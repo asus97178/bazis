@@ -131,7 +131,7 @@ bun run osnova codegen --target production
 | command | positional string | Обязательно | `g` / `generate`, `codegen` |
 | `new <Name>` | positional string | Для нового проекта | Создаёт независимую папку с kebab-case именем; правила имени как у модулей |
 | `--path` | path string | Только `new`, default `./<kebab-name>` | Точный путь нового каталога; родитель должен существовать, существующий каталог не перезаписывается |
-| `--framework` | path string | Только `new`, default `./src/osnova` или пакет рядом с исходным CLI | Локальный пакет `osnova` с CLI и codegen; по умолчанию копируется в `vendor/osnova` |
+| `--framework` | path string | Только `new`, default `./src/osnova` или пакет рядом с исходным CLI | Локальный пакет `osnova` с CLI и codegen; по умолчанию копируется в `vendor/osnv` |
 | `--link-framework` | flag | Только `new`, false | Вместо копии сохранить относительную `file:`-ссылку на внешний checkout; требует его при переносе |
 | generator | positional string | Для `g` | `module` / `m`; `pack` / `p` / `module-pack` |
 | name | positional string | Для `g` | Латинская буква, затем буквы/цифры; части через одиночный дефис |
@@ -165,14 +165,16 @@ CLI не принимает null. Пропущенные значения фла
 без готовой БД подходит `--empty`. DI-экспорты корня: `[]`; TypeScript-вход —
 `src/index.ts`; опубликованный HTTP-вход — `/health`.
 
-По умолчанию новый проект получает снимок пакета в `vendor/osnova` и зависимость
-`file:./vendor/osnova`. Переносится весь проект, включая vendor; исходный checkout
-больше не нужен. В снимок входят index.ts, package.json, core, library, cli и
-LICENSES при наличии; node_modules, тесты, скрытые файлы и compile scratch исключены.
+По умолчанию новый проект получает снимок пакета в `vendor/osnv` и зависимость
+`file:./vendor/osnv`. Переносится весь проект, включая vendor; исходный checkout
+больше не нужен. В снимок входят index.ts, package.json, core, library, cli,
+LICENSE и README.md; node_modules, тесты, скрытые файлы и compile scratch исключены.
 Симлинк внутри копируемых исходников — явная ошибка до публикации проекта.
 Снимок не обновляется автоматически. Режим `--link-framework` сохраняет прежнюю
-связь с живым checkout для совместной разработки. Пакет остаётся `private`,
-публикация в реестр не выполняется. Скомпилированному CLI вне checkout нужно
+связь с живым checkout для совместной разработки. С 0.96.1 пакет называется
+`osnv` и готовится к публикации в npm: проект импортирует фреймворк по имени
+пакета (`osnv/core/di`), поэтому сгенерированный `tsconfig.json` не содержит
+алиасов `@/*` и `@osnova/*`. Скомпилированному CLI вне checkout нужно
 передать `--framework`. Исходный пакет не меняется. `dry-run` возвращает число
 файлов снимка, но ничего не записывает; CLI не печатает сотни путей vendor.
 

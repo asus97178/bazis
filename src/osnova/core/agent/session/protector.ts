@@ -1,11 +1,11 @@
-import { createToken } from "@/core/di";
-import { reader, type InfraConnector } from "@/core/infra";
-import { type AppConfig, type ConfigRegistry, Secret } from "@/core/kernel";
-import { ValueConverters, type ValueConverter } from "@/library/orm";
+import { createToken } from "../../di";
+import { reader, type InfraConnector } from "../../infra";
+import { type AppConfig, type ConfigRegistry, Secret } from "../../kernel";
+import { ValueConverters, type ValueConverter } from "../../../library/orm";
 import { types as nodeUtilTypes } from "node:util";
 import { AgentSessionError, type AgentSessionCheckpointProtectionConfigV1, type AgentSessionCheckpointProtectorV1, type AgentSessionOpenRequestV1, type AgentSessionSealRequestV1, type AgentSessionSealedCheckpointV1 } from "./contracts";
 import { openSealedCheckpointEnvelopeV1, sealedCheckpointEnvelopeV1 } from "./codec";
-import { identifyConnector } from "@/core/infra/connectorIdentity";
+import { identifyConnector } from "../../infra/connectorIdentity";
 
 export const AGENT_SESSION_CHECKPOINT_PROTECTOR = createToken<AgentSessionCheckpointProtectorV1>("AgentSessionCheckpointProtectorV1");
 

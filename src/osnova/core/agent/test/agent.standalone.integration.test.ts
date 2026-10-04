@@ -34,13 +34,13 @@ test("standalone Agent API and exact generated DTO schemas work in source and bi
   try {
     await generateProject({ name: "AgentSchemaFixture", outputPath: project, frameworkPath: path.join(repository, "src/osnova") });
     await mkdir(path.join(project, "node_modules"));
-    await symlink("../vendor/osnova", path.join(project, "node_modules/osnova"), "dir");
+    await symlink("../vendor/osnv", path.join(project, "node_modules/osnv"), "dir");
     for (const name of ["@types", "typescript"]) await symlink(path.join(repository, "node_modules", name), path.join(project, "node_modules", name), "dir");
     const compilerOptions = { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true, noEmit: true, types: ["bun"] };
     // No paths at all: neither runtime nor type-only framework imports can borrow workspace aliases.
     await write("tsconfig.json", JSON.stringify({ compilerOptions, include: ["standalone.ts"] }));
-    await write("standalone.ts", `import { createContainer } from "osnova/core/di";
-import { AgentRegistry, AgentRuntime, agentMessage, agentModelResponse } from "osnova/core/agent";
+    await write("standalone.ts", `import { createContainer } from "osnv/core/di";
+import { AgentRegistry, AgentRuntime, agentMessage, agentModelResponse } from "osnv/core/agent";
 const services = createContainer({ exports: [] });
 try {
   const runtime = new AgentRuntime(services, AgentRegistry.fromDefinition({ name: "standalone", instructions: "Answer." }), {
@@ -58,7 +58,7 @@ try {
     expect(await run([standaloneBinary], root)).toBe("STANDALONE_AGENT_PASS");
 
     // The generator's public aliases point only into this copied package, never the original checkout.
-    await write("tsconfig.json", JSON.stringify({ compilerOptions: { ...compilerOptions, paths: { "@osnova/*": ["./node_modules/osnova/*"] } }, include: ["src/**/*.ts"] }));
+    await write("tsconfig.json", JSON.stringify({ compilerOptions: { ...compilerOptions, paths: { "@osnova/*": ["./node_modules/osnv/*"] } }, include: ["src/**/*.ts"] }));
     await write("src/alpha/contracts.ts", `export class NestedInput { declare label: string; }
 export class EmptyInput {}
 export class SharedInput { declare id: string; child: NestedInput = new NestedInput(); empty: EmptyInput = new EmptyInput(); }
@@ -70,7 +70,7 @@ export interface NestedInput { count: number; }
 export interface EmptyInput { count: number; }
 export const unrelated = true;
 `);
-    await write("src/agent.ts", `import { Agent, Task, Tool, agentOutput } from "osnova/core/agent";
+    await write("src/agent.ts", `import { Agent, Task, Tool, agentOutput } from "osnv/core/agent";
 import { SharedInput, SharedOutput } from "./alpha/contracts";
 @Tool({ name: "identity.tool", description: "Echo a declared field", input: SharedInput, output: SharedOutput })
 export class IdentityTool { execute(input: SharedInput): SharedOutput { return { answer: input.id }; } }
@@ -79,10 +79,10 @@ export class IdentityAgent {
   @Task({ name: "run", input: SharedInput, output: SharedOutput }) run(_input: SharedInput): SharedOutput { return agentOutput<SharedOutput>(); }
 }
 `);
-    await write("src/index.ts", `import { createContainer } from "osnova/core/di";
-import { AgentRegistry, AgentRuntime, AgentToolExecutor, describeTool, agentMessage, agentModelResponse, agentToolCall } from "osnova/core/agent";
-import { modelValidatorAdapter } from "osnova/library/validation";
-import { getGeneratedOpenApiSchemaName, getGeneratedOpenApiMetadata } from "osnova/core/http/OpenApi/generatedOpenApiRegistry";
+    await write("src/index.ts", `import { createContainer } from "osnv/core/di";
+import { AgentRegistry, AgentRuntime, AgentToolExecutor, describeTool, agentMessage, agentModelResponse, agentToolCall } from "osnv/core/agent";
+import { modelValidatorAdapter } from "osnv/library/validation";
+import { getGeneratedOpenApiSchemaName, getGeneratedOpenApiMetadata } from "osnv/core/http/OpenApi/generatedOpenApiRegistry";
 import { SharedInput, SharedOutput, NestedInput, EmptyInput } from "./alpha/contracts";
 import { unrelated } from "./beta/contracts";
 import { IdentityAgent, IdentityTool } from "./agent";
@@ -117,7 +117,7 @@ try {
   console.log("AGENT_SCHEMA_IDENTITY_PASS");
 } finally { await services.dispose(); }
 `);
-    const generator = path.join(project, "vendor/osnova/core/scripts/di-generate.ts");
+    const generator = path.join(project, "vendor/osnv/core/scripts/di-generate.ts");
     await run([process.execPath, "--no-env-file", generator]);
     await run([process.execPath, compiler, "--noEmit"]);
     expect(await run([process.execPath, "--no-env-file", "src/index.ts"])).toBe("AGENT_SCHEMA_IDENTITY_PASS");

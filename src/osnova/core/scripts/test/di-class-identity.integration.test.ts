@@ -28,14 +28,14 @@ test("codegen preserves class identity, private same-name dependencies and expor
   try {
     await symlink(path.join(repo, "node_modules"), path.join(root, "node_modules"), "dir");
     const files: Record<string, string> = {
-      "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true, noEmit: true, paths: { "osnova/*": [path.join(repo, "src/osnova/*")], "@osnova/*": [path.join(repo, "src/osnova/*")], "@/*": [path.join(repo, "src/osnova/*")] } }, include: ["src/**/*.ts"] }),
+      "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true, noEmit: true, paths: { "osnv/*": [path.join(repo, "src/osnova/*")], "@osnova/*": [path.join(repo, "src/osnova/*")], "@/*": [path.join(repo, "src/osnova/*")] } }, include: ["src/**/*.ts"] }),
       "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
       "src/a/Dependency.ts": 'export class Dependency { readonly value = "A"; }',
       "src/b/Dependency.ts": 'export class Dependency { readonly value = "B"; }',
       "src/a/barrel.ts": 'export { Dependency as RenamedDependency } from "./Dependency";',
-      "src/a/Service.ts": 'import type { Lazy } from "osnova/core/di"; import { RenamedDependency as Input } from "./barrel"; class WorkerService { constructor(readonly dependency: Input, readonly lazy: Lazy<Input>) {} } export { WorkerService as Service };',
-      "src/b/Service.ts": 'import type { Lazy } from "osnova/core/di"; import { Dependency as Input } from "./Dependency"; export default class WorkerService { constructor(readonly dependency: Input, readonly lazy: Lazy<Input>) {} }',
-      "src/index.ts": `import { createContainer, singleton } from "osnova/core/di";
+      "src/a/Service.ts": 'import type { Lazy } from "osnv/core/di"; import { RenamedDependency as Input } from "./barrel"; class WorkerService { constructor(readonly dependency: Input, readonly lazy: Lazy<Input>) {} } export { WorkerService as Service };',
+      "src/b/Service.ts": 'import type { Lazy } from "osnv/core/di"; import { Dependency as Input } from "./Dependency"; export default class WorkerService { constructor(readonly dependency: Input, readonly lazy: Lazy<Input>) {} }',
+      "src/index.ts": `import { createContainer, singleton } from "osnv/core/di";
 import { Dependency as A } from "./a/Dependency";
 import { Dependency as B } from "./b/Dependency";
 import { Service as Alpha } from "./a/Service";

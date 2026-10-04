@@ -38,15 +38,15 @@ describe("new project", () => {
     const result = await generateProject(options);
     expect(result.projectDir).toBe(await realpath(outputPath));
     const manifest = JSON.parse(await readFile(path.join(outputPath, "package.json"), "utf8"));
-    expect(manifest.dependencies.osnova).toBe("file:./vendor/osnova");
+    expect(manifest.dependencies.osnv).toBe("file:./vendor/osnv");
     expect(result.frameworkMode).toBe("snapshot");
     expect(result.frameworkFileCount).toBeGreaterThan(0);
     expect(result.frameworkFileCount).toBe(planned.frameworkFileCount);
-    expect(await Bun.file(path.join(outputPath, "vendor/osnova/cli/main.ts")).text()).toBe(await Bun.file(path.join(frameworkPath, "cli/main.ts")).text());
-    expect(await readdir(path.join(outputPath, "vendor/osnova"))).not.toContain("node_modules");
-    expect(await readdir(path.join(outputPath, "vendor/osnova/cli"))).not.toContain("test");
-    expect(manifest.scripts["di:generate"]).toContain("node_modules/osnova/core/scripts/di-generate.ts");
-    expect(manifest.scripts.osnova).toContain("node_modules/osnova/cli/main.ts");
+    expect(await Bun.file(path.join(outputPath, "vendor/osnv/cli/main.ts")).text()).toBe(await Bun.file(path.join(frameworkPath, "cli/main.ts")).text());
+    expect(await readdir(path.join(outputPath, "vendor/osnv"))).not.toContain("node_modules");
+    expect(await readdir(path.join(outputPath, "vendor/osnv/cli"))).not.toContain("test");
+    expect(manifest.scripts["di:generate"]).toContain("node_modules/osnv/core/scripts/di-generate.ts");
+    expect(manifest.scripts.osnova).toContain("node_modules/osnv/cli/main.ts");
     expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("атомарный модуль");
     expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toContain("registerOsnovaGeneratedRuntime");
     await expect(generateProject(options)).rejects.toThrow("already exists");
@@ -59,7 +59,7 @@ describe("new project", () => {
     const root = await fixture();
     const result = await generateProject({ name: "Linked", outputPath: path.join(root, "linked"), frameworkPath, linkFramework: true });
     const manifest = await Bun.file(path.join(result.projectDir, "package.json")).json();
-    expect(manifest.dependencies.osnova).toBe(`file:${path.relative(result.projectDir, frameworkPath)}`);
+    expect(manifest.dependencies.osnv).toBe(`file:${path.relative(result.projectDir, frameworkPath)}`);
     expect(result.frameworkMode).toBe("link");
     expect(result.frameworkFileCount).toBe(0);
     expect(await readdir(result.projectDir)).not.toContain("vendor");
@@ -80,7 +80,7 @@ describe("new project", () => {
     const relocated = path.join(root, "relocated");
     await rename(result.projectDir, relocated);
     await mkdir(path.join(relocated, "node_modules"));
-    await symlink("../vendor/osnova", path.join(relocated, "node_modules/osnova"));
+    await symlink("../vendor/osnv", path.join(relocated, "node_modules/osnv"));
     await symlink(path.resolve("node_modules/typescript"), path.join(relocated, "node_modules/typescript"));
     await symlink(path.resolve("node_modules/@types"), path.join(relocated, "node_modules/@types"));
     const run = async (args: string[]) => {

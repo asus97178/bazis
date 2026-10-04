@@ -13,7 +13,7 @@ async function project(files: Record<string, string>): Promise<string> {
     compilerOptions: {
       target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true,
       noEmit: true,
-      paths: { "osnova/*": [path.join(repo, "src/osnova/*")], "@osnova/*": [path.join(repo, "src/osnova/*")], "@/*": [path.join(repo, "src/osnova/*")] },
+      paths: { "osnv/*": [path.join(repo, "src/osnova/*")], "@osnova/*": [path.join(repo, "src/osnova/*")], "@/*": [path.join(repo, "src/osnova/*")] },
     },
     include: ["src/**/*.ts"],
   };
@@ -58,8 +58,8 @@ test("codegen binds inherited and generic constructors to each concrete identity
   const root = await project({
     "src/a.ts": 'export class Dependency { readonly value = "A"; }',
     "src/b.ts": 'export class Dependency { readonly value = "B"; }',
-    "src/contract.ts": 'import { createToken } from "osnova/core/di"; export type IContract = { value: string }; export const IContract = createToken<IContract>("IContract");',
-    "src/services.ts": `import type { Lazy } from "osnova/core/di";
+    "src/contract.ts": 'import { createToken } from "osnv/core/di"; export type IContract = { value: string }; export const IContract = createToken<IContract>("IContract");',
+    "src/services.ts": `import type { Lazy } from "osnv/core/di";
 import { Dependency as A } from "./a";
 import { Dependency as B } from "./b";
 import type { IContract } from "./contract";
@@ -82,7 +82,7 @@ export class Explicit extends BaseService {}
 export class Bound extends BaseService {}
 export class Override extends A { override readonly value = "A"; }
 `,
-    "src/index.ts": `import { createContainer, DI, singleton, singletonValue, lazyDependency } from "osnova/core/di";
+    "src/index.ts": `import { createContainer, DI, singleton, singletonValue, lazyDependency } from "osnv/core/di";
 import { Dependency as A } from "./a";
 import { Dependency as B } from "./b";
 import { IContract } from "./contract";
@@ -131,7 +131,7 @@ test("private helpers and explicitly bound private services need no generated im
 const { registerOsnovaGeneratedRuntime } = await import("./generated/osnova/runtime");
 await registerOsnovaGeneratedRuntime();
 await verify();`,
-    "src/services.ts": `import { createContainer, DI, singleton, singletonValue, createToken } from "osnova/core/di";
+    "src/services.ts": `import { createContainer, DI, singleton, singletonValue, createToken } from "osnv/core/di";
 export class Dependency {}
 class InternalHelper { constructor(readonly dependency: Dependency) {} }
 class TypeOnlyHelper { constructor(readonly dependency: Dependency) {} }
@@ -176,7 +176,7 @@ test.each([
   'interface MissingToken { value: string }; class Base { constructor(readonly dependency: MissingToken) {} }',
 ])("unsupported inferred inherited constructors fail before publication: %s", async base => {
   const root = await project({
-    "src/index.ts": `import { singleton } from "osnova/core/di";
+    "src/index.ts": `import { singleton } from "osnv/core/di";
 export class Dependency {}
 ${base}
 export class Child extends Base {}
@@ -201,7 +201,7 @@ test.each([
   'export type { InternalService }; export const registration = addScoped(InternalService);',
 ])("private inferred DI classes fail before generated publication: %s", async registration => {
   const root = await project({
-    "src/index.ts": `import { scoped as addScoped, DI, Module, createContainer, ServiceCollection } from "osnova/core/di";
+    "src/index.ts": `import { scoped as addScoped, DI, Module, createContainer, ServiceCollection } from "osnv/core/di";
 export class Dependency {}
 class InternalService { constructor(readonly dependency: Dependency) {} start() {} stop() {} }
 ${registration}

@@ -40,27 +40,27 @@ test("compiled CLI creates an independent app with exact late DI and cached acti
     const relocated = path.join(project, "relocated");
     await run([cli, "g", "module", "AuditProbe", "--empty", "--no-codegen"], relocated);
     await mkdir(path.join(relocated, "node_modules"));
-    await symlink("../vendor/osnova", path.join(relocated, "node_modules/osnova"), "dir");
+    await symlink("../vendor/osnv", path.join(relocated, "node_modules/osnv"), "dir");
     for (const [name, source] of [
       ["@types", "node_modules/@types"], ["typescript", "node_modules/typescript"],
     ]) await symlink(path.join(repository, source!), path.join(relocated, "node_modules", name!), "dir");
     const sources = {
       "src/app/modules/audit-probe/User.service.ts": `export class UserService { get() { return "independent-app"; } }`,
       "src/app/modules/audit-probe/Dependency.service.ts": `export class DependencyService { get() { return "late-dependency"; } }`,
-      "src/app/modules/audit-probe/Cached.service.ts": `import { Cacheable } from "osnova/core/cache";
+      "src/app/modules/audit-probe/Cached.service.ts": `import { Cacheable } from "osnv/core/cache";
 import { DependencyService } from "./Dependency.service";
 export class CachedService {
   constructor(readonly dependency: DependencyService) {}
   @Cacheable({ seconds: 30 }) get() { return this.dependency.get(); }
 }`,
-      "src/app/modules/audit-probe/AuditProbe.module.ts": `import { Module, scoped } from "osnova/core/di";
-import { memory } from "osnova/core/cache";
+      "src/app/modules/audit-probe/AuditProbe.module.ts": `import { Module, scoped } from "osnv/core/di";
+import { memory } from "osnv/core/cache";
 import { UserService } from "./User.service";
 import { DependencyService } from "./Dependency.service";
 import { CachedService } from "./Cached.service";
 @Module({ imports: [memory()], providers: [scoped(UserService), scoped(DependencyService), scoped(CachedService)], exports: [UserService, CachedService] })
 export class AuditProbeModule {}`,
-      "src/index.ts": `import { createContainer } from "osnova/core/di";
+      "src/index.ts": `import { createContainer } from "osnv/core/di";
 import { AppModule } from "./app/modules/App.module";
 import { UserService } from "./app/modules/audit-probe/User.service";
 import { CachedService } from "./app/modules/audit-probe/Cached.service";

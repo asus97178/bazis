@@ -1,8 +1,8 @@
-import type { Secret } from "@/core/kernel";
-import type { OsnovaModuleRef } from "@/core/di";
+import type { Secret } from "../../kernel";
+import type { OsnovaModuleRef } from "../../di";
 import type { AgentToolExecutorOptions, AgentToolSchemaValidator } from "../AgentToolExecutor";
 import { normalizeJsonValue, type JsonObject, type JsonValue } from "../semantic";
-import { Validator } from "@/library/validation";
+import { Validator } from "../../../library/validation";
 
 const UUID_V1_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

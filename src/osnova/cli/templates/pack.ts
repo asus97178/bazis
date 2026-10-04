@@ -16,7 +16,7 @@ export function buildPackTemplates(naming: ModuleNaming, partNames: readonly str
   return [
     {
       relativePath: `${naming.entity}.module.ts`,
-      content: `import { Module } from "@osnova/core/di";
+      content: `import { Module } from "osnv/core/di";
 ${parts.map((part) => `import { ${part.moduleClass} } from "./${part.folder}/${part.entity}.module";`).join("\n")}
 
 @Module({

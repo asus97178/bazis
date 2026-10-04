@@ -35,9 +35,9 @@ bun run dev
 Команда создаёт отдельный минимальный backend с `AppModule`, HTTP `/health`,
 настройками TypeScript и codegen. Путь можно задать через `--path`, а состав
 файлов заранее посмотреть через `--dry-run`. Из собранного CLI вне checkout
-укажите `--framework /path/to/src/osnova`. Фреймворк копируется в `vendor/osnova`;
+укажите `--framework /path/to/src/osnova`. Фреймворк копируется в `vendor/osnv`;
 сохраните этот каталог в Git и переносите вместе с приложением. Зависимость
-`file:./vendor/osnova` не требует исходного checkout. Для совместной разработки
+`file:./vendor/osnv` не требует исходного checkout. Для совместной разработки
 с живым checkout есть явный `--link-framework`. После создания проекта модуль без
 готовой БД можно добавить командой `bun run osnova g module Task --empty`.
 

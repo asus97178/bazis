@@ -883,8 +883,8 @@ function renderAgentCatalog(context: AgentCodegenContext): RenderedAgentCatalog 
   lines.push("// Do not edit manually.");
   lines.push("");
   if (context.frameworkImports === "public") {
-    lines.push('import type { Class } from "@osnova/core/di";');
-    lines.push('import type { AgentMetadata, AgentMetadataIndex, PromptMetadata, ToolMetadata } from "@osnova/core/agent";');
+    lines.push('import type { Class } from "osnv/core/di";');
+    lines.push('import type { AgentMetadata, AgentMetadataIndex, PromptMetadata, ToolMetadata } from "osnv/core/agent";');
   } else {
     // The core catalog ships inside the standalone `osnova` package, where
     // workspace-only `@/` aliases do not exist.

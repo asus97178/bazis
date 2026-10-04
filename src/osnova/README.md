@@ -1,0 +1,44 @@
+# osnv — Osnova
+
+Модульный backend-фреймворк для [Bun](https://bun.com) на TypeScript: DI с
+кодогенерацией, HTTP, ORM для PostgreSQL, JWT, WebSocket, фоновые службы,
+AI-агенты и CLI. Пакет поставляется исходниками TypeScript и работает только
+в Bun (≥ 1.4.0): сборка в JavaScript не нужна, типы берутся из исходников.
+
+## Новый проект
+
+```sh
+bunx osnv new MyApp
+cd my-app
+bun install
+bun run dev        # GET http://127.0.0.1:3000/health
+```
+
+Модуль внутри проекта: `bun run osnova g module Task --empty`, затем
+`bun run di:generate`. Бинарник: `bun run build:bin`.
+
+## В существующем проекте
+
+```sh
+bun add osnv
+```
+
+```ts
+// src/index.ts — так его создаёт `bunx osnv new`
+import { runApp } from "osnv/core/app";
+import { AppModule } from "./app/modules/App.module";
+import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
+
+await registerOsnovaGeneratedRuntime();
+await runApp(AppModule, { http: { hostname: "127.0.0.1", port: 3000, health: true } });
+```
+
+`src/generated/osnova/` создаёт кодогенерация
+`bun run node_modules/osnv/core/scripts/di-generate.ts` по файлу
+`osnova.codegen.json`: она связывает зависимости конструкторов и HTTP-модели.
+Проще всего начать с `bunx osnv new` — он создаёт эти файлы и скрипты.
+Публичные входы перечислены в `exports` файла `package.json`.
+
+## Лицензия
+
+MIT

@@ -7,8 +7,8 @@ test("invalid HTTP bindings and ORM logic stop real codegen before replacing out
   const repository = process.cwd();
   const root = await mkdtemp(path.join(tmpdir(), "osnova-dx-codegen-"));
   const source = path.join(root, "src/index.ts");
-  const valid = `import { Validator } from "osnova/library/validation";
-import { Controller, Get, HttpContext, Post } from "osnova/core/http";
+  const valid = `import { Validator } from "osnv/library/validation";
+import { Controller, Get, HttpContext, Post } from "osnv/core/http";
 @Controller("probe") export class ProbeController {
   @Get() getAll(state: string) { return state; }
   @Get("context") context(ctx: HttpContext) { return ctx.path; }
@@ -25,7 +25,7 @@ export class ProbeInput { @Validator({ required: true, minLength: 3 }) name = ""
   };
   try {
     await mkdir(path.join(root, "node_modules"));
-    await symlink(path.join(repository, "src/osnova"), path.join(root, "node_modules/osnova"));
+    await symlink(path.join(repository, "src/osnova"), path.join(root, "node_modules/osnv"));
     await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
     await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true,
@@ -43,10 +43,10 @@ export class ProbeInput { @Validator({ required: true, minLength: 3 }) name = ""
     await Bun.write(path.join(root, "runtime-probe.ts"), `
 import { ProbeController, ProbeInput } from "./src/index";
 import { registerOsnovaGeneratedRuntime } from "./src/generated/osnova/runtime";
-import { resolveGeneratedBindings } from "./node_modules/osnova/core/http/Binding/autoBindings";
-import { bindArguments } from "./node_modules/osnova/core/http/Binding/ParameterBinder";
-import { HttpContext } from "./node_modules/osnova/core/http/HttpContext/HttpContext";
-import { modelValidatorAdapter } from "osnova/library/validation";
+import { resolveGeneratedBindings } from "./node_modules/osnv/core/http/Binding/autoBindings";
+import { bindArguments } from "./node_modules/osnv/core/http/Binding/ParameterBinder";
+import { HttpContext } from "./node_modules/osnv/core/http/HttpContext/HttpContext";
+import { modelValidatorAdapter } from "osnv/library/validation";
 await registerOsnovaGeneratedRuntime();
 const bindings = resolveGeneratedBindings(ProbeController, "update");
 for (const [name, expectedStatus] of [["Alice", 200], ["x", 400]]) {
@@ -67,10 +67,10 @@ console.log("automatic route/body/context/validation: PASS");
     expect(runtimeOut).toContain("automatic route/body/context/validation: PASS");
     for (const [code, diagnostic] of [
       [valid.replace("state: string", 'state: "active" | "inactive"'), "OSNOVA_HTTP_BINDING_UNRESOLVED"],
-      [valid + `import type { FieldSelector } from "osnova/library/orm";
+      [valid + `import type { FieldSelector } from "osnv/library/orm";
 interface User { tenantId: string; age: number; }
 export function filter(u: FieldSelector<User>) { return u.tenantId.eq("a") && u.age.gte(18); }`, "OSNOVA_ORM_PREDICATE_LOGIC"],
-      [valid + `import type { FieldSelector } from "osnova/library/orm";
+      [valid + `import type { FieldSelector } from "osnv/library/orm";
 interface User { age: number; }
 export function filter(u: FieldSelector<User>) { return u.age.lt(18) || u.age.gt(65); }`, "OSNOVA_ORM_PREDICATE_LOGIC"],
     ] as const) {
