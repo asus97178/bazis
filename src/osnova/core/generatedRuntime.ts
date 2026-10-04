@@ -15,6 +15,7 @@ import {
   type GeneratedProviderAttachmentV1,
 } from "./di/module/generatedProviderAttachments";
 export type { GeneratedProviderAttachmentV1 } from "./di/module/generatedProviderAttachments";
+export { warnIfGeneratedSourcesChanged, type GeneratedSourceFingerprint } from "./generatedFingerprint";
 export {
   createGeneratedProviderAttachmentChannel,
   getGeneratedProviderAttachment,

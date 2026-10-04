@@ -3,14 +3,16 @@ import { generateModule, generateModulePack } from "./generateModule";
 import { parseCliArgs } from "./parseCli";
 import { runCodegen } from "./codegen";
 import { generateProject } from "./generateProject";
-import { runBuild, runDev } from "./build";
+import { runBuild, runDev, runTest } from "./build";
 
 export const USAGE = `Usage:
   osnv new <Name> [options]                  Create a new application project
   osnv g module <Name> [options]             Atomic module (alias: m)
   osnv g pack <Name> --parts <a,b> [options] Composite module (aliases: p, module-pack)
   osnv codegen [--target <name|all>]         Run the project's di:generate script
-  osnv dev                                   Codegen, then run the app from source
+  osnv dev [--watch]                         Codegen, then run the app from source;
+                                             --watch reruns both when src/ changes
+  osnv test [<bun test args>]                Codegen, then bun test
   osnv build                                 Codegen and typecheck
   osnv build --bin [--outfile <path>]        Also compile a standalone executable (default bin/<name>)
   osnv --help
@@ -44,7 +46,8 @@ Examples (from the project root):
   bunx osnv g module Mailer --empty --no-register
   bunx osnv g pack DataManager --parts tables,fields,validators,records
   bunx osnv codegen --target production
-  bunx osnv dev
+  bunx osnv dev --watch
+  bunx osnv test
   bunx osnv build --bin
 
 Read AGENTS.md and docs/architecture/MODULE_ARCHITECTURE.md before implementing.
@@ -75,7 +78,8 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
   }
   try {
     if (parsed.kind === "codegen") return await runtime.codegen(process.cwd(), parsed.target);
-    if (parsed.kind === "dev") return await runDev(process.cwd(), runtime.codegen);
+    if (parsed.kind === "dev") return await runDev(process.cwd(), runtime.codegen, runtime.log, { watch: parsed.watch });
+    if (parsed.kind === "test") return await runTest(process.cwd(), parsed.args, runtime.codegen);
     if (parsed.kind === "build") return await runBuild(process.cwd(), { bin: parsed.bin, outfile: parsed.outfile }, runtime.codegen, runtime.log);
     if (parsed.kind === "new") {
       const result = await generateProject({ name: parsed.name, outputPath: parsed.outputPath, frameworkPath: parsed.frameworkPath, linkFramework: parsed.linkFramework, dryRun: parsed.dryRun });

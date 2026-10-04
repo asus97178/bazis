@@ -21,7 +21,8 @@ export type ParseCliResult =
   | { readonly kind: "new"; readonly name: string; readonly outputPath?: string; readonly frameworkPath?: string; readonly linkFramework: boolean; readonly dryRun: boolean }
   | { readonly kind: "generate"; readonly args: ParsedGenerateArgs }
   | { readonly kind: "codegen"; readonly target?: string }
-  | { readonly kind: "dev" }
+  | { readonly kind: "dev"; readonly watch: boolean }
+  | { readonly kind: "test"; readonly args: readonly string[] }
   | { readonly kind: "build"; readonly bin: boolean; readonly outfile?: string }
   | { readonly kind: "error"; readonly message: string };
 
@@ -30,12 +31,14 @@ const GENERATOR_ALIASES = new Map<string, "module" | "pack">([
   ["pack", "pack"], ["p", "pack"], ["module-pack", "pack"],
 ]);
 const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--parts", "--target", "--path", "--framework", "--outfile"]);
-const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--bin"]);
+const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--bin", "--watch"]);
 
 /** Parsing is pure: help and invalid input can never start generation. */
 export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   if (argv.some((arg) => arg === "--help" || arg === "-h")) return { kind: "help", help: true };
   if (argv.length === 0) return { kind: "help", help: false };
+  // Everything after `test` (or `test --`) belongs to `bun test`.
+  if (argv[0] === "test") return { kind: "test", args: argv[1] === "--" ? argv.slice(2) : argv.slice(1) };
 
   const positional: string[] = [];
   const options = new Map<string, string>();
@@ -78,9 +81,10 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
     return error("Target must be a codegen target name or all.");
   }
   if (command === "dev") {
-    if (positional.length !== 1 || options.size > 0) return error("Use: osnv dev");
-    return { kind: "dev" };
+    if (positional.length !== 1 || [...options.keys()].some((option) => option !== "--watch")) return error("Use: osnv dev [--watch]");
+    return { kind: "dev", watch: options.has("--watch") };
   }
+  if (options.has("--watch")) return error("--watch is only supported by dev.");
   if (command === "build") {
     if (positional.length !== 1) return error("Use: osnv build [--bin [--outfile <path>]]");
     for (const option of options.keys()) {

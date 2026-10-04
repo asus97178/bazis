@@ -10,6 +10,8 @@ CLI выполняется отдельным процессом и не рег�
 
 ```sh
 bunx osnv dev                         # codegen, затем src/index.ts из исходников
+bunx osnv dev --watch                 # то же; изменение в src/ перезапускает codegen и приложение
+bunx osnv test [<аргументы bun test>]  # codegen, затем bun test
 bunx osnv build                       # codegen и проверка типов (tsc --noEmit)
 bunx osnv build --bin                 # + исполняемый файл bin/<имя из package.json>
 bunx osnv build --bin --outfile dist/app
@@ -18,6 +20,19 @@ bunx osnv build --bin --outfile dist/app
 Реализация — [build.ts](build.ts). Точка входа берётся из `osnova.codegen.json`
 (первый entrypoint цели по умолчанию), TypeScript — из `node_modules` проекта.
 `dev` передаёт SIGINT/SIGTERM приложению и возвращает его код завершения.
+`dev --watch` следит за `src/` рекурсивно (кроме `src/generated`, иначе codegen
+перезапускал бы сам себя), склеивает события за 150 мс, останавливает
+приложение, перезапускает codegen и стартует заново; при ошибке codegen ждёт
+следующего изменения. `test` передаёт всё после `test` (или `test --`) в `bun test`.
+
+`codegen` запускает генератор фреймворка напрямую, скрипт проекта не нужен:
+сначала `node_modules/osnv`, затем исходник `src/osnova` (checkout фреймворка),
+затем пакет самого CLI. Генератор пишет `src/generated/osnova/fingerprint.ts`:
+список исходников цели, их SHA-256 и версию `osnv`. Сгенерированный `runtime.ts`
+при старте из исходников сверяет их и громко предупреждает, если код или версия
+фреймворка изменились после генерации (около 10 мс на 750 файлов). В бинарнике
+исходников нет — проверка пропускается. В репозитории фреймворка `fingerprint.ts`
+не коммитится: он меняется с каждой правкой исходников.
 `build --bin` компилирует из временного каталога (`compileBinary`): Bun 1.4.0
 оставляет `.bun-build` в рабочем каталоге, если его исполняемый файл read-only
 или помечен `uchg`. Bun для дочерних процессов — `scripts/osnova-bun`, иначе

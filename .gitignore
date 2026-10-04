@@ -31,3 +31,6 @@ blob-report/
 *.sqlite3-*
 *.db
 *.db-*
+
+# Local codegen fingerprint for the startup freshness check (changes with every source edit)
+src/generated/osnova/fingerprint.ts

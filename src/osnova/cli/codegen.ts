@@ -1,21 +1,33 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 
-/** Run the host's existing generator, including its toolchain checks. */
+const GENERATOR = "core/scripts/di-generate.ts";
+
+/** Run the framework generator for the project in `cwd`; returns its exit code. */
 export async function runCodegen(cwd: string, target?: string): Promise<number> {
-  const packageFile = Bun.file(path.join(cwd, "package.json"));
-  if (!await packageFile.exists()) throw new Error("codegen requires a project package.json in the current directory.");
-  const manifest = await packageFile.json();
-  if (typeof manifest.scripts?.["di:generate"] !== "string" || !manifest.scripts["di:generate"].trim()) {
-    throw new Error("Project has no di:generate script. Add it or generate with --no-codegen.");
-  }
   if (target !== undefined) {
     const configFile = Bun.file(path.join(cwd, "osnova.codegen.json"));
     if (!await configFile.exists()) throw new Error("--target requires osnova.codegen.json in the current directory.");
     const config = await configFile.json();
     if (target !== "all" && !Object.hasOwn(config.targets ?? {}, target)) throw new Error(`Unknown codegen target: ${target}`);
   }
-  const args = [await resolveBun(cwd), "run", "di:generate", ...(target === undefined ? [] : ["--target", target])];
+  const args = [await resolveBun(cwd), resolveGenerator(cwd), ...(target === undefined ? [] : ["--target", target])];
   return await Bun.spawn(args, { cwd, stdout: "inherit", stderr: "inherit" }).exited;
+}
+
+/**
+ * The generator of the framework this project uses: the installed package,
+ * the framework source checkout, or the package this CLI runs from.
+ */
+export function resolveGenerator(cwd: string): string {
+  const candidates = [
+    path.join(cwd, "node_modules/osnv", GENERATOR),
+    path.join(cwd, "src/osnova", GENERATOR),
+    path.resolve(import.meta.dir, "..", GENERATOR),
+  ];
+  const generator = candidates.find((candidate) => existsSync(candidate));
+  if (!generator) throw new Error("osnv code generator not found. Install the framework in this project: bun add osnv");
+  return generator;
 }
 
 /** Bun for child processes: the project's qualified launcher when present. */

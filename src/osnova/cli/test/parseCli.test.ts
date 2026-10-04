@@ -92,7 +92,12 @@ describe("parseCliArgs", () => {
   });
 
   test("parses dev and build, with --bin and --outfile only on build", () => {
-    expect(parseCliArgs(["dev"])).toEqual({ kind: "dev" });
+    expect(parseCliArgs(["dev"])).toEqual({ kind: "dev", watch: false });
+    expect(parseCliArgs(["dev", "--watch"])).toEqual({ kind: "dev", watch: true });
+    expect(parseCliArgs(["test"])).toEqual({ kind: "test", args: [] });
+    expect(parseCliArgs(["test", "src/a.test.ts", "-t", "health"])).toEqual({ kind: "test", args: ["src/a.test.ts", "-t", "health"] });
+    expect(parseCliArgs(["test", "--", "--bail"])).toEqual({ kind: "test", args: ["--bail"] });
+    expect(parseCliArgs(["build", "--watch"]).kind).toBe("error");
     expect(parseCliArgs(["build"])).toEqual({ kind: "build", bin: false, outfile: undefined });
     expect(parseCliArgs(["build", "--bin"])).toEqual({ kind: "build", bin: true, outfile: undefined });
     expect(parseCliArgs(["build", "--bin", "--outfile", "dist/app"])).toEqual({ kind: "build", bin: true, outfile: "dist/app" });
