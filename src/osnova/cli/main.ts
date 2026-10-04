@@ -17,7 +17,7 @@ export const USAGE = `Usage:
 Generation options:
   --path <directory>    Exact project directory (new only; default: ./<name>)
   --framework <path>    Local Osnova package directory (new only)
-  --link-framework      Link that checkout instead of copying vendor/osnova (new only)
+  --link-framework      Link that checkout instead of copying vendor/osnv (new only)
   --modules-root <path>  Modules root (default: src/app/modules)
   --app-module <path>    Host module (default: {modules-root}/App.module.ts)
   --empty               Module entry and MODULE.md only
@@ -90,7 +90,7 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
       runtime.log(`[osnova] ${result.dryRun ? "planned" : "created"} project: ${result.projectDir}`);
       for (const file of result.files) runtime.log(`  + ${file}`);
       runtime.log(result.frameworkMode === "snapshot"
-        ? `[osnova] vendor/osnova: ${result.frameworkFileCount} package files${result.dryRun ? " planned" : " copied"}. Keep this directory in version control.`
+        ? `[osnova] vendor/osnv: ${result.frameworkFileCount} package files${result.dryRun ? " planned" : " copied"}. Keep this directory in version control.`
         : "[osnova] Framework is linked to an external checkout (--link-framework).");
       if (!result.dryRun) runtime.log(`[osnova] Next: cd ${result.projectDir} && bun install && bun run dev`);
       return 0;

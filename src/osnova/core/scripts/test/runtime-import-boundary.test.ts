@@ -258,7 +258,7 @@ function isAllowedRuntimeSpecifier(specifier: string): boolean {
     || specifier.startsWith("@/")
     || specifier === "@osnova"
     || specifier.startsWith("@osnova/")
-    || specifier.startsWith("osnova/")
+    || specifier.startsWith("osnv/")
     || specifier === "bun"
     || specifier.startsWith("bun:")
     || specifier.startsWith("node:");

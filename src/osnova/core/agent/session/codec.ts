@@ -1,4 +1,4 @@
-import { canonicalBoundaryJsonV1 as libraryCanonicalBoundaryJsonV1, canonicalJsonHashV1, decodeBoundedJsonV1, normalizeBoundedJsonV1 } from "@/library/boundary";
+import { canonicalBoundaryJsonV1 as libraryCanonicalBoundaryJsonV1, canonicalJsonHashV1, decodeBoundedJsonV1, normalizeBoundedJsonV1 } from "../../../library/boundary";
 import { AgentSessionError } from "./contracts";
 
 const MARKER = "osnova.agent-session/plaintext/v1";

@@ -15,7 +15,7 @@ async function list() {
   const server = new CodexAppServer(binary!, options.args, options.options);
   try {
     const initialized = await server.request("initialize", {
-      clientInfo: { name: "osnova_skills_check", title: "Osnova Skills Check", version: "0.96.0" }, capabilities: { experimentalApi: true },
+      clientInfo: { name: "osnova_skills_check", title: "Osnova Skills Check", version: "0.96.1" }, capabilities: { experimentalApi: true },
     });
     if (initialized.codexHome !== paths.home) throw new Error("Unexpected Codex home");
     server.notify("initialized");

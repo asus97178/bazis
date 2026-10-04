@@ -24,7 +24,7 @@ export function buildModuleTemplates(
 
   if (profile === "empty") {
     return [
-      { relativePath: `${entity}.module.ts`, content: `import { Module } from "@osnova/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class ${naming.moduleClass} {}\n` },
+      { relativePath: `${entity}.module.ts`, content: `import { Module } from "osnv/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class ${naming.moduleClass} {}\n` },
       { relativePath: "MODULE.md", content: modulePassport(naming, profile) },
     ];
   }
@@ -56,8 +56,8 @@ export function buildModuleTemplates(
 }
 
 function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
-  const cacheImport = profile === "full" ? "import { cachedScoped } from \"@osnova/core/cache\";\n" : "";
-  const moduleImport = "import { Module, scoped } from \"@osnova/core/di\";";
+  const cacheImport = profile === "full" ? "import { cachedScoped } from \"osnv/core/cache\";\n" : "";
+  const moduleImport = "import { Module, scoped } from \"osnv/core/di\";";
   const providerFactory = profile === "full" ? "cachedScoped" : "scoped";
   const backgroundImport = profile === "full" ? `import { ${n.entity}StatsReporter } from "./background/${n.entity}StatsReporter";\n` : "";
   const aiImports = profile === "full"
@@ -96,12 +96,12 @@ export class ${n.moduleClass} {}
 
 function controllerFile(n: ModuleNaming, profile: ModuleTemplateProfile, authImportPath: string): string {
   const fullImports = profile === "full"
-    ? `import { OutputCache } from "@osnova/core/cache";
-import { Authorize, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "@osnova/core/http";
+    ? `import { OutputCache } from "osnv/core/cache";
+import { Authorize, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "osnv/core/http";
 import { TokenKind } from "${authImportPath}/tokenKinds";
 import { requireTokenKind } from "${authImportPath}/jwtAuth";
 `
-    : "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from \"@osnova/core/http\";\n";
+    : "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from \"osnv/core/http\";\n";
   const authList = profile === "full"
     ? `  @Authorize(requireTokenKind(TokenKind.Admin, TokenKind.Client))
   @OutputCache({ seconds: 30, varyByQuery: "*", varyByUser: true, tags: ["${n.route}"] })
@@ -110,7 +110,7 @@ import { requireTokenKind } from "${authImportPath}/jwtAuth";
   const authRead = profile === "full" ? "  @Authorize(requireTokenKind(TokenKind.Admin, TokenKind.Client))\n" : "";
   const authWrite = profile === "full" ? "  @Authorize(requireTokenKind(TokenKind.Admin))\n" : "";
 
-  return `${fullImports}import { buildListDocument } from "@osnova/library/jsonapi";
+  return `${fullImports}import { buildListDocument } from "osnv/library/jsonapi";
 import { ${n.entity}ListQuery } from "./contracts/${n.entity}ListQuery";
 import { Create${n.entity}Request, Update${n.entity}Request } from "./contracts/${n.entity}Requests";
 import type { I${n.entity}Service } from "../services/I${n.entity}.service";
@@ -155,7 +155,7 @@ ${authWrite}  @Delete(":id(uuid)")
 function ormModelFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const schemaImport = profile === "full" ? ", Schema" : "";
   const schemaDecorator = profile === "full" ? `@Schema("${n.dbSchema}")\n` : "";
-  return `import { Column, Entity, Index, UUID${schemaImport} } from "@osnova/core/orm";
+  return `import { Column, Entity, Index, UUID${schemaImport} } from "osnv/core/orm";
 
 ${schemaDecorator}@Entity({ migrate: true, table: "${n.route}" })
 export class ${n.entity} {
@@ -179,7 +179,7 @@ export class ${n.entity} {
 }
 
 function dbContextFile(n: ModuleNaming): string {
-  return `import { DbContext } from "@osnova/core/orm";
+  return `import { DbContext } from "osnv/core/orm";
 import { ${n.entity} } from "./${n.entity}.model";
 
 export class ${n.entity}DbContext extends DbContext {
@@ -189,9 +189,9 @@ export class ${n.entity}DbContext extends DbContext {
 }
 
 function serviceInterfaceFile(n: ModuleNaming): string {
-  return `import { createToken } from "@osnova/core/di";
-import type { PageResult } from "@osnova/core/orm";
-import type { ListQuery } from "@osnova/library/jsonapi";
+  return `import { createToken } from "osnv/core/di";
+import type { PageResult } from "osnv/core/orm";
+import type { ListQuery } from "osnv/library/jsonapi";
 import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.entity}Requests";
 import type { ${n.entity}Response, ${n.entity}Summary } from "../http/contracts/${n.entity}Responses";
 
@@ -211,7 +211,7 @@ export const I${n.entity}Service = createToken<I${n.entity}Service>("I${n.entity
 
 function serviceFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const imports = profile === "full"
-    ? `import { Cacheable, type ICache } from "@osnova/core/cache";\n`
+    ? `import { Cacheable, type ICache } from "osnv/core/cache";\n`
     : "";
   const cacheDecorator = profile === "full"
     ? `  @Cacheable({ seconds: 60, key: (id) => \`${n.route}:\${String(id)}\`, tags: ["${n.route}"] })
@@ -219,8 +219,8 @@ function serviceFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
     : "";
   const invalidateCache = profile === "full" ? `\n    this.cache.evictByTag("${n.route}");` : "";
 
-  return `${imports}import { paginate, type PageResult } from "@osnova/core/orm";
-import type { ListQuery } from "@osnova/library/jsonapi";
+  return `${imports}import { paginate, type PageResult } from "osnv/core/orm";
+import type { ListQuery } from "osnv/library/jsonapi";
 import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.entity}Requests";
 import { to${n.entity}Response, type ${n.entity}Response, type ${n.entity}Summary } from "../http/contracts/${n.entity}Responses";
 import { ${n.entity} } from "../model/${n.entity}.model";
@@ -293,8 +293,8 @@ ${cacheDecorator}  async getById(id: string): Promise<${n.entity}Response | null
 }
 
 function requestFile(n: ModuleNaming): string {
-  return `import { RequestModel } from "@osnova/core/http";
-import { Validator } from "@osnova/library/validation";
+  return `import { RequestModel } from "osnv/core/http";
+import { Validator } from "osnv/library/validation";
 
 @RequestModel()
 export class Create${n.entity}Request {
@@ -345,7 +345,7 @@ export function to${n.entity}Response(entity: ${n.entity}): ${n.entity}Response 
 }
 
 function listQueryFile(n: ModuleNaming): string {
-  return `import { Filterable, ListOptions, ListRequest, Sortable } from "@osnova/core/http";
+  return `import { Filterable, ListOptions, ListRequest, Sortable } from "osnv/core/http";
 import type { ${n.entity} } from "../../model/${n.entity}.model";
 
 @ListOptions({ defaultSize: 20, maxSize: 100 })
@@ -365,9 +365,9 @@ export class ${n.entity}ListQuery extends ListRequest<${n.entity}> {
 }
 
 function statsReporterFile(n: ModuleNaming): string {
-  return `import { Background, PeriodicBackgroundService } from "@osnova/core/background";
-import type { ServiceProvider } from "@osnova/core/di";
-import type { Logger } from "@osnova/core/kernel";
+  return `import { Background, PeriodicBackgroundService } from "osnv/core/background";
+import type { ServiceProvider } from "osnv/core/di";
+import type { Logger } from "osnv/core/kernel";
 import { I${n.entity}Service } from "../services/I${n.entity}.service";
 
 @Background({ intervalMs: 60_000, runImmediately: false })
@@ -396,7 +396,7 @@ export class ${n.entity}StatsReporter extends PeriodicBackgroundService {
 }
 
 function aiContractsFile(n: ModuleNaming): string {
-  return `import { Validator } from "@osnova/library/validation";
+  return `import { Validator } from "osnv/library/validation";
 
 export class Prepare${n.entity}BriefRequest {
   @Validator({ required: true, minLength: 3 })
@@ -414,8 +414,8 @@ export class ${n.entity}BriefDocument {
 }
 
 function aiToolFile(n: ModuleNaming): string {
-  return `import { Tool, type AgentToolExecutionContext } from "@osnova/core/agent";
-import { Validator } from "@osnova/library/validation";
+  return `import { Tool, type AgentToolExecutionContext } from "osnv/core/agent";
+import { Validator } from "osnv/library/validation";
 import type { I${n.entity}Service } from "../../services/I${n.entity}.service";
 
 export class ${n.entity}SummaryToolInput {
@@ -454,7 +454,7 @@ export class ${n.entity}SummaryTool {
 }
 
 function agentFile(n: ModuleNaming): string {
-  return `import { Agent, Task, agentOutput } from "@osnova/core/agent";
+  return `import { Agent, Task, agentOutput } from "osnv/core/agent";
 import { Prepare${n.entity}BriefRequest, ${n.entity}BriefDocument } from "../contracts/${n.entity}Brief";
 import { ${n.entity}SummaryTool } from "../tools/${n.entity}SummaryTool";
 

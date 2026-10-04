@@ -39,7 +39,7 @@ test("a generated non-default target late-normalizes class deps declared before 
           strict: true,
           paths: {
             "@osnova/core/*": ["./src/osnova/core/*"],
-            "osnova/core/*": ["./src/osnova/core/*"],
+            "osnv/core/*": ["./src/osnova/core/*"],
           },
         },
         include: ["src/**/*.ts"],

@@ -8,8 +8,8 @@ import path from "node:path";
 test("clean UsersController.list starts through runApp in source and binary without foreign bindings", async () => {
   const repository = process.cwd();
   const root = await mkdtemp(path.join(tmpdir(), "osnova-http-consumer-"));
-  const source = `import { Module, singleton } from "osnova/core/di";
-import { Controller, Get, Ok } from "osnova/core/http";
+  const source = `import { Module, singleton } from "osnv/core/di";
+import { Controller, Get, Ok } from "osnv/core/http";
 export class UsersService { async getAll() { return [{ id: 1, name: "Alice" }]; } }
 @Controller("users") export class UsersController {
   constructor(private readonly users: UsersService) {}
@@ -26,14 +26,14 @@ export class AppModule {}
   try {
     await mkdir(path.join(root, "src"));
     await mkdir(path.join(root, "node_modules"));
-    await symlink(path.join(repository, "src/osnova"), path.join(root, "node_modules/osnova"));
+    await symlink(path.join(repository, "src/osnova"), path.join(root, "node_modules/osnv"));
     await Bun.write(path.join(root, "package.json"), JSON.stringify({ type: "module" }));
     await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true,
     }, include: ["src/**/*.ts"] }));
     await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
     await Bun.write(path.join(root, "src/Users.module.ts"), source);
-    await Bun.write(path.join(root, "src/index.ts"), `import { runApp } from "osnova/core/app";
+    await Bun.write(path.join(root, "src/index.ts"), `import { runApp } from "osnv/core/app";
 import { AppModule } from "./Users.module";
 import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
 await registerOsnovaGeneratedRuntime();
@@ -74,7 +74,7 @@ process.exitCode = await runApp(AppModule, { http: { port: Number(process.env.PR
     }
   } finally {
     // Unlink the dependency explicitly before recursive cleanup.
-    await rm(path.join(root, "node_modules/osnova"), { force: true });
+    await rm(path.join(root, "node_modules/osnv"), { force: true });
     // Compiling from the qualified immutable Bun executable preserves its
     // macOS flag on Bun's private build copy. Remove only this test's copies.
     if (process.platform === "darwin") {

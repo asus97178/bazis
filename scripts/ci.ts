@@ -52,6 +52,8 @@ try {
   rmSync(outside, { recursive: true, force: true });
 }
 
+run("package", [bun, "run", "scripts/package-check.ts"]);
+
 if (live !== undefined) run("live PostgreSQL", ["python3", "ops/live-postgres/runner.py", resolve(live)]);
 
 console.log("\n[ci] PASS");
