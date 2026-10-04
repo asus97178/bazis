@@ -1,0 +1,46 @@
+{
+  "name": "osnova-workspace",
+  "module": "src/osnova/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "toolchain:check": "bun run scripts/bun-toolchain-check.ts --receipt",
+    "config:check": "bun run scripts/bun-toolchain-check.ts && bun run src/config-check.ts",
+    "config:inspect": "bun run scripts/bun-toolchain-check.ts && bun run src/config-check.ts inspect",
+    "di:generate": "bun run scripts/bun-toolchain-check.ts && bun run src/osnova/core/scripts/di-generate.ts",
+    "osnova": "bun run src/osnova/cli/main.ts",
+    "predev": "bun run scripts/bun-toolchain-check.ts && bun run di:generate",
+    "dev": "bun run scripts/bun-toolchain-check.ts && OSNOVA_ENV=development bun run src/index.ts",
+    "prestart": "bun run scripts/bun-toolchain-check.ts && bun run di:generate",
+    "start": "bun run scripts/bun-toolchain-check.ts && OSNOVA_ENV=production bun run src/index.ts",
+    "prebuild": "bun run di:generate",
+    "build": "bun run scripts/bun-toolchain-check.ts && bun x tsc --noEmit",
+    "admin:ui": "bun run --cwd admin-ui start",
+    "admin:ui:build": "bun run --cwd admin-ui build",
+    "admin:ui:check": "bun run --cwd admin-ui check",
+    "admin:backend": "bun run scripts/bun-toolchain-check.ts && OSNOVA_ENV=development bun run src/admin-ui-dev.ts",
+    "admin:token": "OSNOVA_ENV=development bun run src/admin-token.ts",
+    "pretest": "bun run scripts/bun-toolchain-check.ts && bun run di:generate --target all",
+    "test": "bun run scripts/bun-toolchain-check.ts && bun test --isolate --path-ignore-patterns='**/*.browser.spec.ts' --path-ignore-patterns='**/docs/audits/**' --path-ignore-patterns='**/bin/**'",
+    "prebuild:bin": "bun run di:generate",
+    "build:bin": "bun run scripts/bun-toolchain-check.ts && bun run build:bin:app && bun run build:bin:cli",
+    "build:bin:app": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/index.ts bin/osnova-app",
+    "build:bin:cli": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/osnova/cli/main.ts bin/osnova",
+    "bin:run": "OSNOVA_ENV=production ./bin/osnova-app",
+    "bin:run:app": "OSNOVA_ENV=production ./bin/osnova-app",
+    "bin:run:cli": "./bin/osnova",
+    "client:ui": "bun run --cwd client-ui start",
+    "client:ui:build": "bun run --cwd client-ui build"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "version": "0.96.0",
+  "workspaces": [
+    "src/osnova"
+  ]
+}

@@ -1,0 +1,230 @@
+import type { ColumnType, EntityModel, IndexModel, PropertyModel } from "../Metadata/types";
+import type { ForeignKeyConstraint, RowLockMode, SqlDialect, SqlParam } from "./types";
+import { projectCheckAstIdentifiers, renderCheck } from "../Schema/CheckExpression";
+import { resolvedForeignKey } from "./resolvedForeignKey";
+import { physicalTableIdentity } from "../Schema/tableKey";
+
+const jsonScalarParameters = new WeakSet<object>();
+
+/** Private transport values contain only an immutable scalar. Immediate DML
+ * can retain them without allowing arbitrary user-provided toJSON hooks. */
+export function isPostgresJsonScalarParameter(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && jsonScalarParameters.has(value);
+}
+
+function jsonScalarParameter(value: number | boolean): SqlParam {
+  // Bun 1.4.0 infers ordinary SQL number/boolean types for bare primitives.
+  // An object selects JSON binding; Bun's JSON serializer calls this method
+  // and transmits the scalar itself, rather than a JSON object or a string.
+  const parameter = Object.freeze({ toJSON: () => value });
+  jsonScalarParameters.add(parameter);
+  return parameter;
+}
+
+/** Private immediate-DML fragment; no SqlDialect surface is widened. */
+export function renderPostgresOnConflictDoNothing(dialect: SqlDialect, columns: readonly string[]): string {
+  if (dialect.name !== "postgres") throw new Error("Immediate conflict insertion requires PostgreSQL.");
+  return ` ON CONFLICT (${columns.map((column) => dialect.quoteId(column)).join(", ")}) DO NOTHING`;
+}
+
+/**
+ * Диалект PostgreSQL (нативный клиент Bun `SQL`, без внешних зависимостей).
+ *
+ * PostgreSQL имеет нативные типы, поэтому значения
+ * передаются как есть: `boolean`, `Date`, `jsonb`-объекты. Плейсхолдеры —
+ * позиционные `$1, $2, ...`. Сгенерированные ключи читаются через `RETURNING`.
+ */
+export class PostgresDialect implements SqlDialect {
+  readonly name = "postgres";
+  readonly supportsReturning = true;
+
+  encode(value: unknown, type: ColumnType): SqlParam {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    switch (type) {
+      case "boolean":
+        return Boolean(value);
+      case "datetime":
+        return value instanceof Date ? value : new Date(String(value));
+      case "json":
+        if (typeof value === "number" || typeof value === "boolean") return jsonScalarParameter(value);
+        // Bun serializes native strings, objects and arrays for JSONB itself.
+        // Pre-serializing them would store JSON text as another JSON string.
+        return value as SqlParam;
+      case "integer":
+      case "real":
+        return typeof value === "bigint" ? value : Number(value);
+      case "text":
+        return typeof value === "string" ? value : String(value);
+    }
+  }
+
+  decode(value: unknown, type: ColumnType): unknown {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    switch (type) {
+      case "boolean":
+        // PG возвращает boolean; на всякий случай поддержим строковую форму.
+        return value === true || value === "t" || value === 1 || value === "true";
+      case "datetime":
+        return value instanceof Date ? value : new Date(String(value));
+      case "json":
+        // Bun already decodes JSON/JSONB, including scalar strings. Parsing a
+        // string again would turn the JSON string "123" into the number 123.
+        return value;
+      case "integer":
+        return typeof value === "bigint" ? value : Number(value);
+      case "real":
+        return Number(value);
+      case "text":
+        return typeof value === "string" ? value : String(value);
+    }
+  }
+
+  rowLockClause(mode: RowLockMode): string {
+    switch (mode) {
+      case "update":
+        return " FOR UPDATE";
+    }
+  }
+
+  quoteId(name: string): string {
+    return `"${name.replace(/"/g, '""')}"`;
+  }
+
+  qualifyTable(model: EntityModel): string {
+    const { schema, table } = physicalTableIdentity(model);
+    if (schema !== undefined) {
+      return `${this.quoteId(schema)}.${this.quoteId(table)}`;
+    }
+    return this.quoteId(table);
+  }
+
+  parameter(index: number): string {
+    return `$${index + 1}`;
+  }
+
+  columnType(type: ColumnType): string {
+    switch (type) {
+      case "integer":
+        return "bigint";
+      case "real":
+        return "double precision";
+      case "boolean":
+        return "boolean";
+      case "datetime":
+        return "timestamptz";
+      case "json":
+        return "jsonb";
+      case "text":
+        return "text";
+    }
+  }
+
+  createTableSql(model: EntityModel, foreignKeys: readonly ForeignKeyConstraint[]): string {
+    const columns = model.properties.map((property) => {
+      if (model.key.length === 1 && property.isKey && property.generation === "identity") {
+        // BY DEFAULT — допускает явную вставку ключа при необходимости.
+        return `${this.quoteId(property.columnName)} bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY`;
+      }
+      if (model.key.length === 1 && property.isKey && property.generation === "uuid") {
+        return `${this.quoteId(property.columnName)} uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY`;
+      }
+      const foreignKey = foreignKeys.find((candidate) => (candidate.columns ?? [candidate.column]).includes(property.columnName));
+      const parts = [this.quoteId(property.columnName), this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property))];
+      if (property.required) {
+        parts.push("NOT NULL");
+      }
+      return parts.join(" ");
+    });
+    if (model.key.length > 1 || (model.key[0].generation !== "identity" && model.key[0].generation !== "uuid")) {
+      columns.push(`PRIMARY KEY (${model.key.map((key) => this.quoteId(key.columnName)).join(", ")})`);
+    }
+    for (const check of model.checks) columns.push(`CONSTRAINT ${this.quoteId(check.name)} CHECK (${renderCheck(projectCheckAstIdentifiers(check.expression, (name) => model.propertyByName(name)!.columnName), (name) => this.quoteId(name))})`);
+    for (const fk of foreignKeys) {
+      const fkColumns = fk.columns ?? [fk.column];
+      const targets = fk.referencedColumns ?? [fk.referencedColumn];
+      const action = (value: string | undefined) => value === "noAction" || !value ? "NO ACTION" : value === "setNull" ? "SET NULL" : value.toUpperCase();
+      columns.push(
+        `${fk.name ? `CONSTRAINT ${this.quoteId(fk.name)} ` : ""}FOREIGN KEY (${fkColumns.map((column) => this.quoteId(column)).join(", ")}) REFERENCES ${this.foreignKeyTarget(fk)} (${targets.map((column) => this.quoteId(column)).join(", ")}) ON DELETE ${action(fk.onDelete)} ON UPDATE ${action(fk.onUpdate)}`,
+      );
+    }
+    return `CREATE TABLE IF NOT EXISTS ${this.qualifyTable(model)} (\n  ${columns.join(",\n  ")}\n)`;
+  }
+
+  createIndexSql(model: EntityModel): readonly string[] {
+    return model.indexes.map((index) => this.createIndexSqlOne(model, index));
+  }
+
+  createIndexSqlOne(model: EntityModel, index: IndexModel): string {
+    const unique = index.unique ? "UNIQUE " : "";
+    const cols = index.columns.map((column) => this.quoteId(column)).join(", ");
+    return `CREATE ${unique}INDEX IF NOT EXISTS ${this.quoteId(index.name)} ON ${this.qualifyTable(
+      model,
+    )} (${cols})`;
+  }
+
+  addColumnSql(model: EntityModel, property: PropertyModel, foreignKey?: ForeignKeyConstraint): string {
+    const parts = [
+      `ALTER TABLE ${this.qualifyTable(model)} ADD COLUMN IF NOT EXISTS`,
+      this.quoteId(property.columnName),
+      this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property)),
+    ];
+    if (property.required) {
+      // An invented FK value (0/empty UUID) cannot safely backfill existing rows.
+      parts.push(foreignKey ? "NOT NULL" : `NOT NULL DEFAULT ${this.defaultLiteral(property.type)}`);
+    }
+    if (foreignKey && (foreignKey.columns ?? [foreignKey.column]).length === 1) {
+      parts.push(
+        `REFERENCES ${this.foreignKeyTarget(foreignKey)} (${this.quoteId(foreignKey.referencedColumn)})`,
+      );
+    }
+    return parts.join(" ");
+  }
+
+  dropColumnSql(model: EntityModel, columnName: string): string {
+    return `ALTER TABLE ${this.qualifyTable(model)} DROP COLUMN IF EXISTS ${this.quoteId(columnName)}`;
+  }
+
+  private defaultLiteral(type: ColumnType): string {
+    switch (type) {
+      case "integer":
+      case "real":
+        return "0";
+      case "boolean":
+        return "false";
+      case "datetime":
+        return "CURRENT_TIMESTAMP";
+      case "json":
+        return "'{}'::jsonb";
+      case "text":
+        return "''";
+    }
+  }
+
+  private ddlColumnType(type: ColumnType | "uuid"): string {
+    return type === "uuid" ? "uuid" : this.columnType(type);
+  }
+
+  private foreignKeyColumnType(fk: ForeignKeyConstraint | undefined, property: PropertyModel): ColumnType | "uuid" {
+    if (!fk) return property.type;
+    return resolvedForeignKey(fk)?.columnTypes.get(property.columnName)
+      ?? (fk.column === property.columnName ? fk.columnType : undefined) ?? property.type;
+  }
+
+  private foreignKeyTarget(fk: ForeignKeyConstraint): string {
+    const resolved = resolvedForeignKey(fk);
+    if (resolved) return this.qualifyTable(resolved.target);
+    return fk.referencedTable.split(".").map((part) => this.quoteId(part)).join(".");
+  }
+}
+
+/** PostgreSQL-private lock policy; it is intentionally not part of SqlDialect. */
+export function renderPostgresSkipLocked(dialect: SqlDialect): string {
+  if (!(dialect instanceof PostgresDialect)) {
+    throw new Error("FOR UPDATE SKIP LOCKED is supported only by PostgreSQL.");
+  }
+  return " SKIP LOCKED";
+}

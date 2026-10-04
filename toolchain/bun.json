@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "osnova.bun-toolchain/v1",
+  "runtime": {
+    "version": "1.4.0",
+    "revision": "34cbb9a40b4bd1bd767d134a7065e66c2432a676"
+  },
+  "qualifiedHosts": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "osName": "macOS",
+      "osVersion": "26.5.2",
+      "osBuild": "25F84",
+      "executableSha256": "539598c775882420b9d8deb7dc14d845f20f7d26f5600c50ab067dde6ac3f3bf"
+    }
+  ]
+}
