@@ -16,13 +16,29 @@ import {
 import { collectTargetReachability, normalizeConfiguredPath, projectPath, readCodegenConfig } from "./di-generate-target";
 import { analyzeOrmPredicates } from "./orm-predicate-codegen";
 import { hashSources } from "../generatedFingerprint";
-const OUTPUT_FILE = "src/osnova/core/di/generated/deps.ts";
-const HTTP_OUTPUT_FILE = "src/osnova/core/http/generated/bindings.ts";
-const CORE_REQUEST_MODELS_FILE = "src/osnova/core/http/generated/requestModels.ts";
-const CORE_LIST_MODELS_FILE = "src/osnova/core/http/generated/listModels.ts";
-const CORE_OPENAPI_METADATA_FILE = "src/osnova/core/http/generated/openapi.ts";
-const CORE_AGENT_CATALOG_FILE = "src/osnova/core/agent/generated/catalog.ts";
-const CORE_AGENT_GENERATED_DIR = "src/osnova/core/agent/generated";
+const FRAMEWORK_DIR = realpathSync(path.resolve(import.meta.dir, "../.."));
+/**
+ * Project-relative framework source when codegen runs in the framework's own
+ * checkout (`src/osnova` there); null when the framework is an installed
+ * dependency (node_modules/osnv, vendor/osnv) and not part of the project sources.
+ */
+const FRAMEWORK_SOURCE = ((): string | null => {
+  const relative = path.relative(realpathSync(process.cwd()), FRAMEWORK_DIR).replaceAll("\\", "/");
+  if (relative && !relative.startsWith("..") && !path.isAbsolute(relative)) {
+    return /(^|\/)(node_modules|vendor)(\/|$)/.test(relative) ? null : relative;
+  }
+  // A checkout linked into the project (src/osnova -> framework) is still its source.
+  try { return realpathSync("src/osnova") === FRAMEWORK_DIR ? "src/osnova" : null; } catch { return null; }
+})();
+const FRAMEWORK_ROOT = FRAMEWORK_SOURCE ?? "src/osnova";
+const OUTPUT_FILE = `${FRAMEWORK_ROOT}/core/di/generated/deps.ts`;
+const HTTP_OUTPUT_FILE = `${FRAMEWORK_ROOT}/core/http/generated/bindings.ts`;
+const CORE_REQUEST_MODELS_FILE = `${FRAMEWORK_ROOT}/core/http/generated/requestModels.ts`;
+const CORE_LIST_MODELS_FILE = `${FRAMEWORK_ROOT}/core/http/generated/listModels.ts`;
+const CORE_OPENAPI_METADATA_FILE = `${FRAMEWORK_ROOT}/core/http/generated/openapi.ts`;
+const CORE_AGENT_CATALOG_FILE = `${FRAMEWORK_ROOT}/core/agent/generated/catalog.ts`;
+const CORE_AGENT_GENERATED_DIR = `${FRAMEWORK_ROOT}/core/agent/generated`;
+const isFrameworkSourcePath = (file: string): boolean => FRAMEWORK_SOURCE !== null && file.startsWith(`${FRAMEWORK_SOURCE}/`);
 const APP_GENERATED_DIR = "src/generated/osnova";
 let activeGeneratedDir = APP_GENERATED_DIR;
 const plannedWrites = new Map<string, string>();
@@ -134,27 +150,12 @@ function readRequestedTarget(): string | undefined {
 
 // Framework internals: their classes are excluded from the auto-deps map (they
 // wire their own services explicitly). Auto-deps magic targets user code only.
-const FRAMEWORK_INTERNAL_PREFIXES = [
-  "src/osnova/core/di/",
-  "src/osnova/core/kernel/",
-  "src/osnova/core/http/",
-  "src/osnova/core/grpc/",
-  "src/osnova/core/http-client/",
-  "src/osnova/core/background/",
-  "src/osnova/core/agent/",
-  "src/osnova/core/websocket/",
-  "src/osnova/core/cache/",
-  "src/osnova/library/validation/",
-  "src/osnova/library/boundary/",
-  "src/osnova/library/orm/",
-  "src/osnova/library/jwt/",
-  "src/osnova/library/jsonapi/",
-  "src/osnova/library/openapi/",
-  "src/osnova/core/orm/",
-  "src/osnova/core/infra/",
-  "src/osnova/core/app/",
-  "src/osnova/library/http-client/",
-];
+const FRAMEWORK_INTERNAL_PREFIXES = FRAMEWORK_SOURCE === null ? [] : [
+  "core/di/", "core/kernel/", "core/http/", "core/grpc/", "core/http-client/", "core/background/",
+  "core/agent/", "core/websocket/", "core/cache/", "library/validation/", "library/boundary/",
+  "library/orm/", "library/jwt/", "library/jsonapi/", "library/openapi/", "core/orm/", "core/infra/",
+  "core/app/", "library/http-client/",
+].map((prefix) => `${FRAMEWORK_SOURCE}/${prefix}`);
 
 // A declaration is an identity; short names are local to their source/module.
 interface CollectedDependency { readonly name: string; readonly target?: ts.ClassDeclaration; readonly lazy?: boolean; }
@@ -228,7 +229,6 @@ let programFiles = new Map<string, ts.SourceFile>();
 // Only their class and token names are read, so app constructor dependencies on
 // framework classes are not discarded as unknown; their own wiring ships with them.
 let installedFrameworkSources: ts.SourceFile[] = [];
-const FRAMEWORK_DIR = realpathSync(path.resolve(import.meta.dir, "../.."));
 let sourceFilePathSet = new Set<string>();
 let checker: ts.TypeChecker;
 let sourceEntries: { filePath: string; source: ts.SourceFile }[] = [];
@@ -338,7 +338,7 @@ async function runConfiguredTargets(): Promise<void> {
   programFiles = new Map();
   installedFrameworkSources = [];
   // In the framework's own checkout its sources are scanned project files.
-  const frameworkInstalled = !isScannableFile(normalizeProjectPath(path.join(FRAMEWORK_DIR, "index.ts")));
+  const frameworkInstalled = FRAMEWORK_SOURCE === null;
   for (const source of program.getSourceFiles()) {
     const filePath = normalizeProjectPath(source.fileName);
     if (isScannableFile(filePath) || explicitTargetSources.has(filePath)) {
@@ -368,7 +368,7 @@ async function runConfiguredTargets(): Promise<void> {
   }
   const owners = new Map<string, string[]>();
   for (const [name, files] of reachableByTarget) for (const file of files) {
-    if (file.startsWith("src/osnova/")) continue;
+    if (isFrameworkSourcePath(file)) continue;
     const current = owners.get(file) ?? [];
     current.push(name);
     owners.set(file, current);
@@ -378,13 +378,13 @@ async function runConfiguredTargets(): Promise<void> {
   const candidateIndex = createSourceCandidateIndex(programFiles);
   const boundaryDiagnostics: string[] = [];
   for (const [file, source] of programFiles) {
-    if (file.startsWith("src/osnova/")) continue;
+    if (isFrameworkSourcePath(file)) continue;
     if (!owners.has(file) && candidateIndex.get(file)) boundaryDiagnostics.push(`OSNOVA_CODEGEN_SOURCE_UNASSIGNED: ${file}`);
   }
   for (const [name, reachable] of reachableByTarget) {
     for (const file of reachable) {
       const source = programFiles.get(file);
-      if (source !== undefined && !file.startsWith("src/osnova/")) collectDynamicImportDiagnostics(source, name, boundaryDiagnostics);
+      if (source !== undefined && !isFrameworkSourcePath(file)) collectDynamicImportDiagnostics(source, name, boundaryDiagnostics);
     }
   }
   if (boundaryDiagnostics.length > 0) throw new Error(boundaryDiagnostics.sort((left, right) => left.localeCompare(right)).join("\n"));
@@ -516,7 +516,7 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
   // Installed applications own only src/generated; framework compatibility
   // shims are regenerated solely when the framework source is in this project.
   if (production) {
-    if (await Bun.file("src/osnova/package.json").exists()) {
+    if (FRAMEWORK_SOURCE !== null) {
       // Compatibility path stays importable, but application metadata belongs
       // exclusively to the constructor-bound target descriptor.
       stageWrite(OUTPUT_FILE, renderOutput({}));
@@ -770,8 +770,12 @@ function validateDepsAgainstKnownTokens(): void {
         continue;
       }
       classDeps.delete(declaration);
-      if (!declaration.members.some(ts.isConstructorDeclaration) && needsInferredDiDeps(declaration)) {
-        fatalErrors.push(`OSNOVA_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(declaration)}: inherited constructor dependency "${depName}" has no known DI token.`);
+      // A class DI must construct cannot lose a dependency silently: the app
+      // would fail later, far from the cause. Other classes need no entry.
+      if (needsInferredDiDeps(declaration)) {
+        fatalErrors.push(declaration.members.some(ts.isConstructorDeclaration)
+          ? `OSNOVA_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "${depName}", which is neither a DI token (createToken) nor a class known to codegen. Register it, import it from the framework package, or bind the class with an explicit factory.`
+          : `OSNOVA_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(declaration)}: inherited constructor dependency "${depName}" has no known DI token.`);
       }
       break;
     }
