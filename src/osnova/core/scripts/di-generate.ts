@@ -1,4 +1,5 @@
 import path from "node:path";
+import { realpathSync } from "node:fs";
 import { lstat, mkdir, readdir, rename, rm } from "node:fs/promises";
 import ts from "typescript";
 import {
@@ -222,6 +223,11 @@ const CONTEXT_TYPES: Record<string, HttpBindingSpec["source"]> = {
 };
 let program: ts.Program;
 let programFiles = new Map<string, ts.SourceFile>();
+// Framework sources outside the scanned project (node_modules/osnv, vendor/osnv).
+// Only their class and token names are read, so app constructor dependencies on
+// framework classes are not discarded as unknown; their own wiring ships with them.
+let installedFrameworkSources: ts.SourceFile[] = [];
+const FRAMEWORK_DIR = realpathSync(path.resolve(import.meta.dir, "../.."));
 let sourceFilePathSet = new Set<string>();
 let checker: ts.TypeChecker;
 let sourceEntries: { filePath: string; source: ts.SourceFile }[] = [];
@@ -256,6 +262,13 @@ function isScannableFile(filePath: string): boolean {
     return false;
   }
   return !/(^|\/)(test|tests|__tests__|fixture|fixtures|__fixtures__|generated|node_modules|vendor|dist|build|bin|coverage|examples)(\/|$)/.test(filePath) && !filePath.startsWith("admin-ui/");
+}
+
+function isInstalledFrameworkSource(source: ts.SourceFile): boolean {
+  if (source.isDeclarationFile) return false;
+  let file: string;
+  try { file = realpathSync(source.fileName); } catch { return false; }
+  return file.startsWith(`${FRAMEWORK_DIR}${path.sep}`) && !/[\\/](test|tests|__tests__)[\\/]|\.(test|spec)\.ts$/.test(file);
 }
 
 function createTypeScriptProgram(): ts.Program {
@@ -322,10 +335,15 @@ async function runConfiguredTargets(): Promise<void> {
   const programStartedAt = performance.now();
   program = createTypeScriptProgram();
   programFiles = new Map();
+  installedFrameworkSources = [];
+  // In the framework's own checkout its sources are scanned project files.
+  const frameworkInstalled = !isScannableFile(normalizeProjectPath(path.join(FRAMEWORK_DIR, "index.ts")));
   for (const source of program.getSourceFiles()) {
     const filePath = normalizeProjectPath(source.fileName);
     if (isScannableFile(filePath) || explicitTargetSources.has(filePath)) {
       programFiles.set(filePath, source);
+    } else if (frameworkInstalled && isInstalledFrameworkSource(source)) {
+      installedFrameworkSources.push(source);
     }
   }
   checker = program.getTypeChecker();
@@ -461,6 +479,7 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
     if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))) collectDiClassRegistrations(source);
   }
   const prepassMs = performance.now() - startedAt;
+  for (const source of installedFrameworkSources) collectTokenDescriptions(source);
   for (const { filePath, source } of sourceEntries) {
     fatalErrors.push(...analyzeOrmPredicates(checker, source));
     collectTokenDescriptions(source);
