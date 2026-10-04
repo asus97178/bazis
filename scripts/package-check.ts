@@ -70,6 +70,7 @@ try {
   ].join("\n"));
   const appModule = join(app, "src/app/modules/App.module.ts");
   writeFileSync(appModule, `import { ProbeModule } from "./probe/Probe.module";\n${readFileSync(appModule, "utf8").replace("imports: [", "imports: [ProbeModule, ")}`);
+  run("osnv test (codegen + template /health test)", [osnv, "test"], app);
   run("osnv build (codegen + typecheck)", [osnv, "build"], app);
   run("osnv build --bin", [osnv, "build", "--bin"], app);
   if (readdirSync(app).some((name) => name.endsWith(".bun-build"))) throw new Error("osnv build --bin left .bun-build files in the project");

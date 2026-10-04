@@ -26,7 +26,10 @@ export interface GenerateProjectResult {
 export async function generateProject(options: GenerateProjectOptions): Promise<GenerateProjectResult> {
   const name = parseModuleName(options.name).folder;
   const requested = path.resolve(options.outputPath ?? name);
-  const parent = await realpath(path.dirname(requested));
+  const parent = await realpath(path.dirname(requested)).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") throw new Error(`Parent directory does not exist: ${path.dirname(requested)}. Create it first or choose another --path.`);
+    throw error;
+  });
   const parentInfo = await lstat(parent);
   if (!parentInfo.isDirectory()) throw new Error(`Project parent is not a directory: ${parent}`);
   const projectDir = path.join(parent, path.basename(requested));
@@ -77,7 +80,8 @@ async function collectFrameworkFiles(directory: string): Promise<string[]> {
     if (info.isSymbolicLink()) throw new Error(`Framework snapshot cannot include a symbolic link: ${relative}`);
     if (info.isDirectory()) {
       for (const entry of (await readdir(file)).sort()) {
-        if (entry.startsWith(".") || excluded.has(entry) || /\.(test|spec)\.[^.]+$/.test(entry) || entry.endsWith(".bun-build")) continue;
+        // Same contents as the npm package: no tests, fixtures or internal passports.
+        if (entry.startsWith(".") || excluded.has(entry) || entry === "MODULE.md" || /\.(test|spec)\.[^.]+$/.test(entry) || entry.endsWith(".bun-build")) continue;
         await visit(path.join(relative, entry));
       }
     } else if (info.isFile()) files.push(relative);
@@ -122,11 +126,12 @@ function buildProjectFiles(name: string, dependency: string, frameworkMode: "sna
   const manifest = {
     name, version: "0.1.0", private: true, type: "module",
     scripts: {
-      "di:generate": "bun run node_modules/osnv/core/scripts/di-generate.ts",
       "codegen": "osnv codegen",
       "dev": "osnv dev",
+      "test": "osnv test",
       "build": "osnv build",
       "build:bin": "osnv build --bin",
+      "start": `./bin/${name}`,
     },
     dependencies: { osnv: dependency },
     devDependencies: { "@types/bun": "1.4.0", typescript: "^5" },
@@ -145,12 +150,34 @@ function buildProjectFiles(name: string, dependency: string, frameworkMode: "sna
     ["tsconfig.json", `${JSON.stringify(tsconfig, null, 2)}\n`],
     ["osnova.codegen.json", `${JSON.stringify(codegen, null, 2)}\n`],
     [".gitignore", "node_modules/\nbin/\nsrc/generated/\n.env\n"],
+    [".env.example", "# Copy to .env (Bun loads it automatically).\nOSNOVA_ENV=development\nHOST=127.0.0.1\nPORT=3000\n"],
+    ["src/app/test/health.test.ts", HEALTH_TEST],
     ["AGENTS.md", "# Работа с проектом Osnova\n\nПеред изменением приложения прочитайте [архитектуру модулей](docs/architecture/MODULE_ARCHITECTURE.md). Новые модули создавайте только командой `bunx osnv g module` или `bunx osnv g pack`; после генерации заполните `MODULE.md`. Файлы `src/generated/` обновляет только codegen.\n"],
     ["docs/architecture/MODULE_ARCHITECTURE.md", "# Архитектура модулей приложения\n\n`src/index.ts` запускает `runApp`; `src/app/modules/App.module.ts` собирает функциональные модули через `imports`. Корень приложения не владеет предметной логикой.\n\nОдна самостоятельная функция — атомарный модуль. Он владеет своими данными, сервисами, HTTP и фоновыми обработчиками. Составной модуль нужен только для нескольких независимых функций; его корень выполняет композицию. Слои и число файлов сами по себе не создают подмодули.\n\nСоздавайте новые модули только через `bunx osnv g module <Name> --empty|--minimal|--full` или `bunx osnv g pack <Name> --parts <a,b>`. Перед реализацией определите ответственность и публичные входы, затем заполните сгенерированный `MODULE.md`: поля, ошибки, зависимости, exports и проверки. Пользуйтесь публичными API пакета `osnv`, существующими DI и ORM. Не редактируйте `src/generated/` вручную; запускайте `bunx osnv codegen`.\n\n`--minimal` создаёт учебный CRUD с ORM. Для его запуска приложению нужны provider БД и готовая схема. Для первой функции без БД используйте `--empty`. Проверяйте типы и бинарную сборку после изменений, влияющих на запуск.\n"],
     ["src/app/modules/App.module.ts", 'import { Module } from "osnv/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class AppModule {}\n'],
-    ["src/index.ts", 'import { runApp } from "osnv/core/app";\nimport { AppModule } from "./app/modules/App.module";\nimport { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";\n\nawait registerOsnovaGeneratedRuntime();\nawait runApp(AppModule, { http: { hostname: "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });\n'],
+    ["src/index.ts", 'import { runApp } from "osnv/core/app";\nimport { AppModule } from "./app/modules/App.module";\nimport { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";\n\nawait registerOsnovaGeneratedRuntime();\nawait runApp(AppModule, { http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });\n'],
     ["README.md", `# ${name}\n\nПриложение Osnova. ${frameworkMode === "snapshot"
       ? "Исходный пакет сохранён в `vendor/osnv`; включайте его в Git и переносите вместе с проектом. Исходный checkout фреймворка больше не нужен. Обновления фреймворка в эту копию автоматически не попадают."
-      : "Зависимость `osnv` связана с внешним локальным checkout через `--link-framework`. Для переноса нужен тот же пакет и обновление пути в `package.json`."}\nПеред изменением модулей прочитайте [локальную архитектуру](docs/architecture/MODULE_ARCHITECTURE.md).\n\nИспользуйте квалифицированный для исходного фреймворка Bun 1.4.0.\n\n\`\`\`sh\nbun install\nbunx osnv dev\n# GET http://127.0.0.1:3000/health\n# При занятом порте: PORT=3100 bunx osnv dev\n\`\`\`\n\nДобавить атомарный модуль из корня проекта: \`bunx osnv g module Task --empty\`.\nПосле заполнения паспорта и реализации модуля запустите \`bunx osnv codegen\`.\nДля проверки типов: \`bunx osnv build\`. Для бинарника: \`bunx osnv build --bin\`.\n\n\`--minimal\` создаёт пример CRUD с пагинацией (20 записей по умолчанию, не более 100 через HTTP); для запуска нужны provider БД и схема. Сервис возвращает \`PageResult\`, HTTP-контроллер формирует JSON:API. Сохранение выполняет \`DbContext.saveChanges()\` для всех изменений своего контекста. В ORM соединяйте условия через \`.and()\` и \`.or()\`; codegen отклоняет \`&&\` и \`||\` между предикатами.\n`],
+      : "Зависимость `osnv` связана с внешним локальным checkout через `--link-framework`. Для переноса нужен тот же пакет и обновление пути в `package.json`."}\nПеред изменением модулей прочитайте [локальную архитектуру](docs/architecture/MODULE_ARCHITECTURE.md).\n\nНужен Bun ≥ 1.4.0. Настройки — в \`.env\` (пример: \`.env.example\`).\n\n\`\`\`sh\nbun install\nbunx osnv dev\n# GET http://127.0.0.1:3000/health\n# При занятом порте: PORT=3100 bunx osnv dev\n\`\`\`\n\nДобавить атомарный модуль из корня проекта: \`bunx osnv g module Task --empty\`.\nПосле заполнения паспорта и реализации модуля запустите \`bunx osnv codegen\`.\nТесты: \`bunx osnv test\`. Проверка типов: \`bunx osnv build\`. Бинарник: \`bunx osnv build --bin\`, запуск — \`bun run start\`.\n\n\`--minimal\` создаёт пример CRUD с пагинацией (20 записей по умолчанию, не более 100 через HTTP); для запуска нужны provider БД и схема. Сервис возвращает \`PageResult\`, HTTP-контроллер формирует JSON:API. Сохранение выполняет \`DbContext.saveChanges()\` для всех изменений своего контекста. В ORM соединяйте условия через \`.and()\` и \`.or()\`; codegen отклоняет \`&&\` и \`||\` между предикатами.\n`],
   ];
 }
+
+const HEALTH_TEST = `import { expect, test } from "bun:test";
+
+// Starts the app from source exactly as \`osnv dev\` does and checks /health.
+test("app starts and answers /health", async () => {
+  const port = String(20000 + Math.floor(Math.random() * 20000));
+  const app = Bun.spawn([process.execPath, "run", "src/index.ts"], { env: { ...process.env, HOST: "127.0.0.1", PORT: port }, stdout: "ignore", stderr: "inherit" });
+  try {
+    let status = 0;
+    for (let attempt = 0; attempt < 100 && status !== 200; attempt++) {
+      await Bun.sleep(100);
+      status = await fetch(\`http://127.0.0.1:\${port}/health\`).then((response) => response.status, () => 0);
+    }
+    expect(status).toBe(200);
+  } finally {
+    app.kill();
+    await app.exited;
+  }
+});
+`;

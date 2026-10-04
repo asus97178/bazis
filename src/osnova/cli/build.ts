@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, watch } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { resolveBun } from "./codegen";
@@ -12,22 +12,76 @@ export interface BuildOptions {
   readonly outfile?: string;
 }
 
-/** `osnv dev`: codegen, then run the default target's entrypoint from source. */
-export async function runDev(cwd: string, codegen: Codegen): Promise<number> {
+/**
+ * `osnv dev`: codegen, then run the default target's entrypoint from source.
+ * With `watch`, a change under src/ (except src/generated) stops the app,
+ * reruns codegen and starts it again; a failed codegen waits for the next change.
+ */
+export async function runDev(cwd: string, codegen: Codegen, log: (message: string) => void, options: { readonly watch?: boolean } = {}): Promise<number> {
+  const bun = await resolveBun(cwd);
+  const entry = await projectEntry(cwd);
+  if (!options.watch) {
+    const generated = await codegen(cwd);
+    if (generated !== 0) return generated;
+    const child = Bun.spawn([bun, "run", entry], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    // The app owns graceful shutdown; forward the signal instead of dying first.
+    const forward = (signal: NodeJS.Signals) => () => child.kill(signal);
+    const onInterrupt = forward("SIGINT"), onTerminate = forward("SIGTERM");
+    process.on("SIGINT", onInterrupt);
+    process.on("SIGTERM", onTerminate);
+    try {
+      return await child.exited;
+    } finally {
+      process.off("SIGINT", onInterrupt);
+      process.off("SIGTERM", onTerminate);
+    }
+  }
+
+  let child: ReturnType<typeof Bun.spawn> | undefined;
+  let queue = Promise.resolve();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stop = async () => {
+    if (!child) return;
+    const running = child;
+    child = undefined;
+    running.kill("SIGTERM");
+    await running.exited;
+  };
+  const start = async () => {
+    if (await codegen(cwd) !== 0) { log("[osnv] codegen failed; waiting for changes..."); return; }
+    child = Bun.spawn([bun, "run", entry], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+  };
+  const watcher = watch(path.join(cwd, "src"), { recursive: true }, (_event, file) => {
+    // codegen writes src/generated: watching it would restart forever.
+    if (!file || /^generated([\\/]|$)/.test(String(file))) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      queue = queue.then(async () => { log(`[osnv] ${file} changed, restarting...`); await stop(); await start(); });
+    }, 150);
+  });
+  const finished = Promise.withResolvers<number>();
+  const shutdown = () => {
+    watcher.close();
+    clearTimeout(timer);
+    queue = queue.then(stop).then(() => finished.resolve(0), () => finished.resolve(1));
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+  log("[osnv] watching src/ for changes (Ctrl+C to stop)");
+  queue = queue.then(start);
+  try {
+    return await finished.promise;
+  } finally {
+    process.off("SIGINT", shutdown);
+    process.off("SIGTERM", shutdown);
+  }
+}
+
+/** `osnv test [args]`: codegen, then `bun test` with the given arguments. */
+export async function runTest(cwd: string, args: readonly string[], codegen: Codegen): Promise<number> {
   const generated = await codegen(cwd);
   if (generated !== 0) return generated;
-  const child = Bun.spawn([await resolveBun(cwd), "run", await projectEntry(cwd)], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
-  // The app owns graceful shutdown; forward the signal instead of dying first.
-  const forward = (signal: NodeJS.Signals) => () => child.kill(signal);
-  const onInterrupt = forward("SIGINT"), onTerminate = forward("SIGTERM");
-  process.on("SIGINT", onInterrupt);
-  process.on("SIGTERM", onTerminate);
-  try {
-    return await child.exited;
-  } finally {
-    process.off("SIGINT", onInterrupt);
-    process.off("SIGTERM", onTerminate);
-  }
+  return await Bun.spawn([await resolveBun(cwd), "test", ...args], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited;
 }
 
 /** `osnv build [--bin]`: codegen and typecheck; with `bin`, also compile. */

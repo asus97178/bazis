@@ -33,7 +33,7 @@ describe("new project", () => {
     const outputPath = path.join(root, "hello-app");
     const options = { name: "HelloApp", outputPath, frameworkPath };
     const planned = await generateProject({ ...options, dryRun: true });
-    expect(planned.files).toHaveLength(9);
+    expect(planned.files).toHaveLength(11);
     expect(await readdir(root)).toEqual([]);
     const result = await generateProject(options);
     expect(result.projectDir).toBe(await realpath(outputPath));
@@ -45,13 +45,14 @@ describe("new project", () => {
     expect(await Bun.file(path.join(outputPath, "vendor/osnv/cli/main.ts")).text()).toBe(await Bun.file(path.join(frameworkPath, "cli/main.ts")).text());
     expect(await readdir(path.join(outputPath, "vendor/osnv"))).not.toContain("node_modules");
     expect(await readdir(path.join(outputPath, "vendor/osnv/cli"))).not.toContain("test");
-    expect(manifest.scripts["di:generate"]).toContain("node_modules/osnv/core/scripts/di-generate.ts");
+    expect(manifest.scripts["di:generate"]).toBeUndefined();
     expect(manifest.scripts).toMatchObject({ codegen: "osnv codegen", dev: "osnv dev", build: "osnv build", "build:bin": "osnv build --bin" });
     expect(manifest.scripts.osnova).toBeUndefined();
     expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("атомарный модуль");
     expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toContain("registerOsnovaGeneratedRuntime");
     await expect(generateProject(options)).rejects.toThrow("already exists");
     await expect(generateProject({ name: "Bad", outputPath: path.join(root, "bad"), frameworkPath: root })).rejects.toThrow("Local Osnova package not found");
+    await expect(generateProject({ name: "Orphan", outputPath: path.join(root, "missing/parent/orphan"), frameworkPath })).rejects.toThrow("Parent directory does not exist");
     await expect(generateProject({ name: "Nested", outputPath: path.join(frameworkPath, "nested-project"), frameworkPath, dryRun: true })).rejects.toThrow("outside the Osnova package");
     expect(await readdir(root)).toEqual(["hello-app"]);
   });
@@ -90,7 +91,7 @@ describe("new project", () => {
       const [code, output, error] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
       expect(code, output + error).toBe(0);
     };
-    await run(["run", "di:generate"]);
+    await run(["node_modules/osnv/cli/main.ts", "codegen"]);
     expect(await Bun.file(path.join(relocated, "src/generated/osnova/runtime.ts")).exists()).toBe(true);
     expect(await Bun.file(path.join(relocated, "src/osnova/package.json")).exists()).toBe(false);
   }, 30_000);
