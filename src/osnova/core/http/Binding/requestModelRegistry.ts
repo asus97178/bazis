@@ -1,0 +1,100 @@
+/**
+ * Реестр «имя класса -> класс» для request-моделей (`@RequestModel()`).
+ *
+ * Это HTTP-биндинг concern: сгенерированные конвенции привязок ссылаются на
+ * класс тела запроса по имени (генерируемый файл — чистые данные, без импортов
+ * пользовательских модулей), а сам класс разрешается из этого реестра при
+ * старте сервера.
+ */
+
+/** Маркер: под одним именем зарегистрировано несколько разных классов. */
+export const AMBIGUOUS_REQUEST_MODEL: unique symbol = Symbol("ambiguous-request-model");
+
+export type RequestModelClass = new () => object;
+
+/**
+ * Runtime hydration metadata emitted by `bun run di:generate` for a class-
+ * typed request-model field. Standard TC39 decorators deliberately do not
+ * expose design types, so this tiny registry is the dependency-free bridge
+ * from TypeScript source types to the HTTP binder.
+ */
+export interface RequestModelFieldShape {
+  readonly model: RequestModelClass;
+  readonly array?: boolean;
+  /** `null` is part of the declared property type. */
+  readonly nullable?: boolean;
+  /** `null` is part of an array element type. */
+  readonly elementNullable?: boolean;
+}
+
+export type RequestModelShape = Readonly<Record<string, RequestModelFieldShape>>;
+
+let registry = new Map<string, RequestModelClass | typeof AMBIGUOUS_REQUEST_MODEL>();
+// Runtime model constructors are process-owned; Map permits exact generated
+// target rollback without changing the public lookup contract.
+let shapes = new Map<RequestModelClass, RequestModelShape>();
+const FORBIDDEN_SHAPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Регистрирует класс request-модели (вызывается декоратором `@RequestModel()`). */
+export function registerRequestModelClass(ctor: RequestModelClass): void {
+  const name = ctor.name;
+  if (!name) {
+    return; // анонимный класс не адресуем по имени
+  }
+  const existing = registry.get(name);
+  if (existing === undefined) {
+    registry.set(name, ctor);
+  } else if (existing !== ctor) {
+    registry.set(name, AMBIGUOUS_REQUEST_MODEL);
+  }
+}
+
+/**
+ * Класс по имени: `undefined` — не зарегистрирован (нет `@RequestModel()`),
+ * `AMBIGUOUS_REQUEST_MODEL` — имя неоднозначно (два разных класса).
+ */
+export function findRequestModelByName(
+  name: string,
+): RequestModelClass | typeof AMBIGUOUS_REQUEST_MODEL | undefined {
+  return registry.get(name);
+}
+
+/** Registers generated nested-model hydration metadata for one DTO class. */
+export function registerRequestModelShape(ctor: RequestModelClass, shape: RequestModelShape): void {
+  const snapshot: Record<string, RequestModelFieldShape> = Object.create(null) as Record<string, RequestModelFieldShape>;
+  for (const key of Object.keys(shape)) {
+    if (
+      FORBIDDEN_SHAPE_KEYS.has(key) ||
+      !Object.prototype.hasOwnProperty.call(shape, key)
+    ) {
+      continue;
+    }
+    const field = shape[key];
+    if (field === undefined || typeof field.model !== "function") {
+      throw new TypeError(`Invalid request-model shape for ${ctor.name}.${key}`);
+    }
+    snapshot[key] = Object.freeze({
+      model: field.model,
+      array: field.array === true || undefined,
+      nullable: field.nullable === true || undefined,
+      elementNullable: field.elementNullable === true || undefined,
+    });
+  }
+  shapes.set(ctor, Object.freeze(snapshot));
+}
+
+/** Generated hydration shape for a DTO constructor, if one was registered. */
+export function findRequestModelShape(ctor: RequestModelClass): RequestModelShape | undefined {
+  return shapes.get(ctor);
+}
+
+/** Internal generated-runtime transaction support. */
+export function snapshotRequestModelRegistry(): { readonly registry: typeof registry; readonly shapes: typeof shapes } {
+  return { registry: new Map(registry), shapes: new Map(shapes) };
+}
+
+/** Internal generated-runtime transaction support. */
+export function restoreRequestModelRegistry(snapshot: ReturnType<typeof snapshotRequestModelRegistry>): void {
+  registry = snapshot.registry;
+  shapes = snapshot.shapes;
+}

@@ -1,0 +1,184 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import { runCli, type CliRuntime } from "../main";
+import { generateModule, generateModulePack } from "../generateModule";
+import { runCodegen } from "../codegen";
+import { parseModuleName } from "../naming";
+
+const roots: string[] = [];
+async function fixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "osnova-cli-command-"));
+  roots.push(root);
+  const appModulePath = path.join(root, "host/App.module.ts");
+  await mkdir(path.dirname(appModulePath), { recursive: true });
+  await Bun.write(appModulePath, 'import { Module } from "@osnova/core/di";\n@Module({ imports: [], exports: [] })\nexport class AppModule {}\n');
+  return { root, appModulePath, modulesRoot: path.join(root, "features") };
+}
+afterEach(async () => {
+  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
+});
+
+function runtime(exitCode = 0) {
+  const calls: { cwd: string; target?: string }[] = [];
+  const logs: string[] = [];
+  const adapter: CliRuntime = {
+    log: (message) => logs.push(message), error: (message) => logs.push(message),
+    codegen: async (cwd, target) => { calls.push({ cwd, target }); return exitCode; },
+  };
+  return { adapter, calls, logs };
+}
+
+describe("CLI command effects", () => {
+  test("g module Name --help does not create files or invoke codegen", async () => {
+    const f = await fixture();
+    const r = runtime();
+    expect(await runCli(["g", "module", "Task", "--modules-root", f.modulesRoot, "--help"], r.adapter)).toBe(0);
+    expect(await Bun.file(f.modulesRoot).exists()).toBe(false);
+    expect(r.calls).toHaveLength(0);
+  });
+
+  test("dry-run plans the host edit and passport without touching either", async () => {
+    const f = await fixture();
+    const original = await readFile(f.appModulePath, "utf8");
+    const r = runtime();
+    expect(await runCli(["g", "module", "Task", "--modules-root", f.modulesRoot, "--app-module", f.appModulePath, "--dry-run"], r.adapter)).toBe(0);
+    expect(await Bun.file(f.modulesRoot).exists()).toBe(false);
+    expect(await readFile(f.appModulePath, "utf8")).toBe(original);
+    expect(r.logs.join("\n")).toContain("MODULE.md");
+    expect(r.logs.join("\n")).toContain("App.module.ts");
+    expect(r.calls).toHaveLength(0);
+  });
+
+  test.each(["--no-codegen", "--no-register"])("respects %s", async (flag) => {
+    const f = await fixture();
+    const r = runtime();
+    expect(await runCli(["g", "m", "Guest", "--modules-root", f.modulesRoot, "--app-module", f.appModulePath, flag], r.adapter)).toBe(0);
+    expect(await Bun.file(path.join(f.modulesRoot, "guest/MODULE.md")).exists()).toBe(true);
+    expect((await readFile(f.appModulePath, "utf8")).includes("GuestModule")).toBe(flag === "--no-codegen");
+    expect(r.calls).toHaveLength(0);
+  });
+
+  test("does not run codegen when host was missing", async () => {
+    const f = await fixture();
+    const r = runtime();
+    expect(await runCli(["g", "module", "Task", "--empty", "--modules-root", f.modulesRoot], r.adapter)).toBe(0);
+    expect(r.calls).toHaveLength(0);
+    expect(r.logs.join("\n")).toContain("App module not found");
+  });
+
+  test("forwards target and codegen failure, preserving the generated scaffold", async () => {
+    const f = await fixture();
+    const r = runtime(17);
+    expect(await runCli(["g", "module", "Task", "--modules-root", f.modulesRoot, "--app-module", f.appModulePath, "--target", "test"], r.adapter)).toBe(17);
+    expect(r.calls).toEqual([{ cwd: process.cwd(), target: "test" }]);
+    expect(await Bun.file(path.join(f.modulesRoot, "task/Task.module.ts")).exists()).toBe(true);
+    expect(r.logs.join("\n")).toContain("scaffold files were kept");
+  });
+
+  test("explicit codegen does not generate a feature", async () => {
+    const r = runtime();
+    expect(await runCli(["codegen", "--target", "all"], r.adapter)).toBe(0);
+    expect(r.calls).toEqual([{ cwd: process.cwd(), target: "all" }]);
+  });
+
+  test("generates only entry and passport for an empty atomic module", async () => {
+    const f = await fixture();
+    const result = await generateModule({ ...f, name: "Mailer", profile: "empty", register: false });
+    expect(await readdir(result.moduleDir)).toEqual(["MODULE.md", "Mailer.module.ts"]);
+    expect(await readFile(path.join(result.moduleDir, "Mailer.module.ts"), "utf8")).toContain("exports: []");
+  });
+
+  test("generates and connects a composite with four atomic passports and no business providers", async () => {
+    const f = await fixture();
+    const result = await generateModulePack({ ...f, name: "DataManager", parts: ["tables", "fields", "validators", "records"] });
+    expect(result.files).toHaveLength(10);
+    expect(result.registered).toBe(true);
+    const module = await readFile(path.join(result.moduleDir, "DataManager.module.ts"), "utf8");
+    expect(module).toContain("imports: [TablesModule, FieldsModule, ValidatorsModule, RecordsModule]");
+    expect(module).not.toContain("providers:");
+    expect(module).not.toContain("ormOsnova:");
+    const app = await readFile(f.appModulePath, "utf8");
+    expect(app).toContain('from "../features/data-manager_modules/DataManager.module"');
+    for (const part of ["tables", "fields", "validators", "records"]) {
+      const files = await readdir(path.join(result.moduleDir, `${part}_module`));
+      expect(files).toHaveLength(2);
+      expect(files).toContain("MODULE.md");
+    }
+    for (const file of result.files.filter((file) => file.endsWith("MODULE.md"))) {
+      const markdown = await readFile(file, "utf8");
+      for (const match of markdown.matchAll(/\]\(([^)]+)\)/g)) {
+        expect(await Bun.file(path.resolve(path.dirname(file), match[1]!)).exists()).toBe(true);
+      }
+    }
+  });
+
+  test("force is idempotent and retains unrelated user files", async () => {
+    const f = await fixture();
+    const options = { ...f, name: "Task", profile: "empty" as const };
+    const initial = await generateModule(options);
+    await Bun.write(path.join(initial.moduleDir, "notes.txt"), "keep");
+    const second = await generateModule({ ...options, force: true });
+    expect(second.changes).toEqual([]);
+    expect(second.registered).toBe(true);
+    expect(await readFile(path.join(initial.moduleDir, "notes.txt"), "utf8")).toBe("keep");
+  });
+
+  test("pack dry-run creates no directory; invalid parts fail before writes", async () => {
+    const f = await fixture();
+    const result = await generateModulePack({ ...f, name: "DataManager", parts: ["tables", "records"], dryRun: true });
+    expect(result.files).toHaveLength(6);
+    expect(await Bun.file(result.moduleDir).exists()).toBe(false);
+    await expect(generateModulePack({ ...f, name: "DataManager", parts: ["records", "records"] })).rejects.toThrow();
+    expect(await Bun.file(f.modulesRoot).exists()).toBe(false);
+  });
+
+  test("actual CLI process handles help and error exit codes without writes", async () => {
+    const f = await fixture();
+    const main = path.resolve(import.meta.dir, "../main.ts");
+    for (const [args, expected] of [
+      [["g", "module", "Task", "--help"], 0],
+      [["g", "module", "Task", "--modules-root"], 1],
+    ] as const) {
+      const process = Bun.spawn([Bun.argv[0]!, main, ...args], { cwd: f.root, stdout: "pipe", stderr: "pipe" });
+      const [code, out, err] = await Promise.all([process.exited, new Response(process.stdout).text(), new Response(process.stderr).text()]);
+      expect(code).toBe(expected);
+      expect(out + err).toContain(expected === 0 ? "Usage:" : "requires a value");
+    }
+    expect(await readdir(f.root)).toEqual(["host"]);
+  });
+});
+
+describe("codegen delegation", () => {
+  test("executes the project script with the requested target and propagates its status", async () => {
+    const f = await fixture();
+    await Bun.write(path.join(f.root, "package.json"), JSON.stringify({ scripts: { "di:generate": "bun run generate.ts" } }));
+    await Bun.write(path.join(f.root, "osnova.codegen.json"), JSON.stringify({ targets: { production: {} } }));
+    await Bun.write(path.join(f.root, "generate.ts"), 'await Bun.write("arguments.json", JSON.stringify(Bun.argv.slice(2))); process.exitCode = 23;');
+    expect(await runCodegen(f.root, "production")).toBe(23);
+    expect(await Bun.file(path.join(f.root, "arguments.json")).json()).toEqual(["--target", "production"]);
+  });
+
+  test("rejects missing project script and unknown target before subprocess execution", async () => {
+    const f = await fixture();
+    await expect(runCodegen(f.root)).rejects.toThrow("package.json");
+    await Bun.write(path.join(f.root, "package.json"), '{"scripts":{}}');
+    await expect(runCodegen(f.root)).rejects.toThrow("di:generate");
+    await Bun.write(path.join(f.root, "package.json"), '{"scripts":{"di:generate":"exit 9"}}');
+    await Bun.write(path.join(f.root, "osnova.codegen.json"), '{"targets":{"production":{}}}');
+    await expect(runCodegen(f.root, "unknown")).rejects.toThrow("Unknown codegen target");
+  });
+});
+
+test.each([
+  ["Status", "Status", "statuses"], ["statuses", "Status", "statuses"],
+  ["Address", "Address", "addresses"], ["addresses", "Address", "addresses"],
+  ["Class", "Class", "classes"], ["Case", "Case", "cases"],
+  ["cases", "Case", "cases"], ["Boy", "Boy", "boys"],
+  ["Category", "Category", "categories"], ["APIKey", "ApiKey", "api-keys"],
+  ["Constructor", "Constructor", "constructors"],
+])("normalizes common module names: %s", (input, entity, route) => {
+  expect(parseModuleName(input).entity).toBe(entity);
+  expect(parseModuleName(input).route).toBe(route);
+});
