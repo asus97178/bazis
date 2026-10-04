@@ -150,3 +150,17 @@ Admin/Client UI, `build:bin` и запуск обоих бинарников и�
 Первый сбой останавливает конвейер с ненулевым кодом. Toolchain квалифицирован
 только для macOS 26.5.2 / 25F84 arm64, поэтому CI-раннер — эта машина
 (self-hosted) до отдельной квалификации другой платформы.
+
+GitHub Actions: [.github/workflows/ci.yml](.github/workflows/ci.yml) запускает
+`run ci` на push в `main`, на теги `v*` и на pull request из этого же репозитория;
+живой PostgreSQL включается вручную (Run workflow → live). Раннер ставится на
+квалифицированный Mac один раз:
+
+1. Settings → Actions → Runners → New self-hosted runner (macOS, ARM64);
+   выполнить показанные `config.sh` с меткой `--labels osnova-qualified`.
+2. В файл `.env` каталога раннера добавить
+   `OSNOVA_BUN_BIN=/Users/<user>/.osnova/toolchain/bun-1.4.0/bun`.
+3. `./svc.sh install && ./svc.sh start` — раннер запускается вместе с системой.
+
+Docker Desktop должен быть запущен для live-прогона. Pull request из форков
+на этот раннер не попадают.
