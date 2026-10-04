@@ -45,17 +45,20 @@ export async function generateModule(options: GenerateModuleOptions): Promise<Ge
   const profile = options.profile ?? "minimal";
   if (!["empty", "minimal", "full"].includes(profile)) throw new Error(`Unknown profile: ${profile}`);
   const modulesRoot = await canonicalDirectory(path.resolve(options.modulesRoot ?? "src/app/modules"));
-  let authImportPath: string | undefined;
+  let authImportPath: string | null | undefined;
   if (profile === "full") {
-    const authRoot = await canonicalDirectory(path.resolve("src/app/modules/auth"));
-    for (const helper of ["tokenKinds.ts", "jwtAuth.ts"]) {
-      if (!(await fileInfo(path.join(authRoot, helper)))?.isFile()) {
-        throw new Error(`Full profile requires host auth helper: ${path.join(authRoot, helper)}. Use --minimal or --empty for a standalone scaffold.`);
-      }
-    }
-    authImportPath = moduleImportPath(path.join(modulesRoot, naming.folder, "http", `${naming.entity}Controller.ts`), authRoot);
+    // The host's auth helpers are optional: without them the controller is
+    // generated without @Authorize and the command says so.
+    const authDir = path.resolve("src/app/modules/auth");
+    const helpers = await Promise.all(["tokenKinds.ts", "jwtAuth.ts"].map(async (helper) => (await fileInfo(path.join(authDir, helper)))?.isFile() === true));
+    authImportPath = helpers.every(Boolean)
+      ? moduleImportPath(path.join(modulesRoot, naming.folder, "http", `${naming.entity}Controller.ts`), await canonicalDirectory(authDir))
+      : null;
   }
-  return generateFiles(options, naming, naming.folder, buildModuleTemplates(naming, profile, authImportPath));
+  const result = await generateFiles(options, naming, naming.folder, buildModuleTemplates(naming, profile, authImportPath));
+  return authImportPath === null
+    ? { ...result, warnings: [...result.warnings, "No auth helpers in src/app/modules/auth: the full profile controller has no @Authorize. Protect its routes before exposing them."] }
+    : result;
 }
 
 export async function generateModulePack(options: GenerateModulePackOptions): Promise<GenerateModuleResult> {

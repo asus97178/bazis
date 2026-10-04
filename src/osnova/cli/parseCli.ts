@@ -21,14 +21,16 @@ export type ParseCliResult =
   | { readonly kind: "new"; readonly name: string; readonly outputPath?: string; readonly frameworkPath?: string; readonly linkFramework: boolean; readonly dryRun: boolean }
   | { readonly kind: "generate"; readonly args: ParsedGenerateArgs }
   | { readonly kind: "codegen"; readonly target?: string }
+  | { readonly kind: "dev" }
+  | { readonly kind: "build"; readonly bin: boolean; readonly outfile?: string }
   | { readonly kind: "error"; readonly message: string };
 
 const GENERATOR_ALIASES = new Map<string, "module" | "pack">([
   ["module", "module"], ["m", "module"],
   ["pack", "pack"], ["p", "pack"], ["module-pack", "pack"],
 ]);
-const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--parts", "--target", "--path", "--framework"]);
-const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework"]);
+const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--parts", "--target", "--path", "--framework", "--outfile"]);
+const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--bin"]);
 
 /** Parsing is pure: help and invalid input can never start generation. */
 export function parseCliArgs(argv: readonly string[]): ParseCliResult {
@@ -59,7 +61,7 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   const [command, generatorToken, name] = positional;
   const target = options.get("--target");
   if (command === "new") {
-    if (positional.length !== 2) return error("Use: osnova new <Name> [--path <directory>] [--framework <directory>] [--link-framework] [--dry-run]");
+    if (positional.length !== 2) return error("Use: osnv new <Name> [--path <directory>] [--framework <directory>] [--link-framework] [--dry-run]");
     for (const option of options.keys()) {
       if (option !== "--path" && option !== "--framework" && option !== "--link-framework" && option !== "--dry-run") {
         return error(`Option ${option} is not supported by new.`);
@@ -75,15 +77,28 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   if (target !== undefined && !/^[a-z][a-z0-9-]*$/.test(target)) {
     return error("Target must be a codegen target name or all.");
   }
+  if (command === "dev") {
+    if (positional.length !== 1 || options.size > 0) return error("Use: osnv dev");
+    return { kind: "dev" };
+  }
+  if (command === "build") {
+    if (positional.length !== 1) return error("Use: osnv build [--bin [--outfile <path>]]");
+    for (const option of options.keys()) {
+      if (option !== "--bin" && option !== "--outfile") return error(`Option ${option} is not supported by build.`);
+    }
+    if (options.has("--outfile") && !options.has("--bin")) return error("--outfile requires --bin.");
+    return { kind: "build", bin: options.has("--bin"), outfile: options.get("--outfile") };
+  }
+  if (options.has("--bin") || options.has("--outfile")) return error("--bin and --outfile are only supported by build.");
   if (command === "codegen") {
-    if (positional.length !== 1) return error("Use: osnova codegen [--target <name|all>]");
+    if (positional.length !== 1) return error("Use: osnv codegen [--target <name|all>]");
     for (const option of options.keys()) {
       if (option !== "--target") return error(`Option ${option} is not supported by codegen.`);
     }
     return { kind: "codegen", target };
   }
   if (command !== "g" && command !== "generate") {
-    return error(`Unknown command: ${command ?? "(missing)"}. Use: osnova --help`);
+    return error(`Unknown command: ${command ?? "(missing)"}. Use: osnv --help`);
   }
   if (generatorToken === undefined) return error("Generator is required: module (m) or pack (p).");
   if (options.has("--path") || options.has("--framework") || options.has("--link-framework")) return error("--path, --framework and --link-framework are only supported by new.");
@@ -100,7 +115,7 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   if (generator === "pack" && profiles.length > 0) return error("Pack parts start empty; module profile flags are not supported by pack.");
   if (generator === "module" && options.has("--parts")) return error("--parts is only supported by pack.");
   if (options.has("--no-codegen") && target !== undefined) return error("--target cannot be used with --no-codegen.");
-  if (options.has("--no-register") && target !== undefined) return error("Use osnova codegen --target separately after connecting the module.");
+  if (options.has("--no-register") && target !== undefined) return error("Use osnv codegen --target separately after connecting the module.");
 
   const parts = options.get("--parts")?.split(",").map((part) => part.trim()) ?? [];
   try {

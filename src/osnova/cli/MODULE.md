@@ -1,41 +1,31 @@
 # Osnova CLI
 
-Версия паспорта: 1.8. Дата сверки: 2026-10-04. Тип: атомарный технический модуль.
-Область: разбор команд, генерация проектов и модулей, регистрация в host, codegen и клиент запуска агента.
+Версия паспорта: 1.9. Дата сверки: 2026-10-05. Тип: атомарный технический модуль.
+Область: разбор команд, генерация проектов и модулей, регистрация в host, codegen,
+запуск приложения и сборка (`osnv dev`, `osnv build`, `osnv build --bin`).
 Точка входа: [main.ts](main.ts), функция `runCli(argv, runtime)`.
 CLI выполняется отдельным процессом и не регистрируется в `AppModule`.
 
-## Запуск агента
+## Запуск и сборка
 
 ```sh
-./bin/osnova agent run main --server http://127.0.0.1:3000 --auth-file /private/path/client.json --message "Какие агенты доступны?"
+bunx osnv dev                         # codegen, затем src/index.ts из исходников
+bunx osnv build                       # codegen и проверка типов (tsc --noEmit)
+bunx osnv build --bin                 # + исполняемый файл bin/<имя из package.json>
+bunx osnv build --bin --outfile dist/app
 ```
 
-Реализация — [AgentClientService](AgentClient.service.ts), существующий HttpClient.
-Команда обращается к приложению: вход → создание диалога → сообщение → выход.
-На сервере работают те же ChatService и RunService, что обслуживают Vue.
-Запуск отображается в истории пользователя. Вывод CLI — конечный ответ;
-поток событий терминала и продолжение существующего диалога пока не реализованы.
+Реализация — [build.ts](build.ts). Точка входа берётся из `osnova.codegen.json`
+(первый entrypoint цели по умолчанию), TypeScript — из `node_modules` проекта.
+`dev` передаёт SIGINT/SIGTERM приложению и возвращает его код завершения.
+`build --bin` компилирует из временного каталога (`compileBinary`): Bun 1.4.0
+оставляет `.bun-build` в рабочем каталоге, если его исполняемый файл read-only
+или помечен `uchg`. Bun для дочерних процессов — `scripts/osnova-bun`, иначе
+`OSNOVA_BUN_BIN`, иначе `bun` из PATH.
 
-| Вход | Правило |
-| --- | --- |
-| agent-id | Обязательный slug, до 64 символов, например main |
-| --server | Обязательный HTTPS origin либо loopback HTTP; без пути, credentials, query и hash |
-| --auth-file | Обязательный путь до 4096 символов; обычный файл, не symlink, до 4096 байт, права без group/other (chmod 600) |
-| --message | Обязательный непустой текст до 8000 символов |
-| --model | Необязательный ID до 121 символа, буквы/цифры/._-; проверяется сервером для codex-профиля |
-| --reasoning | Необязательный уровень до 32 символов, `[a-z][a-z0-9_-]*`; например high |
-
-Файл авторизации: `{"server":"http://127.0.0.1:3000","email":"client@example.test","password":"..."}`.
-Это отдельная клиентская учётная запись, не административная. server в файле
-должен точно совпадать с origin команды. Пароль не передаётся в argv, лог или
-вызов модели. Полученная сессия временная и отзывается в finally; при сетевом
-сбое выход выполняется best effort. Redirect и автоматические повторы запрещены.
-Ответ HTTP ограничен 256000 байт, обычный timeout 15 секунд, сообщение — 160 секунд.
-SIGINT/SIGTERM отменяет HTTP и отправляет штатную команду отмены, сохраняя сессию
-до завершения этой попытки. Потерянный ответ не доказывает отсутствие выполнения:
-источником результата остаётся история в приложении. Коды выхода: 0 completed,
-1 ошибка/неуспешный ход, 130 отмена. AgentClientService не создаёт свои ORM или DI.
+Команда `agent run` (клиент чат-API приложения) перенесена в приложение:
+`bun run agent:run` и `src/app/modules/agent-chat/client/AgentClient.service.ts`.
+Фреймворк не знает об адресах и cookie конкретного приложения.
 
 ## Ответственность и компоненты
 
@@ -105,6 +95,7 @@ generic-параметров и связывает их с конкретным 
 | `registerModuleInSource` | [moduleRegistration.ts](moduleRegistration.ts) | Исходник host, абсолютные пути, класс | TypeScript с импортом и регистрацией |
 | Шаблоны | [templates/module.ts](templates/module.ts), [templates/pack.ts](templates/pack.ts), [templates/passport.ts](templates/passport.ts) | Нормализованное имя и профиль | Файлы и `MODULE.md` |
 | `runCodegen` | [codegen.ts](codegen.ts) | cwd и target | Запуск проектного `di:generate`, код завершения |
+| `runDev`, `runBuild`, `compileBinary` | [build.ts](build.ts) | cwd, `{ bin, outfile }`, функция codegen | Запуск приложения; проверка типов; исполняемый файл без `.bun-build` в проекте |
 
 DI, ORM, HTTP, AI и background самого CLI не используются. Генерируемые модули
 подключают существующие публичные ORM/DI API; зависимости конструкторов связывает codegen.
@@ -112,19 +103,21 @@ DI, ORM, HTTP, AI и background самого CLI не используются. 
 ## Команды и входные поля
 
 ```sh
-bun run osnova --help
-bun run osnova new MyApp --dry-run
-bun run osnova new MyApp
-bun run osnova g module Task --dry-run
-bun run osnova g m Guest --no-codegen
-bun run osnova g module Mailer --empty --no-register
-bun run osnova g module Catalog --full --no-codegen
-bun run osnova g pack DataManager --parts tables,fields,validators,records --dry-run
-bun run osnova codegen --target production
+bunx osnv --help
+bunx osnv new MyApp --dry-run
+bunx osnv new MyApp
+bunx osnv g module Task --dry-run
+bunx osnv g m Guest --no-codegen
+bunx osnv g module Mailer --empty --no-register
+bunx osnv g module Catalog --full --no-codegen
+bunx osnv g pack DataManager --parts tables,fields,validators,records --dry-run
+bunx osnv codegen --target production
 ```
 
 В этом репозитории команды Bun выполняются через `scripts/osnova-bun` с
-квалифицированным `OSNOVA_BUN_BIN`. Скомпилированный CLI: `bin/osnova`.
+квалифицированным `OSNOVA_BUN_BIN` (`./scripts/osnova-bun run osnv …`).
+Скомпилированный CLI: `bin/osnv`. В созданном проекте скрипты `dev`, `build`,
+`build:bin`, `codegen` — обёртки над `osnv dev|build|build --bin|codegen`.
 
 | Поле | Тип / источник | Обязательность / default | Проверка / поведение |
 | --- | --- | --- | --- |
@@ -140,7 +133,7 @@ bun run osnova codegen --target production
 | `--app-module` | path string, cwd | `{modules-root}/App.module.ts` | Импорт вычисляется относительно этого файла |
 | `--empty` | flag | false | Только module: точка подключения и паспорт |
 | `--minimal` | flag | true | Только module: CRUD и паспорт |
-| `--full` | flag | false | Только module: CRUD/list/cache/auth/background/AI; старый алиас `--enterprise` |
+| `--full` | flag | false | Только module: CRUD/list/cache/auth/background/AI; старый алиас `--enterprise`. `@Authorize` генерируется, если в проекте есть `src/app/modules/auth/{tokenKinds,jwtAuth}.ts`; иначе маршруты публичные и CLI предупреждает. Для запуска host нужен кэш (`runApp({ cache: memory() })`) и provider БД |
 | `--no-register` | flag | false | Пропустить host и автоматический codegen |
 | `--no-codegen` | flag | false | Создать и подключить, не запускать codegen |
 | `--target` | string | Проектный default | Имя из `osnova.codegen.json` или `all`; для codegen или генерации с регистрацией |
@@ -161,7 +154,7 @@ CLI не принимает null. Пропущенные значения фла
 `src/index.ts` и корневой `App.module.ts`. Корень приложения — композиция с
 `imports: []`, без предметного модуля. Вход HTTP слушает loopback на порту
 `PORT` (по умолчанию 3000) и включает `/health`. Генерация модулей остаётся
-командой `bun run osnova g module ...` в новом проекте; для первой функции
+командой `bunx osnv g module ...` в новом проекте; для первой функции
 без готовой БД подходит `--empty`. DI-экспорты корня: `[]`; TypeScript-вход —
 `src/index.ts`; опубликованный HTTP-вход — `/health`.
 

@@ -16,11 +16,11 @@ describe("binary build targets", () => {
     expect(pkg.scripts["build:bin"]).toContain("build:bin:app");
     expect(pkg.scripts["build:bin"]).toContain("build:bin:cli");
     expect(pkg.scripts["build:bin:app"]).toContain("scripts/build-bin.ts src/index.ts bin/osnova-app");
-    expect(pkg.scripts["build:bin:cli"]).toContain("scripts/build-bin.ts src/osnova/cli/main.ts bin/osnova");
+    expect(pkg.scripts["build:bin:cli"]).toContain("scripts/build-bin.ts src/osnova/cli/main.ts bin/osnv");
     expect(pkg.scripts["prebuild:bin"]).toBe("bun run di:generate");
     expect(pkg.scripts.prebuild).toBe("bun run di:generate");
     expect(pkg.scripts["bin:run"]).toBe("OSNOVA_ENV=production ./bin/osnova-app");
     expect(pkg.scripts["bin:run:app"]).toBe("OSNOVA_ENV=production ./bin/osnova-app");
-    expect(pkg.scripts["bin:run:cli"]).toBe("./bin/osnova");
+    expect(pkg.scripts["bin:run:cli"]).toBe("./bin/osnv");
   });
 });

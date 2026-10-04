@@ -26,7 +26,7 @@ cp .env.example .env
 Пошаговый путь от CLI до бинарника: [быстрый старт](docs/QUICKSTART.md).
 
 ```sh
-./scripts/osnova-bun run osnova new MyApp
+./scripts/osnova-bun run osnv new MyApp
 cd my-app
 bun install
 bun run dev
@@ -39,7 +39,7 @@ bun run dev
 сохраните этот каталог в Git и переносите вместе с приложением. Зависимость
 `file:./vendor/osnv` не требует исходного checkout. Для совместной разработки
 с живым checkout есть явный `--link-framework`. После создания проекта модуль без
-готовой БД можно добавить командой `bun run osnova g module Task --empty`.
+готовой БД можно добавить командой `bunx osnv g module Task --empty`.
 
 Команды config проверяют активные DB, LLM, JWT, SMS и HTTP-настройки.
 Клиенты не создаются, сетевые подключения не открываются, SMS не отправляются.
@@ -112,7 +112,7 @@ Production требует восемь непустых секретов из [.
 ./scripts/osnova-bun run build:bin
 ./bin/osnova-app config check --environment=production
 ./bin/osnova-app config inspect --environment=test --config-file=/path/config.json
-./bin/osnova --help
+./bin/osnv --help
 ```
 
 Бинарник приложения содержит статические объявления конфигурации. Команды

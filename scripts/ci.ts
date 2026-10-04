@@ -47,7 +47,7 @@ run("binaries", [bun, "run", "build:bin"]);
 const outside = mkdtempSync(join(tmpdir(), "osnova-ci-bin-"));
 try {
   run("app binary config", [join(root, "bin/osnova-app"), "config", "check", "--environment=test"], outside);
-  run("cli binary", [join(root, "bin/osnova"), "--help"], outside);
+  run("cli binary", [join(root, "bin/osnv"), "--help"], outside);
 } finally {
   rmSync(outside, { recursive: true, force: true });
 }

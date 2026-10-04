@@ -147,7 +147,7 @@
 - Атомарный модуль: `g module <Name>` с подходящим профилем `--empty`, `--minimal`
   или `--full`.
 - Составной модуль с частями: `g pack <Name> --parts <part-a,part-b,...>`.
-- Запуск из корня репозитория: `./scripts/osnova-bun run osnova <команда>`
+- Запуск из корня репозитория: `./scripts/osnova-bun run osnv <команда>`
   с квалифицированным `OSNOVA_BUN_BIN`. Параметры каталогов и остальные флаги
   смотри в [паспорте CLI](src/osnova/cli/MODULE.md).
 
