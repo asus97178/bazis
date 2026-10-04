@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import path from "node:path";
-import { mkdtemp, mkdir, readdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import ts from "typescript";
 import { collectTargetReachability, projectPath } from "../di-generate-target";
@@ -164,6 +164,37 @@ test("fails closed from the shared candidate index for real DI, HTTP, Agent and 
       "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/z-agent.ts",
     ]);
     expect(await Bun.file(path.join(root, "src/generated/osnova/sentinel.ts")).text()).toBe("untouched\n");
+    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).exists()).toBe(false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a DI class with an unknown constructor dependency fails codegen loudly instead of being dropped", async () => {
+  const root = await temporaryProject({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", experimentalDecorators: true }, include: ["src/**/*.ts"] }),
+    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "src/index.ts": "export { AppModule } from \"./app\";\n",
+    "src/app.ts": [
+      'import { Module, singleton } from "osnv/core/di";',
+      "interface Clock { now(): number }",
+      "export class Reporter { constructor(private readonly clock: Clock) {} }",
+      "export class Plain { constructor(readonly label: Clock) {} }",
+      "@Module({ providers: [singleton(Reporter)], exports: [] })",
+      "export class AppModule {}",
+      "",
+    ].join("\n"),
+  });
+  // Installed framework, as in an application created by `osnv new`.
+  await mkdir(path.join(root, "node_modules"), { recursive: true });
+  await symlink(path.resolve("src/osnova"), path.join(root, "node_modules/osnv"));
+  try {
+    const result = await runGenerator(root);
+    expect(result.exit).not.toBe(0);
+    const diagnostics = result.output.split("\n").filter((line) => line.includes("OSNOVA_DI_DEPENDENCY_UNKNOWN"));
+    // Only the DI-constructed class is reported; Plain is not managed by DI.
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toContain('constructor parameter 1 of "Reporter" has type "Clock"');
     expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).exists()).toBe(false);
   } finally {
     await rm(root, { recursive: true, force: true });
