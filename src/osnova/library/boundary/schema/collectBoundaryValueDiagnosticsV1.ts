@@ -1,6 +1,6 @@
 import {
   appendJsonPointerV1,
-  OSNOVA_DIAGNOSTIC_LIMIT_V1,
+  OSNV_DIAGNOSTIC_LIMIT_V1,
   osnovaDiagnosticV1,
   type OsnovaDiagnosticV1,
 } from "../diagnostics-v1";
@@ -18,7 +18,7 @@ export function collectBoundaryValueDiagnosticsV1(
   pointer: string,
   diagnostics: OsnovaDiagnosticV1[],
 ): void {
-  if (diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) return;
+  if (diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) return;
   if (value === null && (schema.type === "null" || schema.nullable === true)) {
     return;
   }
@@ -77,7 +77,7 @@ export function collectBoundaryValueDiagnosticsV1(
         validateUniqueItems(value, pointer, diagnostics);
       }
       for (let index = 0; index < value.length; index += 1) {
-        if (diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) break;
+        if (diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) break;
         collectBoundaryValueDiagnosticsV1(
           schema.items,
           value[index]!,
@@ -160,7 +160,7 @@ function validateObject(
   }
 
   for (const required of schema.required ?? []) {
-    if (diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) break;
+    if (diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) break;
     if (!Object.prototype.hasOwnProperty.call(value, required)) {
       addDiagnostic(diagnostics, valueDiagnostic(
         "BSV1_VALUE_REQUIRED",
@@ -173,7 +173,7 @@ function validateObject(
   const properties = schema.properties ?? Object.freeze(Object.create(null)) as Readonly<Record<string, BoundarySchemaV1>>;
   const additional = schema.additionalProperties ?? false;
   for (const key of keys) {
-    if (diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) break;
+    if (diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) break;
     const propertyPointer = appendJsonPointerV1(pointer, key);
     const propertySchema = properties[key];
     if (propertySchema !== undefined) {
@@ -210,7 +210,7 @@ function validateUniqueItems(
 ): void {
   const firstByCanonicalValue = new Map<string, number>();
   for (let index = 0; index < values.length; index += 1) {
-    if (diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) break;
+    if (diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) break;
     const canonical = canonicalBoundaryJsonV1(values[index]);
     const first = firstByCanonicalValue.get(canonical);
     if (first !== undefined) {
@@ -316,7 +316,7 @@ function addDiagnostic(
   diagnostics: OsnovaDiagnosticV1[],
   diagnostic: OsnovaDiagnosticV1,
 ): void {
-  if (diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) return;
+  if (diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) return;
   diagnostics.push(diagnostic);
 }
 

@@ -26,14 +26,14 @@ export class ProbeInput { @Validator({ required: true, minLength: 3 }) name = ""
   try {
     await mkdir(path.join(root, "node_modules"));
     await symlink(path.join(repository, "src/osnova"), path.join(root, "node_modules/osnv"));
-    await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
+    await Bun.write(path.join(root, "osnv.config.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
     await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true,
     }, include: ["src/**/*.ts"] }));
     await Bun.write(source, valid);
     const generated = await run();
     expect(generated.exit, generated.output).toBe(0);
-    const output = path.join(root, "src/generated/osnova/bindings.ts");
+    const output = path.join(root, "src/generated/osnv/bindings.ts");
     const before = await Bun.file(output).text();
     expect(before).toContain('"source":"route","name":"id"');
     expect(before).toContain('"source":"body","model":"ProbeInput"');
@@ -42,7 +42,7 @@ export class ProbeInput { @Validator({ required: true, minLength: 3 }) name = ""
     // has no registration decorator, and no controller owns manual bindings.
     await Bun.write(path.join(root, "runtime-probe.ts"), `
 import { ProbeController, ProbeInput } from "./src/index";
-import { registerOsnovaGeneratedRuntime } from "./src/generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "./src/generated/osnv/runtime";
 import { resolveGeneratedBindings } from "./node_modules/osnv/core/http/Binding/autoBindings";
 import { bindArguments } from "./node_modules/osnv/core/http/Binding/ParameterBinder";
 import { HttpContext } from "./node_modules/osnv/core/http/HttpContext/HttpContext";
@@ -66,13 +66,13 @@ console.log("automatic route/body/context/validation: PASS");
     expect(runtimeExit, runtimeOut + runtimeErr).toBe(0);
     expect(runtimeOut).toContain("automatic route/body/context/validation: PASS");
     for (const [code, diagnostic] of [
-      [valid.replace("state: string", 'state: "active" | "inactive"'), "OSNOVA_HTTP_BINDING_UNRESOLVED"],
+      [valid.replace("state: string", 'state: "active" | "inactive"'), "OSNV_HTTP_BINDING_UNRESOLVED"],
       [valid + `import type { FieldSelector } from "osnv/library/orm";
 interface User { tenantId: string; age: number; }
-export function filter(u: FieldSelector<User>) { return u.tenantId.eq("a") && u.age.gte(18); }`, "OSNOVA_ORM_PREDICATE_LOGIC"],
+export function filter(u: FieldSelector<User>) { return u.tenantId.eq("a") && u.age.gte(18); }`, "OSNV_ORM_PREDICATE_LOGIC"],
       [valid + `import type { FieldSelector } from "osnv/library/orm";
 interface User { age: number; }
-export function filter(u: FieldSelector<User>) { return u.age.lt(18) || u.age.gt(65); }`, "OSNOVA_ORM_PREDICATE_LOGIC"],
+export function filter(u: FieldSelector<User>) { return u.age.lt(18) || u.age.gt(65); }`, "OSNV_ORM_PREDICATE_LOGIC"],
     ] as const) {
       await Bun.write(source, code);
       const rejected = await run();

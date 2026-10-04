@@ -5,8 +5,8 @@ import { SchedulerProbe } from "./SchedulerProbe";
 
 assert.equal(Bun.version, authority.runtime.version);
 assert.equal(Bun.revision, authority.runtime.revision);
-const schedulerMode = process.env.OSNOVA_JWT_STAND_SCHEDULER;
-assert(schedulerMode === undefined || schedulerMode === "0" || schedulerMode === "1", "Invalid OSNOVA_JWT_STAND_SCHEDULER");
+const schedulerMode = process.env.OSNV_JWT_STAND_SCHEDULER;
+assert(schedulerMode === undefined || schedulerMode === "0" || schedulerMode === "1", "Invalid OSNV_JWT_STAND_SCHEDULER");
 const peers = ["http://app-a:3000", "http://app-b:3000"];
 const healthy = new Set<string>();
 let cursor = 0, probing = false;

@@ -20,12 +20,12 @@ import {
 /**
  * Живая интеграция провайдера PostgreSQL.
  *
- * Запускается только если задан `OSNOVA_PG_URL` (иначе весь блок пропускается),
+ * Запускается только если задан `OSNV_PG_URL` (иначе весь блок пропускается),
  * поэтому в обычном `bun test` без базы он не мешает, а в CI с поднятой PG —
  * проверяет реальный путь: миграция, RETURNING-ключи, нативные типы
  * (boolean/timestamptz/jsonb), запросы, include и транзакционный SaveChanges.
  *
- *   OSNOVA_PG_URL="postgres://postgres:PASSWORD@localhost:5432/bun_app" bun test
+ *   OSNV_PG_URL="postgres://postgres:PASSWORD@localhost:5432/bun_app" bun test
  *
  * Использует таблицы `pg_it_*` и удаляет их до и после прогона.
  */
@@ -116,7 +116,7 @@ class RoadmapContext extends DbContext {
   readonly softDocs = this.set(PgSoftDoc);
 }
 
-const url = process.env.OSNOVA_PG_URL;
+const url = process.env.OSNV_PG_URL;
 
 async function dropCoreTables(provider: PostgresProvider): Promise<void> {
   await provider.execute("DROP TABLE IF EXISTS pg_it_products", []);

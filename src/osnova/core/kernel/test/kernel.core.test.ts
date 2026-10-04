@@ -34,28 +34,28 @@ describe("Kernel core", () => {
     expect(new Environment("production").debug).toBe(false);
     expect(new Environment("development").isDevelopment).toBe(true);
     expect(new Environment("test").isTest).toBe(true);
-    process.env.OSNOVA_ENV = "prod";
+    process.env.OSNV_ENV = "prod";
     try {
       expect(Environment.fromProcess().name).toBe("production");
-      process.env.OSNOVA_ENV = "staging";
+      process.env.OSNV_ENV = "staging";
       expect(() => Environment.fromProcess()).toThrow(KernelError);
     } finally {
-      delete process.env.OSNOVA_ENV;
+      delete process.env.OSNV_ENV;
     }
   });
 
   test("missing process environment fails closed to production", () => {
-    const previousOsnova = process.env.OSNOVA_ENV;
+    const previousOsnova = process.env.OSNV_ENV;
     const previousNode = process.env.NODE_ENV;
     try {
-      delete process.env.OSNOVA_ENV;
+      delete process.env.OSNV_ENV;
       delete process.env.NODE_ENV;
       const environment = Environment.fromProcess();
       expect(environment.name).toBe("production");
       expect(environment.debug).toBe(false);
     } finally {
-      if (previousOsnova === undefined) delete process.env.OSNOVA_ENV;
-      else process.env.OSNOVA_ENV = previousOsnova;
+      if (previousOsnova === undefined) delete process.env.OSNV_ENV;
+      else process.env.OSNV_ENV = previousOsnova;
       if (previousNode === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previousNode;
     }

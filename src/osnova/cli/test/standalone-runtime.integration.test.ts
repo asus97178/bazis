@@ -64,7 +64,7 @@ export class AuditProbeModule {}`,
 import { AppModule } from "./app/modules/App.module";
 import { UserService } from "./app/modules/audit-probe/User.service";
 import { CachedService } from "./app/modules/audit-probe/Cached.service";
-import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "./generated/osnv/runtime";
 await registerOsnovaGeneratedRuntime();
 const container = createContainer(AppModule, { validateOnBuild: true });
 try {

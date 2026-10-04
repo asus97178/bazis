@@ -123,11 +123,11 @@ export function compileBinary(bun: string, entry: string, outfile: string): numb
 }
 
 async function projectEntry(cwd: string): Promise<string> {
-  const configFile = Bun.file(path.join(cwd, "osnova.codegen.json"));
-  if (!await configFile.exists()) throw new Error("osnova.codegen.json not found in the current directory.");
+  const configFile = Bun.file(path.join(cwd, "osnv.config.json"));
+  if (!await configFile.exists()) throw new Error("osnv.config.json not found in the current directory.");
   const config = await configFile.json() as { defaultTarget?: string; targets?: Record<string, { entrypoints?: unknown }> };
   const entry = (config.targets?.[config.defaultTarget ?? ""]?.entrypoints as unknown[] | undefined)?.[0];
-  if (typeof entry !== "string" || !entry) throw new Error("osnova.codegen.json has no entrypoint for its default target.");
+  if (typeof entry !== "string" || !entry) throw new Error("osnv.config.json has no entrypoint for its default target.");
   return path.resolve(cwd, entry);
 }
 

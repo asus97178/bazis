@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, Key, postgres, type PostgresProvider } from "../index";
 
-const url = process.env.OSNOVA_PG_URL;
+const url = process.env.OSNV_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 const prefix = `ormtx_${run}_`;
 const owned = new Set<string>();

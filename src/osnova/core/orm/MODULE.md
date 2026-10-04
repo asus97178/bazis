@@ -151,8 +151,8 @@ boolean, включая bigint. Это provider-independent тесты без ф
 не объявляют проверенным выполнение фильтра на PostgreSQL или в бинарнике.
 
 [Физическая регрессия](test/orm.release-095.postgres.live.test.ts) предназначена
-только для одноразового PostgreSQL: `OSNOVA_RELEASE_095_PG=owned-disposable-v1`,
-`OSNOVA_RELEASE_095_PG_URL` с `127.0.0.1`, явным портом, отличным от 5432, и базой
+только для одноразового PostgreSQL: `OSNV_RELEASE_095_PG=owned-disposable-v1`,
+`OSNV_RELEASE_095_PG_URL` с `127.0.0.1`, явным портом, отличным от 5432, и базой
 `osnova_release_095`. Тест создаёт уникальную схему `release_095_<uuid>` и свои
 таблицы, проверяет фактическую выборку и удаляет только эту схему в `finally`.
 Обычный прогон без guard даёт SKIP и не подтверждает физическую квалификацию.

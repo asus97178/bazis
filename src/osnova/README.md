@@ -32,15 +32,15 @@ bun add osnv
 // src/index.ts — так его создаёт `bunx osnv new`
 import { runApp } from "osnv/core/app";
 import { AppModule } from "./app/modules/App.module";
-import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "./generated/osnv/runtime";
 
 await registerOsnovaGeneratedRuntime();
 await runApp(AppModule, { http: { hostname: "127.0.0.1", port: 3000, health: true } });
 ```
 
-`src/generated/osnova/` создаёт кодогенерация
+`src/generated/osnv/` создаёт кодогенерация
 `bun run node_modules/osnv/core/scripts/di-generate.ts` по файлу
-`osnova.codegen.json`: она связывает зависимости конструкторов и HTTP-модели.
+`osnv.config.json`: она связывает зависимости конструкторов и HTTP-модели.
 Проще всего начать с `bunx osnv new` — он создаёт эти файлы и скрипты.
 Публичные входы перечислены в `exports` файла `package.json`.
 

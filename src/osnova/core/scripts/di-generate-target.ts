@@ -18,32 +18,32 @@ const TARGET_NAME = /^[a-z][a-z0-9-]*$/;
 export async function readCodegenConfig(): Promise<CodegenConfig> {
   let parsed: unknown;
   try {
-    parsed = await Bun.file("osnova.codegen.json").json();
+    parsed = await Bun.file("osnv.config.json").json();
   } catch {
-    throw new Error("OSNOVA_CODEGEN_CONFIG_INVALID: osnova.codegen.json");
+    throw new Error("OSNV_CODEGEN_CONFIG_INVALID: osnv.config.json");
   }
-  if (!parsed || typeof parsed !== "object") throw new Error("OSNOVA_CODEGEN_CONFIG_INVALID: root object required");
+  if (!parsed || typeof parsed !== "object") throw new Error("OSNV_CODEGEN_CONFIG_INVALID: root object required");
   const value = parsed as Partial<CodegenConfig>;
   if (value.version !== 1 || typeof value.defaultTarget !== "string" || !value.targets || typeof value.targets !== "object") {
-    throw new Error("OSNOVA_CODEGEN_CONFIG_INVALID: version=1, defaultTarget and targets are required");
+    throw new Error("OSNV_CODEGEN_CONFIG_INVALID: version=1, defaultTarget and targets are required");
   }
   for (const [name, target] of Object.entries(value.targets)) {
     if (!TARGET_NAME.test(name) || !target || !Array.isArray(target.entrypoints) || target.entrypoints.length === 0) {
-      throw new Error(`OSNOVA_CODEGEN_CONFIG_INVALID: invalid target ${name}`);
+      throw new Error(`OSNV_CODEGEN_CONFIG_INVALID: invalid target ${name}`);
     }
     for (const candidate of [...target.entrypoints, ...(target.applicationParts ?? [])]) normalizeConfiguredPath(candidate);
   }
-  if (!Object.hasOwn(value.targets, value.defaultTarget)) throw new Error("OSNOVA_CODEGEN_CONFIG_INVALID: defaultTarget is undeclared");
+  if (!Object.hasOwn(value.targets, value.defaultTarget)) throw new Error("OSNV_CODEGEN_CONFIG_INVALID: defaultTarget is undeclared");
   return value as CodegenConfig;
 }
 
 export function normalizeConfiguredPath(value: string): string {
   if (typeof value !== "string" || path.isAbsolute(value) || value.includes("*") || value.includes("?")) {
-    throw new Error(`OSNOVA_CODEGEN_CONFIG_INVALID: invalid path ${String(value)}`);
+    throw new Error(`OSNV_CODEGEN_CONFIG_INVALID: invalid path ${String(value)}`);
   }
   const normalized = path.posix.normalize(value.replaceAll("\\", "/"));
   if (normalized.startsWith("../") || normalized === ".." || normalized !== value) {
-    throw new Error(`OSNOVA_CODEGEN_CONFIG_INVALID: path must be normalized root-relative: ${value}`);
+    throw new Error(`OSNV_CODEGEN_CONFIG_INVALID: path must be normalized root-relative: ${value}`);
   }
   return normalized;
 }

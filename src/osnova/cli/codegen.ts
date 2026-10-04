@@ -6,8 +6,8 @@ const GENERATOR = "core/scripts/di-generate.ts";
 /** Run the framework generator for the project in `cwd`; returns its exit code. */
 export async function runCodegen(cwd: string, target?: string): Promise<number> {
   if (target !== undefined) {
-    const configFile = Bun.file(path.join(cwd, "osnova.codegen.json"));
-    if (!await configFile.exists()) throw new Error("--target requires osnova.codegen.json in the current directory.");
+    const configFile = Bun.file(path.join(cwd, "osnv.config.json"));
+    if (!await configFile.exists()) throw new Error("--target requires osnv.config.json in the current directory.");
     const config = await configFile.json();
     if (target !== "all" && !Object.hasOwn(config.targets ?? {}, target)) throw new Error(`Unknown codegen target: ${target}`);
   }
@@ -34,7 +34,7 @@ export function resolveGenerator(cwd: string): string {
 export async function resolveBun(cwd: string): Promise<string> {
   const wrapper = path.join(cwd, "scripts/osnova-bun");
   // process.execPath can be the compiled CLI itself. Never invoke it as Bun.
-  const executable = await Bun.file(wrapper).exists() ? wrapper : (process.env.OSNOVA_BUN_BIN || Bun.which("bun"));
-  if (!executable) throw new Error("Bun was not found. Set OSNOVA_BUN_BIN or put Bun on PATH.");
+  const executable = await Bun.file(wrapper).exists() ? wrapper : (process.env.OSNV_BUN_BIN || Bun.which("bun"));
+  if (!executable) throw new Error("Bun was not found. Set OSNV_BUN_BIN or put Bun on PATH.");
   return executable;
 }

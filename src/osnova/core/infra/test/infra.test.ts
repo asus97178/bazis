@@ -203,7 +203,7 @@ describe("config objects (defineConfig → connector)", () => {
   });
 
   test("empty required host fails fast with a clear InfraError", () => {
-    // A unique prefix keeps a developer .env (OSNOVA_DB__*) from filling the empty host.
+    // A unique prefix keeps a developer .env (OSNV_DB__*) from filling the empty host.
     const broken = defineConfig("broken-db", {
       default: { host: "", port: 5432, database: "app", username: "postgres", password: secret("x") },
     });

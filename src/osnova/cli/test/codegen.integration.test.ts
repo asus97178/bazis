@@ -25,13 +25,13 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
     }
     await Bun.write(path.join(modules, "App.module.ts"), 'import { Module } from "@osnova/core/di";\n@Module({imports: [], exports: []})\nexport class AppModule {}\n');
     await Bun.write(path.join(root, "src/index.ts"), 'export { AppModule } from "./app/modules/App.module";\n');
-    await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
+    await Bun.write(path.join(root, "osnv.config.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
     await Bun.write(path.join(root, "package.json"), JSON.stringify({ scripts: { "di:generate": "bun run src/osnova/core/scripts/di-generate.ts" } }));
     await run(["g", "m", "CliGuest", "--no-codegen"]);
     await run(["g", "module", "CliCatalog", "--full", "--no-codegen"]);
     await run(["g", "module", "CliMailer", "--empty", "--no-codegen"]);
     await run(["g", "pack", "CliDataManager", "--parts", "tables,records", "--no-codegen"]);
-    const generated = path.join(root, "src/generated/osnova");
+    const generated = path.join(root, "src/generated/osnv");
     await Bun.write(path.join(generated, "workflowActionManifest.ts"), "// retired generated channel\n");
     await Bun.write(path.join(generated, "targets/production/workflowActionManifest.ts"), "// retired generated channel\n");
     await Bun.write(path.join(generated, "keep.txt"), "unrelated file");

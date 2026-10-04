@@ -1,7 +1,7 @@
 import {
   appendJsonPointerV1,
   finalizeOsnovaDiagnosticsV1,
-  OSNOVA_DIAGNOSTIC_LIMIT_V1,
+  OSNV_DIAGNOSTIC_LIMIT_V1,
   osnovaDiagnosticV1,
   type OsnovaDiagnosticsV1,
   type OsnovaDiagnosticV1,
@@ -556,7 +556,7 @@ class BoundarySchemaDecoderV1 {
   }
 
   private add(code: string, message: string, pointer: string): void {
-    if (this.diagnostics.length > OSNOVA_DIAGNOSTIC_LIMIT_V1) return;
+    if (this.diagnostics.length > OSNV_DIAGNOSTIC_LIMIT_V1) return;
     this.diagnostics.push(osnovaDiagnosticV1({
       severity: "error",
       stage: "schema",

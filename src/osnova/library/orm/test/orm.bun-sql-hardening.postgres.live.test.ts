@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { createServer, connect, type Socket } from "node:net";
 import { DbContext, DbContextOptions, PostgresProvider } from "../index";
 
-const url = process.env.OSNOVA_PG_URL;
-const enabled = !!url && process.env.OSNOVA_ORM_HARDENING_LIVE === "1";
+const url = process.env.OSNV_PG_URL;
+const enabled = !!url && process.env.OSNV_ORM_HARDENING_LIVE === "1";
 class Context extends DbContext {}
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const context = (provider: PostgresProvider) => new Context(new DbContextOptions({ provider, entities: [] }));
@@ -128,7 +128,7 @@ describe.skipIf(!enabled)("Bun.SQL bounded fault qualification", () => {
   }, 10000);
 
   test("PostgreSQL restart changes identity and old cancellation returns unknown in budget", async () => {
-    const id = process.env.OSNOVA_ORM_HARDENING_CONTAINER!, run = process.env.OSNOVA_ORM_HARDENING_RUN!;
+    const id = process.env.OSNV_ORM_HARDENING_CONTAINER!, run = process.env.OSNV_ORM_HARDENING_RUN!;
     if (!/^[a-f0-9]{64}$/.test(id) || !/^[a-f0-9]{12}$/.test(run)) throw new Error("Owned disposable container identity is required.");
     const inspect = Bun.spawnSync(["/usr/local/bin/docker", "inspect", id]);
     const state = JSON.parse(inspect.stdout.toString())[0]; expect(state.Config.Labels["osnova.orm-qualification-run"]).toBe(run);
@@ -147,7 +147,7 @@ describe.skipIf(!enabled)("Bun.SQL bounded fault qualification", () => {
   }, 15000);
 
   test("TLS validates the configured CA and rejects an incorrect hostname", async () => {
-    const file = process.env.OSNOVA_ORM_TLS_CA_FILE;
+    const file = process.env.OSNV_ORM_TLS_CA_FILE;
     if (!file) throw new Error("Disposable TLS certificate is required for qualification.");
     const ca = readFileSync(file, "utf8");
     const good = new PostgresProvider({ options: { url, tls: { ca, rejectUnauthorized: true, serverName: "localhost" } } });
@@ -157,7 +157,7 @@ describe.skipIf(!enabled)("Bun.SQL bounded fault qualification", () => {
   });
 
   for (const guarded of [false, true]) test(`TLS cancellation ${guarded ? "is confirmed after the server statement limit" : "returns bounded unknown when native close leaves the backend active"}`, async () => {
-    const file = process.env.OSNOVA_ORM_TLS_CA_FILE;
+    const file = process.env.OSNV_ORM_TLS_CA_FILE;
     if (!file) throw new Error("Disposable TLS certificate is required for qualification.");
     const options = { url, max: 2, tls: { ca: readFileSync(file, "utf8"), rejectUnauthorized: true, serverName: "localhost" } };
     const p = new PostgresProvider({ options, cancellationMode: "close", cancellationTimeoutMs: guarded ? 2000 : 200, serverTimeouts: guarded ? { statementTimeoutMs: 600 } : undefined });

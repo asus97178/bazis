@@ -15,10 +15,10 @@ class Context extends DbContext {}
 
 /** Shared by bun:test and the compiled qualification executable. */
 export function serverCancellationCases() {
-  if (process.env.OSNOVA_ORM_SERVER_CANCELLATION_LIVE !== "owned-disposable-v1") throw new Error("Owned disposable qualification is required.");
-  const url = new URL(process.env.OSNOVA_PG_URL!);
+  if (process.env.OSNV_ORM_SERVER_CANCELLATION_LIVE !== "owned-disposable-v1") throw new Error("Owned disposable qualification is required.");
+  const url = new URL(process.env.OSNV_PG_URL!);
   if (url.hostname !== "127.0.0.1" || !/^\/cancel_[a-f0-9]+$/.test(url.pathname)) throw new Error("Only the owned loopback database is allowed.");
-  const ca = readFileSync(process.env.OSNOVA_SERVER_CANCEL_CA!, "utf8");
+  const ca = readFileSync(process.env.OSNV_SERVER_CANCEL_CA!, "utf8");
   let assertions = 0;
   function check(value: unknown, message: string): asserts value { assertions++; if (!value) throw new Error(message); }
   const eq = (a: unknown, b: unknown, message: string) => check(JSON.stringify(a) === JSON.stringify(b), message);

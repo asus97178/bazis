@@ -4,7 +4,7 @@ import { InMemoryWebSocketAdapter, RedisWebSocketAdapter, SessionManager, type O
 import { RedisWebSocketOperations } from "../adapter/redis-operations";
 import { testNamespace, testHandler, startWebSocketFixture, until } from "./reliability.fixture";
 
-const url = process.env.OSNOVA_WS_TEST_REDIS_URL;
+const url = process.env.OSNV_WS_TEST_REDIS_URL;
 const live = url ? describe : describe.skip;
 const publication = (room = "shared") => ({ messageId: crypto.randomUUID(), expiresAt: Date.now() + 30_000,
   namespace: "/reliability", room, excludeSid: "publisher", packet: { v: 1 as const, type: "event" as const, event: "notice", data: { value: [] } } });

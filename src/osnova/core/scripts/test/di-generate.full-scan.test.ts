@@ -36,7 +36,7 @@ async function runGeneratorTarget(cwd: string, target: string, env?: Record<stri
 }
 
 test("codegen declares isolated production and test targets", async () => {
-  const config = await Bun.file("osnova.codegen.json").json() as {
+  const config = await Bun.file("osnv.config.json").json() as {
     version: number;
     defaultTarget: string;
     targets: Record<string, { entrypoints: string[]; applicationParts?: string[] }>;
@@ -59,11 +59,11 @@ test("test fixture stays out of production output", async () => {
   // Framework packages must not ship the host application's name-based DI map.
   const legacyDeps = await Bun.file("src/osnova/core/di/generated/deps.ts").text();
   expect(legacyDeps).toMatch(/GENERATED_CLASS_DEPS[^=]*=\s*\{\s*\};/);
-  expect(generated.output).not.toContain("OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/app/test/fixtures/application-postgres.fixture.ts");
+  expect(generated.output).not.toContain("OSNV_CODEGEN_SOURCE_UNASSIGNED: src/app/test/fixtures/application-postgres.fixture.ts");
   const channels = ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "agentCatalog.ts", "runtime.ts"];
   const paths = [
-    ...channels.map((channel) => `src/generated/osnova/${channel}`),
-    ...channels.map((channel) => `src/generated/osnova/targets/test/${channel}`),
+    ...channels.map((channel) => `src/generated/osnv/${channel}`),
+    ...channels.map((channel) => `src/generated/osnv/targets/test/${channel}`),
   ];
   const outputs = await Promise.all(paths.map(async (filePath) => [filePath, await Bun.file(filePath).text()] as const));
   for (const [filePath, content] of outputs) {
@@ -93,9 +93,9 @@ test("all targets share one root Program and the target pipeline emits every cha
   expect(output).toContain("programFactories=1");
   expect(output).toContain("targets=production,test");
   for (const channel of ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "agentCatalog.ts", "runtime.ts"]) {
-    expect(await Bun.file(`src/generated/osnova/targets/test/${channel}`).exists()).toBe(true);
+    expect(await Bun.file(`src/generated/osnv/targets/test/${channel}`).exists()).toBe(true);
   }
-  expect(await Bun.file("src/generated/osnova/targets/demo/runtime.ts").exists()).toBe(false);
+  expect(await Bun.file("src/generated/osnv/targets/demo/runtime.ts").exists()).toBe(false);
 }, 60_000);
 
 test("removing the provisioning target returns its DI source to fail-closed unassigned diagnostics", async () => {
@@ -105,19 +105,19 @@ test("removing the provisioning target returns its DI source to fail-closed unas
   };
   const assigned = await temporaryProject({
     ...base,
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] }, "provisioning": { entrypoints: ["src/provisioning.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] }, "provisioning": { entrypoints: ["src/provisioning.ts"] } } }),
     "src/index.ts": "export const application = true;\n",
   });
   const unassigned = await temporaryProject({
     ...base,
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     "src/index.ts": "export const application = true;\n",
   });
   try {
     expect((await runGeneratorTarget(assigned, "all")).exit).toBe(0);
     const rejected = await runGeneratorTarget(unassigned, "all");
     expect(rejected.exit).not.toBe(0);
-    expect(rejected.output).toContain("OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/provisioning.ts");
+    expect(rejected.output).toContain("OSNV_CODEGEN_SOURCE_UNASSIGNED: src/provisioning.ts");
   } finally {
     await Promise.all([rm(assigned, { recursive: true, force: true }), rm(unassigned, { recursive: true, force: true })]);
   }
@@ -141,7 +141,7 @@ test("a generic third target receives only its static reachable application slic
 test("fails closed from the shared candidate index for real DI, HTTP, Agent and Module markers", async () => {
   const root = await temporaryProject({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", experimentalDecorators: true }, include: ["src/**/*.ts"] }),
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     "src/index.ts": "export const root = true;\n",
     "src/z-agent.ts": "@Agent() export class AgentSource {}\n@Tool() export class ToolSource {}\n@Prompt() export class PromptSource {}\n",
     "src/c-controller.ts": "@Controller(\"items\") export class ControllerSource {}\n",
@@ -149,22 +149,22 @@ test("fails closed from the shared candidate index for real DI, HTTP, Agent and 
     "src/m-module.ts": "@Module({ providers: [] }) export class FeatureModule {}\n",
     "src/a-request.ts": "@RequestModel() export class RequestSource {}\n",
     "src/b-list.ts": "export class ListSource extends ListRequest {}\n",
-    "src/generated/osnova/sentinel.ts": "untouched\n",
+    "src/generated/osnv/sentinel.ts": "untouched\n",
   });
   try {
     const result = await runGenerator(root);
     expect(result.exit).not.toBe(0);
-    const diagnostics = result.output.split("\n").filter((line) => line.includes("OSNOVA_CODEGEN_SOURCE_UNASSIGNED")).map((line) => line.replace(/^error: /, ""));
+    const diagnostics = result.output.split("\n").filter((line) => line.includes("OSNV_CODEGEN_SOURCE_UNASSIGNED")).map((line) => line.replace(/^error: /, ""));
     expect(diagnostics).toEqual([
-      "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/a-request.ts",
-      "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/b-list.ts",
-      "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/c-controller.ts",
-      "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/d-di.ts",
-      "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/m-module.ts",
-      "OSNOVA_CODEGEN_SOURCE_UNASSIGNED: src/z-agent.ts",
+      "OSNV_CODEGEN_SOURCE_UNASSIGNED: src/a-request.ts",
+      "OSNV_CODEGEN_SOURCE_UNASSIGNED: src/b-list.ts",
+      "OSNV_CODEGEN_SOURCE_UNASSIGNED: src/c-controller.ts",
+      "OSNV_CODEGEN_SOURCE_UNASSIGNED: src/d-di.ts",
+      "OSNV_CODEGEN_SOURCE_UNASSIGNED: src/m-module.ts",
+      "OSNV_CODEGEN_SOURCE_UNASSIGNED: src/z-agent.ts",
     ]);
-    expect(await Bun.file(path.join(root, "src/generated/osnova/sentinel.ts")).text()).toBe("untouched\n");
-    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).exists()).toBe(false);
+    expect(await Bun.file(path.join(root, "src/generated/osnv/sentinel.ts")).text()).toBe("untouched\n");
+    expect(await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).exists()).toBe(false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -173,7 +173,7 @@ test("fails closed from the shared candidate index for real DI, HTTP, Agent and 
 test("a DI class with an unknown constructor dependency fails codegen loudly instead of being dropped", async () => {
   const root = await temporaryProject({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", experimentalDecorators: true }, include: ["src/**/*.ts"] }),
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     "src/index.ts": "export { AppModule } from \"./app\";\n",
     "src/app.ts": [
       'import { Module, singleton } from "osnv/core/di";',
@@ -191,11 +191,11 @@ test("a DI class with an unknown constructor dependency fails codegen loudly ins
   try {
     const result = await runGenerator(root);
     expect(result.exit).not.toBe(0);
-    const diagnostics = result.output.split("\n").filter((line) => line.includes("OSNOVA_DI_DEPENDENCY_UNKNOWN"));
+    const diagnostics = result.output.split("\n").filter((line) => line.includes("OSNV_DI_DEPENDENCY_UNKNOWN"));
     // Only the DI-constructed class is reported; Plain is not managed by DI.
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]).toContain('constructor parameter 1 of "Reporter" has type "Clock"');
-    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).exists()).toBe(false);
+    expect(await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).exists()).toBe(false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -223,17 +223,17 @@ test("shared application parts are reached by two targets without target ambigui
 test("reports deterministic dynamic-edge locations and leaves outputs untouched", async () => {
   const root = await temporaryProject({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler" }, include: ["src/**/*.ts"] }),
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     "src/index.ts": "const second = name;\nimport(second);\nconst first = name;\nimport(first);\n",
   });
   try {
     const result = await runGenerator(root);
     expect(result.exit).not.toBe(0);
-    expect(result.output.split("\n").filter((line) => line.includes("OSNOVA_CODEGEN_DYNAMIC_EDGE_UNRESOLVED")).map((line) => line.replace(/^error: /, ""))).toEqual([
-      "OSNOVA_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:2",
-      "OSNOVA_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:4",
+    expect(result.output.split("\n").filter((line) => line.includes("OSNV_CODEGEN_DYNAMIC_EDGE_UNRESOLVED")).map((line) => line.replace(/^error: /, ""))).toEqual([
+      "OSNV_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:2",
+      "OSNV_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:4",
     ]);
-    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).exists()).toBe(false);
+    expect(await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).exists()).toBe(false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -242,16 +242,16 @@ test("reports deterministic dynamic-edge locations and leaves outputs untouched"
 test("disk transaction restores backups, removes newly-created finals and cleans staging after injected rename failure", async () => {
   const root = await temporaryProject({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler" }, include: ["src/**/*.ts"] }),
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     "src/index.ts": "export const root = true;\n",
-    "src/generated/osnova/deps.ts": "previous-deps\n",
+    "src/generated/osnv/deps.ts": "previous-deps\n",
   });
   try {
-    const result = await runGenerator(root, { OSNOVA_CODEGEN_TEST_FAIL_RENAME_AT: "4" });
+    const result = await runGenerator(root, { OSNV_CODEGEN_TEST_FAIL_RENAME_AT: "4" });
     expect(result.exit).not.toBe(0);
-    expect(result.output).toContain("OSNOVA_CODEGEN_TEST_RENAME_FAILURE:4");
-    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).text()).toBe("previous-deps\n");
-    expect(await Bun.file(path.join(root, "src/generated/osnova/bindings.ts")).exists()).toBe(false);
+    expect(result.output).toContain("OSNV_CODEGEN_TEST_RENAME_FAILURE:4");
+    expect(await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).text()).toBe("previous-deps\n");
+    expect(await Bun.file(path.join(root, "src/generated/osnv/bindings.ts")).exists()).toBe(false);
     expect((await readdir(root)).filter((name) => name.startsWith(".osnova-codegen-stage-"))).toEqual([]);
   } finally {
     await rm(root, { recursive: true, force: true });

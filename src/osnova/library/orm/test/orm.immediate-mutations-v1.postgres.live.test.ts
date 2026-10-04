@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, EntityState, HasConversion, Index, Key, OrmTrackedMutationConflictError, UUID, postgres, type PostgresProvider } from "../index";
 
-const url = process.env.OSNOVA_PG_URL;
+const url = process.env.OSNV_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 const name = `ormim_${run}_rows`;
 const uuidName = `ormim_${run}_uuid`;

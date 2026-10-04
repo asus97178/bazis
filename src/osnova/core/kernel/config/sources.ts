@@ -5,6 +5,9 @@ type ConfigTree = { [key: string]: ConfigTreeValue };
 type ConfigTreeValue = string | number | boolean | null | ConfigTreeValue[] | ConfigTree;
 
 /** In-memory defaults. Nested objects are flattened into dot keys. */
+/** Prefix of framework environment variables: `OSNV_DB__HOST` -> `db.host`. */
+export const ENV_PREFIX = "OSNV_";
+
 export function memorySource(values: ConfigTree, description = "memory"): ConfigSource {
   return {
     description,
@@ -13,7 +16,7 @@ export function memorySource(values: ConfigTree, description = "memory"): Config
 }
 
 /**
- * Environment variables. `OSNOVA_DB__HOST=x` -> `db.host = "x"`:
+ * Environment variables. `OSNV_DB__HOST=x` -> `db.host = "x"`:
  * the prefix is stripped, `__` becomes `.`, keys are lowercased.
  */
 export function envSource(options?: {
@@ -21,7 +24,7 @@ export function envSource(options?: {
   /** Override for tests; defaults to process.env. */
   readonly variables?: Record<string, string | undefined>;
 }): ConfigSource {
-  const prefix = options?.prefix ?? "OSNOVA_";
+  const prefix = options?.prefix ?? ENV_PREFIX;
   return {
     description: `env(${prefix}*)`,
     load: () => {

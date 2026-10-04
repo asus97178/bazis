@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, EntityState, Key, OrmTransactionScopeError, PostgresProvider, Schema } from "../index";
 
 // Opt in only on the explicitly authorized disposable runner. ENV_OFF has no SQL.
-const url = process.env.OSNOVA_PG_URL;
-const enabled = !!url && process.env.OSNOVA_ORM_CANCELLATION_LIVE === "1";
+const url = process.env.OSNV_PG_URL;
+const enabled = !!url && process.env.OSNV_ORM_CANCELLATION_LIVE === "1";
 class Context extends DbContext {}
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const outcome = (promise: Promise<unknown>) => promise.then(() => "resolved" as const, () => "rejected" as const);

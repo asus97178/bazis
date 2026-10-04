@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 
 // Driver qualification is deliberately separate from the ORM's connection
 // quarantine tests. A working pool or query.cancelled flag is not cancellation.
-const url = process.env.OSNOVA_PG_URL;
-const enabled = !!url && process.env.OSNOVA_ORM_QUALIFICATION_LIVE === "1";
+const url = process.env.OSNV_PG_URL;
+const enabled = !!url && process.env.OSNV_ORM_QUALIFICATION_LIVE === "1";
 type Pending = Promise<unknown> & { cancel(): unknown; readonly cancelled: boolean };
 type Client = { unsafe(sql: string, params?: readonly unknown[]): Pending }
   & ((strings: TemplateStringsArray, ...params: unknown[]) => Pending);

@@ -11,7 +11,7 @@ export function analyzeOrmPredicates(checker: ts.TypeChecker, source: ts.SourceF
   };
   const reject = (node: ts.Node): void => {
     const location = source.getLineAndCharacterOfPosition(node.getStart(source));
-    diagnostics.push(`OSNOVA_ORM_PREDICATE_LOGIC: ${source.fileName}:${location.line + 1}:${location.character + 1}: `
+    diagnostics.push(`OSNV_ORM_PREDICATE_LOGIC: ${source.fileName}:${location.line + 1}:${location.character + 1}: `
       + "ORM conditions cannot use JavaScript truthiness. Use .and(), .or(), .not() or an explicit boolean condition.");
   };
   const visit = (node: ts.Node): void => {

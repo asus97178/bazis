@@ -110,7 +110,7 @@ describe("kernel registers LOGGER", () => {
       .build();
     expect(kernel.container.resolve(LOGGER)).toBe(custom);
     await kernel.start();
-    expect(calls.some((m) => m.includes("osnova started"))).toBe(true); // startup report routed through Logger
+    expect(calls.some((m) => m.includes("osnv started"))).toBe(true); // startup report routed through Logger
     await kernel.stop();
   });
 

@@ -7,7 +7,7 @@ New architectural modules are not created. The new components belong to RecordsM
 Run from the repository with an authorized, hash-matched Bun 1.4.0 executable:
 
 ```sh
-OSNOVA_BUN_BIN=/absolute/path/to/qualified/bun python3 ops/record-recovery/runner.py unique-run-name
+OSNV_BUN_BIN=/absolute/path/to/qualified/bun python3 ops/record-recovery/runner.py unique-run-name
 ```
 
 The runner builds Darwin arm64 and Linux arm64 musl probes through osnova-bun,

@@ -5,11 +5,11 @@ import path from "node:path";
 const ROOT = path.resolve(import.meta.dir, "../../../../..");
 const SRC = path.join(ROOT, "src");
 const OSNOVA = path.join(SRC, "osnova");
-const APP_GENERATED = path.join(SRC, "generated", "osnova");
+const APP_GENERATED = path.join(SRC, "generated", "osnv");
 const PACKAGE_JSON = path.join(ROOT, "package.json");
 const TSCONFIG_JSON = path.join(ROOT, "tsconfig.json");
 
-const STABLE_OSNOVA_BARRELS = new Set([
+const STABLE_OSNV_BARRELS = new Set([
   "@osnova/core/agent",
   "@osnova/core/app",
   "@osnova/core/background",
@@ -120,7 +120,7 @@ describe("runtime import boundary", () => {
       for (const file of sourceFiles(APP_GENERATED)) {
         // Additional target artifacts intentionally import their own
         // application slice. The default production surface must not.
-        if (posix(file).includes("/generated/osnova/targets/")) continue;
+        if (posix(file).includes("/generated/osnv/targets/")) continue;
         const content = stripComments(readFileSync(file, "utf8"));
         for (const specifier of allImportSpecifiers(content)) {
           if (specifier.includes("/demo/") || specifier.includes("../demo")) {
@@ -265,7 +265,7 @@ function isAllowedRuntimeSpecifier(specifier: string): boolean {
 }
 
 function isStableOsnovaBarrel(specifier: string): boolean {
-  return STABLE_OSNOVA_BARRELS.has(specifier);
+  return STABLE_OSNV_BARRELS.has(specifier);
 }
 
 function resolveLocalDependency(fromFile: string, specifier: string): string | undefined {

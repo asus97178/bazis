@@ -9,7 +9,7 @@
 Каркас создан из корня фактической командой:
 
 ```sh
-OSNOVA_BUN_BIN=/private/tmp/osnova-di-structure-20260919-5pq4e459/bun-1.4.0 \
+OSNV_BUN_BIN=/private/tmp/osnova-di-structure-20260919-5pq4e459/bun-1.4.0 \
   ./scripts/osnova-bun run osnova g module Grpc --empty --modules-root src/osnova/core --no-register
 ```
 
@@ -440,7 +440,7 @@ override в бинарнике без исходников, node_modules и вн
 Generated-файлы вручную не редактируются.
 
 ```sh
-OSNOVA_BUN_BIN=<qualified-absolute-path> ./scripts/osnova-bun test --isolate --timeout 60000 ./src/osnova/core/grpc/test
+OSNV_BUN_BIN=<qualified-absolute-path> ./scripts/osnova-bun test --isolate --timeout 60000 ./src/osnova/core/grpc/test
 ./scripts/osnova-bun run di:generate --target all
 ./scripts/osnova-bun x --no-install tsc --noEmit
 ./scripts/osnova-bun run build:bin:app

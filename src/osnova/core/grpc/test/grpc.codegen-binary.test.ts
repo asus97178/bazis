@@ -46,7 +46,7 @@ test("codegen wires gRPC DI and DTO validation; runApp serves HTTP + gRPC from s
     await Bun.write(path.join(root, "src/nativeClient.ts"), peer.replace('"../../Metadata"', '"@osnova/core/grpc"'));
     const config = await Bun.file(path.join(workspace, "tsconfig.json")).json();
     await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify(config));
-    await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({
+    await Bun.write(path.join(root, "osnv.config.json"), JSON.stringify({
       version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/main.ts"] } },
     }));
     const proto = await Bun.file(path.join(import.meta.dir, "fixtures/echo.proto")).text();
@@ -124,7 +124,7 @@ import { GrpcServer } from "@osnova/core/grpc";
 import { HttpServer } from "@osnova/core/http";
 import { ApplicationLifetime } from "@osnova/core/kernel";
 import { modelValidatorAdapter } from "@osnova/library/validation";
-import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "./generated/osnv/runtime";
 import { FeatureModule, ClientProbe, clientOptions, handlerCalls } from "./feature";
 let ownClient: import("@osnova/core/grpc").GrpcClient | undefined;
 const grpcOnly = process.argv.includes("--grpc-only");
@@ -210,16 +210,16 @@ await assert.rejects(ownClient.unary("Echo", {}), {code:1});
 `);
     const generated = await run([process.execPath, "run", "src/osnova/core/scripts/di-generate.ts"], root);
     expect(generated.code, generated.output).toBe(0);
-    const deps = await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).text();
+    const deps = await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).text();
     expect(deps).toContain("GeneratedGrpcController");
     expect(deps).toContain("PrivateGreeter");
     expect(deps).toContain("ClientProbe");
     expect(deps).toContain("GrpcClient");
-    const bindings = await Bun.file(path.join(root, "src/generated/osnova/bindings.ts")).text();
+    const bindings = await Bun.file(path.join(root, "src/generated/osnv/bindings.ts")).text();
     expect(bindings).toContain("GRPC_REQUEST_BINDINGS");
     expect(bindings).toContain('"collect": { model:');
     expect(bindings).toContain("requestStream: true");
-    const shapes = await Bun.file(path.join(root, "src/generated/osnova/httpRequestModels.ts")).text();
+    const shapes = await Bun.file(path.join(root, "src/generated/osnv/httpRequestModels.ts")).text();
     expect(shapes).toContain('"contacts": { model:');
     const source = await run([process.execPath, "run", "src/main.ts"], root);
     expect(source.code, source.output).toBe(0);

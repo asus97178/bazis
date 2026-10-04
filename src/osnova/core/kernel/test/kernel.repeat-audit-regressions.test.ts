@@ -134,7 +134,7 @@ test("a late cleanup failure after the deadline is reported safely and does not 
     await owned.disposed.promise;
     await Bun.sleep(0);
     expect(log).toEqual(["destroy", "dispose"]);
-    expect(messages).toEqual([["[osnova] startup.cleanup failed."]]);
+    expect(messages).toEqual([["[osnv] startup.cleanup failed."]]);
     expect(JSON.stringify(messages)).not.toContain("do-not-log");
   } finally { release.resolve(); console.error = previous; }
 });
@@ -196,7 +196,7 @@ for (const mode of ["throw", "reject", "thenable", "then-getter", "throwing-sink
       await Bun.sleep(0);
       expect(starts).toBe(3);
       expect(stops).toBe(3);
-      expect(messages).toEqual([["[osnova] supervised.onRetry failed."], ["[osnova] supervised.onRetry failed."]]);
+      expect(messages).toEqual([["[osnv] supervised.onRetry failed."], ["[osnv] supervised.onRetry failed."]]);
       expect(JSON.stringify(messages)).not.toContain("observer-secret");
     } finally { console.error = previous; }
   });

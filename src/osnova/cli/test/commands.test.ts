@@ -155,7 +155,7 @@ describe("codegen delegation", () => {
     const f = await fixture();
     const generator = path.join(f.root, "node_modules/osnv/core/scripts/di-generate.ts");
     await mkdir(path.dirname(generator), { recursive: true });
-    await Bun.write(path.join(f.root, "osnova.codegen.json"), JSON.stringify({ targets: { production: {} } }));
+    await Bun.write(path.join(f.root, "osnv.config.json"), JSON.stringify({ targets: { production: {} } }));
     await Bun.write(generator, 'await Bun.write("arguments.json", JSON.stringify(Bun.argv.slice(2))); process.exitCode = 23;');
     expect(resolveGenerator(f.root)).toBe(generator);
     expect(await runCodegen(f.root, "production")).toBe(23);
@@ -164,9 +164,9 @@ describe("codegen delegation", () => {
 
   test("rejects an unknown target before subprocess execution", async () => {
     const f = await fixture();
-    await Bun.write(path.join(f.root, "osnova.codegen.json"), '{"targets":{"production":{}}}');
+    await Bun.write(path.join(f.root, "osnv.config.json"), '{"targets":{"production":{}}}');
     await expect(runCodegen(f.root, "unknown")).rejects.toThrow("Unknown codegen target");
-    await expect(runCodegen(path.join(f.root, "missing"), "production")).rejects.toThrow("osnova.codegen.json");
+    await expect(runCodegen(path.join(f.root, "missing"), "production")).rejects.toThrow("osnv.config.json");
   });
 });
 

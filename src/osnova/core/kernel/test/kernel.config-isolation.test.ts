@@ -103,10 +103,10 @@ describe("configuration ownership per kernel", () => {
     const declaration = defineConfig("owned", schema);
     schema.default.mode = "mutated-default";
     schema.production.mode = "mutated-prod";
-    const variables = { OSNOVA_OWNED__MODE: "first" };
+    const variables = { OSNV_OWNED__MODE: "first" };
     const root = { config: declaration };
     const first = await builder(root).addConfigSource(envSource({ variables })).build();
-    variables.OSNOVA_OWNED__MODE = "second";
+    variables.OSNV_OWNED__MODE = "second";
     const second = await builder(root).addConfigSource(envSource({ variables })).build();
     try {
       expect(Object.isFrozen(declaration)).toBe(true);

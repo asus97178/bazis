@@ -7,8 +7,8 @@ DOCKER = '/usr/local/bin/docker'
 os.umask(0o077)
 state = json.loads((PREVIEW / 'state.json').read_text())
 container = state['container']
-env = {k: v for k, v in os.environ.items() if not k.startswith('OSNOVA_') and k not in ('BUN_OPTIONS','NODE_OPTIONS')}
-env['OSNOVA_BUN_BIN'] = str(ROOT / '.cache/jwt-stand/toolchain/bun')
+env = {k: v for k, v in os.environ.items() if not k.startswith('OSNV_') and k not in ('BUN_OPTIONS','NODE_OPTIONS')}
+env['OSNV_BUN_BIN'] = str(ROOT / '.cache/jwt-stand/toolchain/bun')
 env['TMPDIR'] = str(BASE / 'physical-tmp')
 pathlib.Path(env['TMPDIR']).mkdir(exist_ok=True)
 work = BASE / 'runtime'; work.mkdir(exist_ok=True)
@@ -60,7 +60,7 @@ try:
     pg('control', f'CREATE DATABASE "{database}" OWNER worker;')
     pg(database, 'CREATE SCHEMA app AUTHORIZATION worker; CREATE SCHEMA product AUTHORIZATION worker;')
     settings = json.loads((PREVIEW/'private-config.json').read_text())['app_env']
-    settings.update(OSNOVA_DB__DATABASE=database, OSNOVA_HTTP__PORT='3101', OSNOVA_ADMIN_PORT='3101', OSNOVA_LLM__BASE_URL=f'http://127.0.0.1:{model.server_port}/v1')
+    settings.update(OSNV_DB__DATABASE=database, OSNV_HTTP__PORT='3101', OSNV_ADMIN_PORT='3101', OSNV_LLM__BASE_URL=f'http://127.0.0.1:{model.server_port}/v1')
     with (BASE/'physical-app.log').open('w') as log:
         app = subprocess.Popen([str(ROOT/'bin/osnova-app')],cwd=work,env=dict(env,**settings),stdin=subprocess.DEVNULL,stdout=log,stderr=log)
     for _ in range(100):

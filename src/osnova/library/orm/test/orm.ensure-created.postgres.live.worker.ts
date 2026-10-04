@@ -1,8 +1,8 @@
 import { Check, Column, DbContext, DbContextOptions, Entity, ForeignKey, Index, Key, Required, Schema, UUID, postgres } from "../index";
 
-const schema = process.env.OSNOVA_ORM_LIVE_SCHEMA;
-const url = process.env.OSNOVA_PG_URL;
-const mode = process.env.OSNOVA_ORM_LIVE_MODE ?? "full";
+const schema = process.env.OSNV_ORM_LIVE_SCHEMA;
+const url = process.env.OSNV_PG_URL;
+const mode = process.env.OSNV_ORM_LIVE_MODE ?? "full";
 if (!schema || !/^[a-z][a-z0-9_]{0,62}$/.test(schema) || !url) process.exit(2);
 
 @Schema(schema)

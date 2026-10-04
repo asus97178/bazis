@@ -43,7 +43,7 @@ export function warnIfGeneratedSourcesChanged(
   warn: (message: string) => void = (message) => console.warn(message),
 ): boolean {
   const root = path.resolve(generatedDir, fingerprint.root);
-  if (!existsSync(path.join(root, "osnova.codegen.json"))) return false;
+  if (!existsSync(path.join(root, "osnv.config.json"))) return false;
   const changes: string[] = [];
   if (hashSources(root, fingerprint.files) !== fingerprint.hash) changes.push("application sources changed");
   const version = frameworkVersion();

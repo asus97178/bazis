@@ -7,7 +7,7 @@ import { postgres, type PostgresProvider } from "@/library/orm";
 import { parseListQuery, type ListQueryOptions } from "@/library/jsonapi";
 import { Validator } from "@/library/validation";
 
-const url = process.env.OSNOVA_PG_URL?.trim();
+const url = process.env.OSNV_PG_URL?.trim();
 const prefix = `ocorm_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}_`;
 const notesTable = `${prefix}notes`;
 const validTable = /^ocorm_[a-f0-9]{16}_[a-z0-9_]+$/;
@@ -35,7 +35,7 @@ class LiveNotesContext extends DbContext {
 }
 
 if (url === undefined || url.length === 0) {
-  test.skip("SKIP — core ORM PostgreSQL qualification requires OSNOVA_PG_URL", () => {});
+  test.skip("SKIP — core ORM PostgreSQL qualification requires OSNV_PG_URL", () => {});
 } else {
   describe("core ORM PostgreSQL qualification", () => {
     test("uses @Infra shared provider, ensureCreated, scoped context and repository CRUD", async () => {

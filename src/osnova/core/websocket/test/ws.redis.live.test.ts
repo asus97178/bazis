@@ -4,7 +4,7 @@ import { RedisWebSocketAdapter } from "../adapter/redis.adapter";
 import { SessionManager } from "../session-manager";
 import { until } from "./reliability.fixture";
 
-const url = process.env.OSNOVA_WS_TEST_REDIS_URL;
+const url = process.env.OSNV_WS_TEST_REDIS_URL;
 const live = url ? describe : describe.skip;
 
 live("WebSocket Redis/Valkey: physical adapter", () => {

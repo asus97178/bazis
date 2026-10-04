@@ -1,10 +1,10 @@
 """Release live-PostgreSQL qualification on one disposable, owned container.
 
-Usage (from the repository root, with OSNOVA_BUN_BIN pointing at the qualified Bun):
+Usage (from the repository root, with OSNV_BUN_BIN pointing at the qualified Bun):
     python3 ops/live-postgres/runner.py <evidence-dir> [suite-path ...]
 
 Starts PostgreSQL 17 (default durability settings, TLS on, loopback only),
-runs the full isolated suite with OSNOVA_PG_URL, then every gated live suite in
+runs the full isolated suite with OSNV_PG_URL, then every gated live suite in
 its own database with exactly the gate it requires, and removes the container.
 Secrets never reach the evidence: the password is generated per run and redacted.
 """
@@ -26,8 +26,8 @@ KNOWN_EXTERNAL = {'orm.qualification-20260913.native-cancel.live.test.ts':
 run_id = uuid.uuid4().hex[:12]
 label = 'osnova.orm-qualification-run=' + run_id
 password, worker_password = secrets.token_hex(24), secrets.token_hex(24)
-env = {k: v for k, v in os.environ.items() if not k.startswith('OSNOVA_') and k not in ('BUN_OPTIONS', 'NODE_OPTIONS')}
-env['OSNOVA_BUN_BIN'] = os.environ['OSNOVA_BUN_BIN']
+env = {k: v for k, v in os.environ.items() if not k.startswith('OSNV_') and k not in ('BUN_OPTIONS', 'NODE_OPTIONS')}
+env['OSNV_BUN_BIN'] = os.environ['OSNV_BUN_BIN']
 tls_dir = tempfile.TemporaryDirectory(prefix='osnova-live-pg-tls-')
 container = address = None
 receipt = {'started_at': datetime.now(timezone.utc).isoformat(), 'run_id': run_id, 'image': IMAGE, 'suites': [], 'cleanup': {}}
@@ -54,29 +54,29 @@ def gated(path):
     name = Path(path).name
     if 'owned-store.core' in name:
         e_run = str(uuid.uuid4()); db = create_database('oe327_' + e_run.replace('-', ''))
-        return db, {'OSNOVA_PG_URL': url(db), 'OSNOVA_OWNED_STORE_E_LIVE': 'wp-orm-3-e327-integrated-v1', 'OSNOVA_OWNED_STORE_E_DATABASE': db,
-                    'OSNOVA_OWNED_STORE_E_ROLE': 'owned-store-e-child-v1', 'OSNOVA_OWNED_STORE_E_RUN': e_run}
+        return db, {'OSNV_PG_URL': url(db), 'OSNV_OWNED_STORE_E_LIVE': 'wp-orm-3-e327-integrated-v1', 'OSNV_OWNED_STORE_E_DATABASE': db,
+                    'OSNV_OWNED_STORE_E_ROLE': 'owned-store-e-child-v1', 'OSNV_OWNED_STORE_E_RUN': e_run}
     if 'orm.owned-store.postgres' in name:
         db = create_database(f'c3_{run_id}')
-        return db, {'OSNOVA_PG_URL': url(db), 'OSNOVA_OWNED_STORE_C3_LIVE': 'owned-disposable-v1', 'OSNOVA_OWNED_STORE_C3_DATABASE': db}
+        return db, {'OSNV_PG_URL': url(db), 'OSNV_OWNED_STORE_C3_LIVE': 'owned-disposable-v1', 'OSNV_OWNED_STORE_C3_DATABASE': db}
     if 'server-cancellation' in name:
         db = create_database('cancel_' + run_id, owner='worker')
-        return db, {'OSNOVA_PG_URL': url(db, 'worker', worker_password), 'OSNOVA_ORM_SERVER_CANCELLATION_LIVE': 'owned-disposable-v1',
-                    'OSNOVA_SERVER_CANCEL_CA': str(BASE / 'server-ca.pem')}
+        return db, {'OSNV_PG_URL': url(db, 'worker', worker_password), 'OSNV_ORM_SERVER_CANCELLATION_LIVE': 'owned-disposable-v1',
+                    'OSNV_SERVER_CANCEL_CA': str(BASE / 'server-ca.pem')}
     if 'json-native' in name:
         db = create_database('orm_audit')
-        return db, {'OSNOVA_PG_URL': url(db), 'OSNOVA_ORM_REPEAT_AUDIT_LIVE': '1'}
+        return db, {'OSNV_PG_URL': url(db), 'OSNV_ORM_REPEAT_AUDIT_LIVE': '1'}
     if 'release-095' in name:
         db = create_database('osnova_release_095')
-        return db, {'OSNOVA_RELEASE_095_PG': 'owned-disposable-v1', 'OSNOVA_RELEASE_095_PG_URL': url(db)}
-    flags = {'audit-20260913': {'OSNOVA_ORM_AUDIT_LIVE': '1'}, 'qualification-20260913': {'OSNOVA_ORM_QUALIFICATION_LIVE': '1'},
-             'cancellation-20260914': {'OSNOVA_ORM_CANCELLATION_LIVE': '1'},
-             'bun-sql-hardening': {'OSNOVA_ORM_HARDENING_LIVE': '1', 'OSNOVA_ORM_HARDENING_CONTAINER': container,
-                                   'OSNOVA_ORM_HARDENING_RUN': run_id, 'OSNOVA_ORM_TLS_CA_FILE': str(BASE / 'server-ca.pem')}}
+        return db, {'OSNV_RELEASE_095_PG': 'owned-disposable-v1', 'OSNV_RELEASE_095_PG_URL': url(db)}
+    flags = {'audit-20260913': {'OSNV_ORM_AUDIT_LIVE': '1'}, 'qualification-20260913': {'OSNV_ORM_QUALIFICATION_LIVE': '1'},
+             'cancellation-20260914': {'OSNV_ORM_CANCELLATION_LIVE': '1'},
+             'bun-sql-hardening': {'OSNV_ORM_HARDENING_LIVE': '1', 'OSNV_ORM_HARDENING_CONTAINER': container,
+                                   'OSNV_ORM_HARDENING_RUN': run_id, 'OSNV_ORM_TLS_CA_FILE': str(BASE / 'server-ca.pem')}}
     for key, extra in flags.items():
         if key in name:
             db = create_database(f'ormqa_{run_id}_{len(receipt["suites"])}')
-            return db, {'OSNOVA_PG_URL': url(db), **extra}
+            return db, {'OSNV_PG_URL': url(db), **extra}
     return None
 
 def run_tests(title, args, extra_env, database, timeout):
@@ -144,9 +144,9 @@ try:
     if not sys.argv[2:]:
         jwt_db = create_database('jwt_qualification')
         agents_db = create_database('agents_test_' + run_id)
-        run_tests('full-suite', [*IGNORES, '--reporter=junit', f'--reporter-outfile={BASE / "full-suite.junit.xml"}'], {'OSNOVA_PG_URL': url('osnova_session_test', 'postgres'), 'OSNOVA_PG_REQUIRED': '1',
-                  'OSNOVA_JWT_QUALIFICATION_PG_URL': url(jwt_db), 'OSNOVA_AGENTS_TEST_DB': 'owned-disposable-v1',
-                  'OSNOVA_AGENTS_PG_URL': url(agents_db)}, 'osnova_session_test', 1800)
+        run_tests('full-suite', [*IGNORES, '--reporter=junit', f'--reporter-outfile={BASE / "full-suite.junit.xml"}'], {'OSNV_PG_URL': url('osnova_session_test', 'postgres'), 'OSNV_PG_REQUIRED': '1',
+                  'OSNV_JWT_QUALIFICATION_PG_URL': url(jwt_db), 'OSNV_AGENTS_TEST_DB': 'owned-disposable-v1',
+                  'OSNV_AGENTS_PG_URL': url(agents_db)}, 'osnova_session_test', 1800)
     for path in files:
         plan = gated(path)
         if plan: run_tests(Path(path).name, [path], plan[1], plan[0], 600)

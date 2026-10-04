@@ -4,8 +4,8 @@ ROOT=pathlib.Path(__file__).resolve().parents[2]
 tools_mode='--tools' in sys.argv
 BASE=ROOT/('.cache/agent-run/physical' if tools_mode else '.cache/codex-chatgpt/physical'); BASE.mkdir(parents=True,exist_ok=True)
 PREVIEW=ROOT/'.cache/client-preview'; os.umask(0o077)
-env={k:v for k,v in os.environ.items() if not k.startswith('OSNOVA_') and k not in ('BUN_OPTIONS','NODE_OPTIONS')}
-env['OSNOVA_BUN_BIN']=str(ROOT/'.cache/jwt-stand/toolchain/bun')
+env={k:v for k,v in os.environ.items() if not k.startswith('OSNV_') and k not in ('BUN_OPTIONS','NODE_OPTIONS')}
+env['OSNV_BUN_BIN']=str(ROOT/'.cache/jwt-stand/toolchain/bun')
 env['TMPDIR']=str(BASE/'tmp'); pathlib.Path(env['TMPDIR']).mkdir(exist_ok=True)
 def command(args,**kwargs):
     result=subprocess.run(args,env=env,text=True,capture_output=True,**kwargs)
@@ -54,8 +54,8 @@ try:
     (home/'fixture-account').write_text('fixture')
     fixture=ROOT/'src/osnova/core/infra/test/fixtures/codex-server.py'; fixture.chmod(0o700)
     settings=json.loads((PREVIEW/'private-config.json').read_text())['app_env']
-    settings.update(OSNOVA_DB__DATABASE=database,OSNOVA_HTTP__PORT='3102',OSNOVA_ADMIN_PORT='3102',OSNOVA_LLM__BASE_URL=f'http://127.0.0.1:{model.server_port}/v1',
-        OSNOVA_CODEX__ENABLED='true',OSNOVA_CODEX__BINARY=str(fixture),OSNOVA_CODEX__STATE_DIRECTORY=str(state))
+    settings.update(OSNV_DB__DATABASE=database,OSNV_HTTP__PORT='3102',OSNV_ADMIN_PORT='3102',OSNV_LLM__BASE_URL=f'http://127.0.0.1:{model.server_port}/v1',
+        OSNV_CODEX__ENABLED='true',OSNV_CODEX__BINARY=str(fixture),OSNV_CODEX__STATE_DIRECTORY=str(state))
     with (BASE/'app.log').open('w') as log: app=subprocess.Popen([str(ROOT/'bin/osnova-app')],cwd=work,env=dict(env,**settings),stdin=subprocess.DEVNULL,stdout=log,stderr=log)
     for _ in range(150):
         if app.poll() is not None: raise RuntimeError('Compiled app exited; see .cache/codex-chatgpt/physical/app.log')

@@ -87,7 +87,7 @@ separate `@Prompt` class when the prompt is reused, versioned, or owned outside
 one agent.
 
 For startup-friendly discovery, `bun run di:generate` writes
-`src/generated/osnova/agentCatalog.ts`. Use
+`src/generated/osnv/agentCatalog.ts`. Use
 `AgentRegistry.fromGeneratedModules([AppModule])` when the runtime should prefer
 the generated metadata index and still respect module ownership.
 

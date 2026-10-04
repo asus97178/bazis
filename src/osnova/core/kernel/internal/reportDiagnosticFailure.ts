@@ -1,7 +1,7 @@
 /** Fixed text avoids exposing arbitrary observer errors, secrets or user inspection hooks. */
 export function reportDiagnosticFailure(component: "supervised.onRetry" | "startup.cleanup"): void {
   try {
-    void Promise.resolve(console.error(`[osnova] ${component} failed.`)).catch(() => undefined);
+    void Promise.resolve(console.error(`[osnv] ${component} failed.`)).catch(() => undefined);
   } catch {
     // A broken diagnostic sink cannot change the owning operation's outcome.
   }

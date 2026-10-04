@@ -6,13 +6,13 @@ import { RedisDistributedCacheDriver } from "@/core/infra";
 /**
  * Opt-in integration coverage for the Redis/Valkey Lua paths.
  *
- *   OSNOVA_REDIS_TEST_URL="redis://localhost:6379" \
+ *   OSNV_REDIS_TEST_URL="redis://localhost:6379" \
  *     bun test src/osnova/core/infra/test/redisCache.live.test.ts
  *
  * The default test run performs no network I/O because the suite is skipped
  * unless the dedicated URL is provided.
  */
-const url = process.env.OSNOVA_REDIS_TEST_URL;
+const url = process.env.OSNV_REDIS_TEST_URL;
 
 describe.skipIf(!url)("Redis distributed cache (live)", () => {
   const prefix = `osnova:test:cache:${randomUUID()}:`;

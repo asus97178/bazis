@@ -1,6 +1,6 @@
 # Runs scripts/ci.ts on the self-hosted macOS runner: the Bun toolchain is
 # qualified only for that host (toolchain/bun.json). The runner's own `.env`
-# file supplies OSNOVA_BUN_BIN; nothing machine-specific lives in the repo.
+# file supplies OSNV_BUN_BIN; nothing machine-specific lives in the repo.
 name: CI
 
 on:
@@ -33,7 +33,7 @@ jobs:
 
       - name: Qualified Bun is configured
         run: |
-          test -n "$OSNOVA_BUN_BIN" || { echo "OSNOVA_BUN_BIN is not set in the runner .env"; exit 1; }
+          test -n "$OSNV_BUN_BIN" || { echo "OSNV_BUN_BIN is not set in the runner .env"; exit 1; }
           ./scripts/osnova-bun --no-env-file run toolchain:check
 
       - name: Install dependencies

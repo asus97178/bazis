@@ -87,7 +87,7 @@ import { SharedInput, SharedOutput, NestedInput, EmptyInput } from "./alpha/cont
 import { unrelated } from "./beta/contracts";
 import { IdentityAgent, IdentityTool } from "./agent";
 import { AppModule } from "./app/modules/App.module";
-import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "./generated/osnv/runtime";
 await registerOsnovaGeneratedRuntime();
 const names = [SharedInput, SharedOutput, NestedInput, EmptyInput].map(model => getGeneratedOpenApiSchemaName(model));
 if (!unrelated || names.some(name => !name) || names.some(name => ["SharedInput", "SharedOutput", "NestedInput", "EmptyInput"].includes(name!))) throw new Error("Missing exact generated names");
@@ -124,13 +124,13 @@ try {
     const schemaBinary = path.join(root, "schema-agent");
     await run([process.execPath, "build", "--compile", "src/index.ts", "--outfile", schemaBinary]);
     expect(await run([schemaBinary], root)).toBe("AGENT_SCHEMA_IDENTITY_PASS");
-    const generatedBefore = await Bun.file(path.join(project, "src/generated/osnova/openapi.ts")).text();
+    const generatedBefore = await Bun.file(path.join(project, "src/generated/osnv/openapi.ts")).text();
     const contracts = await Bun.file(path.join(project, "src/alpha/contracts.ts")).text();
     await write("src/alpha/contracts.ts", contracts.replace("export class NestedInput", "class NestedInput"));
     const rejected = await execute([process.execPath, "--no-env-file", generator]);
     expect(rejected.exit).not.toBe(0);
-    expect(rejected.stdout + rejected.stderr).toContain("OSNOVA_AGENT_SCHEMA_MODEL_UNIMPORTABLE");
-    expect(await Bun.file(path.join(project, "src/generated/osnova/openapi.ts")).text()).toBe(generatedBefore);
+    expect(rejected.stdout + rejected.stderr).toContain("OSNV_AGENT_SCHEMA_MODEL_UNIMPORTABLE");
+    expect(await Bun.file(path.join(project, "src/generated/osnv/openapi.ts")).text()).toBe(generatedBefore);
     console.log("Agent standalone types/source/binary and nominal schema generation/types/source/binary: PASS");
   } finally {
     await clearBuildFlags(root);

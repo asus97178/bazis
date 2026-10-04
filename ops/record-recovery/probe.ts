@@ -6,7 +6,7 @@ import { startHostedServices, stopHostedServices } from "@osnova/core/di";
 import { ConsoleLogger, Osnova, memorySource } from "@osnova/core/kernel";
 import { HttpContext, HttpError, PRINCIPAL_STATE_KEY } from "@osnova/core/http";
 import { PostgresProvider, isUnknownTransactionOutcome, ormModule } from "@osnova/core/orm";
-import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnv/runtime";
 import { TokenKind } from "../../src/app/modules/auth/tokenKinds";
 import { DataManagerFieldsModule } from "../../src/app/modules/datamanager_modules/fields_module/DataManagerFields.module";
 import { DataManagerRecordsModule } from "../../src/app/modules/datamanager_modules/records_module/DataManagerRecords.module";
@@ -19,11 +19,11 @@ let assertions = 0;
 function check(value: unknown, message: string): asserts value { assertions++; if (!value) throw new Error(message); }
 const outcome = <T>(promise: Promise<T>) => promise.then(value => ({ ok: true as const, value }), error => ({ ok: false as const, error }));
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-check(process.env.OSNOVA_RECORD_RECOVERY === "owned-disposable-v1", "Owned fixture gate required");
-const url = new URL(process.env.OSNOVA_PG_URL!);
+check(process.env.OSNV_RECORD_RECOVERY === "owned-disposable-v1", "Owned fixture gate required");
+const url = new URL(process.env.OSNV_PG_URL!);
 check(url.hostname === "127.0.0.1" && /^\/recovery_[a-f0-9]+_(darwin|linux)$/.test(url.pathname), "Only an owned loopback database is allowed");
 check(Bun.version === "1.4.0" && Bun.revision === "34cbb9a40b4bd1bd767d134a7065e66c2432a676", "Runtime mismatch");
-const ca = readFileSync(process.env.OSNOVA_RECORD_CA!, "utf8");
+const ca = readFileSync(process.env.OSNV_RECORD_CA!, "utf8");
 const options = (address = url.toString(), isolation = "read committed") => ({ url: address, max: 6,
   tls: { ca, serverName: "localhost", rejectUnauthorized: true },
   connectionTimeout: 3, idleTimeout: 5, connection: { default_transaction_isolation: isolation,

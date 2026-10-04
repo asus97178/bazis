@@ -268,7 +268,7 @@ bigint/Date. Выбор колонки для сортировки и conflictBy
 
 Codegen использует общий TypeScript Program, анализирует тип Predicate и
 отклоняет `&&`, `||`, `!` и условные переходы по предикату с кодом
-OSNOVA_ORM_PREDICATE_LOGIC, файлом и позицией. Правильный вход:
+OSNV_ORM_PREDICATE_LOGIC, файлом и позицией. Правильный вход:
 `u => u.age.gte(18).and(u.name.startsWith("A"))`. Публичная семантика SQL и
 сохранения не меняется. Цена проверки приходится на генерацию, runtime query
 не разбирает исходный код. Новых performance-гарантий не заявлено.
@@ -380,7 +380,7 @@ JSON-типов диалект создаёт замороженный внут�
 [orm.json-native.postgres.live.test.ts](test/orm.json-native.postgres.live.test.ts)
 проверяет PostgreSQL entity/projection, INSERT/UPDATE через свежие контексты
 и immediate-операции. Физический тест включается только через
-`OSNOVA_ORM_REPEAT_AUDIT_LIVE=1` и `OSNOVA_PG_URL`: база `orm_audit`, адрес
+`OSNV_ORM_REPEAT_AUDIT_LIVE=1` и `OSNV_PG_URL`: база `orm_audit`, адрес
 `127.0.0.1`, отдельный явно указанный порт, отличный от `5432`. Он создаёт
 и удаляет только собственную случайную схему. Само наличие теста и его
 ENV_OFF-пропуск не являются успешной физической проверкой; результаты

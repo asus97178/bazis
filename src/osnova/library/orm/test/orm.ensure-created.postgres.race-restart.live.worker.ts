@@ -1,8 +1,8 @@
 import { Check, Column, DbContext, DbContextOptions, Entity, Index, Key, Required, Schema, postgres } from "../index";
 
-const schema = process.env.OSNOVA_ORM_ADDITIVE_LIVE_SCHEMA;
-const url = process.env.OSNOVA_PG_URL;
-const mode = process.env.OSNOVA_ORM_ADDITIVE_LIVE_MODE;
+const schema = process.env.OSNV_ORM_ADDITIVE_LIVE_SCHEMA;
+const url = process.env.OSNV_PG_URL;
+const mode = process.env.OSNV_ORM_ADDITIVE_LIVE_MODE;
 
 if (!schema || !/^[a-z][a-z0-9_]{0,62}$/.test(schema) || !url || !["base", "full", "fault", "retry"].includes(mode ?? "")) process.exit(2);
 

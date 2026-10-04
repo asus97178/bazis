@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 function runtimeScript(mode: "default" | "test"): string {
   const root = process.cwd().replaceAll("\\", "\\\\").replaceAll("\"", "\\\"");
   const generatedRuntime = `${root}/src/osnova/core/generatedRuntime.ts`;
-  const testBootstrap = `${root}/src/generated/osnova/targets/test/bootstrap.ts`;
+  const testBootstrap = `${root}/src/generated/osnv/targets/test/bootstrap.ts`;
   return [
     "const seen: string[] = [];",
     "(globalThis as { __osnovaGeneratedRuntimeTestHook?: (target: string) => void }).__osnovaGeneratedRuntimeTestHook = (target) => seen.push(target);",
