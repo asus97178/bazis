@@ -1,0 +1,86 @@
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { resolveBun } from "./codegen";
+
+type Codegen = (cwd: string, target?: string) => Promise<number>;
+
+export interface BuildOptions {
+  /** Also compile the entrypoint into a standalone executable. */
+  readonly bin: boolean;
+  /** Executable path relative to the project; default `bin/<package name>`. */
+  readonly outfile?: string;
+}
+
+/** `osnv dev`: codegen, then run the default target's entrypoint from source. */
+export async function runDev(cwd: string, codegen: Codegen): Promise<number> {
+  const generated = await codegen(cwd);
+  if (generated !== 0) return generated;
+  const child = Bun.spawn([await resolveBun(cwd), "run", await projectEntry(cwd)], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+  // The app owns graceful shutdown; forward the signal instead of dying first.
+  const forward = (signal: NodeJS.Signals) => () => child.kill(signal);
+  const onInterrupt = forward("SIGINT"), onTerminate = forward("SIGTERM");
+  process.on("SIGINT", onInterrupt);
+  process.on("SIGTERM", onTerminate);
+  try {
+    return await child.exited;
+  } finally {
+    process.off("SIGINT", onInterrupt);
+    process.off("SIGTERM", onTerminate);
+  }
+}
+
+/** `osnv build [--bin]`: codegen and typecheck; with `bin`, also compile. */
+export async function runBuild(cwd: string, options: BuildOptions, codegen: Codegen, log: (message: string) => void): Promise<number> {
+  const generated = await codegen(cwd);
+  if (generated !== 0) return generated;
+  const bun = await resolveBun(cwd);
+  const tsc = path.join(cwd, "node_modules/typescript/bin/tsc");
+  if (!existsSync(tsc)) throw new Error("TypeScript is not installed in this project. Run: bun add -d typescript");
+  log("[osnv] typecheck...");
+  const typecheck = await Bun.spawn([bun, tsc, "--noEmit"], { cwd, stdout: "inherit", stderr: "inherit" }).exited;
+  if (typecheck !== 0 || !options.bin) return typecheck;
+  const outfile = path.resolve(cwd, options.outfile ?? path.join("bin", await binaryName(cwd)));
+  log(`[osnv] compile ${path.relative(cwd, outfile)}...`);
+  return compileBinary(bun, await projectEntry(cwd), outfile);
+}
+
+/**
+ * `bun build --compile` clones the running Bun executable into a temporary
+ * `.<hash>.bun-build` file in its working directory and cannot remove it when
+ * that executable is read-only or carries `uchg` (scripts/osnova-bun). Compile
+ * from a private directory and remove it afterwards.
+ */
+export function compileBinary(bun: string, entry: string, outfile: string): number {
+  const workDir = mkdtempSync(path.join(tmpdir(), "osnv-compile-"));
+  try {
+    const result = Bun.spawnSync([bun, "build", "--compile", path.resolve(entry), "--outfile", path.resolve(outfile)],
+      { cwd: workDir, stdout: "inherit", stderr: "inherit" });
+    return result.exitCode ?? 1;
+  } finally {
+    if (existsSync("/usr/bin/chflags")) Bun.spawnSync(["/usr/bin/chflags", "-R", "nouchg", workDir]);
+    try {
+      rmSync(workDir, { recursive: true, force: true });
+    } catch (error) {
+      // The binary itself is complete; report the leftover without failing the build.
+      console.error(`[osnv] temporary directory was not removed: ${workDir}`, error);
+    }
+  }
+}
+
+async function projectEntry(cwd: string): Promise<string> {
+  const configFile = Bun.file(path.join(cwd, "osnova.codegen.json"));
+  if (!await configFile.exists()) throw new Error("osnova.codegen.json not found in the current directory.");
+  const config = await configFile.json() as { defaultTarget?: string; targets?: Record<string, { entrypoints?: unknown }> };
+  const entry = (config.targets?.[config.defaultTarget ?? ""]?.entrypoints as unknown[] | undefined)?.[0];
+  if (typeof entry !== "string" || !entry) throw new Error("osnova.codegen.json has no entrypoint for its default target.");
+  return path.resolve(cwd, entry);
+}
+
+async function binaryName(cwd: string): Promise<string> {
+  const manifest = Bun.file(path.join(cwd, "package.json"));
+  const name = await manifest.exists() ? (await manifest.json() as { name?: unknown }).name : undefined;
+  const base = typeof name === "string" ? name.replace(/^@[^/]+\//, "").replace(/[^a-z0-9._-]+/gi, "-") : "";
+  if (!base) throw new Error("package.json needs a name for the default binary path; pass --outfile.");
+  return base;
+}

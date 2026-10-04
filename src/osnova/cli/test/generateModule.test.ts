@@ -153,6 +153,27 @@ export class AppModule {}
     expect(module).not.toContain("provider:");
   });
 
+  test("full profile without host auth helpers generates public routes and warns", async () => {
+    const previous = process.cwd();
+    const host = await mkdtemp(path.join(os.tmpdir(), "osnv-full-no-auth-"));
+    try {
+      process.chdir(host);
+      const root = path.join(host, "src/app/modules");
+      await mkdir(root, { recursive: true });
+      const result = await generateModule({ name: "Ledger", modulesRoot: root, register: false, profile: "full" });
+      expect(result.files).toHaveLength(14);
+      expect(result.warnings.some((warning) => warning.includes("no @Authorize"))).toBe(true);
+      const controller = await readFile(path.join(root, "ledger/http/LedgerController.ts"), "utf8");
+      expect(controller).not.toMatch(/^\s*@Authorize\(/m);
+      expect(controller).not.toContain("tokenKinds");
+      expect(controller).toContain("@OutputCache");
+      expect(controller).toContain("these routes are public");
+    } finally {
+      process.chdir(previous);
+      await rm(host, { recursive: true, force: true });
+    }
+  });
+
   test("fails when module folder exists", async () => {
     const modulesRoot = path.join(tempRoot, "dup");
     await generateModule({ name: "Invoice", modulesRoot, register: false });

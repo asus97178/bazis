@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseCliArgs } from "../parseCli";
 
 describe("parseCliArgs", () => {
-  test("parses osnova g module Product", () => {
+  test("parses osnv g module Product", () => {
     const parsed = parseCliArgs(["g", "module", "Product"]);
     expect(parsed.kind).toBe("generate");
     if (parsed.kind === "generate") {
@@ -12,7 +12,7 @@ describe("parseCliArgs", () => {
     }
   });
 
-  test("parses shorthand osnova g m Product", () => {
+  test("parses shorthand osnv g m Product", () => {
     const parsed = parseCliArgs(["g", "m", "Product"]);
     expect(parsed.kind).toBe("generate");
     if (parsed.kind === "generate") {
@@ -89,5 +89,15 @@ describe("parseCliArgs", () => {
 
   test("exposes an explicit codegen command with target forwarding", () => {
     expect(parseCliArgs(["codegen", "--target", "production"])).toEqual({ kind: "codegen", target: "production" });
+  });
+
+  test("parses dev and build, with --bin and --outfile only on build", () => {
+    expect(parseCliArgs(["dev"])).toEqual({ kind: "dev" });
+    expect(parseCliArgs(["build"])).toEqual({ kind: "build", bin: false, outfile: undefined });
+    expect(parseCliArgs(["build", "--bin"])).toEqual({ kind: "build", bin: true, outfile: undefined });
+    expect(parseCliArgs(["build", "--bin", "--outfile", "dist/app"])).toEqual({ kind: "build", bin: true, outfile: "dist/app" });
+    for (const args of [["build", "--outfile", "dist/app"], ["dev", "--bin"], ["build", "extra"], ["codegen", "--bin"], ["g", "module", "Task", "--bin"]]) {
+      expect(parseCliArgs(args).kind).toBe("error");
+    }
   });
 });

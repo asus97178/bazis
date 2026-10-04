@@ -18,7 +18,8 @@ export interface ModuleTemplateFiles {
 export function buildModuleTemplates(
   naming: ModuleNaming,
   profile: ModuleTemplateProfile = "minimal",
-  authImportPath = "../../auth",
+  /** null: the host has no auth helpers, so `full` emits no @Authorize. */
+  authImportPath: string | null = "../../auth",
 ): readonly ModuleTemplateFiles[] {
   const { entity } = naming;
 
@@ -94,21 +95,27 @@ export class ${n.moduleClass} {}
 `;
 }
 
-function controllerFile(n: ModuleNaming, profile: ModuleTemplateProfile, authImportPath: string): string {
-  const fullImports = profile === "full"
-    ? `import { OutputCache } from "osnv/core/cache";
+function controllerFile(n: ModuleNaming, profile: ModuleTemplateProfile, authImportPath: string | null): string {
+  const auth = profile === "full" && authImportPath !== null;
+  const fullImports = profile !== "full"
+    ? "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from \"osnv/core/http\";\n"
+    : auth
+      ? `import { OutputCache } from "osnv/core/cache";
 import { Authorize, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "osnv/core/http";
 import { TokenKind } from "${authImportPath}/tokenKinds";
 import { requireTokenKind } from "${authImportPath}/jwtAuth";
 `
-    : "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from \"osnv/core/http\";\n";
+      : `import { OutputCache } from "osnv/core/cache";
+import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "osnv/core/http";
+// No host auth helpers (src/app/modules/auth) were found: these routes are public.
+// Add @Authorize(...) from "osnv/core/http" with your policy before exposing them.
+`;
   const authList = profile === "full"
-    ? `  @Authorize(requireTokenKind(TokenKind.Admin, TokenKind.Client))
-  @OutputCache({ seconds: 30, varyByQuery: "*", varyByUser: true, tags: ["${n.route}"] })
+    ? `${auth ? "  @Authorize(requireTokenKind(TokenKind.Admin, TokenKind.Client))\n" : ""}  @OutputCache({ seconds: 30, varyByQuery: "*", varyByUser: true, tags: ["${n.route}"] })
 `
     : "";
-  const authRead = profile === "full" ? "  @Authorize(requireTokenKind(TokenKind.Admin, TokenKind.Client))\n" : "";
-  const authWrite = profile === "full" ? "  @Authorize(requireTokenKind(TokenKind.Admin))\n" : "";
+  const authRead = auth ? "  @Authorize(requireTokenKind(TokenKind.Admin, TokenKind.Client))\n" : "";
+  const authWrite = auth ? "  @Authorize(requireTokenKind(TokenKind.Admin))\n" : "";
 
   return `${fullImports}import { buildListDocument } from "osnv/library/jsonapi";
 import { ${n.entity}ListQuery } from "./contracts/${n.entity}ListQuery";

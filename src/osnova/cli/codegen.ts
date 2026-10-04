@@ -14,11 +14,15 @@ export async function runCodegen(cwd: string, target?: string): Promise<number> 
     const config = await configFile.json();
     if (target !== "all" && !Object.hasOwn(config.targets ?? {}, target)) throw new Error(`Unknown codegen target: ${target}`);
   }
-  const wrapper = path.join(cwd, "scripts/osnova-bun");
-  const hasWrapper = await Bun.file(wrapper).exists();
-  // process.execPath can be the compiled CLI itself. Never invoke it as Bun.
-  const executable = hasWrapper ? wrapper : (process.env.OSNOVA_BUN_BIN || Bun.which("bun"));
-  if (!executable) throw new Error("Bun was not found. Set OSNOVA_BUN_BIN or put Bun on PATH.");
-  const args = [executable, "run", "di:generate", ...(target === undefined ? [] : ["--target", target])];
+  const args = [await resolveBun(cwd), "run", "di:generate", ...(target === undefined ? [] : ["--target", target])];
   return await Bun.spawn(args, { cwd, stdout: "inherit", stderr: "inherit" }).exited;
+}
+
+/** Bun for child processes: the project's qualified launcher when present. */
+export async function resolveBun(cwd: string): Promise<string> {
+  const wrapper = path.join(cwd, "scripts/osnova-bun");
+  // process.execPath can be the compiled CLI itself. Never invoke it as Bun.
+  const executable = await Bun.file(wrapper).exists() ? wrapper : (process.env.OSNOVA_BUN_BIN || Bun.which("bun"));
+  if (!executable) throw new Error("Bun was not found. Set OSNOVA_BUN_BIN or put Bun on PATH.");
+  return executable;
 }

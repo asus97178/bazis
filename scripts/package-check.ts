@@ -38,8 +38,9 @@ try {
 
   const app = join(consumer, "demo");
   run("app install", [bun, "install"], app);
-  run("app codegen", [bun, "run", "di:generate"], app);
-  run("app module", [bun, "run", "osnova", "g", "module", "Task", "--empty"], app);
+  const osnv = join(app, "node_modules/.bin/osnv");
+  run("osnv codegen", [osnv, "codegen"], app);
+  run("osnv g module --empty", [osnv, "g", "module", "Task", "--empty"], app);
   // An app service that depends on framework classes: codegen must wire them
   // from the installed package, not drop the registration as unknown.
   const probe = join(app, "src/app/modules/probe");
@@ -69,21 +70,33 @@ try {
   ].join("\n"));
   const appModule = join(app, "src/app/modules/App.module.ts");
   writeFileSync(appModule, `import { ProbeModule } from "./probe/Probe.module";\n${readFileSync(appModule, "utf8").replace("imports: [", "imports: [ProbeModule, ")}`);
-  run("app codegen with framework deps", [bun, "run", "di:generate"], app);
-  run("app typecheck", [bun, "run", "build"], app);
+  run("osnv build (codegen + typecheck)", [osnv, "build"], app);
+  run("osnv build --bin", [osnv, "build", "--bin"], app);
+  if (readdirSync(app).some((name) => name.endsWith(".bun-build"))) throw new Error("osnv build --bin left .bun-build files in the project");
 
-  const port = String(39000 + Math.floor(Math.random() * 900));
-  server = Bun.spawn([bun, "run", "src/index.ts"], { cwd: app, env: { ...process.env, PORT: port }, stdout: "ignore", stderr: "ignore" });
-  let healthy = false;
-  for (let attempt = 0; attempt < 50 && !healthy; attempt++) {
-    await Bun.sleep(200);
-    healthy = await fetch(`http://127.0.0.1:${port}/health`).then((response) => response.ok, () => false);
+  // The same app from source (`osnv dev`) and as the compiled executable.
+  for (const [label, command] of [["osnv dev", [osnv, "dev"]], ["binary", [join(app, "bin/demo")]]] as const) {
+    const port = String(39000 + Math.floor(Math.random() * 900));
+    server = Bun.spawn([...command], { cwd: app, env: { ...process.env, PORT: port }, stdout: "ignore", stderr: "ignore" });
+    let healthy = false;
+    for (let attempt = 0; attempt < 100 && !healthy; attempt++) {
+      await Bun.sleep(200);
+      healthy = await fetch(`http://127.0.0.1:${port}/health`).then((response) => response.ok, () => false);
+    }
+    if (!healthy) throw new Error(`${label}: app did not answer /health`);
+    const described = await fetch(`http://127.0.0.1:${port}/probe`).then((response) => response.ok ? response.json() : undefined, () => undefined) as { environment?: unknown; healthy?: unknown } | undefined;
+    if (typeof described?.environment !== "string" || described.healthy !== true) throw new Error(`${label}: framework classes were not injected into an app service: ${JSON.stringify(described)}`);
+    console.log(`[package] ${label}: /health 200, app service received framework dependencies`);
+    server.kill("SIGTERM");
+    if (await server.exited !== 0 && label === "osnv dev") throw new Error("osnv dev did not stop cleanly on SIGTERM");
+    server = undefined;
   }
-  if (!healthy) throw new Error("generated app did not answer /health");
-  console.log("[package] app /health 200");
-  const described = await fetch(`http://127.0.0.1:${port}/probe`).then((response) => response.ok ? response.json() : undefined, () => undefined) as { environment?: unknown; healthy?: unknown } | undefined;
-  if (typeof described?.environment !== "string" || described.healthy !== true) throw new Error(`framework classes were not injected into an app service: ${JSON.stringify(described)}`);
-  console.log("[package] app service received framework dependencies");
+  // --full needs a cache and a database to run, so it is built, not started.
+  run("osnv new Full", [join(consumer, "node_modules/.bin/osnv"), "new", "Full"], consumer);
+  const full = join(consumer, "full");
+  run("full install", [bun, "install"], full);
+  run("osnv g module --full (no host auth)", [join(full, "node_modules/.bin/osnv"), "g", "module", "Report", "--full"], full);
+  run("full osnv build", [join(full, "node_modules/.bin/osnv"), "build"], full);
   console.log(`[package] PASS ${tarball} (${listing.filter(Boolean).length} entries)`);
 } finally {
   server?.kill();

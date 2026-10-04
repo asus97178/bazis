@@ -46,7 +46,8 @@ describe("new project", () => {
     expect(await readdir(path.join(outputPath, "vendor/osnv"))).not.toContain("node_modules");
     expect(await readdir(path.join(outputPath, "vendor/osnv/cli"))).not.toContain("test");
     expect(manifest.scripts["di:generate"]).toContain("node_modules/osnv/core/scripts/di-generate.ts");
-    expect(manifest.scripts.osnova).toContain("node_modules/osnv/cli/main.ts");
+    expect(manifest.scripts).toMatchObject({ codegen: "osnv codegen", dev: "osnv dev", build: "osnv build", "build:bin": "osnv build --bin" });
+    expect(manifest.scripts.osnova).toBeUndefined();
     expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("атомарный модуль");
     expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toContain("registerOsnovaGeneratedRuntime");
     await expect(generateProject(options)).rejects.toThrow("already exists");

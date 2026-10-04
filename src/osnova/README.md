@@ -11,11 +11,11 @@ AI-агенты и CLI. Пакет поставляется исходникам
 bunx osnv new MyApp
 cd my-app
 bun install
-bun run dev        # GET http://127.0.0.1:3000/health
+bunx osnv dev      # GET http://127.0.0.1:3000/health
 ```
 
-Модуль внутри проекта: `bun run osnova g module Task --empty`, затем
-`bun run di:generate`. Бинарник: `bun run build:bin`.
+Модуль внутри проекта: `bunx osnv g module Task --empty` (кодогенерация
+запускается сама). Проверка типов: `bunx osnv build`; бинарник: `bunx osnv build --bin`.
 
 ## В существующем проекте
 

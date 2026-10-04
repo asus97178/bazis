@@ -13,7 +13,7 @@ Osnova использует TypeScript, Bun, DI, DbContext и контролле
 
 ```sh
 ./scripts/osnova-bun run toolchain:check
-./scripts/osnova-bun run osnova new MyApp --path ../my-app
+./scripts/osnova-bun run osnv new MyApp --path ../my-app
 cd ../my-app
 "$OSNOVA_BUN_BIN" install
 "$OSNOVA_BUN_BIN" run dev
@@ -34,7 +34,7 @@ checkout принимает `--framework /absolute/path/to/src/osnova`.
 Из корня нового приложения:
 
 ```sh
-"$OSNOVA_BUN_BIN" run osnova g module Task --empty
+"$OSNOVA_BUN_BIN" x osnv g module Task --empty
 ```
 
 CLI создаст `Task.module.ts`, `MODULE.md` и подключит модуль в `AppModule`.
