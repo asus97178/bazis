@@ -132,12 +132,6 @@
       "osnv/core/http": [
         "./src/osnova/core/http/index.ts"
       ],
-      "osnv/core/http/Binding/listModelRegistry": [
-        "./src/osnova/core/http/Binding/listModelRegistry.ts"
-      ],
-      "osnv/core/http/Binding/requestModelRegistry": [
-        "./src/osnova/core/http/Binding/requestModelRegistry.ts"
-      ],
       "osnv/core/http/OpenApi/generatedOpenApiRegistry": [
         "./src/osnova/core/http/OpenApi/generatedOpenApiRegistry.ts"
       ],
