@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -40,6 +40,36 @@ try {
   run("app install", [bun, "install"], app);
   run("app codegen", [bun, "run", "di:generate"], app);
   run("app module", [bun, "run", "osnova", "g", "module", "Task", "--empty"], app);
+  // An app service that depends on framework classes: codegen must wire them
+  // from the installed package, not drop the registration as unknown.
+  const probe = join(app, "src/app/modules/probe");
+  mkdirSync(probe, { recursive: true });
+  writeFileSync(join(probe, "Probe.service.ts"), [
+    'import { Environment, HealthService } from "osnv/core/kernel";',
+    "export class ProbeService {",
+    "  constructor(private readonly environment: Environment, private readonly health: HealthService) {}",
+    "  async describe() { return { environment: this.environment.name, healthy: (await this.health.check()).healthy }; }",
+    "}", "",
+  ].join("\n"));
+  writeFileSync(join(probe, "Probe.controller.ts"), [
+    'import { Controller, Get } from "osnv/core/http";',
+    'import { ProbeService } from "./Probe.service";',
+    '@Controller("probe")',
+    "export class ProbeController {",
+    "  constructor(private readonly probe: ProbeService) {}",
+    "  @Get() describe() { return this.probe.describe(); }",
+    "}", "",
+  ].join("\n"));
+  writeFileSync(join(probe, "Probe.module.ts"), [
+    'import { Module, singleton } from "osnv/core/di";',
+    'import { ProbeController } from "./Probe.controller";',
+    'import { ProbeService } from "./Probe.service";',
+    "@Module({ providers: [singleton(ProbeService)], controllers: [ProbeController], exports: [] })",
+    "export class ProbeModule {}", "",
+  ].join("\n"));
+  const appModule = join(app, "src/app/modules/App.module.ts");
+  writeFileSync(appModule, `import { ProbeModule } from "./probe/Probe.module";\n${readFileSync(appModule, "utf8").replace("imports: [", "imports: [ProbeModule, ")}`);
+  run("app codegen with framework deps", [bun, "run", "di:generate"], app);
   run("app typecheck", [bun, "run", "build"], app);
 
   const port = String(39000 + Math.floor(Math.random() * 900));
@@ -51,6 +81,9 @@ try {
   }
   if (!healthy) throw new Error("generated app did not answer /health");
   console.log("[package] app /health 200");
+  const described = await fetch(`http://127.0.0.1:${port}/probe`).then((response) => response.ok ? response.json() : undefined, () => undefined) as { environment?: unknown; healthy?: unknown } | undefined;
+  if (typeof described?.environment !== "string" || described.healthy !== true) throw new Error(`framework classes were not injected into an app service: ${JSON.stringify(described)}`);
+  console.log("[package] app service received framework dependencies");
   console.log(`[package] PASS ${tarball} (${listing.filter(Boolean).length} entries)`);
 } finally {
   server?.kill();
