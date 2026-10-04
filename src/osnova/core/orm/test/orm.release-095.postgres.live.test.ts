@@ -6,10 +6,10 @@ import {
 } from "@/library/orm";
 import { paginate } from "../listQuery";
 
-const enabled = process.env.OSNOVA_RELEASE_095_PG === "owned-disposable-v1";
+const enabled = process.env.OSNV_RELEASE_095_PG === "owned-disposable-v1";
 
 function fixtureUrl(): string {
-  const raw = process.env.OSNOVA_RELEASE_095_PG_URL;
+  const raw = process.env.OSNV_RELEASE_095_PG_URL;
   if (!enabled || !raw) throw new Error("The release ORM test requires its disposable PostgreSQL guard and dedicated URL.");
   let parsed: URL;
   try { parsed = new URL(raw); } catch { throw new Error("The disposable PostgreSQL URL is invalid."); }
@@ -116,7 +116,7 @@ async function createFixture() {
 }
 
 if (!enabled) {
-  test.skip("SKIP — release ORM physical regressions require OSNOVA_RELEASE_095_PG=owned-disposable-v1 and OSNOVA_RELEASE_095_PG_URL", () => {});
+  test.skip("SKIP — release ORM physical regressions require OSNV_RELEASE_095_PG=owned-disposable-v1 and OSNV_RELEASE_095_PG_URL", () => {});
 } else {
   describe("release 0.95 disposable PostgreSQL ORM regressions", () => {
     test("both include branches survive all reference/collection, tracking and order combinations", async () => {

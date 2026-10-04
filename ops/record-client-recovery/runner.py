@@ -17,8 +17,8 @@ if not re.fullmatch('[a-z0-9-]+', name):
     raise SystemExit('Usage: runner.py unique-evidence-name')
 BASE = ROOT / 'docs/audits/record-recovery-client-2026-09-20-evidence' / name
 BASE.mkdir(parents=True, exist_ok=False)
-env = {k:v for k,v in os.environ.items() if not k.startswith('OSNOVA_') and k not in ('BUN_OPTIONS', 'NODE_OPTIONS')}
-env['OSNOVA_BUN_BIN'] = os.environ['OSNOVA_BUN_BIN']
+env = {k:v for k,v in os.environ.items() if not k.startswith('OSNV_') and k not in ('BUN_OPTIONS', 'NODE_OPTIONS')}
+env['OSNV_BUN_BIN'] = os.environ['OSNV_BUN_BIN']
 DOCKER = '/usr/local/bin/docker'
 IMAGE = 'sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73'
 run = uuid.uuid4().hex[:12]
@@ -50,7 +50,7 @@ def pg(database, sql):
 
 def hashes():
     dirs = ['admin-ui/src/app/features/datamanager', 'admin-ui/src/app/core', 'admin-ui/test/record-recovery',
-            'src/app/modules/datamanager_modules', 'src/osnova/library/orm', 'src/osnova/library/http-client', 'src/generated/osnova', 'ops/record-client-recovery']
+            'src/app/modules/datamanager_modules', 'src/osnova/library/orm', 'src/osnova/library/http-client', 'src/generated/osnv', 'ops/record-client-recovery']
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for folder in dirs for p in sorted((ROOT / folder).rglob('*')) if p.is_file()}
 
 
@@ -85,8 +85,8 @@ try:
     pg('control',f'CREATE DATABASE "{database}" OWNER worker')
     receipt['postgres_version'] = pg(database,'SELECT version()')
     receipt['worker_superuser'] = pg(database,"SELECT rolsuper FROM pg_roles WHERE rolname='worker'")
-    child_env=dict(env,OSNOVA_CLIENT_RECOVERY='owned-disposable-v1',OSNOVA_CLIENT_DIST=str(scratch/'dist'),
-                   OSNOVA_CLIENT_RESULT=str(BASE/'database-result.json'),OSNOVA_PG_URL=f'postgres://worker:{passwords[1]}@{address}/{database}')
+    child_env=dict(env,OSNV_CLIENT_RECOVERY='owned-disposable-v1',OSNV_CLIENT_DIST=str(scratch/'dist'),
+                   OSNV_CLIENT_RESULT=str(BASE/'database-result.json'),OSNV_PG_URL=f'postgres://worker:{passwords[1]}@{address}/{database}')
     with (BASE/'server.log').open('w') as log:
         child=subprocess.Popen([str(scratch/'server')],cwd=scratch,env=child_env,stdout=subprocess.PIPE,stderr=log,text=True)
         while True:

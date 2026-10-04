@@ -49,7 +49,7 @@ local tagCount = tonumber(ARGV[5])
 for i = 1, versionCount do
   local actual = redis.call('get', KEYS[2 + i])
   local expected = ARGV[5 + i]
-  if expected == '__OSNOVA_MISSING_VERSION__' then
+  if expected == '__OSNV_MISSING_VERSION__' then
     if actual then return 0 end
   elseif actual ~= expected then
     return 0
@@ -112,7 +112,7 @@ export class RedisDistributedCacheDriver implements DistributedCacheDriver {
   public async writeIfLockOwner(request: DistributedCacheFencedWrite): Promise<boolean> {
     const versionKeys = request.versionChecks.map((check) => check.key);
     const tagKeys = request.tags.map((tag) => tag.key);
-    const expectedVersions = request.versionChecks.map((check) => check.expected ?? "__OSNOVA_MISSING_VERSION__");
+    const expectedVersions = request.versionChecks.map((check) => check.expected ?? "__OSNV_MISSING_VERSION__");
     const tagMembers = request.tags.map((tag) => tag.member);
     const keys = [request.lockKey, request.key, ...versionKeys, ...tagKeys];
     const args = [

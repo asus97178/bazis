@@ -143,7 +143,7 @@ function validateDescriptor(descriptor: OsnovaGeneratedTargetDescriptor): void {
  * Loads project-owned generated runtime registrations, when present.
  *
  * The framework core stays independent from `src/app`: generated
- * files live under `src/generated/osnova` and register request/list models,
+ * files live under `src/generated/osnv` and register request/list models,
  * OpenAPI metadata and similar app-owned artifacts through public registries.
  */
 export function loadOsnovaGeneratedRuntime(): Promise<void> {
@@ -160,11 +160,11 @@ export async function loadOsnovaGeneratedAgentMetadata(
   const registered = selectRegisteredAgentMetadata(targets);
   if (registered !== undefined || explicitlyActivatedTargetIds.size > 0) return registered;
   try {
-    const generatedAgentCatalog = "../../generated/osnova/agentCatalog";
+    const generatedAgentCatalog = "../../generated/osnv/agentCatalog";
     const module = (await import(generatedAgentCatalog)) as GeneratedAgentCatalogModule;
     return module.GENERATED_AGENT_METADATA;
   } catch (error) {
-    if (isOptionalGeneratedModuleMissing(error, "generated/osnova/agentCatalog")) {
+    if (isOptionalGeneratedModuleMissing(error, "generated/osnv/agentCatalog")) {
       return undefined;
     }
     throw error;
@@ -186,11 +186,11 @@ function selectRegisteredAgentMetadata(targets: readonly Class<object>[]): Agent
 
 async function loadRuntimeOnce(): Promise<void> {
   try {
-    const generatedRuntime = "../../generated/osnova/runtime";
+    const generatedRuntime = "../../generated/osnv/runtime";
     const module = (await import(generatedRuntime)) as GeneratedRuntimeModule;
     await module.registerOsnovaGeneratedRuntime?.();
   } catch (error) {
-    if (isOptionalGeneratedModuleMissing(error, "generated/osnova/runtime")) {
+    if (isOptionalGeneratedModuleMissing(error, "generated/osnv/runtime")) {
       return;
     }
     throw error;

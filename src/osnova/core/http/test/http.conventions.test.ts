@@ -6,7 +6,7 @@ import { ConventionController } from "./fixtures/conventionControllers";
 
 // The controller is an explicitly declared target-local codegen fixture. Its
 // generated descriptor is registered before the test host creates routes.
-import "../../../../generated/osnova/targets/test/bootstrap";
+import "../../../../generated/osnv/targets/test/bootstrap";
 
 let container: DiContainer;
 let server: HttpServer;

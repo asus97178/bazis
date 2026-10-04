@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 import { postgres } from "../index";
 
-const url = process.env.OSNOVA_PG_URL;
+const url = process.env.OSNV_PG_URL;
 let schema: string | undefined;
 let unrelatedSchema: string | undefined;
 
@@ -94,7 +94,7 @@ function freshSchema(prefix: string): string { return `${prefix}_${crypto.random
 
 async function runWorker(physicalSchema: string, mode: "base" | "full" | "fault" | "retry"): Promise<{ readonly exit: number; readonly output: string }> {
   const worker = fileURLToPath(new URL("./orm.ensure-created.postgres.race-restart.live.worker.ts", import.meta.url));
-  const child = Bun.spawn([process.execPath, "run", worker], { env: { ...process.env, OSNOVA_ORM_ADDITIVE_LIVE_SCHEMA: physicalSchema, OSNOVA_ORM_ADDITIVE_LIVE_MODE: mode }, stdout: "pipe", stderr: "pipe" });
+  const child = Bun.spawn([process.execPath, "run", worker], { env: { ...process.env, OSNV_ORM_ADDITIVE_LIVE_SCHEMA: physicalSchema, OSNV_ORM_ADDITIVE_LIVE_MODE: mode }, stdout: "pipe", stderr: "pipe" });
   const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
   return { exit, output: `${stdout}\n${stderr}`.replaceAll(url ?? "", "[redacted]") };
 }

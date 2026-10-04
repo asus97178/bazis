@@ -151,7 +151,7 @@ hook сохраняет доступ к своим зависимостям. `sh
 Поздний отказ hook и ошибки `stop`/`onDestroy` собираются, остальные доступные шаги
 очистки выполняются; startup и cleanup ошибки возвращаются через `AggregateError`
 с исходной ошибкой старта в `cause`. Если срок уже истёк, последующий отказ cleanup
-сообщается фиксированным `[osnova] startup.cleanup failed.` без содержимого ошибки.
+сообщается фиксированным `[osnv] startup.cleanup failed.` без содержимого ошибки.
 Внутренние `waitForRollback`, `rollbackFailure`, `rollbackElapsedMs` связывают
 Coordinator с Kernel, не регистрируют новые DI-сервисы. Подписчики `onStarted`
 и EventBus сохраняют прежнее поведение; они не являются resource lifecycle hooks.
@@ -159,7 +159,7 @@ Coordinator с Kernel, не регистрируют новые DI-сервис�
 `RestartPolicy.onRetry` — диагностическое уведомление перед повтором, не управляющий
 callback. Синхронное исключение, отклонение Promise/thenable и ошибка чтения `then`
 не прекращают повтор и не заменяют исходную ошибку запуска. Promise наблюдается,
-но не задерживает recovery. Сбой виден как `[osnova] supervised.onRetry failed.`;
+но не задерживает recovery. Сбой виден как `[osnv] supervised.onRetry failed.`;
 исходная ошибка не сериализуется, сбой самого diagnostic sink изолирован.
 
 Собранный Kernel хранит независимую копию уникальных `signals`. Повтор значения

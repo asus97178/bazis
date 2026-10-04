@@ -10,7 +10,7 @@ async function generate(files: Record<string, string>) {
   try {
     const inputs = {
       "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true }, include: ["src/**/*.ts"] }),
-      "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/main.ts"] } } }),
+      "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/main.ts"] } } }),
       ...files,
     };
     for (const [file, contents] of Object.entries(inputs)) {
@@ -20,7 +20,7 @@ async function generate(files: Record<string, string>) {
     }
     const child = Bun.spawn([process.execPath, "run", generator], { cwd: root, stdout: "pipe", stderr: "pipe" });
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-    const bindings = Bun.file(path.join(root, "src/generated/osnova/bindings.ts"));
+    const bindings = Bun.file(path.join(root, "src/generated/osnv/bindings.ts"));
     return { code, output: stdout + stderr, bindings: await bindings.exists() ? await bindings.text() : undefined };
   } finally { await rm(root, { recursive: true, force: true }); }
 }

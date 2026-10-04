@@ -18,10 +18,10 @@ class Context extends DbContext {}
 class PlannedRollback extends Error {}
 
 function environment() {
-  check(process.env.OSNOVA_ORM_ENTERPRISE_LIVE === "owned-disposable-v1", "Explicit owned disposable qualification is required");
-  const url = new URL(process.env.OSNOVA_PG_URL!);
+  check(process.env.OSNV_ORM_ENTERPRISE_LIVE === "owned-disposable-v1", "Explicit owned disposable qualification is required");
+  const url = new URL(process.env.OSNV_PG_URL!);
   check(url.hostname === "127.0.0.1" && /^\/cancel_[a-f0-9]+$/.test(url.pathname), "Only the owned loopback database is allowed");
-  const ca = readFileSync(process.env.OSNOVA_SERVER_CANCEL_CA!, "utf8");
+  const ca = readFileSync(process.env.OSNV_SERVER_CANCEL_CA!, "utf8");
   const config = dbConfig.resolve("test", Configuration.empty());
   const options = (max: number, value = url.toString()) => ({ url: value, max,
     tls: { ca, serverName: "localhost", rejectUnauthorized: true },
@@ -53,7 +53,7 @@ async function acknowledge(observer: SQL, pid: () => number, sql: string) {
 
 async function soak() {
   const { options, policy } = environment();
-  const seconds = Number(process.env.OSNOVA_ORM_SOAK_SECONDS ?? 900), rate = Number(process.env.OSNOVA_ORM_SOAK_RATE ?? 50);
+  const seconds = Number(process.env.OSNV_ORM_SOAK_SECONDS ?? 900), rate = Number(process.env.OSNV_ORM_SOAK_RATE ?? 50);
   check(Number.isInteger(seconds) && seconds >= 30 && seconds <= 3600 && Number.isInteger(rate) && rate >= 1 && rate <= 500, "Invalid soak profile");
   const schema = `ent_${crypto.randomUUID().replaceAll("-", "")}`;
   @Schema(schema) @Entity({ table: "ledger" }) class Ledger {

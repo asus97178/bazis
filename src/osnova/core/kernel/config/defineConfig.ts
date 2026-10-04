@@ -3,6 +3,7 @@ import { Environment } from "../Environment";
 import { KernelError } from "../errors";
 import { Configuration } from "./Configuration";
 import { Secret } from "./Secret";
+import { ENV_PREFIX } from "./sources";
 import { isSensitiveKey, redactSensitiveText } from "../../../library/redaction";
 
 type Stand = "development" | "test" | "production";
@@ -81,10 +82,10 @@ export function processConfiguration(): Configuration {
   const values = new Map<string, string>();
   const origins = new Map<string, { source: string; priority: number }>();
   for (const [name, value] of Object.entries(process.env)) {
-    if (name.startsWith("OSNOVA_") && value !== undefined) {
-      const key = name.slice(7).toLowerCase().replaceAll("__", ".");
+    if (name.startsWith(ENV_PREFIX) && value !== undefined) {
+      const key = name.slice(ENV_PREFIX.length).toLowerCase().replaceAll("__", ".");
       values.set(key, value);
-      origins.set(key, { source: "env(OSNOVA_*)", priority: 0 });
+      origins.set(key, { source: "env(OSNV_*)", priority: 0 });
     }
   }
   return new Configuration(values, origins);
@@ -124,9 +125,9 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
   const claimed = new Set<string>();
   for (const key of keys) {
     const alias = input.env?.[key];
-    const env = [...new Set([`OSNOVA_${fullKey(key).replaceAll(".", "__").toUpperCase()}`, ...(typeof alias === "string" ? [alias] : alias ?? [])])];
+    const env = [...new Set([`${ENV_PREFIX}${fullKey(key).replaceAll(".", "__").toUpperCase()}`, ...(typeof alias === "string" ? [alias] : alias ?? [])])];
     for (const name of env) {
-      if (!/^OSNOVA_[A-Z0-9_-]+$/.test(name) || claimed.has(name)) throw new KernelError(`Invalid or duplicate configuration environment name: ${name}.`);
+      if (!name.startsWith(ENV_PREFIX) || name.length === ENV_PREFIX.length || !/^[A-Z0-9_-]+$/.test(name) || claimed.has(name)) throw new KernelError(`Invalid or duplicate configuration environment name: ${name}.`);
       claimed.add(name);
     }
     names.set(key, Object.freeze(env));
@@ -146,7 +147,7 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       const type = isSecret(base) ? "secret" : isEnum(base) ? typeof base.default : typeof base;
       const candidates: { raw: string; source: string; priority: number }[] = [];
       for (const name of names.get(key)!) {
-        const sourceKey = name.slice(7).toLowerCase().replaceAll("__", ".");
+        const sourceKey = name.slice(ENV_PREFIX.length).toLowerCase().replaceAll("__", ".");
         const raw = configuration.get(sourceKey);
         if (raw === undefined) continue;
         const origin = configuration.origin(sourceKey);

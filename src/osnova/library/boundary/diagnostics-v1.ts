@@ -32,7 +32,7 @@ export interface OsnovaDiagnosticsV1 {
   readonly truncated: boolean;
 }
 
-export const OSNOVA_DIAGNOSTIC_LIMIT_V1 = 100;
+export const OSNV_DIAGNOSTIC_LIMIT_V1 = 100;
 const DIAGNOSTIC_MESSAGE_BYTES_V1 = 512;
 const DIAGNOSTIC_POINTER_BYTES_V1 = 2_048;
 const UTF8 = new TextEncoder();
@@ -63,12 +63,12 @@ export function osnovaDiagnosticV1(
 
 export function finalizeOsnovaDiagnosticsV1(
   diagnostics: readonly OsnovaDiagnosticV1[],
-  limit = OSNOVA_DIAGNOSTIC_LIMIT_V1,
+  limit = OSNV_DIAGNOSTIC_LIMIT_V1,
 ): OsnovaDiagnosticsV1 {
   if (!Number.isSafeInteger(limit) || limit < 1) {
     throw new RangeError("Diagnostic limit must be a positive safe integer.");
   }
-  const safeLimit = Math.min(OSNOVA_DIAGNOSTIC_LIMIT_V1, limit);
+  const safeLimit = Math.min(OSNV_DIAGNOSTIC_LIMIT_V1, limit);
   const sorted = [...diagnostics].sort(compareDiagnosticsV1);
   if (sorted.length <= safeLimit) {
     return Object.freeze({

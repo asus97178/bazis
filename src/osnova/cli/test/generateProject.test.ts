@@ -86,13 +86,13 @@ describe("new project", () => {
     await symlink(path.resolve("node_modules/typescript"), path.join(relocated, "node_modules/typescript"));
     await symlink(path.resolve("node_modules/@types"), path.join(relocated, "node_modules/@types"));
     const run = async (args: string[]) => {
-      const executable = process.env.OSNOVA_BUN_BIN ?? process.execPath;
+      const executable = process.env.OSNV_BUN_BIN ?? process.execPath;
       const child = Bun.spawn([executable, ...args], { cwd: relocated, stdout: "pipe", stderr: "pipe" });
       const [code, output, error] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
       expect(code, output + error).toBe(0);
     };
     await run(["node_modules/osnv/cli/main.ts", "codegen"]);
-    expect(await Bun.file(path.join(relocated, "src/generated/osnova/runtime.ts")).exists()).toBe(true);
+    expect(await Bun.file(path.join(relocated, "src/generated/osnv/runtime.ts")).exists()).toBe(true);
     expect(await Bun.file(path.join(relocated, "src/osnova/package.json")).exists()).toBe(false);
   }, 30_000);
 });

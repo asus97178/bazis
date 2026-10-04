@@ -3,13 +3,13 @@ import { Secret } from "../Secret";
 import { defineConfig, secret } from "../defineConfig";
 
 const TOUCHED_ENV_KEYS = [
-  "OSNOVA_ENV",
-  "OSNOVA_HTTP__PORT",
-  "OSNOVA_FEATURE__X",
-  "OSNOVA_JWT__ADMIN__SECRET",
-  "OSNOVA_DB__HOST",
-  "OSNOVA_WORKER__MAXRETRIES",
-  "OSNOVA_WORKER__MAX_RETRIES",
+  "OSNV_ENV",
+  "OSNV_HTTP__PORT",
+  "OSNV_FEATURE__X",
+  "OSNV_JWT__ADMIN__SECRET",
+  "OSNV_DB__HOST",
+  "OSNV_WORKER__MAXRETRIES",
+  "OSNV_WORKER__MAX_RETRIES",
 ];
 
 afterEach(() => {
@@ -27,8 +27,8 @@ describe("defineConfig", () => {
   });
 
   test("env переопределяет и приводится к типу дефолта", () => {
-    process.env.OSNOVA_HTTP__PORT = "8080";
-    process.env.OSNOVA_FEATURE__X = "true";
+    process.env.OSNV_HTTP__PORT = "8080";
+    process.env.OSNV_FEATURE__X = "true";
     const config = defineConfig({
       default: { "http.port": 3000, "feature.x": false },
     });
@@ -36,8 +36,8 @@ describe("defineConfig", () => {
     expect(config.get("feature.x")).toBe(true);
   });
 
-  test("секция стенда переопределяет дефолт (OSNOVA_ENV)", () => {
-    process.env.OSNOVA_ENV = "production";
+  test("секция стенда переопределяет дефолт (OSNV_ENV)", () => {
+    process.env.OSNV_ENV = "production";
     const config = defineConfig({
       default: { "log.level": "debug" },
       production: { "log.level": "info" },
@@ -46,7 +46,7 @@ describe("defineConfig", () => {
   });
 
   test("explicit view has its environment without changing the shared definition", () => {
-    process.env.OSNOVA_ENV = "development";
+    process.env.OSNV_ENV = "development";
     const config = defineConfig({
       default: { "log.level": "default" },
       development: { "log.level": "debug" },
@@ -70,7 +70,7 @@ describe("defineConfig", () => {
   });
 
   test("секрет из env переопределяет dev-дефолт", () => {
-    process.env.OSNOVA_JWT__ADMIN__SECRET = "real-secret-from-env-0123456789-abcdef";
+    process.env.OSNV_JWT__ADMIN__SECRET = "real-secret-from-env-0123456789-abcdef";
     const config = defineConfig({
       default: { "jwt.admin.secret": secret("dev-fallback-key-padding-0123456789xxx") },
     });
@@ -78,7 +78,7 @@ describe("defineConfig", () => {
   });
 
   test("обязательный секрет без значения — fail-fast", () => {
-    process.env.OSNOVA_ENV = "production";
+    process.env.OSNV_ENV = "production";
     const config = defineConfig({
       default: { "jwt.admin.secret": secret("dev-only") },
       production: { "jwt.admin.secret": secret() },
@@ -87,26 +87,26 @@ describe("defineConfig", () => {
   });
 
   test("нечисловое значение в env — fail-fast", () => {
-    process.env.OSNOVA_HTTP__PORT = "abc";
+    process.env.OSNV_HTTP__PORT = "abc";
     const config = defineConfig({ default: { "http.port": 3000 } });
     expect(() => config.ensureValid()).toThrow(/число/);
   });
 
   test("camelCase numeric schema key reads the conventional lowercased environment key", () => {
-    process.env.OSNOVA_WORKER__MAXRETRIES = "7";
+    process.env.OSNV_WORKER__MAXRETRIES = "7";
     const config = defineConfig("worker", { default: { maxRetries: 3 } });
     expect(config.get("maxRetries")).toBe(7);
   });
 
   test("non-canonical separator spelling does not become an environment-key alias", () => {
-    process.env.OSNOVA_WORKER__MAX_RETRIES = "7";
+    process.env.OSNV_WORKER__MAX_RETRIES = "7";
     const config = defineConfig("worker", { default: { maxRetries: 3 } });
     expect(config.get("maxRetries")).toBe(3);
   });
 
   describe("неймспейс (префикс домена)", () => {
     test("ключи читаются без префикса, env — с префиксом домена", () => {
-      process.env.OSNOVA_DB__HOST = "db.internal";
+      process.env.OSNV_DB__HOST = "db.internal";
       const config = defineConfig("db", {
         default: { host: "localhost", port: 5432 },
       });
@@ -115,14 +115,14 @@ describe("defineConfig", () => {
     });
 
     test("env без префикса домена не переопределяет namespaced-ключ", () => {
-      process.env.OSNOVA_HOST = "wrong";
+      process.env.OSNV_HOST = "wrong";
       const config = defineConfig("db", { default: { host: "localhost" } });
       expect(config.get("host")).toBe("localhost");
-      delete process.env.OSNOVA_HOST;
+      delete process.env.OSNV_HOST;
     });
 
     test("обязательный секрет домена сообщает полный env-ключ в ошибке", () => {
-      process.env.OSNOVA_ENV = "production";
+      process.env.OSNV_ENV = "production";
       const config = defineConfig("db", {
         default: { password: secret("dev-only") },
         production: { password: secret() },

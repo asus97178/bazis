@@ -76,7 +76,7 @@ DbSet<User> + DbContext   ← весь ORM (запросы, трекинг, Save
 const DataModule = ormModule({
   context: AppDbContext,
   entities: [User, Post],
-  provider: postgres({ url: Bun.env.OSNOVA_PG_URL! }),
+  provider: postgres({ url: Bun.env.OSNV_PG_URL! }),
   registerRepositories: true, // по умолчанию true
 });
 ```
@@ -328,7 +328,7 @@ class AppDbContext extends DbContext {
 export const DataModule = ormModule({
   context: AppDbContext,
   entities: [User],
-  provider: postgres({ url: Bun.env.OSNOVA_PG_URL! }),
+  provider: postgres({ url: Bun.env.OSNV_PG_URL! }),
   migrateOnStart: true,
 });
 ```
@@ -579,7 +579,7 @@ HTTP-запрос
 const UsersDataModule = ormModule({
   context: UsersDbContext,
   entities: [User],
-  provider: postgres({ url: Bun.env.OSNOVA_PG_URL! }),
+  provider: postgres({ url: Bun.env.OSNV_PG_URL! }),
   migrateOnStart: true,
 });
 
@@ -638,7 +638,7 @@ curl http://localhost:3000/api/users
 curl -X POST http://localhost:3000/api/users -H 'Content-Type: application/json' -d '{"name":"Bob"}'
 ```
 
-База подключается через `OSNOVA_PG_URL`. Схема создаётся при старте через `migrateOnStart`.
+База подключается через `OSNV_PG_URL`. Схема создаётся при старте через `migrateOnStart`.
 
 ### Почему контроллер → IUserStore, а не IRepository
 
@@ -723,7 +723,7 @@ const controller = scope.resolve(UsersController);
 const DataModule = ormModule({
   context: UsersDbContext,
   entities: [User],
-  provider: postgres({ url: Bun.env.OSNOVA_PG_URL! }),
+  provider: postgres({ url: Bun.env.OSNV_PG_URL! }),
   healthCheck: false,
 });
 

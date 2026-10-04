@@ -7,8 +7,8 @@ test("generated production wrapper clears a rejected load and retries without bi
   // the first generated-wrapper load itself rejects and is retried.
   const program = `
     const root = ${JSON.stringify(root)};
-    const runtime = await import(new URL("src/generated/osnova/runtime.ts", \`file://\${root}/\`).href);
-    const bindings = await import(new URL("src/generated/osnova/bindings.ts", \`file://\${root}/\`).href);
+    const runtime = await import(new URL("src/generated/osnv/runtime.ts", \`file://\${root}/\`).href);
+    const bindings = await import(new URL("src/generated/osnv/bindings.ts", \`file://\${root}/\`).href);
     const entries = bindings.GENERATED_TARGET_BINDINGS;
     const original = entries[0][0];
     entries[0][0] = null;

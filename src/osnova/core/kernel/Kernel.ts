@@ -367,7 +367,7 @@ export class Kernel {
         // A broken logger must not prevent the shutdown request.
       }
     }
-    console.error("[osnova] Unhandled error, shutting down:", redacted);
+    console.error("[osnv] Unhandled error, shutting down:", redacted);
   }
 
   private printStartupReport(): void {
@@ -383,9 +383,9 @@ export class Kernel {
       startupMs: Number(this.startupMs.toFixed(1)),
     };
     if (logger) {
-      logger.info("osnova started", fields);
+      logger.info("osnv started", fields);
       return;
     }
-    console.log(`[osnova] started ${JSON.stringify(fields)}`);
+    console.log(`[osnv] started ${JSON.stringify(fields)}`);
   }
 }

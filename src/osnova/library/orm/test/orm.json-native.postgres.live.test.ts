@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, Key, Schema, postgres } from "../index";
 
-const enabled = process.env.OSNOVA_ORM_REPEAT_AUDIT_LIVE === "1";
+const enabled = process.env.OSNV_ORM_REPEAT_AUDIT_LIVE === "1";
 const values: unknown[] = ["123", "false", "null", '{"role":"reader"}', '[1,2]', '"quoted"', "ordinary text", "", 123, 0, -7, 3.25, false, true, null, [1, "false"], { value: "null" }];
 
 function fixtureUrl(): string {
-  const raw = process.env.OSNOVA_PG_URL;
+  const raw = process.env.OSNV_PG_URL;
   if (!enabled || !raw) throw new Error("Native JSON regression requires its owned disposable PostgreSQL guard and URL.");
   const url = new URL(raw);
   if (!["postgres:", "postgresql:"].includes(url.protocol) || url.hostname !== "127.0.0.1"
@@ -46,7 +46,7 @@ async function createFixture() {
 }
 
 if (!enabled) {
-  test.skip("SKIP — native JSON PostgreSQL regression requires OSNOVA_ORM_REPEAT_AUDIT_LIVE=1 and dedicated OSNOVA_PG_URL", () => {});
+  test.skip("SKIP — native JSON PostgreSQL regression requires OSNV_ORM_REPEAT_AUDIT_LIVE=1 and dedicated OSNV_PG_URL", () => {});
 } else {
   test("native JSONB values preserve entity and projection types", async () => withFixture(async ({ provider, schema, context }) => {
     // Constants only: bypass parameter encoding to isolate native result decoding.

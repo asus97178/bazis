@@ -1,6 +1,6 @@
 import type { OsnovaModuleMetadata } from "./types";
 
-const OSNOVA_MODULE_MARKER = Symbol.for("@osnova/core/di/module");
+const OSNV_MODULE_MARKER = Symbol.for("@osnova/core/di/module");
 
 /**
  * Registers module metadata on the decorated class (NestJS-style).
@@ -29,7 +29,7 @@ const OSNOVA_MODULE_MARKER = Symbol.for("@osnova/core/di/module");
 export function Module(metadata: OsnovaModuleMetadata) {
   return (target: abstract new (...args: never) => unknown, _context: ClassDecoratorContext): void => {
     Object.assign(target, metadata);
-    Object.defineProperty(target, OSNOVA_MODULE_MARKER, {
+    Object.defineProperty(target, OSNV_MODULE_MARKER, {
       configurable: false,
       enumerable: false,
       value: true,
@@ -40,5 +40,5 @@ export function Module(metadata: OsnovaModuleMetadata) {
 
 /** @internal Distinguishes decorated module classes from profile factory functions. */
 export function isOsnovaModuleClass(value: unknown): value is abstract new (...args: never) => unknown {
-  return typeof value === "function" && Reflect.get(value, OSNOVA_MODULE_MARKER) === true;
+  return typeof value === "function" && Reflect.get(value, OSNV_MODULE_MARKER) === true;
 }

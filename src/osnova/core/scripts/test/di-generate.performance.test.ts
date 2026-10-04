@@ -43,7 +43,7 @@ test("actual synthetic small and large projects remain near-linear within the do
       await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({
         compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler" }, include: ["src/**/*.ts"],
       }));
-      await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({
+      await Bun.write(path.join(root, "osnv.config.json"), JSON.stringify({
         version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } },
       }));
       const classes = Array.from({ length: count }, (_, index) => `export class Candidate${index} { constructor(readonly dependency: Dependency) {} }`).join("\n");

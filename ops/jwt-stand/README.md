@@ -219,7 +219,7 @@ scheduler lag p99 <=100 ms, выполнено >=99% запросов, 0 нео�
 concurrency 1..64. Короткая проверка не заменяет профиль 300 s.
 
 Для целевого сбора Linux-счётчиков в локальном `.cache/jwt-stand/compose.json`
-задайте `services.proxy.environment.OSNOVA_JWT_STAND_SCHEDULER` строкой `"1"`
+задайте `services.proxy.environment.OSNV_JWT_STAND_SCHEDULER` строкой `"1"`
 и выполните `stand.py start`: Compose пересоздаст proxy с новым окружением.
 Генератор автоматически примет режим из proxy и запишет
 `profile.schedulerDiagnostics: true`. После диагностики удалите поле или задайте

@@ -23,7 +23,7 @@ JSON null существующий источник пропускает: он �
 отклоняется; null в разрешённом представлении отсутствует. Схема kernel не меняется.
 
 Контракт probe: команда fingerprint, matrix, business или soak; явный
-OSNOVA_ORM_ENTERPRISE_LIVE=owned-disposable-v1, loopback URL с БД cancel_<run>,
+OSNV_ORM_ENTERPRISE_LIVE=owned-disposable-v1, loopback URL с БД cancel_<run>,
 публичный test CA. Soak duration — 30..3600 с, default 900; темп — 1..500 операций/с,
 default 50; worker max=8, максимум 64 одновременно запущенных операций.
 Измеритель использует фиксированные гистограммы, пишет JSON-окна каждые 10 секунд.

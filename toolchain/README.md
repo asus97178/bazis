@@ -13,7 +13,7 @@
 бинарник в `/private/tmp`: macOS очищает его при перезагрузке.
 
 ```sh
-export OSNOVA_BUN_BIN=/absolute/path/to/bun
+export OSNV_BUN_BIN=/absolute/path/to/bun
 ./scripts/osnova-bun run toolchain:check
 ./scripts/osnova-bun run di:generate --target all
 ./scripts/osnova-bun test --isolate src/osnova/core/di/test
@@ -23,7 +23,7 @@ export OSNOVA_BUN_BIN=/absolute/path/to/bun
 Команды запускаются из корня проекта. Launcher проверяет бинарник до исполнения,
 создаёт временную копию и использует её также для дочерних команд `bun`.
 Несовпадение версии, хеша или macOS останавливает запуск с диагностикой
-`OSNOVA_BUN_*`. Обычный `bun run` использует Bun из PATH, который может отличаться
+`OSNV_BUN_*`. Обычный `bun run` использует Bun из PATH, который может отличаться
 от закреплённого.
 
 Копия помечается флагом `uchg`. `bun build --compile` клонирует исполняемый файл
@@ -42,13 +42,13 @@ export OSNOVA_BUN_BIN=/absolute/path/to/bun
 Если приложение задаёт больший shutdown timeout, увеличь и бюджет launcher:
 
 ```sh
-OSNOVA_BUN_SHUTDOWN_TIMEOUT_MS=35000 ./scripts/osnova-bun run start
+OSNV_BUN_SHUTDOWN_TIMEOUT_MS=35000 ./scripts/osnova-bun run start
 ```
 
-`OSNOVA_BUN_SHUTDOWN_TIMEOUT_MS` — необязательная строка из десятичных цифр,
+`OSNV_BUN_SHUTDOWN_TIMEOUT_MS` — необязательная строка из десятичных цифр,
 целое от 1 до 2147483647 миллисекунд без ведущих нулей; default — `15000`.
 Некорректное значение останавливает запуск с
-`OSNOVA_BUN_SHUTDOWN_TIMEOUT_INVALID` до создания дочернего процесса.
+`OSNV_BUN_SHUTDOWN_TIMEOUT_INVALID` до создания дочернего процесса.
 Ожидание проверяется с шагом 100 мс, значение округляется вверх до этого шага.
 Значение выбирается больше бюджета kernel; launcher не читает конфигурацию
 приложения. `shutdownTimeoutMs = 0` отключает предел kernel, но не launcher.

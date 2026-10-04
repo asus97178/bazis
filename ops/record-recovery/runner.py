@@ -23,8 +23,8 @@ IMAGE = 'sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
 run = uuid.uuid4().hex[:12]
 label = 'osnova.record-recovery-run=' + run
 passwords = [secrets.token_hex(24), secrets.token_hex(24)]
-env = {k: v for k, v in os.environ.items() if not k.startswith('OSNOVA_') and k not in ['BUN_OPTIONS', 'NODE_OPTIONS']}
-env['OSNOVA_BUN_BIN'] = os.environ['OSNOVA_BUN_BIN']
+env = {k: v for k, v in os.environ.items() if not k.startswith('OSNV_') and k not in ['BUN_OPTIONS', 'NODE_OPTIONS']}
+env['OSNV_BUN_BIN'] = os.environ['OSNV_BUN_BIN']
 receipt = {'started_at': datetime.now(timezone.utc).isoformat(), 'run': run, 'image': IMAGE,
            'authorization': 'User делай, local business recovery qualification; owned disposable resources only.', 'checks': {}}
 scratch_context = tempfile.TemporaryDirectory(prefix='osnova-record-recovery-fixture-')
@@ -43,7 +43,7 @@ def sha(path):
 
 
 def hashes():
-    files = [p for folder in ['src/osnova/library/orm', 'src/osnova/core/orm', 'src/app/modules/datamanager_modules', 'src/generated/osnova', 'ops/record-recovery']
+    files = [p for folder in ['src/osnova/library/orm', 'src/osnova/core/orm', 'src/app/modules/datamanager_modules', 'src/generated/osnv', 'ops/record-recovery']
              for p in (ROOT / folder).rglob('*') if p.is_file()]
     files += [ROOT / p for p in ['package.json', 'bun.lock', 'toolchain/bun.json', 'scripts/osnova-bun', 'tsconfig.json']]
     return {str(p.relative_to(ROOT)): sha(p) for p in sorted(files)}
@@ -113,9 +113,9 @@ try:
         database = 'recovery_' + run + '_' + platform
         pg('recovery_control', f'CREATE DATABASE "{database}" OWNER worker')
         for mode in ['exercise', 'restart']:
-            child_env = dict(env, OSNOVA_RECORD_RECOVERY='owned-disposable-v1',
-                             OSNOVA_PG_URL=f'postgres://worker:{passwords[1]}@{"127.0.0.1:5432" if platform == "linux" else address}/{database}',
-                             OSNOVA_RECORD_CA='/qual/ca.pem' if platform == 'linux' else str(scratch / 'server.crt'))
+            child_env = dict(env, OSNV_RECORD_RECOVERY='owned-disposable-v1',
+                             OSNV_PG_URL=f'postgres://worker:{passwords[1]}@{"127.0.0.1:5432" if platform == "linux" else address}/{database}',
+                             OSNV_RECORD_CA='/qual/ca.pem' if platform == 'linux' else str(scratch / 'server.crt'))
             binary = scratch / ('probe-' + platform)
             args = [str(binary), mode]
             if platform == 'linux':
@@ -124,7 +124,7 @@ try:
                         '--memory', '512m', '--cpus', '1', '--pids-limit', '96', '--tmpfs', '/tmp:size=134217728',
                         '--mount', f'type=bind,src={binary},dst=/qual/probe,readonly',
                         '--mount', f'type=bind,src={scratch / "server.crt"},dst=/qual/ca.pem,readonly', '--workdir', '/tmp',
-                        '--env', 'OSNOVA_RECORD_RECOVERY', '--env', 'OSNOVA_PG_URL', '--env', 'OSNOVA_RECORD_CA', '--entrypoint', '/qual/probe', IMAGE, mode]
+                        '--env', 'OSNV_RECORD_RECOVERY', '--env', 'OSNV_PG_URL', '--env', 'OSNV_RECORD_CA', '--entrypoint', '/qual/probe', IMAGE, mode]
             start = time.monotonic()
             result = command(args, child_env, timeout=120, check=False, cwd=scratch)
             (BASE / f'{platform}-{mode}.log').write_text(redact(result.stdout + result.stderr))

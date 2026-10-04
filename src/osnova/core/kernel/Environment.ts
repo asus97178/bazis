@@ -24,12 +24,12 @@ export class Environment {
     return this.name === "test";
   }
 
-  /** Reads OSNOVA_ENV (fallback NODE_ENV, then production). Unknown value fails fast. */
+  /** Reads OSNV_ENV (fallback NODE_ENV, then production). Unknown value fails fast. */
   public static fromProcess(debugOverride?: boolean): Environment {
     // A missing deployment setting must fail closed. Development is always an
     // explicit choice made by the dev scripts, never an accidental production
     // fallback.
-    const raw = process.env.OSNOVA_ENV ?? process.env.NODE_ENV ?? "production";
+    const raw = process.env.OSNV_ENV ?? process.env.NODE_ENV ?? "production";
     const name = parseEnvironmentName(raw);
     return new Environment(name, debugOverride ?? name !== "production");
   }
@@ -47,7 +47,7 @@ function parseEnvironmentName(raw: string): EnvironmentName {
       return "test";
     default:
       throw new KernelError(
-        `Unknown environment "${raw}" (OSNOVA_ENV/NODE_ENV). Expected: development | production | test.`,
+        `Unknown environment "${raw}" (OSNV_ENV/NODE_ENV). Expected: development | production | test.`,
       );
   }
 }

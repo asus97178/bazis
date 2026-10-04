@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, Key, PostgresProvider, Schema } from "../index";
 
-const url = process.env.OSNOVA_PG_URL;
-const enabled = !!url && process.env.OSNOVA_ORM_QUALIFICATION_LIVE === "1";
+const url = process.env.OSNV_PG_URL;
+const enabled = !!url && process.env.OSNV_ORM_QUALIFICATION_LIVE === "1";
 class Context extends DbContext {}
 class PlannedRollback extends Error {}
 

@@ -230,7 +230,7 @@ test("context is bounded by whole turns; child environment drops application sec
     const paths = await codexPaths(directory), options = codexProcessOptions(paths);
     expect(options.options.env.CODEX_HOME).toBe(paths.home);
     expect(options.options.env).not.toHaveProperty("OPENAI_API_KEY");
-    expect(options.options.env).not.toHaveProperty("OSNOVA_DB__PASSWORD");
+    expect(options.options.env).not.toHaveProperty("OSNV_DB__PASSWORD");
     expect(() => checkCodexPolicy({ config: { features: {} } })).toThrow();
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

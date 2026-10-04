@@ -10,12 +10,12 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 function project(withConfig = true): { root: string; generated: string; fingerprint: GeneratedSourceFingerprint } {
   const root = mkdtempSync(path.join(tmpdir(), "osnv-fingerprint-"));
   roots.push(root);
-  mkdirSync(path.join(root, "src/generated/osnova"), { recursive: true });
-  if (withConfig) writeFileSync(path.join(root, "osnova.codegen.json"), "{}");
+  mkdirSync(path.join(root, "src/generated/osnv"), { recursive: true });
+  if (withConfig) writeFileSync(path.join(root, "osnv.config.json"), "{}");
   writeFileSync(path.join(root, "src/index.ts"), "export const a = 1;\n");
   const files = ["src/index.ts"];
   const fingerprint = { root: "../../..", framework: frameworkVersion() ?? "0.0.0", files, hash: hashSources(root, files)! };
-  return { root, generated: path.join(root, "src/generated/osnova"), fingerprint };
+  return { root, generated: path.join(root, "src/generated/osnv"), fingerprint };
 }
 
 test("silent while sources match what codegen saw", () => {

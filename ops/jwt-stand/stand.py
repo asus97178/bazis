@@ -71,7 +71,7 @@ class Stand:
     def run(self, arguments, *, name=None, timeout=90, accept_failure=False, build=False):
         environment = dict(self.environment)
         if build:
-            environment["OSNOVA_BUN_BIN"] = str(Path(self.args.bun).resolve())
+            environment["OSNV_BUN_BIN"] = str(Path(self.args.bun).resolve())
         process = subprocess.run([str(arg) for arg in arguments], cwd=ROOT, env=environment,
                                  stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout)
         output = process.stdout.decode(errors="replace")
@@ -251,7 +251,7 @@ class Stand:
             return {**common(cpu, quota, memory), "image": self.state["binaryImage"]["id"], "user": f"{os.getuid()}:{os.getgid()}", "read_only": True,
                     "cap_drop": ["ALL"], "security_opt": ["no-new-privileges:true"], "tmpfs": ["/tmp:rw,size=64m"],
                     "working_dir": "/stand", "entrypoint": ["/stand/bin/" + name],
-                    "environment": {"OSNOVA_ENV": "production", "NODE_EXTRA_CA_CERTS": "/stand/certs/server.crt"},
+                    "environment": {"OSNV_ENV": "production", "NODE_EXTRA_CA_CERTS": "/stand/certs/server.crt"},
                     "volumes": [f"{certificates / 'server.crt'}:/stand/certs/server.crt:ro"]}
         healthy = lambda names: {name: {"condition": "service_healthy"} for name in names}
         check = lambda url: {"test": ["CMD", "/stand/bin/client", "health", "--url=" + url], "interval": "5s", "timeout": "6s", "retries": 6, "start_period": "20s"}

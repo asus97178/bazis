@@ -4,7 +4,7 @@
  * Аналогичен {@link requestModelRegistry}: сгенерированные конвенции привязок
  * ссылаются на класс по имени (генерируемый файл — чистые данные), а сам класс
  * разрешается из этого реестра при старте сервера. Регистрация приходит из
- * app-owned generated runtime (`src/generated/osnova/httpListModels.ts`).
+ * app-owned generated runtime (`src/generated/osnv/httpListModels.ts`).
  */
 
 /** Маркер: под одним именем зарегистрировано несколько разных классов. */

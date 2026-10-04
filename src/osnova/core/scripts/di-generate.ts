@@ -39,7 +39,7 @@ const CORE_OPENAPI_METADATA_FILE = `${FRAMEWORK_ROOT}/core/http/generated/openap
 const CORE_AGENT_CATALOG_FILE = `${FRAMEWORK_ROOT}/core/agent/generated/catalog.ts`;
 const CORE_AGENT_GENERATED_DIR = `${FRAMEWORK_ROOT}/core/agent/generated`;
 const isFrameworkSourcePath = (file: string): boolean => FRAMEWORK_SOURCE !== null && file.startsWith(`${FRAMEWORK_SOURCE}/`);
-const APP_GENERATED_DIR = "src/generated/osnova";
+const APP_GENERATED_DIR = "src/generated/osnv";
 let activeGeneratedDir = APP_GENERATED_DIR;
 const plannedWrites = new Map<string, string>();
 const plannedRemovals = new Set<string>();
@@ -50,9 +50,9 @@ const plannedRemovals = new Set<string>();
 let renameCount = 0;
 async function renameGeneratedFile(from: string, to: string): Promise<void> {
   renameCount += 1;
-  const failAt = process.env.OSNOVA_CODEGEN_TEST_FAIL_RENAME_AT;
+  const failAt = process.env.OSNV_CODEGEN_TEST_FAIL_RENAME_AT;
   if (failAt !== undefined && Number(failAt) === renameCount) {
-    throw new Error(`OSNOVA_CODEGEN_TEST_RENAME_FAILURE:${renameCount}`);
+    throw new Error(`OSNV_CODEGEN_TEST_RENAME_FAILURE:${renameCount}`);
   }
   await rename(from, to);
 }
@@ -131,7 +131,7 @@ async function planStaleGeneratedTargetRemoval(configuredNames: readonly string[
   for (const entry of await readdir(targetsDirectory, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     if (!/^[a-z][a-z0-9-]*$/.test(entry.name)) {
-      throw new Error(`OSNOVA_CODEGEN_GENERATED_TARGET_INVALID: ${entry.name}`);
+      throw new Error(`OSNV_CODEGEN_GENERATED_TARGET_INVALID: ${entry.name}`);
     }
     if (!configured.has(entry.name)) stageRemove(`${targetsDirectory}/${entry.name}`);
   }
@@ -141,11 +141,11 @@ function readRequestedTarget(): string | undefined {
   const args = Bun.argv.slice(2);
   if (args.length === 0) return undefined;
   if (args.length !== 2 || args[0] !== "--target") {
-    throw new Error("OSNOVA_CODEGEN_CONFIG_INVALID: expected --target <name|all>");
+    throw new Error("OSNV_CODEGEN_CONFIG_INVALID: expected --target <name|all>");
   }
   const target = args[1];
   if (target && (target === "all" || /^[a-z][a-z0-9-]*$/.test(target))) return target;
-  throw new Error(`OSNOVA_CODEGEN_TARGET_UNKNOWN: ${target ?? ""}`);
+  throw new Error(`OSNV_CODEGEN_TARGET_UNKNOWN: ${target ?? ""}`);
 }
 
 // Framework internals: their classes are excluded from the auto-deps map (they
@@ -352,7 +352,7 @@ async function runConfiguredTargets(): Promise<void> {
   const discoveryStartedAt = performance.now();
   const requested = readRequestedTarget() ?? config.defaultTarget;
   if (requested !== "all" && !Object.hasOwn(config.targets, requested)) {
-    throw new Error(`OSNOVA_CODEGEN_TARGET_UNKNOWN: ${requested}`);
+    throw new Error(`OSNV_CODEGEN_TARGET_UNKNOWN: ${requested}`);
   }
   const names = requested === "all"
     ? Object.keys(config.targets).sort((left, right) => left.localeCompare(right))
@@ -362,7 +362,7 @@ async function runConfiguredTargets(): Promise<void> {
     const target = config.targets[name] as { entrypoints: readonly string[]; applicationParts?: readonly string[] };
     const roots = [...target.entrypoints, ...(target.applicationParts ?? [])].map(normalizeConfiguredPath);
     for (const root of roots) {
-      if (!programFiles.has(root)) throw new Error(`OSNOVA_CODEGEN_ENTRY_NOT_IN_PROGRAM: ${name}:${root}`);
+      if (!programFiles.has(root)) throw new Error(`OSNV_CODEGEN_ENTRY_NOT_IN_PROGRAM: ${name}:${root}`);
     }
     reachableByTarget.set(name, collectTargetReachability(program, programFiles, roots));
   }
@@ -379,7 +379,7 @@ async function runConfiguredTargets(): Promise<void> {
   const boundaryDiagnostics: string[] = [];
   for (const [file, source] of programFiles) {
     if (isFrameworkSourcePath(file)) continue;
-    if (!owners.has(file) && candidateIndex.get(file)) boundaryDiagnostics.push(`OSNOVA_CODEGEN_SOURCE_UNASSIGNED: ${file}`);
+    if (!owners.has(file) && candidateIndex.get(file)) boundaryDiagnostics.push(`OSNV_CODEGEN_SOURCE_UNASSIGNED: ${file}`);
   }
   for (const [name, reachable] of reachableByTarget) {
     for (const file of reachable) {
@@ -451,7 +451,7 @@ function collectDynamicImportDiagnostics(source: ts.SourceFile, target: string, 
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && (node.arguments[0] === undefined || !ts.isStringLiteralLike(node.arguments[0]))) {
       const location = source.getLineAndCharacterOfPosition(node.getStart(source));
-      diagnostics.push(`OSNOVA_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: ${target}:${normalizeProjectPath(source.fileName)}:${location.line + 1}`);
+      diagnostics.push(`OSNV_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: ${target}:${normalizeProjectPath(source.fileName)}:${location.line + 1}`);
     }
     ts.forEachChild(node, visit);
   };
@@ -521,8 +521,8 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
       // exclusively to the constructor-bound target descriptor.
       stageWrite(OUTPUT_FILE, renderOutput({}));
       stageWrite(HTTP_OUTPUT_FILE, renderHttpBindings({}));
-      stageWrite(CORE_REQUEST_MODELS_FILE, renderEmptyGeneratedSideEffect("Request model registrations moved to src/generated/osnova/httpRequestModels.ts."));
-      stageWrite(CORE_LIST_MODELS_FILE, renderEmptyGeneratedSideEffect("List model registrations moved to src/generated/osnova/httpListModels.ts."));
+      stageWrite(CORE_REQUEST_MODELS_FILE, renderEmptyGeneratedSideEffect("Request model registrations moved to src/generated/osnv/httpRequestModels.ts."));
+      stageWrite(CORE_LIST_MODELS_FILE, renderEmptyGeneratedSideEffect("List model registrations moved to src/generated/osnv/httpListModels.ts."));
       stageWrite(CORE_OPENAPI_METADATA_FILE, renderOpenApiMetadata({}, {}, "core"));
       stageWrite(CORE_AGENT_CATALOG_FILE, generateAgentMetadataCatalog([], CORE_AGENT_GENERATED_DIR).output);
     }
@@ -637,7 +637,7 @@ function renderTargetDeps(): string {
   if (entries.some(([, deps]) => deps.some(dep => dep.target && dep.lazy))) lines.push('import { lazyDependency } from "osnv/core/di";');
   for (const [declaration, reference] of references) {
     const name = dependencyClassExportName(declaration);
-    if (!name) throw new Error(`OSNOVA_DI_CLASS_UNIMPORTABLE: ${sourceLocation(declaration)}`);
+    if (!name) throw new Error(`OSNV_DI_CLASS_UNIMPORTABLE: ${sourceLocation(declaration)}`);
     lines.push(`import { ${name} as ${reference} } from ${JSON.stringify(toModuleSpecifierFrom(activeGeneratedDir, normalizeProjectPath(declaration.getSourceFile().fileName)))};`);
   }
   lines.push("export const GENERATED_TARGET_CLASS_DEPS = Object.freeze([");
@@ -690,7 +690,7 @@ function renderTargetBindings(): string {
   for (let index = 0; index < entries.length; index += 1) {
     const name = entries[index] as string;
     const file = httpControllerFiles[name] ?? classFilesByName.get(name);
-    if (file === undefined) throw new Error(`OSNOVA_CODEGEN_CONTROLLER_SOURCE_MISSING: ${name}`);
+    if (file === undefined) throw new Error(`OSNV_CODEGEN_CONTROLLER_SOURCE_MISSING: ${name}`);
     lines.push(`import { ${name} as TargetController_${index} } from ${JSON.stringify(toModuleSpecifierFrom(activeGeneratedDir, normalizeProjectPath(file)))};`);
   }
   lines.push("export const GENERATED_TARGET_BINDINGS = Object.freeze([");
@@ -774,8 +774,8 @@ function validateDepsAgainstKnownTokens(): void {
       // would fail later, far from the cause. Other classes need no entry.
       if (needsInferredDiDeps(declaration)) {
         fatalErrors.push(declaration.members.some(ts.isConstructorDeclaration)
-          ? `OSNOVA_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "${depName}", which is neither a DI token (createToken) nor a class known to codegen. Register it, import it from the framework package, or bind the class with an explicit factory.`
-          : `OSNOVA_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(declaration)}: inherited constructor dependency "${depName}" has no known DI token.`);
+          ? `OSNV_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "${depName}", which is neither a DI token (createToken) nor a class known to codegen. Register it, import it from the framework package, or bind the class with an explicit factory.`
+          : `OSNV_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(declaration)}: inherited constructor dependency "${depName}" has no known DI token.`);
       }
       break;
     }
@@ -787,7 +787,7 @@ function collectClassDeps(source: ts.SourceFile): void {
     if (ts.isClassDeclaration(node) && node.name) {
       const result = readConstructorTypeNames(node);
       if (result.unsupportedInheritedParameter !== undefined && needsInferredDiDeps(node)) {
-        fatalErrors.push(`OSNOVA_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(node)}: cannot infer inherited constructor parameter "${result.unsupportedInheritedParameter}" for "${node.name.text}". The parameter needs a runtime DI token or an explicit value/factory binding.`);
+        fatalErrors.push(`OSNV_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(node)}: cannot infer inherited constructor parameter "${result.unsupportedInheritedParameter}" for "${node.name.text}". The parameter needs a runtime DI token or an explicit value/factory binding.`);
       }
       if (result.deps.length > 0) {
         if (dependencyClassExportName(node)) {
@@ -796,7 +796,7 @@ function collectClassDeps(source: ts.SourceFile): void {
             classDeps.set(node, result.deps);
           }
         } else if (needsInferredDiDeps(node)) {
-          fatalErrors.push(`OSNOVA_DI_CLASS_UNIMPORTABLE: ${sourceLocation(node)}: DI class "${node.name.text}" must be exported (an export alias is sufficient) so constructor dependencies can bind to its exact identity.`);
+          fatalErrors.push(`OSNV_DI_CLASS_UNIMPORTABLE: ${sourceLocation(node)}: DI class "${node.name.text}" must be exported (an export alias is sufficient) so constructor dependencies can bind to its exact identity.`);
         }
       }
     }
@@ -1296,7 +1296,7 @@ function resolveOpenApiSchemaModelImports(agentModels: readonly ts.ClassDeclarat
   for (const [declaration, name] of openApiSchemaModels) {
     if (!reachable.has(name)) continue;
     if (!isNamedExportedTopLevelClass(declaration)) {
-      fatalErrors.push(`OSNOVA_AGENT_SCHEMA_MODEL_UNIMPORTABLE: Agent schema ${name} must be a named exported top-level class (${sourcePathForDeclaration(declaration)}).`);
+      fatalErrors.push(`OSNV_AGENT_SCHEMA_MODEL_UNIMPORTABLE: Agent schema ${name} must be a named exported top-level class (${sourcePathForDeclaration(declaration)}).`);
       continue;
     }
     openApiSchemas[name] ??= openApiCodegen.schemaFromDeclaration(declaration);
@@ -1412,7 +1412,7 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
 
     if (failed) {
       fatalErrors.push(
-        `OSNOVA_HTTP_BINDING_UNRESOLVED: controller "${controllerName}.${member.name.text}" (${filePath}): cannot infer bindings (${failed}). ` +
+        `OSNV_HTTP_BINDING_UNRESOLVED: controller "${controllerName}.${member.name.text}" (${filePath}): cannot infer bindings (${failed}). ` +
           `Use supported parameter types; read headers or raw bodies through HttpContext, and inject services in the constructor.`,
       );
       continue;

@@ -19,7 +19,7 @@ import {
 } from "../index";
 import { compileDynamicModelGraph } from "../Metadata/DynamicModelBuilder";
 
-const url = process.env.OSNOVA_PG_URL;
+const url = process.env.OSNV_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
 const prefix = `ormgc_${run}_`;
 const ownedTables = new Set<string>();
@@ -411,4 +411,4 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
   });
 });
 
-test.skipIf(Boolean(url))("GC live contracts are explicitly skipped without OSNOVA_PG_URL", () => expect(url).toBeUndefined());
+test.skipIf(Boolean(url))("GC live contracts are explicitly skipped without OSNV_PG_URL", () => expect(url).toBeUndefined());

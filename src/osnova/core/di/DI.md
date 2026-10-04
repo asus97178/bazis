@@ -1230,7 +1230,7 @@ try {
   container = createContainer(AppModule, { validateOnBuild: true });
 } catch (error) {
   if (error instanceof DiError) {
-    console.error(`[osnova] DI configuration error: ${error.message}`);
+    console.error(`[osnv] DI configuration error: ${error.message}`);
     process.exit(1);
   }
   throw error;

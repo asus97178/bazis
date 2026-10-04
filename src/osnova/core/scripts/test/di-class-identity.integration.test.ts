@@ -29,7 +29,7 @@ test("codegen preserves class identity, private same-name dependencies and expor
     await symlink(path.join(repo, "node_modules"), path.join(root, "node_modules"), "dir");
     const files: Record<string, string> = {
       "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true, noEmit: true, paths: { "osnv/*": [path.join(repo, "src/osnova/*")], "@osnova/*": [path.join(repo, "src/osnova/*")], "@/*": [path.join(repo, "src/osnova/*")] } }, include: ["src/**/*.ts"] }),
-      "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+      "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
       "src/a/Dependency.ts": 'export class Dependency { readonly value = "A"; }',
       "src/b/Dependency.ts": 'export class Dependency { readonly value = "B"; }',
       "src/a/barrel.ts": 'export { Dependency as RenamedDependency } from "./Dependency";',
@@ -40,7 +40,7 @@ import { Dependency as A } from "./a/Dependency";
 import { Dependency as B } from "./b/Dependency";
 import { Service as Alpha } from "./a/Service";
 import Beta from "./b/Service";
-const { registerOsnovaGeneratedRuntime } = await import("./generated/osnova/runtime");
+const { registerOsnovaGeneratedRuntime } = await import("./generated/osnv/runtime");
 await registerOsnovaGeneratedRuntime();
 const root = createContainer({ imports: [
   { providers: [singleton(A), singleton(Alpha)], exports: [Alpha] },
@@ -55,7 +55,7 @@ await root.dispose();`,
       await Bun.write(destination, content);
     }
     await run([process.execPath, path.join(repo, "src/osnova/core/scripts/di-generate.ts")], root);
-    const generated = await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).text();
+    const generated = await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).text();
     expect(generated).toContain("import { Service as TargetClass_");
     expect(generated).toContain("import { default as TargetClass_");
     expect(generated.match(/import \{ Dependency as DependencyClass_/g)).toHaveLength(2);

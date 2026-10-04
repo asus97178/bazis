@@ -44,7 +44,7 @@ test("a generated non-default target late-normalizes class deps declared before 
         },
         include: ["src/**/*.ts"],
       }),
-      "osnova.codegen.json": JSON.stringify({
+      "osnv.config.json": JSON.stringify({
         version: 1,
         defaultTarget: "production",
         targets: {
@@ -78,7 +78,7 @@ import { AuditBootstrapDependency } from "./Dependency";
 import { AuditBootstrapModule } from "./Module";
 import { AuditBootstrapService } from "./Service";
 
-await import("../generated/osnova/targets/audit/bootstrap");
+await import("../generated/osnv/targets/audit/bootstrap");
 const container = createContainer(AuditBootstrapModule, { validateOnBuild: true });
 try {
   const service = container.resolve(AuditBootstrapService);

@@ -18,7 +18,7 @@ NestJS (granular lifecycle-хуки, global-модули) — всё без ре
 - `LifecycleCoordinator.ts` — порядок boot/shutdown: options fail-fast → `onInit` → hosted services по фазам → `onBootstrap`; остановка в обратном порядке с `shutdownTimeout`; rollback при падении старта.
 - `ApplicationLifetime.ts` — инжектируемый lifetime: `onStarted/onStopping/onStopped` + программный `stop(exitCode)`.
 - `lifecycleHooks.ts` — токен `LIFECYCLE_HOOK` (enumerable) + `addLifecycleHook`.
-- `Environment.ts` — окружение (`development|production|test`) из `OSNOVA_ENV`/`NODE_ENV`, флаг `debug`.
+- `Environment.ts` — окружение (`development|production|test`) из `OSNV_ENV`/`NODE_ENV`, флаг `debug`.
 - `SupervisedHostedService.ts` — retry с экспоненциальным backoff; передаёт startup signal и прекращает повторы при отмене.
 - `logging/ConsoleLogger.ts` — стандартный structured logger; fields
   редактируются через `@osnova/library/redaction` по умолчанию. Сырые fields
@@ -30,7 +30,7 @@ NestJS (granular lifecycle-хуки, global-модули) — всё без ре
 - `Configuration.ts` — собственный снимок плоского конфига (`db.host` → строка), типизированные геттеры, `loadConfiguration`.
 - `defineConfig.ts` — неизменяемое объявление с overrides окружения, отдельным `resolve(environment?, configuration?)` и DI-токеном `token`. Одно объявление используется в нескольких kernel.
 - `ConfigRegistry.ts` — одно проверенное представление объявления на kernel; `get(definition)` возвращает тот же объект, что и DI по `definition.token`.
-- `sources.ts` — источники: `memorySource`, `envSource` (`OSNOVA_DB__HOST` → `db.host`), `argsSource` (`--db.host=x`), `jsonFileSource` (файл рядом с бинарником).
+- `sources.ts` — источники: `memorySource`, `envSource` (`OSNV_DB__HOST` → `db.host`), `argsSource` (`--db.host=x`), `jsonFileSource` (файл рядом с бинарником).
 - `addConfigOptions.ts` — `configOptions(token, { bind, validate })`: validated options модуля, читающие из `Configuration`; kernel валидирует все на старте одной ошибкой.
 - `Secret.ts` — секрет с redaction: `toString/toJSON/inspect` печатают `***`, значение только через `reveal()`.
 

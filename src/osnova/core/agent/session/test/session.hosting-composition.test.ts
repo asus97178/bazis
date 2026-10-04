@@ -169,16 +169,16 @@ describe("TEST-003 strict-schema private identity", () => {
 function disposableDbConfig(url: string) {
   const target = new URL(url);
   if (target.protocol !== "postgres:" || target.hostname !== "127.0.0.1" || target.pathname !== "/osnova_session_test" || decodeURIComponent(target.username) !== "postgres" || target.port.length === 0) {
-    throw new Error("OSNOVA_PG_URL must be the approved disposable PG17 target.");
+    throw new Error("OSNV_PG_URL must be the approved disposable PG17 target.");
   }
   return defineConfig("test003-hosting-db", { default: {
     host: target.hostname, port: Number(target.port), database: target.pathname.slice(1), username: decodeURIComponent(target.username), password: secret(decodeURIComponent(target.password)),
   } });
 }
 
-const suppliedPgUrl = Bun.env.OSNOVA_PG_URL;
+const suppliedPgUrl = Bun.env.OSNV_PG_URL;
 if (!suppliedPgUrl) {
-  test.skip("physical strict-schema composition requires explicit OSNOVA_PG_URL disposable target", () => {});
+  test.skip("physical strict-schema composition requires explicit OSNV_PG_URL disposable target", () => {});
 } else {
   test("physical: actual container admits canonical Infra + strict ORM and disposes in reverse", async () => {
     const events: string[] = [];

@@ -4,7 +4,7 @@ import type { EnvironmentName } from "./EnvironmentName";
 export type UnhandledErrorPolicy = "shutdown" | "none";
 
 export interface KernelOptions {
-  /** Overrides OSNOVA_ENV / NODE_ENV detection. */
+  /** Overrides OSNV_ENV / NODE_ENV detection. */
   readonly environment?: EnvironmentName;
   /** Overrides the debug flag (default: true everywhere except production). */
   readonly debug?: boolean;

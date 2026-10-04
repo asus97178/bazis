@@ -6,14 +6,14 @@
 ## Локальная работа
 
 Используется квалифицированный Bun через `scripts/osnova-bun`. Переменная
-`OSNOVA_BUN_BIN` должна указывать на уже проверенный исполняемый файл;
+`OSNV_BUN_BIN` должна указывать на уже проверенный исполняемый файл;
 требования к версии и хосту задаются в `toolchain/`. Проверка не устанавливает
 runtime и не заменяет его. Текущий допуск: Bun 1.4.0, macOS arm64
 26.5.2 (25F84). Для другой платформы нужна отдельная квалификация.
 
 ```sh
 # Указать путь к своему квалифицированному Bun:
-export OSNOVA_BUN_BIN=/absolute/path/to/bun
+export OSNV_BUN_BIN=/absolute/path/to/bun
 ./scripts/osnova-bun run toolchain:check
 ./scripts/osnova-bun install --frozen-lockfile
 cp .env.example .env
@@ -70,22 +70,22 @@ SMS.RU нужен при фактической отправке SMS. Redis и O
 Порядок приложения: defaults → секция окружения → JSON-файл → env → CLI.
 Файл задаётся `--config-file=/path/config.json`, окружение —
 `--environment=development|test|production`; без аргумента берётся
-`OSNOVA_ENV`, затем `NODE_ENV`, затем production.
+`OSNV_ENV`, затем `NODE_ENV`, затем production.
 
 ```sh
 ./scripts/osnova-bun run config:inspect --environment=test --config-file=/path/config.json --db.host=db.internal
 ```
 
-Обычное соответствие: `db.host` → `OSNOVA_DB__HOST`, `jwt.system.accessTtl`
-→ `OSNOVA_JWT__SYSTEM__ACCESSTTL`. Для LLM также объявлены удобные имена
-`OSNOVA_LLM__BASE_URL` и `OSNOVA_LLM__API_KEY`. Разные значения канонического
+Обычное соответствие: `db.host` → `OSNV_DB__HOST`, `jwt.system.accessTtl`
+→ `OSNV_JWT__SYSTEM__ACCESSTTL`. Для LLM также объявлены удобные имена
+`OSNV_LLM__BASE_URL` и `OSNV_LLM__API_KEY`. Разные значения канонического
 имени и alias в одном источнике дают ошибку; более поздний источник побеждает.
-`OSNOVA_LLM__MODEL` применяется к обоим профилям AppInfra.
+`OSNV_LLM__MODEL` применяется к обоим профилям AppInfra.
 
 | Настройка | Development default | Production / ограничения |
 | --- | --- | --- |
-| `http.port` / `http.adminPort` | 3000 | Целое 1…65535; прежний `OSNOVA_ADMIN_PORT` поддерживается |
-| `http.hostname` / `http.adminHostname` | `0.0.0.0` | IPv4/IPv6 либо `localhost`; для loopback задайте `127.0.0.1`; alias `OSNOVA_ADMIN_HTTP__HOSTNAME` |
+| `http.port` / `http.adminPort` | 3000 | Целое 1…65535; прежний `OSNV_ADMIN_PORT` поддерживается |
+| `http.hostname` / `http.adminHostname` | `0.0.0.0` | IPv4/IPv6 либо `localhost`; для loopback задайте `127.0.0.1`; alias `OSNV_ADMIN_HTTP__HOSTNAME` |
 | `http.corsOrigins` / `http.adminCorsOrigins` | Локальные UI origins | В production список пуст; задайте точные origins через запятую |
 | `db.tls` | disable | verify-full по умолчанию; режимы Bun TLS |
 | `db.max` | 10 соединений | Целое 1…1000 |
@@ -159,7 +159,7 @@ GitHub Actions: [.github/workflows/ci.yml](.github/workflows/ci.yml) запус�
 1. Settings → Actions → Runners → New self-hosted runner (macOS, ARM64);
    выполнить показанные `config.sh` с меткой `--labels osnova-qualified`.
 2. В файл `.env` каталога раннера добавить
-   `OSNOVA_BUN_BIN=/Users/<user>/.osnova/toolchain/bun-1.4.0/bun`.
+   `OSNV_BUN_BIN=/Users/<user>/.osnova/toolchain/bun-1.4.0/bun`.
 3. `./svc.sh install && ./svc.sh start` — раннер запускается вместе с системой.
 
 Docker Desktop должен быть запущен для live-прогона. Pull request из форков

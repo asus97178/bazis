@@ -1,6 +1,6 @@
 """Exercise Agents against an owned, disposable PostgreSQL and the real app binary.
 
-Usage: OSNOVA_BUN_BIN=/qualified/bun python3 ops/agents-module/verify.py RUN [--browser]
+Usage: OSNV_BUN_BIN=/qualified/bun python3 ops/agents-module/verify.py RUN [--browser]
 The optional browser phase waits for an evidence-directory browser-result.json
 containing {"status":"PASS", "checks":[...]} before cleaning up all owned processes.
 Never connects to an existing database or downloads a container image.
@@ -26,8 +26,8 @@ if not re.fullmatch(r"[a-z0-9-]+", name):
     raise SystemExit("Expected a unique evidence run name")
 BASE = ROOT / "docs/audits/agents-module-2026-09-20-evidence" / name
 BASE.mkdir(parents=True, exist_ok=False)
-env = {k: v for k, v in os.environ.items() if not k.startswith("OSNOVA_") and k not in ("BUN_OPTIONS", "NODE_OPTIONS")}
-env["OSNOVA_BUN_BIN"] = os.environ["OSNOVA_BUN_BIN"]
+env = {k: v for k, v in os.environ.items() if not k.startswith("OSNV_") and k not in ("BUN_OPTIONS", "NODE_OPTIONS")}
+env["OSNV_BUN_BIN"] = os.environ["OSNV_BUN_BIN"]
 DOCKER = "/usr/local/bin/docker"
 IMAGE = "sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73"
 run = uuid.uuid4().hex[:12]
@@ -140,13 +140,13 @@ try:
     pg(preview_db, "CREATE SCHEMA app AUTHORIZATION worker; CREATE SCHEMA product AUTHORIZATION worker")
     receipt["postgres_version"] = pg(test_db, "SELECT version()")
     assert pg(test_db, "SELECT rolsuper FROM pg_roles WHERE rolname='worker'") == "f"
-    test_env = dict(env, OSNOVA_AGENTS_TEST_DB="owned-disposable-v1", OSNOVA_AGENTS_PG_URL=f"postgres://worker:{passwords[1]}@{address}/{test_db}")
+    test_env = dict(env, OSNV_AGENTS_TEST_DB="owned-disposable-v1", OSNV_AGENTS_PG_URL=f"postgres://worker:{passwords[1]}@{address}/{test_db}")
     (BASE / "postgres-tests.log").write_text(safe(command([*bun, "test", "--timeout", "30000", "--isolate", "./src/app/modules/agents/test/Agents.postgres.live.test.ts"], test_env)))
     receipt["checks"]["postgres_contracts"] = "PASS"
     print("PostgreSQL contracts PASS", flush=True)
-    app_env = dict(env, OSNOVA_ENV="development", OSNOVA_HTTP__HOSTNAME="127.0.0.1", OSNOVA_HTTP__PORT="3000",
-                   OSNOVA_DB__HOST="127.0.0.1", OSNOVA_DB__PORT=address.split(":")[1], OSNOVA_DB__DATABASE=preview_db,
-                   OSNOVA_DB__USERNAME="worker", OSNOVA_DB__PASSWORD=passwords[1], OSNOVA_DB__TLS="disable")
+    app_env = dict(env, OSNV_ENV="development", OSNV_HTTP__HOSTNAME="127.0.0.1", OSNV_HTTP__PORT="3000",
+                   OSNV_DB__HOST="127.0.0.1", OSNV_DB__PORT=address.split(":")[1], OSNV_DB__DATABASE=preview_db,
+                   OSNV_DB__USERNAME="worker", OSNV_DB__PASSWORD=passwords[1], OSNV_DB__TLS="disable")
     app = start([str(ROOT / "bin/osnova-app")], app_env, scratch, "app.log")
     ready(app, "http://127.0.0.1:3000/api/admin/auth/bootstrap")
     http("GET", "/api/agents", status=401)

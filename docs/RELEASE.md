@@ -45,7 +45,7 @@ lockfile-only, восстановить исходный состав manifest �
 ## Последовательность проверок
 
 Перед запуском сверить наличие команд в `package.json`. Все команды выполняются
-с явным `OSNOVA_BUN_BIN`, без рабочих env и provider credentials. Общий codegen
+с явным `OSNV_BUN_BIN`, без рабочих env и provider credentials. Общий codegen
 и тестовые серверы имеют одного владельца; одновременно их не запускать.
 
 1. `toolchain:check` и `di:generate --target all`.
@@ -55,7 +55,7 @@ lockfile-only, восстановить исходный состав manifest �
 4. `admin:ui:check`, `admin:ui:build`, `client:ui:build`. Обе UI-сборки запускают
    установленный `vue-tsc --noEmit` через настоящий Node ≥22.12 и только затем
    Vite. Bun 1.4.0 обходит нужный hook и может пропускать Vue SFC без ошибки.
-   При необходимости путь к Node задаётся через `OSNOVA_VUE_NODE_BIN`.
+   При необходимости путь к Node задаётся через `OSNV_VUE_NODE_BIN`.
 5. `build:bin` создаёт `bin/osnova-app` и `bin/osnova`. Выполнить оба вне checkout:
    app `config check --environment=test`, CLI `--help`, а затронутые runtime-пути
    проверить отдельной контролируемой compiled-фикстурой.
@@ -87,7 +87,7 @@ lockfile-only, восстановить исходный состав manifest �
   доверия нет. Для локального HTTP используется development/test либо осознанная
   настройка оператора: [ClientAuth](../src/app/modules/client-auth/MODULE.md).
 - Launcher по умолчанию даёт 15 секунд на остановку. При большем kernel-бюджете
-  согласовать `OSNOVA_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
+  согласовать `OSNV_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
 - SMS endpoint должен принимать конечный POST без redirects. Перенаправления
   завершаются ошибкой: [SMS](../src/app/modules/sms/MODULE.md).
 - Admin UI и OpenAPI поставляются вместе: UI берёт разрешённые сортировки из
@@ -155,7 +155,7 @@ Runner прогоняет полный набор и каждый гейтиро
 
 Изменения поведения:
 
-- Новый ключ `db.tlsCa` (`OSNOVA_DB__TLS_CA`): PEM дополнительного CA для
+- Новый ключ `db.tlsCa` (`OSNV_DB__TLS_CA`): PEM дополнительного CA для
   `db.tls=verify-full`; пусто — только системное доверие. В ORM-коннекторе
   пустой `tlsCa` теперь означает «CA не задан» вместо ошибки конфигурации.
 - Kernel, `Application` и hosted-helpers запускают singleton, на который
@@ -170,7 +170,7 @@ Runner прогоняет полный набор и каждый гейтиро
 
 Изменения относительно 0.95.0:
 
-- `db.tlsCa` / `OSNOVA_DB__TLS_CA` для production `verify-full` с частным CA;
+- `db.tlsCa` / `OSNV_DB__TLS_CA` для production `verify-full` с частным CA;
   пустой `tlsCa` в ORM-коннекторе означает «CA не задан».
 - Singleton с несколькими регистрациями `HOSTED_SERVICE` запускается один раз;
   модуль с несколькими `ownedStore` стартует в kernel.
@@ -181,7 +181,7 @@ Runner прогоняет полный набор и каждый гейтиро
   частей Access, DeveloperTools, Observability.
 - Физическая квалификация: `ops/live-postgres/runner.py`.
 
-Миграция: действий не требуется; `OSNOVA_DB__TLS_CA` — опционально.
+Миграция: действий не требуется; `OSNV_DB__TLS_CA` — опционально.
 
 ## Выпуск 0.96.1 (2026-10-04): пакет `osnv`
 
@@ -215,6 +215,6 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 Также в 0.96.1: `osnv codegen` вызывает генератор фреймворка напрямую (скрипт
 `di:generate` в проекте больше не нужен); `osnv dev --watch`; `osnv test`;
 предупреждение при старте из исходников, изменённых после кодогенерации
-(`src/generated/osnova/fingerprint.ts`). Новый проект получает скрипты `test` и
+(`src/generated/osnv/fingerprint.ts`). Новый проект получает скрипты `test` и
 `start`, `.env.example`, тест `/health`, `HOST`; копия `vendor/osnv` совпадает по
 составу с npm-пакетом.

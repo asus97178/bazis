@@ -42,15 +42,15 @@ describe("configuration views and validation", () => {
   });
 
   test("explicit aliases support camelCase, conflicts fail, later sources win", async () => {
-    const config = defineConfig("llm", { default: { baseUrl: "default", apiKey: secret("hidden") }, env: { baseUrl: "OSNOVA_LLM__BASE_URL", apiKey: "OSNOVA_LLM__API_KEY" } });
-    const aliases = await loadConfiguration([envSource({ variables: { OSNOVA_LLM__BASE_URL: "https://example.invalid", OSNOVA_LLM__API_KEY: "synthetic-secret" } })]);
+    const config = defineConfig("llm", { default: { baseUrl: "default", apiKey: secret("hidden") }, env: { baseUrl: "OSNV_LLM__BASE_URL", apiKey: "OSNV_LLM__API_KEY" } });
+    const aliases = await loadConfiguration([envSource({ variables: { OSNV_LLM__BASE_URL: "https://example.invalid", OSNV_LLM__API_KEY: "synthetic-secret" } })]);
     const view = config.resolve("test", aliases);
     expect(view.get("baseUrl")).toBe("https://example.invalid");
     expect(view.get("apiKey").reveal()).toBe("synthetic-secret");
     expect(JSON.stringify(view.inspect())).not.toContain("synthetic-secret");
-    const conflicting = await loadConfiguration([envSource({ variables: { OSNOVA_LLM__BASEURL: "one", OSNOVA_LLM__BASE_URL: "two" } })]);
+    const conflicting = await loadConfiguration([envSource({ variables: { OSNV_LLM__BASEURL: "one", OSNV_LLM__BASE_URL: "two" } })]);
     expect(() => config.resolve("test", conflicting)).toThrow(/conflicting/);
-    const ordered = await loadConfiguration([memorySource({ llm: { baseUrl: "file" } }), envSource({ variables: { OSNOVA_LLM__BASE_URL: "env" } })]);
+    const ordered = await loadConfiguration([memorySource({ llm: { baseUrl: "file" } }), envSource({ variables: { OSNV_LLM__BASE_URL: "env" } })]);
     expect(config.resolve("test", ordered).get("baseUrl")).toBe("env");
   });
 

@@ -38,7 +38,7 @@ export class Osnova {
       kernel = await builder.build();
     } catch (error) {
       if (error instanceof DiError || error instanceof KernelError) {
-        console.error(`[osnova] configuration error: ${redactSensitiveText(error.message)}`);
+        console.error(`[osnv] configuration error: ${redactSensitiveText(error.message)}`);
         process.exitCode = 1;
         return 1;
       }
@@ -53,15 +53,15 @@ export class Osnova {
       if (error instanceof ShutdownTimeoutError) {
         // Graceful shutdown is stuck: hanging handles would keep the process
         // alive forever, so this is the one place a hard exit is correct.
-        console.error(`[osnova] ${redactSensitiveText(error.message)} Forcing exit.`);
+        console.error(`[osnv] ${redactSensitiveText(error.message)} Forcing exit.`);
         process.exit(1);
       }
       // Configuration problems surfacing at start (e.g. options fail-fast)
       // deserve the same friendly output as build-time ones.
       if (error instanceof DiError || error instanceof KernelError) {
-        console.error(`[osnova] configuration error: ${redactSensitiveText(error.message)}`);
+        console.error(`[osnv] configuration error: ${redactSensitiveText(error.message)}`);
       } else {
-        console.error("[osnova] application failed:", inspect(redactSensitive(error), {
+        console.error("[osnv] application failed:", inspect(redactSensitive(error), {
           depth: null, colors: false, customInspect: false, getters: false,
           maxArrayLength: null, maxStringLength: null,
         }));

@@ -32,8 +32,8 @@ IMAGE = 'sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
 run = uuid.uuid4().hex[:12]
 label = 'osnova.orm-enterprise-run=' + run
 passwords = [secrets.token_hex(24) for _ in range(3)]
-env = {k: v for k, v in os.environ.items() if not k.startswith('OSNOVA_') and k not in ['BUN_OPTIONS', 'NODE_OPTIONS']}
-env['OSNOVA_BUN_BIN'] = os.environ.get('OSNOVA_BUN_BIN', '/private/tmp/osnova-bun-1.4.0-osn018/bun-darwin-aarch64/bun')
+env = {k: v for k, v in os.environ.items() if not k.startswith('OSNV_') and k not in ['BUN_OPTIONS', 'NODE_OPTIONS']}
+env['OSNV_BUN_BIN'] = os.environ.get('OSNV_BUN_BIN', '/private/tmp/osnova-bun-1.4.0-osn018/bun-darwin-aarch64/bun')
 receipt = {'started_at': datetime.now(timezone.utc).isoformat(), 'run': run, 'image': IMAGE,
            'authorization': 'User делай after enterprise qualification conditions; disposable resources only.',
            'profile': {'seconds': args.seconds, 'rate': args.rate, 'production_profile_confirmed': False}, 'checks': {}}
@@ -74,19 +74,19 @@ def pg(database, sql):
 
 def client(mode, platform, database, address):
     binary = scratch / ('probe-linux' if platform == 'linux' else 'probe-darwin')
-    client_env = dict(env, OSNOVA_ORM_ENTERPRISE_LIVE='owned-disposable-v1', OSNOVA_ORM_SERVER_CANCELLATION_LIVE='owned-disposable-v1',
-                      OSNOVA_PG_URL=f'postgres://worker:{passwords[1]}@{address}/{database}',
-                      OSNOVA_SERVER_CANCEL_OTHER_URL=f'postgres://other_worker:{passwords[2]}@{address}/{database}',
-                      OSNOVA_SERVER_CANCEL_CA=str(scratch / 'server.crt'), OSNOVA_ORM_SOAK_SECONDS=str(args.seconds), OSNOVA_ORM_SOAK_RATE=str(args.rate))
+    client_env = dict(env, OSNV_ORM_ENTERPRISE_LIVE='owned-disposable-v1', OSNV_ORM_SERVER_CANCELLATION_LIVE='owned-disposable-v1',
+                      OSNV_PG_URL=f'postgres://worker:{passwords[1]}@{address}/{database}',
+                      OSNV_SERVER_CANCEL_OTHER_URL=f'postgres://other_worker:{passwords[2]}@{address}/{database}',
+                      OSNV_SERVER_CANCEL_CA=str(scratch / 'server.crt'), OSNV_ORM_SOAK_SECONDS=str(args.seconds), OSNV_ORM_SOAK_RATE=str(args.rate))
     if platform == 'linux':
-        client_env['OSNOVA_SERVER_CANCEL_CA'] = '/qual/ca.pem'
+        client_env['OSNV_SERVER_CANCEL_CA'] = '/qual/ca.pem'
         command_args = [DOCKER, 'run', '--rm', '--pull=never', '--name', f'osnova-orm-ent-{run}-{mode}', '--label', label,
                         '--network', 'container:' + container, '--read-only', '--cap-drop=ALL', '--security-opt', 'no-new-privileges',
                         '--user', 'postgres', '--memory', '512m', '--cpus', '1', '--pids-limit', '96', '--tmpfs', '/tmp:size=134217728',
                         '--mount', f'type=bind,src={binary},dst=/qual/probe,readonly',
                         '--mount', f'type=bind,src={scratch / "server.crt"},dst=/qual/ca.pem,readonly', '--workdir', '/tmp']
         for key in client_env:
-            if key.startswith('OSNOVA_') and key != 'OSNOVA_BUN_BIN':
+            if key.startswith('OSNV_') and key != 'OSNV_BUN_BIN':
                 command_args += ['--env', key]
         command_args += ['--entrypoint', '/qual/probe', IMAGE, mode]
     else:

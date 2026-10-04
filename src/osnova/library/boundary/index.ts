@@ -1,5 +1,5 @@
 export {
-  OSNOVA_DIAGNOSTIC_LIMIT_V1,
+  OSNV_DIAGNOSTIC_LIMIT_V1,
   appendJsonPointerV1,
   escapeJsonPointerSegmentV1,
   finalizeOsnovaDiagnosticsV1,

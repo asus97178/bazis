@@ -5,7 +5,7 @@ import { HOSTED_SERVICE, createContainer, singletonValue, type OsnovaModuleMetad
 import { HttpServer, httpModule } from "@osnova/core/http";
 import type { CodexClient } from "@osnova/core/infra";
 import { hs256, TokenService } from "@osnova/library/jwt";
-import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnv/runtime";
 import { AppModule } from "../../src/app/modules/App.module";
 import { AdminUiDevModule } from "../../src/app/modules/AdminUiDev.module";
 import { ACCESS_TOKEN_VALIDATOR } from "../../src/app/modules/auth/accessTokenValidation";

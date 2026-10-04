@@ -17,7 +17,7 @@ bunx osnv build --bin                 # + исполняемый файл bin/<�
 bunx osnv build --bin --outfile dist/app
 ```
 
-Реализация — [build.ts](build.ts). Точка входа берётся из `osnova.codegen.json`
+Реализация — [build.ts](build.ts). Точка входа берётся из `osnv.config.json`
 (первый entrypoint цели по умолчанию), TypeScript — из `node_modules` проекта.
 `dev` передаёт SIGINT/SIGTERM приложению и возвращает его код завершения.
 `dev --watch` следит за `src/` рекурсивно (кроме `src/generated`, иначе codegen
@@ -27,7 +27,7 @@ bunx osnv build --bin --outfile dist/app
 
 `codegen` запускает генератор фреймворка напрямую, скрипт проекта не нужен:
 сначала `node_modules/osnv`, затем исходник `src/osnova` (checkout фреймворка),
-затем пакет самого CLI. Генератор пишет `src/generated/osnova/fingerprint.ts`:
+затем пакет самого CLI. Генератор пишет `src/generated/osnv/fingerprint.ts`:
 список исходников цели, их SHA-256 и версию `osnv`. Сгенерированный `runtime.ts`
 при старте из исходников сверяет их и громко предупреждает, если код или версия
 фреймворка изменились после генерации (около 10 мс на 750 файлов). В бинарнике
@@ -36,7 +36,7 @@ bunx osnv build --bin --outfile dist/app
 `build --bin` компилирует из временного каталога (`compileBinary`): Bun 1.4.0
 оставляет `.bun-build` в рабочем каталоге, если его исполняемый файл read-only
 или помечен `uchg`. Bun для дочерних процессов — `scripts/osnova-bun`, иначе
-`OSNOVA_BUN_BIN`, иначе `bun` из PATH.
+`OSNV_BUN_BIN`, иначе `bun` из PATH.
 
 Команда `agent run` (клиент чат-API приложения) перенесена в приложение:
 `bun run agent:run` и `src/app/modules/agent-chat/client/AgentClient.service.ts`.
@@ -73,7 +73,7 @@ Agent, Task, Tool и их ссылки; constructor → schema связи кор
 class DTO дополняют существующий `GENERATED_OPENAPI_SCHEMA_MODELS`.
 Одноимённый независимый интерфейс больше не приводит к потере схемы класса.
 Неимпортируемый связанный class DTO отклоняется с
-`OSNOVA_AGENT_SCHEMA_MODEL_UNIMPORTABLE` до записи generated-файлов.
+`OSNV_AGENT_SCHEMA_MODEL_UNIMPORTABLE` до записи generated-файлов.
 Прежние ограничения Agent collector на неоднозначные class-имена и named exports
 сохраняются. Публичные команды и входные DTO этого CLI не меняются.
 Проверка [Agent standalone integration](../core/agent/test/agent.standalone.integration.test.ts)
@@ -97,7 +97,7 @@ DI-codegen также выводит зависимости унаследова
 generic-параметров и связывает их с конкретным наследником. Собственный constructor
 и явно заданные deps сохраняют приоритет. Локальные неэкспортируемые helpers
 пропускаются; private class в обычной DI-регистрации без собственной metadata
-получает `OSNOVA_DI_CLASS_UNIMPORTABLE` до записи generated-файлов. Достаточно
+получает `OSNV_DI_CLASS_UNIMPORTABLE` до записи generated-файлов. Достаточно
 экспортировать класс или его alias, чтобы продолжить обычную автоматическую
 привязку. Подробности и проверка binary — в [паспорте DI](../core/di/MODULE.md).
 
@@ -130,7 +130,7 @@ bunx osnv codegen --target production
 ```
 
 В этом репозитории команды Bun выполняются через `scripts/osnova-bun` с
-квалифицированным `OSNOVA_BUN_BIN` (`./scripts/osnova-bun run osnv …`).
+квалифицированным `OSNV_BUN_BIN` (`./scripts/osnova-bun run osnv …`).
 Скомпилированный CLI: `bin/osnv`. В созданном проекте скрипты `dev`, `build`,
 `build:bin`, `codegen` — обёртки над `osnv dev|build|build --bin|codegen`.
 
@@ -151,7 +151,7 @@ bunx osnv codegen --target production
 | `--full` | flag | false | Только module: CRUD/list/cache/auth/background/AI; старый алиас `--enterprise`. `@Authorize` генерируется, если в проекте есть `src/app/modules/auth/{tokenKinds,jwtAuth}.ts`; иначе маршруты публичные и CLI предупреждает. Для запуска host нужен кэш (`runApp({ cache: memory() })`) и provider БД |
 | `--no-register` | flag | false | Пропустить host и автоматический codegen |
 | `--no-codegen` | flag | false | Создать и подключить, не запускать codegen |
-| `--target` | string | Проектный default | Имя из `osnova.codegen.json` или `all`; для codegen или генерации с регистрацией |
+| `--target` | string | Проектный default | Имя из `osnv.config.json` или `all`; для codegen или генерации с регистрацией |
 | `--dry-run` | flag | false | Прочитать и проверить план, не писать и не запускать codegen |
 | `--force` | flag | false | Разрешить перезапись файлов каркаса, включая паспорт; чужие файлы не удаляются |
 | `-h`, `--help` | flag | false | Справка в любой позиции; без записи и codegen |
@@ -164,7 +164,7 @@ CLI не принимает null. Пропущенные значения фла
 
 `new` принимает только `--path`, `--framework`, `--link-framework`, `--dry-run` и `--help`. Он не
 запускает установку пакетов, codegen или приложение. Создаёт `package.json`,
-`tsconfig.json`, `osnova.codegen.json`, `.gitignore`, `AGENTS.md`, локальную
+`tsconfig.json`, `osnv.config.json`, `.gitignore`, `AGENTS.md`, локальную
 архитектурную памятку, `README.md`,
 `src/index.ts` и корневой `App.module.ts`. Корень приложения — композиция с
 `imports: []`, без предметного модуля. Вход HTTP слушает loopback на порту
@@ -234,7 +234,7 @@ codegen исключает исходники установленного фр�
 Регрессии находятся в [test](test). Проверки запускаются в временных каталогах;
 живое приложение, PostgreSQL и LLM для проверки CLI не нужны.
 Историческая проверка генератора: исходная база 15 PASS / 0 FAIL, затем 93 PASS / 0 FAIL,
-361 assertions в 6 файлах. Команда (после настройки OSNOVA_BUN_BIN):
+361 assertions в 6 файлах. Команда (после настройки OSNV_BUN_BIN):
 
 ```sh
 ./scripts/osnova-bun test --isolate ./src/osnova/cli/test

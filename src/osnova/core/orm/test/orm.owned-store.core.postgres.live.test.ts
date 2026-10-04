@@ -11,7 +11,7 @@ import { defineOrmOwnedStoreV1 } from "../../../library/orm/Schema/OrmOwnedStore
 import { canonicalOwnedStoreModelHashV1, canonicalOwnedStoreScopeHashV1 } from "../../../library/orm/Schema/OwnedStoreCanonical";
 
 const registry = "__osnova_orm_owned_stores_v1";
-const run = process.env.OSNOVA_OWNED_STORE_E_RUN;
+const run = process.env.OSNV_OWNED_STORE_E_RUN;
 const enabled = exactGate(process.env);
 const compact = typeof run === "string" ? run.replaceAll("-", "") : "";
 const short = compact.slice(0, 12);
@@ -28,17 +28,17 @@ class StoreAContext extends DbContext { readonly items = this.set(StoreAItem); }
 class StoreBContext extends DbContext { readonly items = this.set(StoreBItem); }
 
 function exactGate(env: NodeJS.ProcessEnv): boolean {
-  const url = env.OSNOVA_PG_URL, database = env.OSNOVA_OWNED_STORE_E_DATABASE;
-  const runId = env.OSNOVA_OWNED_STORE_E_RUN;
+  const url = env.OSNV_PG_URL, database = env.OSNV_OWNED_STORE_E_DATABASE;
+  const runId = env.OSNV_OWNED_STORE_E_RUN;
   let dsnDatabase: string | undefined, protocol: string | undefined;
   try { const parsed = new URL(url ?? ""); dsnDatabase = parsed.pathname.slice(1); protocol = parsed.protocol; } catch { dsnDatabase = undefined; }
-  const override = Object.keys(env).some((key) => key.startsWith("OSNOVA_") && key.slice(7).toLowerCase().replaceAll("__", ".").startsWith("e327db."));
+  const override = Object.keys(env).some((key) => key.startsWith("OSNV_") && key.slice("OSNV_".length).toLowerCase().replaceAll("__", ".").startsWith("e327db."));
   return !override && (protocol === "postgres:" || protocol === "postgresql:") && typeof url === "string" && url.length > 0
-    && env.OSNOVA_OWNED_STORE_E_LIVE === "wp-orm-3-e327-integrated-v1"
-    && env.OSNOVA_OWNED_STORE_E_ROLE === "owned-store-e-child-v1"
+    && env.OSNV_OWNED_STORE_E_LIVE === "wp-orm-3-e327-integrated-v1"
+    && env.OSNV_OWNED_STORE_E_ROLE === "owned-store-e-child-v1"
     && typeof runId === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(runId)
     && typeof database === "string" && database === `oe327_${runId.replaceAll("-", "")}` && dsnDatabase === database
-    && env.OSNOVA_OWNED_STORE_C3_LIVE === undefined && env.OSNOVA_OWNED_STORE_C3_DATABASE === undefined && env.OSNOVA_OWNED_STORE_C3_ROLE === undefined && env.OSNOVA_OWNED_STORE_C3_RUN === undefined;
+    && env.OSNV_OWNED_STORE_C3_LIVE === undefined && env.OSNV_OWNED_STORE_C3_DATABASE === undefined && env.OSNV_OWNED_STORE_C3_ROLE === undefined && env.OSNV_OWNED_STORE_C3_RUN === undefined;
 }
 function q(name: string): string {
   if (!safe.test(name) || !Object.values(names).some(owned => owned === name)) throw new Error("E327 foreign identifier");
@@ -46,7 +46,7 @@ function q(name: string): string {
 }
 function noE327Overrides(): void {
   for (const key of Object.keys(process.env)) {
-    const normalized = key.startsWith("OSNOVA_") ? key.slice(7).toLowerCase().replaceAll("__", ".") : "";
+    const normalized = key.startsWith("OSNV_") ? key.slice("OSNV_".length).toLowerCase().replaceAll("__", ".") : "";
     if (normalized.startsWith("e327db.")) throw new Error("E327 config override rejected");
   }
 }
@@ -122,17 +122,17 @@ async function health(container: ReturnType<typeof createContainer>) { return co
 
 test.skipIf(enabled)("E327 ENV_OFF rejects incomplete or redirected opt-in before observer, Infra, or container effects", () => {
   expect(enabled).toBe(false);
-  const valid: NodeJS.ProcessEnv = { OSNOVA_PG_URL: "postgres://unused/oe327_00000000000000000000000000000000", OSNOVA_OWNED_STORE_E_LIVE: "wp-orm-3-e327-integrated-v1", OSNOVA_OWNED_STORE_E_DATABASE: "oe327_00000000000000000000000000000000", OSNOVA_OWNED_STORE_E_ROLE: "owned-store-e-child-v1", OSNOVA_OWNED_STORE_E_RUN: "00000000-0000-0000-0000-000000000000" };
+  const valid: NodeJS.ProcessEnv = { OSNV_PG_URL: "postgres://unused/oe327_00000000000000000000000000000000", OSNV_OWNED_STORE_E_LIVE: "wp-orm-3-e327-integrated-v1", OSNV_OWNED_STORE_E_DATABASE: "oe327_00000000000000000000000000000000", OSNV_OWNED_STORE_E_ROLE: "owned-store-e-child-v1", OSNV_OWNED_STORE_E_RUN: "00000000-0000-0000-0000-000000000000" };
   expect(exactGate(valid)).toBe(true);
   for (const key of Object.keys(valid)) { const missing = { ...valid }; delete missing[key]; expect(exactGate(missing)).toBe(false); }
-  for (const candidate of [{}, { ...valid, OSNOVA_OWNED_STORE_E_LIVE: "wrong" }, { ...valid, OSNOVA_OWNED_STORE_E_ROLE: "wrong" }, { ...valid, OSNOVA_OWNED_STORE_E_RUN: "unsafe" }, { ...valid, OSNOVA_OWNED_STORE_E_DATABASE: "unsafe" }, { ...valid, OSNOVA_PG_URL: "postgres://unused/other" }, { ...valid, OSNOVA_PG_URL: "https://unused/oe327_00000000000000000000000000000000" }, { ...valid, OSNOVA_E327DB__HOST: "redirected" }, { ...valid, "OSNOVA_e327db.host": "redirected" }]) expect(exactGate(candidate)).toBe(false);
-  for (const suffix of ["LIVE", "DATABASE", "ROLE", "RUN"]) expect(exactGate({ ...valid, [`OSNOVA_OWNED_STORE_C3_${suffix}`]: "wrong" })).toBe(false);
+  for (const candidate of [{}, { ...valid, OSNV_OWNED_STORE_E_LIVE: "wrong" }, { ...valid, OSNV_OWNED_STORE_E_ROLE: "wrong" }, { ...valid, OSNV_OWNED_STORE_E_RUN: "unsafe" }, { ...valid, OSNV_OWNED_STORE_E_DATABASE: "unsafe" }, { ...valid, OSNV_PG_URL: "postgres://unused/other" }, { ...valid, OSNV_PG_URL: "https://unused/oe327_00000000000000000000000000000000" }, { ...valid, OSNV_E327DB__HOST: "redirected" }, { ...valid, "OSNV_e327db.host": "redirected" }]) expect(exactGate(candidate)).toBe(false);
+  for (const suffix of ["LIVE", "DATABASE", "ROLE", "RUN"]) expect(exactGate({ ...valid, [`OSNV_OWNED_STORE_C3_${suffix}`]: "wrong" })).toBe(false);
   expect(() => q("other")).toThrow("E327 foreign identifier");
   expect({ infraDefinitions, observers, containers }).toEqual({ infraDefinitions: 0, observers: 0, containers: 0 });
 });
 
 test.skipIf(!enabled)("E327 sequential two-store PostgreSQL core lifecycle", async () => {
-  const url = process.env.OSNOVA_PG_URL!;
+  const url = process.env.OSNV_PG_URL!;
   type Container = ReturnType<typeof createContainer>;
   type Entry = { container: Container; coordinator: LifecycleCoordinator; stopped: boolean; disposed: boolean };
   type Proof = Readonly<{ kind: "old" | "support" | "owned"; catalog: Catalog; tuples: Rows }>;
@@ -188,7 +188,7 @@ test.skipIf(!enabled)("E327 sequential two-store PostgreSQL core lifecycle", asy
   };
   try {
     await fresh(async p => {
-      check((await p.query("SELECT current_database() AS database", []))[0]?.database === process.env.OSNOVA_OWNED_STORE_E_DATABASE, "E327_DATABASE_IDENTITY");
+      check((await p.query("SELECT current_database() AS database", []))[0]?.database === process.env.OSNV_OWNED_STORE_E_DATABASE, "E327_DATABASE_IDENTITY");
       same((await relationState(p)).relations, [], "E327_DATABASE_NOT_EMPTY");
       same(await registrySnapshot(p), [], "E327_REGISTRY_NOT_ABSENT");
     });

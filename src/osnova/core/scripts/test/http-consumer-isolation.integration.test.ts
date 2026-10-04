@@ -31,16 +31,16 @@ export class AppModule {}
     await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: {
       target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true,
     }, include: ["src/**/*.ts"] }));
-    await Bun.write(path.join(root, "osnova.codegen.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
+    await Bun.write(path.join(root, "osnv.config.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
     await Bun.write(path.join(root, "src/Users.module.ts"), source);
     await Bun.write(path.join(root, "src/index.ts"), `import { runApp } from "osnv/core/app";
 import { AppModule } from "./Users.module";
-import { registerOsnovaGeneratedRuntime } from "./generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "./generated/osnv/runtime";
 await registerOsnovaGeneratedRuntime();
 process.exitCode = await runApp(AppModule, { http: { port: Number(process.env.PROBE_PORT), prefix: "api", docs: false } });
 `);
     await command([path.join(repository, "src/osnova/core/scripts/di-generate.ts")]);
-    const bindings = await Bun.file(path.join(root, "src/generated/osnova/bindings.ts")).text();
+    const bindings = await Bun.file(path.join(root, "src/generated/osnv/bindings.ts")).text();
     expect(bindings).toContain('"list":[]');
     expect(bindings).not.toContain("UserListQuery");
     const packageBindings = await Bun.file(path.join(repository, "src/osnova/core/http/generated/bindings.ts")).text();

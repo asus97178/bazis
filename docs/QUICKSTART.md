@@ -8,15 +8,15 @@ Osnova использует TypeScript, Bun, DI, DbContext и контролле
 ## 1. Создать приложение
 
 В checkout фреймворка используйте квалифицированный Bun из
-[toolchain](../toolchain/bun.json). Команды ниже предполагают, что OSNOVA_BUN_BIN
+[toolchain](../toolchain/bun.json). Команды ниже предполагают, что OSNV_BUN_BIN
 уже указывает на проверенный исполняемый файл.
 
 ```sh
 ./scripts/osnova-bun run toolchain:check
 ./scripts/osnova-bun run osnv new MyApp --path ../my-app
 cd ../my-app
-"$OSNOVA_BUN_BIN" install
-"$OSNOVA_BUN_BIN" run dev
+"$OSNV_BUN_BIN" install
+"$OSNV_BUN_BIN" run dev
 ```
 
 Пустой backend слушает `http://127.0.0.1:3000`; GET `/health` проверяет запуск.
@@ -34,7 +34,7 @@ checkout принимает `--framework /absolute/path/to/src/osnova`.
 Из корня нового приложения:
 
 ```sh
-"$OSNOVA_BUN_BIN" x osnv g module Task --empty
+"$OSNV_BUN_BIN" x osnv g module Task --empty
 ```
 
 CLI создаст `Task.module.ts`, `MODULE.md` и подключит модуль в `AppModule`.
@@ -65,16 +65,16 @@ provider БД и готовой схемы. `--full` дополнительно 
 ## 4. Проверить и собрать
 
 ```sh
-"$OSNOVA_BUN_BIN" run di:generate
-"$OSNOVA_BUN_BIN" run build
-"$OSNOVA_BUN_BIN" run build:bin
+"$OSNV_BUN_BIN" run di:generate
+"$OSNV_BUN_BIN" run build
+"$OSNV_BUN_BIN" run build:bin
 ./bin/my-app
 ```
 
 `dev` и `build` сами запускают codegen. Его файлы в `src/generated` не редактируют
-вручную. Ошибка `OSNOVA_HTTP_BINDING_UNRESOLVED` означает, что сигнатура action
+вручную. Ошибка `OSNV_HTTP_BINDING_UNRESOLVED` означает, что сигнатура action
 не позволяет определить источник аргумента: уточните тип; для заголовков и сырых тел используйте `HttpContext`.
-При `OSNOVA_ORM_PREDICATE_LOGIC` замените JS-логику методами `.and/.or/.not`.
+При `OSNV_ORM_PREDICATE_LOGIC` замените JS-логику методами `.and/.or/.not`.
 Ошибка генерации сохраняет предыдущие outputs и останавливает штатную команду.
 
 Бинарник приложения содержит код и generated metadata. Внешние БД, конфигурация

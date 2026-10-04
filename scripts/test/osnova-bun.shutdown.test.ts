@@ -18,7 +18,7 @@ async function within<T>(work: Promise<T>, milliseconds: number): Promise<T> {
 async function shutdown(cleanupMs: number, timeoutMs?: string) {
   const child = Bun.spawn(["/bin/sh", launcher, "--no-env-file", fixture, String(cleanupMs)], {
     cwd: repo,
-    env: { OSNOVA_BUN_BIN: process.execPath, ...(timeoutMs === undefined ? {} : { OSNOVA_BUN_SHUTDOWN_TIMEOUT_MS: timeoutMs }) },
+    env: { OSNV_BUN_BIN: process.execPath, ...(timeoutMs === undefined ? {} : { OSNV_BUN_SHUTDOWN_TIMEOUT_MS: timeoutMs }) },
     stdin: "ignore", stdout: "pipe", stderr: "pipe",
   });
   const ready = Promise.withResolvers<{ pid: number; executable: string }>();
@@ -84,8 +84,8 @@ test("launcher still terminates a hung child after its configured budget", async
 test.each(["0", "-1", "1.5", "2147483648", "999999999999999999999999"])("launcher rejects invalid shutdown budget %s", (timeoutMs) => {
   const result = Bun.spawnSync(["/bin/sh", launcher, "--no-env-file", "-e", "process.exit(0)"], {
     cwd: repo,
-    env: { OSNOVA_BUN_BIN: process.execPath, OSNOVA_BUN_SHUTDOWN_TIMEOUT_MS: timeoutMs },
+    env: { OSNV_BUN_BIN: process.execPath, OSNV_BUN_SHUTDOWN_TIMEOUT_MS: timeoutMs },
   });
   expect(result.exitCode).toBe(1);
-  expect(new TextDecoder().decode(result.stderr)).toContain("OSNOVA_BUN_SHUTDOWN_TIMEOUT_INVALID");
+  expect(new TextDecoder().decode(result.stderr)).toContain("OSNV_BUN_SHUTDOWN_TIMEOUT_INVALID");
 });

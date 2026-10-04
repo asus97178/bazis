@@ -144,7 +144,7 @@ class FakeRedis implements RedisCommandClient {
           for (let index = 0; index < versionCount; index += 1) {
             const expected = restValues[index];
             const actual = this.store.get(restKeys[index] ?? "");
-            if (expected === "__OSNOVA_MISSING_VERSION__" ? actual !== undefined : actual !== expected) return 0;
+            if (expected === "__OSNV_MISSING_VERSION__" ? actual !== undefined : actual !== expected) return 0;
           }
           this.store.set(valueKey, value ?? "");
           this.ttls.set(valueKey, -1);

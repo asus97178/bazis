@@ -3,17 +3,17 @@ import { startHostedServices, stopHostedServices } from "@osnova/core/di";
 import { ConsoleLogger, Osnova, memorySource } from "@osnova/core/kernel";
 import { HttpContext, HttpError, PRINCIPAL_STATE_KEY } from "@osnova/core/http";
 import { ormModule, postgres } from "@osnova/core/orm";
-import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnova/runtime";
+import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnv/runtime";
 import { TokenKind } from "../../src/app/modules/auth/tokenKinds";
 import { DataManagerRecordsModule } from "../../src/app/modules/datamanager_modules/records_module/DataManagerRecords.module";
 import { DataManagerFieldsModule } from "../../src/app/modules/datamanager_modules/fields_module/DataManagerFields.module";
 import { DataController } from "../../src/app/modules/datamanager_modules/records_module/http/DataController";
 import { TableService } from "../../src/app/modules/datamanager_modules/tables_module/services/TableService";
 
-if (process.env.OSNOVA_CLIENT_RECOVERY !== "owned-disposable-v1") throw new Error("Owned disposable gate required");
-const url = new URL(process.env.OSNOVA_PG_URL!);
+if (process.env.OSNV_CLIENT_RECOVERY !== "owned-disposable-v1") throw new Error("Owned disposable gate required");
+const url = new URL(process.env.OSNV_PG_URL!);
 if (url.hostname !== "127.0.0.1" || !/^\/recordclient_[a-f0-9]+$/.test(url.pathname)) throw new Error("Only owned local fixture is allowed");
-const dist = resolve(process.env.OSNOVA_CLIENT_DIST!);
+const dist = resolve(process.env.OSNV_CLIENT_DIST!);
 const provider = postgres({ options: { url: url.toString(), max: 6 }, operationTimeoutMs: 3000 });
 await registerOsnovaGeneratedRuntime();
 const kernel = await Osnova.createBuilder({ imports: [ormModule({ provider, healthCheck: false }), DataManagerFieldsModule, DataManagerRecordsModule] })
@@ -51,7 +51,7 @@ const server = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 60, asyn
     fault = body.fault; return json({ fault });
   }
   if (path === "/fixture/finish" && request.method === "POST") {
-    await Bun.write(process.env.OSNOVA_CLIENT_RESULT!, JSON.stringify(await status(), null, 2));
+    await Bun.write(process.env.OSNV_CLIENT_RESULT!, JSON.stringify(await status(), null, 2));
     setTimeout(async () => { server.stop(true); await stopHostedServices(kernel.container); await kernel.container.dispose(); await provider.close(); process.exit(0); }, 100);
     return json({ saved: true });
   }

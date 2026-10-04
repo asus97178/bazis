@@ -19,7 +19,7 @@ async function project(files: Record<string, string>): Promise<string> {
   };
   for (const [name, content] of Object.entries({
     "tsconfig.json": JSON.stringify(config),
-    "osnova.codegen.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "osnv.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     ...files,
   })) {
     const file = path.join(root, name);
@@ -90,7 +90,7 @@ import Grandchild, { Inherited, GenericChild, LocalChild, DefaultChild, Contract
 // Register providers before bootstrap; late normalization must remain supported.
 DI.bindDeps(Bound, Override, lazyDependency(Override));
 const providers = [singleton(A), singleton(B), singleton(Override), singleton(Inherited), singleton(Grandchild), singleton(GenericChild), singleton(LocalChild), singleton(DefaultChild), singleton(ContractChild), singletonValue(IContract, {value: "contract"}), singleton(OwnConstructor), singleton(OwnEmpty), singleton(Bound), singleton(Explicit, Explicit, [Override, lazyDependency(Override)])];
-const { registerOsnovaGeneratedRuntime } = await import("./generated/osnova/runtime");
+const { registerOsnovaGeneratedRuntime } = await import("./generated/osnv/runtime");
 await registerOsnovaGeneratedRuntime();
 const container = createContainer({ providers }, { validateOnBuild: true });
 try {
@@ -109,7 +109,7 @@ try {
   });
   try {
     await succeeds(root, "run", generator);
-    const deps = await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).text();
+    const deps = await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).text();
     expect(deps).toContain("import { Inherited as TargetClass_");
     expect(deps).toContain("import { default as TargetClass_");
     expect(deps).not.toContain("import { BaseService as TargetClass_");
@@ -128,7 +128,7 @@ test("private helpers and explicitly bound private services need no generated im
   const root = await project({
     "src/unreachable-helper.ts": 'class Dependency {} class InternalHelper { constructor(readonly dependency: Dependency) {} } export function helper() { return new InternalHelper(new Dependency()); }',
     "src/index.ts": `import { verify } from "./services";
-const { registerOsnovaGeneratedRuntime } = await import("./generated/osnova/runtime");
+const { registerOsnovaGeneratedRuntime } = await import("./generated/osnv/runtime");
 await registerOsnovaGeneratedRuntime();
 await verify();`,
     "src/services.ts": `import { createContainer, DI, singleton, singletonValue, createToken } from "osnv/core/di";
@@ -162,7 +162,7 @@ try {
   });
   try {
     await succeeds(root, "run", generator);
-    const deps = await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).text();
+    const deps = await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).text();
     for (const name of ["InternalHelper", "TypeOnlyHelper", "Explicit", "Bound", "Static"]) expect(deps).not.toContain(name);
     expect(deps).toContain("import { ValueAlias as TargetClass_");
     await succeeds(root, path.join(repo, "node_modules/typescript/bin/tsc"), "--noEmit");
@@ -186,8 +186,8 @@ export const registration = singleton(Child);
   try {
     const generated = await run(root, "run", generator);
     expect(generated.exit).not.toBe(0);
-    expect(generated.stderr).toContain("OSNOVA_DI_CONSTRUCTOR_UNRESOLVED");
-    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).exists()).toBe(false);
+    expect(generated.stderr).toContain("OSNV_DI_CONSTRUCTOR_UNRESOLVED");
+    expect(await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).exists()).toBe(false);
   } finally { await cleanup(root); }
 }, 60_000);
 
@@ -206,14 +206,14 @@ export class Dependency {}
 class InternalService { constructor(readonly dependency: Dependency) {} start() {} stop() {} }
 ${registration}
 `,
-    "src/generated/osnova/deps.ts": "export const previousOutput = true;\n",
+    "src/generated/osnv/deps.ts": "export const previousOutput = true;\n",
   });
   try {
     const generated = await run(root, "run", generator);
     expect(generated.exit).not.toBe(0);
-    expect(generated.stderr).toContain("OSNOVA_DI_CLASS_UNIMPORTABLE");
+    expect(generated.stderr).toContain("OSNV_DI_CLASS_UNIMPORTABLE");
     expect(generated.stderr).toContain('DI class "InternalService" must be exported');
-    expect(await Bun.file(path.join(root, "src/generated/osnova/deps.ts")).text()).toBe("export const previousOutput = true;\n");
-    expect(await Bun.file(path.join(root, "src/generated/osnova/runtime.ts")).exists()).toBe(false);
+    expect(await Bun.file(path.join(root, "src/generated/osnv/deps.ts")).text()).toBe("export const previousOutput = true;\n");
+    expect(await Bun.file(path.join(root, "src/generated/osnv/runtime.ts")).exists()).toBe(false);
   } finally { await cleanup(root); }
 }, 60_000);

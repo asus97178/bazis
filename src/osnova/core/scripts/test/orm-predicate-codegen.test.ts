@@ -51,7 +51,7 @@ if (u.active.eq(true)) { console.log("unsafe"); }
 `);
   expect(result.types).toEqual([]);
   expect(result.logic).toHaveLength(5);
-  expect(result.logic.every(message => message.includes("OSNOVA_ORM_PREDICATE_LOGIC") && message.includes(".and()"))).toBe(true);
+  expect(result.logic.every(message => message.includes("OSNV_ORM_PREDICATE_LOGIC") && message.includes(".and()"))).toBe(true);
 });
 
 test("explicit ORM combinators and ordinary boolean logic stay valid", () => {
