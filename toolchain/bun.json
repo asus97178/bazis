@@ -12,6 +12,22 @@
       "osVersion": "26.5.2",
       "osBuild": "25F84",
       "executableSha256": "539598c775882420b9d8deb7dc14d845f20f7d26f5600c50ab067dde6ac3f3bf"
+    },
+    {
+      "platform": "linux",
+      "arch": "arm64",
+      "osName": "Linux",
+      "osVersion": "glibc",
+      "osBuild": "any",
+      "executableSha256": "086c4121c8738a8e0f5ed730e8a461bc3973b4444e372ddb77aef9a747fa2ae9"
+    },
+    {
+      "platform": "linux",
+      "arch": "x64",
+      "osName": "Linux",
+      "osVersion": "glibc",
+      "osBuild": "any",
+      "executableSha256": "33d56b070be6a9e3da0ab013038b43d1645d0534ca811ecdba4472599117eb4b"
     }
   ]
 }
