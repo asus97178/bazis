@@ -21,12 +21,35 @@ case "$shutdown_timeout_ms" in ''|*[!0-9]*|0*) fail OSNV_BUN_SHUTDOWN_TIMEOUT_IN
 [ "${#shutdown_timeout_ms}" -le 10 ] && [ "$shutdown_timeout_ms" -le 2147483647 ] || fail OSNV_BUN_SHUTDOWN_TIMEOUT_INVALID
 shutdown_polls=$(((shutdown_timeout_ms + 99) / 100))
 [ -f "$authority" ] || fail OSNV_BUN_AUTHORITY_INVALID
-sha_count=$(LC_ALL=C /usr/bin/awk '/"executableSha256"[[:space:]]*:/{count++} END { print count + 0 }' "$authority")
-[ "$sha_count" = 1 ] || fail OSNV_BUN_AUTHORITY_INVALID
-expected_sha=$(LC_ALL=C /usr/bin/sed -n 's/^[[:space:]]*"executableSha256"[[:space:]]*:[[:space:]]*"\([0-9a-f][0-9a-f]*\)"[[:space:]]*,\{0,1\}[[:space:]]*$/\1/p' "$authority")
+# Qualified hosts: macOS (uchg-locked copy) and glibc Linux (0500 copy in a
+# 0700 directory; Linux has no user-settable immutable flag).
+case "$(uname -s)" in
+  Darwin) host_platform=darwin; tmp_root=/private/tmp; can_lock=1 ;;
+  Linux) host_platform=linux; tmp_root=/tmp; can_lock=0 ;;
+  *) fail OSNV_BUN_PLATFORM_NOT_QUALIFIED ;;
+esac
+case "$(uname -m)" in
+  arm64|aarch64) host_arch=arm64 ;;
+  x86_64|amd64) host_arch=x64 ;;
+  *) fail OSNV_BUN_PLATFORM_NOT_QUALIFIED ;;
+esac
+# Every qualified host entry for this platform and architecture must name the
+# same executable; the full host check (OS version/libc) runs in
+# bun-toolchain-check.ts below.
+expected_sha=$(LC_ALL=C /usr/bin/awk -v want_platform="$host_platform" -v want_arch="$host_arch" '
+  function value(line) { sub(/^[^:]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); return line }
+  /^[[:space:]]*\{/ { platform = ""; arch = "" }
+  /"platform"[[:space:]]*:/ { platform = value($0) }
+  /"arch"[[:space:]]*:/ { arch = value($0) }
+  /"executableSha256"[[:space:]]*:/ { if (platform == want_platform && arch == want_arch) { sha = value($0); if (found != "" && sha != found) conflict = 1; found = sha } }
+  END { if (found != "" && !conflict) print found }' "$authority")
+[ -n "$expected_sha" ] || fail OSNV_BUN_PLATFORM_NOT_QUALIFIED
 [ "${#expected_sha}" = 64 ] || fail OSNV_BUN_AUTHORITY_INVALID
 
-private_dir=$(/usr/bin/mktemp -d /private/tmp/osnova-bun-launch.XXXXXX) || fail OSNV_BUN_BINARY_UNREADABLE
+sha256_of() {
+  if [ "$can_lock" = 1 ]; then /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; else /usr/bin/sha256sum "$1" | /usr/bin/awk '{print $1}'; fi
+}
+private_dir=$(/usr/bin/mktemp -d "$tmp_root/osnova-bun-launch.XXXXXX") || fail OSNV_BUN_BINARY_UNREADABLE
 copy="$private_dir/bun"
 docker="$private_dir/docker"
 immutable=0
@@ -67,11 +90,13 @@ trap 'forward_signal QUIT' QUIT
 
 /bin/cp "$candidate" "$copy" >/dev/null 2>&1 || abort_after_copy OSNV_BUN_BINARY_UNREADABLE
 /bin/chmod 0500 "$copy" >/dev/null 2>&1 || abort_after_copy OSNV_BUN_BINARY_UNREADABLE
-copy_sha=$(/usr/bin/shasum -a 256 "$copy" | /usr/bin/awk '{print $1}')
+copy_sha=$(sha256_of "$copy")
 [ "$copy_sha" = "$expected_sha" ] || abort_after_copy OSNV_BUN_SHA256_MISMATCH
-/usr/bin/chflags uchg "$copy" >/dev/null 2>&1 || abort_after_copy OSNV_BUN_BINARY_UNREADABLE
-immutable=1
-copy_sha=$(/usr/bin/shasum -a 256 "$copy" | /usr/bin/awk '{print $1}')
+if [ "$can_lock" = 1 ]; then
+  /usr/bin/chflags uchg "$copy" >/dev/null 2>&1 || abort_after_copy OSNV_BUN_BINARY_UNREADABLE
+  immutable=1
+fi
+copy_sha=$(sha256_of "$copy")
 [ "$copy_sha" = "$expected_sha" ] || abort_after_copy OSNV_BUN_SHA256_MISMATCH
 
 PATH="$private_dir:/usr/bin:/bin"
@@ -103,11 +128,14 @@ write_docker_stub() {
 write_docker_wrapper() {
   /usr/bin/printf '%s\n' '#!/bin/sh' 'set -eu' 'PATH=/usr/bin:/bin' 'export PATH' "docker_link=$docker_link" "docker_target=$docker_target" "expected_docker_link_uid=$expected_docker_link_uid" "expected_docker_target_uid=$expected_docker_target_uid" "expected_docker_sha=$docker_captured_sha" 'unavailable() { printf "%s\\n" OSNV_DOCKER_CAPABILITY_UNAVAILABLE >&2; exit 127; }' '[ -L "$docker_link" ] || unavailable' '[ "$(/usr/bin/readlink "$docker_link" 2>/dev/null)" = "$docker_target" ] || unavailable' '[ "$(/usr/bin/stat -f %u "$docker_link" 2>/dev/null)" = "$expected_docker_link_uid" ] || unavailable' '[ -f "$docker_target" ] && [ ! -L "$docker_target" ] && [ -x "$docker_target" ] && [ -r "$docker_target" ] || unavailable' 'docker_target_uid=$(/usr/bin/stat -f %u "$docker_target" 2>/dev/null) || unavailable' '[ "$docker_target_uid" = 0 ] || [ "$docker_target_uid" = "$expected_docker_target_uid" ] || unavailable' 'docker_mode=$(/usr/bin/stat -f %Lp "$docker_target" 2>/dev/null) || unavailable' 'case "$docker_mode" in *[!0-7]*|"" ) unavailable ;; esac' '[ $((0$docker_mode & 022)) -eq 0 ] || unavailable' 'docker_current_sha=$(/usr/bin/shasum -a 256 "$docker_target" 2>/dev/null | /usr/bin/awk "{print \$1}")' '[ "$docker_current_sha" = "$expected_docker_sha" ] || unavailable' 'exec "$docker_target" "$@"' > "$docker" || return 1
 }
-if docker_route_safe; then write_docker_wrapper || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED; else write_docker_stub || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED; fi
+# The verified Docker route is Docker Desktop on macOS; elsewhere docker is a stub.
+if [ "$can_lock" = 1 ] && docker_route_safe; then write_docker_wrapper || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED; else write_docker_stub || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED; fi
 docker_created=1
 /bin/chmod 0500 "$docker" >/dev/null 2>&1 || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED
-/usr/bin/chflags uchg "$docker" >/dev/null 2>&1 || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED
-docker_immutable=1
+if [ "$can_lock" = 1 ]; then
+  /usr/bin/chflags uchg "$docker" >/dev/null 2>&1 || abort_after_copy OSNV_DOCKER_ROUTE_SETUP_FAILED
+  docker_immutable=1
+fi
 
 "$copy" "$@" &
 child_pid=$!

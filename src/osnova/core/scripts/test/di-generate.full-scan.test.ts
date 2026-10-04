@@ -124,7 +124,7 @@ test("removing the provisioning target returns its DI source to fail-closed unas
 }, 30_000);
 
 test("a generic third target receives only its static reachable application slice", async () => {
-  const root = path.join("/private/tmp", `osnova-codegen-third-${crypto.randomUUID()}`);
+  const root = path.join(tmpdir(), `osnova-codegen-third-${crypto.randomUUID()}`);
   const third = path.join(root, "third.ts");
   const feature = path.join(root, "feature.ts");
   const other = path.join(root, "other.ts");
