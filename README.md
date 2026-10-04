@@ -133,3 +133,20 @@ Health выполняет до четырёх checks одновременно: d
 Проверка [полного бинарника, восстановления приложения и длительной нагрузки](docs/audits/2026-09-14-infra-config-operations/RESULT.md) содержит актуальные результаты и границы production-готовности.
 При остановке raw PostgreSQL ожидает завершения запросов не более 1000 мс
 по умолчанию; свой предел задаётся через `postgres(config, { shutdownTimeoutMs })`.
+
+## CI
+
+Весь конвейер выпуска — одна команда, её вызывает и CI-хост:
+
+```sh
+./scripts/osnova-bun --no-env-file run ci
+# С квалификацией на одноразовом PostgreSQL 17 (нужен Docker):
+./scripts/osnova-bun --no-env-file run ci -- --live docs/audits/<имя-прогона>
+```
+
+[scripts/ci.ts](scripts/ci.ts) последовательно выполняет toolchain-проверку,
+codegen с проверкой, что `src/generated` закоммичен, `tsc`, тесты, сборки
+Admin/Client UI, `build:bin` и запуск обоих бинарников из пустого каталога.
+Первый сбой останавливает конвейер с ненулевым кодом. Toolchain квалифицирован
+только для macOS 26.5.2 / 25F84 arm64, поэтому CI-раннер — эта машина
+(self-hosted) до отдельной квалификации другой платформы.

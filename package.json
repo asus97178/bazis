@@ -22,6 +22,7 @@
     "admin:token": "OSNOVA_ENV=development bun run src/admin-token.ts",
     "pretest": "bun run scripts/bun-toolchain-check.ts && bun run di:generate --target all",
     "test": "bun run scripts/bun-toolchain-check.ts && bun test --isolate --path-ignore-patterns='**/*.browser.spec.ts' --path-ignore-patterns='**/docs/audits/**' --path-ignore-patterns='**/bin/**'",
+    "ci": "bun run scripts/ci.ts",
     "prebuild:bin": "bun run di:generate",
     "build:bin": "bun run scripts/bun-toolchain-check.ts && bun run build:bin:app && bun run build:bin:cli",
     "build:bin:app": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/index.ts bin/osnova-app",
