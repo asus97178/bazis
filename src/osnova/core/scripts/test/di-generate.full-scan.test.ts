@@ -29,7 +29,10 @@ async function runGeneratorTarget(cwd: string, target: string, env?: Record<stri
     stderr: "pipe",
   });
   const [exit, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-  return { exit, output: `${stdout}${stderr}` };
+  // Under GitHub Actions Bun also prints uncaught errors as `::error …` workflow
+  // annotations; they decorate the generator's diagnostics and are not part of them.
+  const output = `${stdout}${stderr}`.split("\n").filter((line) => !line.startsWith("::")).join("\n");
+  return { exit, output };
 }
 
 test("codegen declares isolated production and test targets", async () => {
