@@ -87,7 +87,8 @@ describe("CLI command effects", () => {
   test("generates only entry and passport for an empty atomic module", async () => {
     const f = await fixture();
     const result = await generateModule({ ...f, name: "Mailer", profile: "empty", register: false });
-    expect(await readdir(result.moduleDir)).toEqual(["MODULE.md", "Mailer.module.ts"]);
+    // readdir order is filesystem-specific (sorted on APFS, hashed on ext4).
+    expect((await readdir(result.moduleDir)).sort()).toEqual(["MODULE.md", "Mailer.module.ts"]);
     expect(await readFile(path.join(result.moduleDir, "Mailer.module.ts"), "utf8")).toContain("exports: []");
   });
 
