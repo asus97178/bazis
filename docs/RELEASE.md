@@ -250,9 +250,11 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 перенесены к модулям-владельцам (команды `bun run …` прежние):
 `admin:token` → `src/app/modules/auth/AdminToken.cli.ts`, `agent:run` →
 `src/app/modules/agent-chat/client/AgentRun.cli.ts`, `config:check`/`config:inspect`
-→ `src/app/config/ConfigCheck.cli.ts`, `admin:backend` →
-`src/app/modules/AdminUiDev.server.ts`. Удалена заглушка снятой фичи Workflow
-(`src/system-workflow-producer.ts`).
+→ `src/app/config/ConfigCheck.cli.ts`. Удалены заглушка снятой фичи Workflow
+(`src/system-workflow-producer.ts`) и отдельный dev-backend админки
+(`admin:backend`, `AdminUiDevModule`, настройки `http.admin*` и переменные
+`OSNV_ADMIN_*`): он поднимал устаревший набор модулей без DataManager.
+Admin UI разрабатывается на обычном `bun run dev` + `bun run admin:ui`.
 
 Миграция: сообщения валидации, ошибки конфигурации, тексты Codex и подписи UI
 по умолчанию стали английскими — для прежнего поведения подключите русские

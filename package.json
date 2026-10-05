@@ -18,7 +18,6 @@
     "admin:ui": "bun run --cwd admin-ui start",
     "admin:ui:build": "bun run --cwd admin-ui build",
     "admin:ui:check": "bun run --cwd admin-ui check",
-    "admin:backend": "bun run scripts/bun-toolchain-check.ts && OSNV_ENV=development bun run src/app/modules/AdminUiDev.server.ts",
     "admin:token": "OSNV_ENV=development bun run src/app/modules/auth/AdminToken.cli.ts",
     "agent:run": "bun run src/app/modules/agent-chat/client/AgentRun.cli.ts",
     "pretest": "bun run scripts/bun-toolchain-check.ts && bun run di:generate --target all",

@@ -55,7 +55,7 @@ export class ToolsModule {}
 
 Новый инструмент добавляется в `tools` один раз. Его зависимости объявляются
 в конструкторе; необходимые предметные модули подключаются через imports и
-публичные DI exports. ToolsModule подключён к AppModule и AdminUiDevModule.
+публичные DI exports. ToolsModule подключён к AppModule.
 
 `tools` автоматически регистрирует класс как scoped. Прежняя точная регистрация
 `scoped(ToolClass)` того же владельца остаётся совместимой и переиспользуется.
