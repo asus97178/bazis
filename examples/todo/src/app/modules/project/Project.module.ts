@@ -6,7 +6,7 @@ import { IProjectService } from "./services/IProject.service";
 import { ProjectService } from "./services/Project.service";
 
 @Module({
-  ormOsnova: {
+  ormOsnv: {
     context: ProjectDbContext,
     entities: [Project],
     // The module decides schema creation: additive migration of its tables on start.

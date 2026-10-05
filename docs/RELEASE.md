@@ -258,6 +258,18 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 `OSNV_ADMIN_*`): он поднимал устаревший набор модулей без DataManager.
 Admin UI разрабатывается на обычном `bun run dev` + `bun run admin:ui`.
 
+Имена: фреймворк называется `osnv` везде (приложение остаётся `osnova`).
+Переименованы публичный API (`OsnovaModuleRef` → `OsnvModuleRef`, `ormOsnova` →
+`ormOsnv`, `ormOsnovaConnect` → `ormOsnvConnect`, `registerOsnovaGeneratedRuntime`
+→ `registerOsnvGeneratedRuntime`, `OsnovaSocket` → `OsnvSocket`, класс ядра
+`Osnova` → `Osnv` и т. д.), папка пакета `src/osnova` → `src/osnv`, алиас
+`@osnova/*` → импорты `osnv/*`, `scripts/osnova-bun` → `scripts/osnv-bun`, схема
+toolchain `osnv.bun-toolchain/v1`. Идентификаторы в данных: таблицы
+`__osnv_orm_owned_stores_v1`, `__OsnvMigrations`, контракты `osnv.orm-owned-store/v1`,
+`osnv.agent-execution-state/v1`, `osnv.websocket.publication/v1` и др.; эталонные
+байты owned-store пересчитаны и доказанно отличаются только доменом. Базы, где
+уже есть таблицы `__osnova_*`, нужно мигрировать вручную (в приложении osnova их нет).
+
 Миграция: сообщения валидации, ошибки конфигурации, тексты Codex и подписи UI
 по умолчанию стали английскими — для прежнего поведения подключите русские
 наборы; тесты, сравнивающие эти тексты, нужно обновить. `RequestModelFieldShape`

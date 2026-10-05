@@ -9,7 +9,7 @@ import { TaskService } from "./services/Task.service";
 @Module({
   // A task belongs to a project: TaskService checks it through IProjectService.
   imports: [ProjectModule],
-  ormOsnova: {
+  ormOsnv: {
     context: TaskDbContext,
     entities: [Task],
     migrateOnStart: true,

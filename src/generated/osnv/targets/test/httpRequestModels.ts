@@ -4,7 +4,7 @@
 // Registers convention body models (class-typed action params) so they are
 // Target-local immutable descriptor; runtime publication is staged by runtime.ts.
 
-import { ConventionOrderDto as RequestModel_0 } from "../../../../osnova/core/http/test/fixtures/conventionControllers";
+import { ConventionOrderDto as RequestModel_0 } from "../../../../osnv/core/http/test/fixtures/conventionControllers";
 
 export const GENERATED_REQUEST_MODELS = Object.freeze([
   RequestModel_0,

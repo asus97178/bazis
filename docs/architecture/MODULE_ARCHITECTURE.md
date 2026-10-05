@@ -1,4 +1,4 @@
-# Архитектура модулей и структура каталогов Osnova
+# Архитектура модулей и структура каталогов osnv
 
 Идентификатор: **MOD-ARCH-001**. Версия: **1.10**. Дата: **2026-10-02**.
 Статус: **обязательное правило репозитория**.
@@ -122,11 +122,11 @@ DI-токены через `exports`. Собственная реализаци�
 
 | Скрипт | Артефакт |
 | --- | --- |
-| `build:bin:app` | `bin/osnova-app` |
-| `build:bin:cli` | `bin/osnova` |
+| `build:bin:app` | `bin/osnv-app` |
+| `build:bin:cli` | `bin/osnv` |
 | `build:bin` | Оба бинарника; перед сборкой выполняется проектный codegen |
 
-Использовать квалифицированный Bun через `scripts/osnova-bun`. При проверке
+Использовать квалифицированный Bun через `scripts/osnv-bun`. При проверке
 отдельной цели предварительно актуализировать требуемые результаты codegen.
 Изменение, влияющее на бинарную сборку или исполнение, проверяется сборкой
 затронутой цели и контрольным запуском соответствующего сценария в управляемом
@@ -145,13 +145,13 @@ DI-токены через `exports`. Собственная реализаци�
 
 ## 3. Направление зависимостей и владельцы
 
-1. `src/osnova/library` содержит библиотечные механизмы; не зависит от приложения
+1. `src/osnv/library` содержит библиотечные механизмы; не зависит от приложения
    и интеграционного слоя `core`.
-2. `src/osnova/core` интегрирует библиотечные механизмы, DI, HTTP, ORM и lifecycle;
+2. `src/osnv/core` интегрирует библиотечные механизмы, DI, HTTP, ORM и lifecycle;
    не импортирует `src/app` или `admin-ui`. Нижний слой DI не импортирует ORM/HTTP:
    расширения регистрируются верхним слоем через существующие механизмы.
 3. `src/app` задаёт прикладные функции, конфигурацию и композицию. Потребители
-   используют публичные входы Osnova (`@osnova/core/di`, `@osnova/core/orm` и т. п.),
+   используют публичные входы osnv (`osnv/core/di`, `osnv/core/orm` и т. п.),
    а не внутренние файлы реализации фреймворка.
 4. `admin-ui` и `client-ui` — клиентские адаптеры. Сервисы предметной области не
    зависят от Vue, компонентов интерфейса или браузерного состояния.
@@ -188,7 +188,7 @@ src/
       <feature>/                   самостоятельный атомарный модуль
       <feature>_modules/           составной модуль и его атомарные части
       actor_modules/               существующая группировка по субъектам
-  osnova/
+  osnv/
     index.ts                       публичный вход фреймворка
     library/<capability>/          библиотечная реализация
     core/<capability>/             интеграция с runtime и DI
@@ -204,7 +204,7 @@ client-ui/                         пользовательский Vue-чат
 ### 4.2. Новый атомарный модуль
 
 Новый модуль создаётся только командой CLI по §8.1. Базовая раскладка согласована
-с [CLI-шаблоном](../../src/osnova/cli/templates/module.ts).
+с [CLI-шаблоном](../../src/osnv/cli/templates/module.ts).
 Пример `task/` ниже — шаблон для будущего модуля, а не существующая реализация.
 
 ```text
@@ -271,7 +271,7 @@ Type-only контракты находятся рядом с владельце
 
 ```ts
 // file: src/app/modules/task/Task.module.ts
-import { Module, scoped } from "@osnova/core/di";
+import { Module, scoped } from "osnv/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { Task } from "./model/Task.model";
 import { TaskDbContext } from "./model/TaskDbContext";
@@ -281,7 +281,7 @@ import { TaskController } from "./http/TaskController";
 
 @Module({
   imports: [AuthModule],
-  ormOsnova: { context: TaskDbContext, entities: [Task] },
+  ormOsnv: { context: TaskDbContext, entities: [Task] },
   providers: [scoped(ITaskService, TaskService)],
   controllers: [TaskController],
   exports: [ITaskService],
@@ -309,7 +309,7 @@ datamanager_modules/
 Корень пакета и каждая новая атомарная часть создаются через CLI по §8.1.
 Каждая часть использует собственную раскладку из §4.2 и паспорт.
 Корень пакета не содержит своих предметных `providers`, `controllers`, `config`,
-`ormOsnova`, `background`, `uiProfiles` и исполняемых AI-обработчиков.
+`ormOsnv`, `background`, `uiProfiles` и исполняемых AI-обработчиков.
 Если нужна оркестрация нескольких частей, она получает явного атомарного
 владельца; не размещается скрытым бизнес-сервисом в корне пакета.
 
@@ -322,7 +322,7 @@ datamanager_modules/
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
-import { Module } from "@osnova/core/di";
+import { Module } from "osnv/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { DataManagerTablesModule } from "./tables_module/DataManagerTables.module";
 import { DataManagerFieldsModule } from "./fields_module/DataManagerFields.module";
@@ -349,13 +349,13 @@ export class DataManagerModule {}
 
 ### 5.1. Базовые метаданные `@Module`
 
-Источник типов: [OsnovaModuleMetadata](../../src/osnova/core/di/module/types/OsnovaModule.ts).
+Источник типов: [OsnvModuleMetadata](../../src/osnv/core/di/module/types/OsnvModule.ts).
 Все перечисленные поля опциональны в TypeScript. Правила проекта могут требовать
 явного значения, например `exports` у нового функционального модуля.
 
 | Поле | Входной тип / значение | Назначение и правило |
 | --- | --- | --- |
-| `imports` | `readonly OsnovaModuleRef[]` | Подключаемые зависимости; у пакета также его атомарные части |
+| `imports` | `readonly OsnvModuleRef[]` | Подключаемые зависимости; у пакета также его атомарные части |
 | `config` | `ModuleConfig` или readonly-массив | Объявления и валидаторы; kernel разрешает значения и проверяет их до создания клиентов по [§5.4](#kernel-config-isolation) |
 | `providers` | `readonly ProviderDefinition[]` | Собственные DI-регистрации; токен, реализация, зависимости и lifetime описываются в паспорте |
 | `controllers` | `readonly Class<object>[]` | Классы HTTP-контроллеров; автоматически регистрируются scoped |
@@ -366,7 +366,7 @@ export class DataManagerModule {}
 | `configure` | `(di: DiRegistrar) => void` | Программная регистрация при необходимости; обычные регистрации задаются декларативно |
 
 Имя модуля берётся из класса с `@Module`, отдельного поля `name` у этих метаданных
-нет. `OsnovaModuleRef` допускает также plain metadata для внутренних/совместимых
+нет. `OsnvModuleRef` допускает также plain metadata для внутренних/совместимых
 сценариев; для нового прикладного модуля используется именованный класс.
 
 Семантика `exports` принципиальна:
@@ -383,14 +383,14 @@ export class DataManagerModule {}
 Новые функциональные модули и пакеты задают `exports` явно. Существующий корень
 приложения не требуется менять ради этого правила.
 
-### 5.2. ORM: `ormOsnova`
+### 5.2. ORM: `ormOsnv`
 
-Это расширение метаданных из `@osnova/core/orm`, а не поле нижнего слоя DI.
+Это расширение метаданных из `osnv/core/orm`, а не поле нижнего слоя DI.
 Принимает один `OrmModuleConfig<DbContext>` или readonly-массив конфигураций.
 Обычный атомарный модуль использует `context` и `entities` на общем подключении.
 Несколько ORM-контекстов не означают автоматически несколько атомарных модулей.
 
-Источник и точные проверки сочетаний: [ormModule.ts](../../src/osnova/core/orm/ormModule.ts).
+Источник и точные проверки сочетаний: [ormModule.ts](../../src/osnv/core/orm/ormModule.ts).
 
 | Поле | Входной тип | Значение / условие |
 | --- | --- | --- |
@@ -405,7 +405,7 @@ export class DataManagerModule {}
 | `executionStrategy` | `DbContextOptionsConfig["executionStrategy"]` | Настройки повторов при transient-ошибках сохранения |
 | `healthCheck` | `boolean` | По умолчанию включён для connection/standalone и выключен для feature |
 | `registerRepositories` | `boolean` | По умолчанию `true`; scoped `IRepository<T>` |
-| `imports` | `readonly OsnovaModuleRef[]` | Дополнительные зависимости контекста |
+| `imports` | `readonly OsnvModuleRef[]` | Дополнительные зависимости контекста |
 | `ownedStore` | `OrmOwnedStoreDefinitionV1` | Специальный контракт управляемого PostgreSQL-хранилища и его lifecycle |
 
 Нельзя смешивать `ensureCreated` с активными startup-миграциями или непустым
@@ -418,15 +418,15 @@ CLI-каркас не задаёт startup-флаги создания или о
 
 ### 5.3. AI и дополнительные расширения
 
-gRPC подключается импортом `@osnova/core/grpc`: поле
+gRPC подключается импортом `osnv/core/grpc`: поле
 `grpcControllers?: readonly Class<object>[]` регистрирует классы с
 `@GrpcController` как scoped на один RPC через существующее owner-bound
 расширение DI. Функциональный модуль может одновременно владеть `controllers`
 и `grpcControllers`; разделение на подмодули по транспорту не требуется.
 Сервер включается через `runApp(..., { grpc: ... })` либо `grpcModule(options)`.
-Контракты и проверки — в [паспорте gRPC](../../src/osnova/core/grpc/MODULE.md).
+Контракты и проверки — в [паспорте gRPC](../../src/osnv/core/grpc/MODULE.md).
 
-Источник действующих AI-полей: [agent/index.ts](../../src/osnova/core/agent/index.ts).
+Источник действующих AI-полей: [agent/index.ts](../../src/osnv/core/agent/index.ts).
 Таблица описывает текущую реализацию. Решение от 2026-09-20 отделяет агентов
 от модулей; переход выполняется по [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
 
@@ -442,14 +442,14 @@ gRPC подключается импортом `@osnova/core/grpc`: поле
 `observer`; `id` — 1–128 печатных ASCII-символов; `version` — положительное safe
 integer; `order` — safe integer; `timeoutMs` — положительное safe integer.
 Handler реализует соответствующий `enforce`, `settle` или `observe`. Точные
-контракты событий берутся из [AgentToolHooks.ts](../../src/osnova/core/agent/AgentToolHooks.ts).
+контракты событий берутся из [AgentToolHooks.ts](../../src/osnv/core/agent/AgentToolHooks.ts).
 
 `tools` автоматически создаёт обычный scoped provider класса у объявившего его
 модуля. Точная существующая scoped-регистрация того же владельца переиспользуется;
 другой lifetime, фабрика, дубликат имени или конфликт владельцев дают ошибку
 сборки контейнера. Повторять Tool в `providers` для обычного подключения не нужно.
 Hook по-прежнему регистрируется как приватный вклад владельца. Источник —
-[moduleContributions-v1.ts](../../src/osnova/core/agent/moduleContributions-v1.ts).
+[moduleContributions-v1.ts](../../src/osnv/core/agent/moduleContributions-v1.ts).
 
 Связь реализации Tool с DI-владельцем не означает включение агента в модуль.
 Назначение Tools агенту и фактические права на действие определяются отдельно.
@@ -502,7 +502,7 @@ Hook по-прежнему регистрируется как приватны�
    фиксируются для разрешения данного kernel; последующее изменение `process.env`
    не меняет готовый результат. Переключать `process.env` для выбора контекста
    при чтении нельзя. Порядок источников задан в
-   [контракте конфигурации](../../src/osnova/core/kernel/config/README.md).
+   [контракте конфигурации](../../src/osnv/core/kernel/config/README.md).
 4. Сервисы получают представление своего kernel через существующий DI;
    host-фабрики могут получать его явным аргументом. Общий импорт объявления
    сам по себе не определяет, значения какого kernel нужно читать. Глобальный
@@ -538,7 +538,7 @@ Hook по-прежнему регистрируется как приватны�
 защиты сессий получают представление kernel. Готовое представление остаётся
 неизменяемым; для другого kernel повторно используется объявление.
 Состояние и границы зафиксированы в
-[паспорте kernel](../../src/osnova/core/kernel/MODULE.md#config-isolation-decision).
+[паспорте kernel](../../src/osnv/core/kernel/MODULE.md#config-isolation-decision).
 
 ## 6. Компоненты атомарного модуля и их входы
 
@@ -580,7 +580,7 @@ Hook по-прежнему регистрируется как приватны�
 не требует повторять их массивом в регистрации.
 
 Обычный путь — `scoped`, `singleton`, `transient` и существующие factory/value
-shortcuts из [shortcuts.ts](../../src/osnova/core/di/module/shortcuts.ts).
+shortcuts из [shortcuts.ts](../../src/osnv/core/di/module/shortcuts.ts).
 Для обычного класса используется `scoped(IService, Service)` либо `scoped(Service)`.
 Зависимости объявляются в конструкторе; codegen извлекает их типы, включая
 `IRepository<Entity>`, а DI использует сгенерированную привязку.
@@ -687,7 +687,7 @@ HTTP-валидацию автоматически: её владелец дол
 ### 8.1. Создание модулей только через CLI
 
 Все новые архитектурные модули приложения и фреймворка создаются **только
-командами Osnova CLI**. Правило охватывает атомарные модули, составные корни и
+командами osnv CLI**. Правило охватывает атомарные модули, составные корни и
 атомарные части, в том числе добавляемые в существующий пакет. Ручное создание
 каркаса, копирование соседнего модуля и создание файлов по примерам документации
 вместо запуска CLI запрещены.
@@ -700,9 +700,9 @@ HTTP-валидацию автоматически: её владелец дол
 | Составной | `g pack <Name> --parts <part-a,part-b,...>` | Корень композиции и пустые атомарные части со своими паспортами |
 
 Команды запускаются из корня репозитория через
-`./scripts/osnova-bun run osnv <команда>` с квалифицированным `OSNV_BUN_BIN`.
+`./scripts/osnv-bun run osnv <команда>` с квалифицированным `OSNV_BUN_BIN`.
 Параметры путей, подключения и codegen описаны в
-[паспорте CLI](../../src/osnova/cli/MODULE.md). `--dry-run` служит для просмотра
+[паспорте CLI](../../src/osnv/cli/MODULE.md). `--dry-run` служит для просмотра
 плана; он не заменяет фактическое создание модуля.
 
 После успешной генерации автор заполняет предметную ответственность, входные

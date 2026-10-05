@@ -16,175 +16,97 @@
     "noEmit": true,
     "paths": {
       "@/*": [
-        "./src/osnova/*"
-      ],
-      "@osnova": [
-        "./src/osnova/index.ts"
-      ],
-      "@osnova/core/agent": [
-        "./src/osnova/core/agent/index.ts"
-      ],
-      "@osnova/core/app": [
-        "./src/osnova/core/app/index.ts"
-      ],
-      "@osnova/core/background": [
-        "./src/osnova/core/background/index.ts"
-      ],
-      "@osnova/core/cache": [
-        "./src/osnova/core/cache/index.ts"
-      ],
-      "@osnova/core/di": [
-        "./src/osnova/core/di/index.ts"
-      ],
-      "@osnova/core/generatedRuntime": [
-        "./src/osnova/core/generatedRuntime.ts"
-      ],
-      "@osnova/core/grpc": [
-        "./src/osnova/core/grpc/index.ts"
-      ],
-      "@osnova/core/http-client": [
-        "./src/osnova/core/http-client/index.ts"
-      ],
-      "@osnova/core/http": [
-        "./src/osnova/core/http/index.ts"
-      ],
-      "@osnova/core/http/Binding/listModelRegistry": [
-        "./src/osnova/core/http/Binding/listModelRegistry.ts"
-      ],
-      "@osnova/core/http/Binding/requestModelRegistry": [
-        "./src/osnova/core/http/Binding/requestModelRegistry.ts"
-      ],
-      "@osnova/core/http/OpenApi/generatedOpenApiRegistry": [
-        "./src/osnova/core/http/OpenApi/generatedOpenApiRegistry.ts"
-      ],
-      "@osnova/core/http/OpenApi/openApiDocument": [
-        "./src/osnova/core/http/OpenApi/openApiDocument.ts"
-      ],
-      "@osnova/core/infra": [
-        "./src/osnova/core/infra/index.ts"
-      ],
-      "@osnova/core/kernel": [
-        "./src/osnova/core/kernel/index.ts"
-      ],
-      "@osnova/core/orm": [
-        "./src/osnova/core/orm/index.ts"
-      ],
-      "@osnova/core/websocket": [
-        "./src/osnova/core/websocket/index.ts"
-      ],
-      "@osnova/library/boundary": [
-        "./src/osnova/library/boundary/index.ts"
-      ],
-      "@osnova/library/http-client": [
-        "./src/osnova/library/http-client/index.ts"
-      ],
-      "@osnova/library/jsonapi": [
-        "./src/osnova/library/jsonapi/index.ts"
-      ],
-      "@osnova/library/jwt": [
-        "./src/osnova/library/jwt/index.ts"
-      ],
-      "@osnova/library/openapi": [
-        "./src/osnova/library/openapi/index.ts"
-      ],
-      "@osnova/library/orm": [
-        "./src/osnova/library/orm/index.ts"
-      ],
-      "@osnova/library/redaction": [
-        "./src/osnova/library/redaction/index.ts"
-      ],
-      "@osnova/library/ui": [
-        "./src/osnova/library/ui/index.ts"
-      ],
-      "@osnova/library/ui/UiProfile": [
-        "./src/osnova/library/ui/UiProfile.ts"
-      ],
-      "@osnova/library/validation": [
-        "./src/osnova/library/validation/index.ts"
+        "./src/osnv/*"
       ],
       "osnv": [
-        "./src/osnova/index.ts"
+        "./src/osnv/index.ts"
       ],
       "osnv/core/agent": [
-        "./src/osnova/core/agent/index.ts"
+        "./src/osnv/core/agent/index.ts"
       ],
       "osnv/core/app": [
-        "./src/osnova/core/app/index.ts"
+        "./src/osnv/core/app/index.ts"
       ],
       "osnv/core/background": [
-        "./src/osnova/core/background/index.ts"
+        "./src/osnv/core/background/index.ts"
       ],
       "osnv/core/cache": [
-        "./src/osnova/core/cache/index.ts"
+        "./src/osnv/core/cache/index.ts"
       ],
       "osnv/core/di": [
-        "./src/osnova/core/di/index.ts"
+        "./src/osnv/core/di/index.ts"
       ],
       "osnv/core/generatedRuntime": [
-        "./src/osnova/core/generatedRuntime.ts"
+        "./src/osnv/core/generatedRuntime.ts"
       ],
       "osnv/core/grpc": [
-        "./src/osnova/core/grpc/index.ts"
+        "./src/osnv/core/grpc/index.ts"
       ],
       "osnv/core/http-client": [
-        "./src/osnova/core/http-client/index.ts"
+        "./src/osnv/core/http-client/index.ts"
       ],
       "osnv/core/http": [
-        "./src/osnova/core/http/index.ts"
+        "./src/osnv/core/http/index.ts"
+      ],
+      "osnv/core/http/Binding/listModelRegistry": [
+        "./src/osnv/core/http/Binding/listModelRegistry.ts"
+      ],
+      "osnv/core/http/Binding/requestModelRegistry": [
+        "./src/osnv/core/http/Binding/requestModelRegistry.ts"
       ],
       "osnv/core/http/OpenApi/generatedOpenApiRegistry": [
-        "./src/osnova/core/http/OpenApi/generatedOpenApiRegistry.ts"
+        "./src/osnv/core/http/OpenApi/generatedOpenApiRegistry.ts"
       ],
       "osnv/core/http/OpenApi/openApiDocument": [
-        "./src/osnova/core/http/OpenApi/openApiDocument.ts"
+        "./src/osnv/core/http/OpenApi/openApiDocument.ts"
       ],
       "osnv/core/infra": [
-        "./src/osnova/core/infra/index.ts"
+        "./src/osnv/core/infra/index.ts"
       ],
       "osnv/core/kernel": [
-        "./src/osnova/core/kernel/index.ts"
+        "./src/osnv/core/kernel/index.ts"
       ],
       "osnv/core/orm": [
-        "./src/osnova/core/orm/index.ts"
+        "./src/osnv/core/orm/index.ts"
       ],
       "osnv/core/websocket": [
-        "./src/osnova/core/websocket/index.ts"
+        "./src/osnv/core/websocket/index.ts"
       ],
       "osnv/library/boundary": [
-        "./src/osnova/library/boundary/index.ts"
+        "./src/osnv/library/boundary/index.ts"
       ],
       "osnv/library/http-client": [
-        "./src/osnova/library/http-client/index.ts"
+        "./src/osnv/library/http-client/index.ts"
       ],
       "osnv/library/jsonapi": [
-        "./src/osnova/library/jsonapi/index.ts"
+        "./src/osnv/library/jsonapi/index.ts"
       ],
       "osnv/library/jwt": [
-        "./src/osnova/library/jwt/index.ts"
+        "./src/osnv/library/jwt/index.ts"
       ],
       "osnv/library/openapi": [
-        "./src/osnova/library/openapi/index.ts"
+        "./src/osnv/library/openapi/index.ts"
       ],
       "osnv/library/orm": [
-        "./src/osnova/library/orm/index.ts"
+        "./src/osnv/library/orm/index.ts"
       ],
       "osnv/library/redaction": [
-        "./src/osnova/library/redaction/index.ts"
+        "./src/osnv/library/redaction/index.ts"
       ],
       "osnv/library/ui": [
-        "./src/osnova/library/ui/index.ts"
+        "./src/osnv/library/ui/index.ts"
       ],
       "osnv/library/ui/UiProfile": [
-        "./src/osnova/library/ui/UiProfile.ts"
+        "./src/osnv/library/ui/UiProfile.ts"
       ],
       "osnv/library/validation": [
-        "./src/osnova/library/validation/index.ts"
+        "./src/osnv/library/validation/index.ts"
       ],
       "osnv/core/*": [
-        "./src/osnova/core/*"
+        "./src/osnv/core/*"
       ],
       "osnv/library/*": [
-        "./src/osnova/library/*"
+        "./src/osnv/library/*"
       ]
     }
   },

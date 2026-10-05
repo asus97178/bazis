@@ -19,17 +19,17 @@ gRPC TLS нужны `python3` и `openssl` в окружении.
 Укажи абсолютный путь к существующему исполняемому файлу этой версии. Это должен
 быть сам бинарник, а не символьная ссылка:
 
-Рекомендуемое постоянное место — `~/.osnova/toolchain/bun-1.4.0/bun` (права 0755:
+Рекомендуемое постоянное место — `~/.osnv/toolchain/bun-1.4.0/bun` (права 0755:
 с read-only бинарником `bun build --compile` оставляет `.bun-build` в каталоге),
 переменная — в `~/.zshenv`, чтобы её видели и неинтерактивные шеллы. Не храните
 бинарник в `/private/tmp`: macOS очищает его при перезагрузке.
 
 ```sh
 export OSNV_BUN_BIN=/absolute/path/to/bun
-./scripts/osnova-bun run toolchain:check
-./scripts/osnova-bun run di:generate --target all
-./scripts/osnova-bun test --isolate src/osnova/core/di/test
-./scripts/osnova-bun node_modules/typescript/bin/tsc --noEmit
+./scripts/osnv-bun run toolchain:check
+./scripts/osnv-bun run di:generate --target all
+./scripts/osnv-bun test --isolate src/osnv/core/di/test
+./scripts/osnv-bun node_modules/typescript/bin/tsc --noEmit
 ```
 
 Команды запускаются из корня проекта. Launcher проверяет бинарник до исполнения,
@@ -42,7 +42,7 @@ export OSNV_BUN_BIN=/absolute/path/to/bun
 во временный `.<hash>.bun-build` в текущем каталоге; клон наследует флаг, и Bun
 не может его удалить. Поэтому `build:bin:*` компилируют через
 [scripts/build-bin.ts](../scripts/build-bin.ts) из временного каталога и удаляют его.
-Прямой `./scripts/osnova-bun build --compile` в checkout оставит около 60 МБ мусора;
+Прямой `./scripts/osnv-bun build --compile` в checkout оставит около 60 МБ мусора;
 убрать его можно так: `chflags nouchg .*.bun-build && rm .*.bun-build`.
 
 При `SIGINT`, `SIGTERM`, `SIGHUP` или `SIGQUIT` launcher передаёт первый сигнал
@@ -54,7 +54,7 @@ export OSNV_BUN_BIN=/absolute/path/to/bun
 Если приложение задаёт больший shutdown timeout, увеличь и бюджет launcher:
 
 ```sh
-OSNV_BUN_SHUTDOWN_TIMEOUT_MS=35000 ./scripts/osnova-bun run start
+OSNV_BUN_SHUTDOWN_TIMEOUT_MS=35000 ./scripts/osnv-bun run start
 ```
 
 `OSNV_BUN_SHUTDOWN_TIMEOUT_MS` — необязательная строка из десятичных цифр,

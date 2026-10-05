@@ -2,7 +2,7 @@
 
 Идентификатор: **AGENT-TOOLS-001**. Версия: **1.0**. Дата: **2026-10-02**.
 Статус: реализовано; изолированные проверки и бинарная проба — PASS.
-Область: native Tools из кода Osnova и назначение метаагентам через каталог.
+Область: native Tools из кода osnv и назначение метаагентам через каталог.
 
 ## 1. Размещение и регистрация
 
@@ -34,7 +34,7 @@ src/app/modules/agents/
 Действующая регистрация:
 
 ```ts
-import { Module, singleton } from "@osnova/core/di";
+import { Module, singleton } from "osnv/core/di";
 import { AuthModule } from "../../auth/Auth.module";
 import { AgentsModule } from "../Agents.module";
 import { AgentsTool } from "./Agents.tool";
@@ -65,7 +65,7 @@ export class ToolsModule {}
 
 ## 2. Общий каталог и зависимости
 
-[AgentRegistry.fromContainer](../../src/osnova/core/agent/AgentRegistry.ts)
+[AgentRegistry.fromContainer](../../src/osnv/core/agent/AgentRegistry.ts)
 строит неизменяемый снимок из фактических вкладов Tools в DI. Каталог кэшируется
 на контейнер; обычные providers без tools в него не попадают. Конструкторы
 инструментов не вызываются. Разные контейнеры имеют независимые каталоги.
@@ -133,11 +133,11 @@ Main при старте не перезаписывается. Уже подг�
 Обычный OpenAI-compatible адаптер передаёт описания через поле tools в API-запросе.
 Модель возвращает имя и аргументы; наш executor выполняет вызов и возвращает
 результат через тот же адаптер. Codex получает dynamicTools с безопасными wire-именами
-и вызывает тот же executor. DTO, DI, идентичность и секреты остаются у Osnova.
+и вызывает тот же executor. DTO, DI, идентичность и секреты остаются у osnv.
 Транспортные адаптеры и настройки strict этим изменением не менялись.
 
 Контракт остаётся стандартным: параметры описываются JSON Schema, обмен с моделью —
-function/tool calling провайдера. Выходную схему Osnova можно объявить дополнительно.
+function/tool calling провайдера. Выходную схему osnv можно объявить дополнительно.
 Обзоры протокола: [OpenAI](https://developers.openai.com/api/docs/guides/function-calling),
 [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools).
 Интеграция Anthropic, MCP и поиск инструментов моделью в этот модуль не добавляются.

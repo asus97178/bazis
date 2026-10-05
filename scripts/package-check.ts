@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-// Consumer view of the published package: pack src/osnova, install the tarball
+// Consumer view of the published package: pack src/osnv, install the tarball
 // into an empty project, create an app with the installed `osnv` CLI and run it.
 // Fails if the tarball carries tests or the installed package cannot build an app.
 const root = resolve(import.meta.dir, "..");
@@ -22,7 +22,7 @@ function run(step: string, command: string[], cwd: string, env: Record<string, s
 
 let server: ReturnType<typeof Bun.spawn> | undefined;
 try {
-  run("pack", [bun, "pm", "pack", "--ignore-scripts", "--destination", work], join(root, "src/osnova"));
+  run("pack", [bun, "pm", "pack", "--ignore-scripts", "--destination", work], join(root, "src/osnv"));
   const tarball = readdirSync(work).find((name) => name.endsWith(".tgz"));
   if (!tarball) throw new Error("pack produced no tarball");
   const listing = run("list tarball", ["tar", "-tzf", join(work, tarball)], work).split("\n");
@@ -67,10 +67,10 @@ try {
   // (it used to look next to the framework sources only and silently did nothing).
   writeFileSync(join(app, "src/app/test/generated-runtime.test.ts"), [
     'import { expect, test } from "bun:test";',
-    'import { loadOsnovaGeneratedRuntime } from "osnv/core/generatedRuntime";',
+    'import { loadOsnvGeneratedRuntime } from "osnv/core/generatedRuntime";',
     'import { getGeneratedOpenApiMetadata } from "osnv/core/http/OpenApi/generatedOpenApiRegistry";',
     'test("installed osnv loads the project generated runtime lazily", async () => {',
-    "  await loadOsnovaGeneratedRuntime();",
+    "  await loadOsnvGeneratedRuntime();",
     '  expect(Object.keys(getGeneratedOpenApiMetadata().schemas)).toContain("ProbeRequest");',
     "});", "",
   ].join("\n"));

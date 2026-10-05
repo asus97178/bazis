@@ -1,9 +1,9 @@
 # От нового проекта до бинарника
 
-Osnova использует TypeScript, Bun, DI, DbContext и контроллеры с декораторами.
+osnv использует TypeScript, Bun, DI, DbContext и контроллеры с декораторами.
 Зависимости конструкторов и привязки HTTP-параметров выводит codegen перед запуском.
 Для разработчика C# ближайшие знакомые понятия — DI scope, EF DbContext и
-контроллеры ASP.NET. ORM-условия в Osnova строятся методами, без LINQ expression trees.
+контроллеры ASP.NET. ORM-условия в osnv строятся методами, без LINQ expression trees.
 
 ## 1. Создать приложение
 
@@ -12,8 +12,8 @@ Osnova использует TypeScript, Bun, DI, DbContext и контролле
 уже указывает на проверенный исполняемый файл.
 
 ```sh
-./scripts/osnova-bun run toolchain:check
-./scripts/osnova-bun run osnv new MyApp --path ../my-app
+./scripts/osnv-bun run toolchain:check
+./scripts/osnv-bun run osnv new MyApp --path ../my-app
 cd ../my-app
 "$OSNV_BUN_BIN" install
 "$OSNV_BUN_BIN" run dev
@@ -27,7 +27,7 @@ CLI копирует пакет в `vendor/osnv`. Добавьте этот ка
 приложением: после переноса исходный checkout не требуется. Это снимок версии;
 изменения фреймворка автоматически не подтягиваются. `--link-framework` оставляет
 живую связь с внешним checkout для совместной разработки. Собранный CLI вне
-checkout принимает `--framework /absolute/path/to/src/osnova`.
+checkout принимает `--framework /absolute/path/to/src/osnv`.
 
 ## 2. Добавить функцию
 
@@ -41,7 +41,7 @@ CLI создаст `Task.module.ts`, `MODULE.md` и подключит моду�
 До реализации заполните ответственность и входы в паспорте. Одна функция может
 содержать модель, сервис, контроллер и фоновые обработчики. Составной модуль
 нужен для самостоятельных функций: `g pack Catalog --parts items,categories`.
-Полный пример контроллера без БД: [HTTP README](../src/osnova/core/http/README.md).
+Полный пример контроллера без БД: [HTTP README](../src/osnv/core/http/README.md).
 
 Для учебного CRUD есть `g module Guest --minimal`: десять файлов, включая
 модель, DbContext, сервис, контроллер, ListQuery и паспорт. Его запуск требует

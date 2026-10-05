@@ -5,7 +5,7 @@
     "": {
       "name": "todo",
       "dependencies": {
-        "osnv": "file:../../src/osnova",
+        "osnv": "file:../../src/osnv",
       },
       "devDependencies": {
         "@types/bun": "1.4.0",
@@ -20,7 +20,7 @@
 
     "bun-types": ["bun-types@1.4.0", "", { "dependencies": { "@types/node": "*" } }, "sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q=="],
 
-    "osnv": ["osnv@file:../../src/osnova", { "peerDependencies": { "typescript": "^5.9.3" }, "bin": { "osnv": "./cli/main.ts" } }],
+    "osnv": ["osnv@file:../../src/osnv", { "peerDependencies": { "typescript": "^5.9.3" }, "bin": { "osnv": "./cli/main.ts" } }],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
