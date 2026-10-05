@@ -64,8 +64,8 @@ async function createFixture() {
   return { provider, context, schema, quotedSchema, Parent, Child, Empty, Broken, DateParent, DateChild };
 }
 
-describe.skipIf(!enabled)("ORM audit regressions on disposable PostgreSQL", () => {
-  test("A1: caught conversion error rolls back earlier real INSERTs", async () => withFixture(async f => {
+describe.skipIf(!enabled)("ORM regressions on disposable PostgreSQL", () => {
+  test("caught conversion error rolls back earlier real INSERTs", async () => withFixture(async f => {
     const parent = new f.Parent(); f.context.add(parent); f.context.add(new f.Broken());
     await expect(f.context.database.transaction(async () => {
       await expect(f.context.saveChanges()).rejects.toThrow("audit conversion failed");
@@ -74,7 +74,7 @@ describe.skipIf(!enabled)("ORM audit regressions on disposable PostgreSQL", () =
     expect(parent.id).toBe(""); expect(f.context.stateOf(parent)).toBe(EntityState.Added);
   }));
 
-  test("A2/A3/A7: UUID FK roundtrip, dotted identifiers, and locked reload preserve edits", async () => withFixture(async f => {
+  test("UUID FK roundtrip, dotted identifiers, and locked reload preserve edits", async () => withFixture(async f => {
     const parent = new f.Parent(); f.context.add(parent); await f.context.saveChanges();
     const child = new f.Child(); child.parentId = parent.id; f.context.add(child); await f.context.saveChanges();
     const loaded = await f.context.setOf(f.Child).include(c => c.parent).asNoTracking().first();
@@ -89,12 +89,12 @@ describe.skipIf(!enabled)("ORM audit regressions on disposable PostgreSQL", () =
     await f.context.database.ensureCreated();
   }));
 
-  test("A4: exact admission rejects real GENERATED ALWAYS drift", async () => withFixture(async f => {
+  test("exact admission rejects real GENERATED ALWAYS drift", async () => withFixture(async f => {
     await f.provider.execute(`ALTER TABLE ${f.quotedSchema}.empty_rows ALTER COLUMN id SET GENERATED ALWAYS`, []);
     await expect(f.context.database.ensureCreated()).rejects.toMatchObject({ code: "ORM_SCHEMA_CATALOG_UNSUPPORTED" });
   }));
 
-  test("A5/A6: Date key include and multiple DEFAULT VALUES inserts roundtrip", async () => withFixture(async f => {
+  test("Date key include and multiple DEFAULT VALUES inserts roundtrip", async () => withFixture(async f => {
     f.context.add(new f.DateParent()); f.context.add(new f.DateChild());
     const rows = [new f.Empty(), new f.Empty()]; f.context.setOf(f.Empty).addRange(rows);
     expect(await f.context.saveChanges()).toBe(4);
@@ -103,7 +103,7 @@ describe.skipIf(!enabled)("ORM audit regressions on disposable PostgreSQL", () =
     expect(child.parent?.id.getTime()).toBe(0);
   }));
 
-  test("A8: a client fault after real server COMMIT never duplicates the saved row", async () => withFixture(async f => {
+  test("a client fault after real server COMMIT never duplicates the saved row", async () => withFixture(async f => {
     type Session = { unsafe(sql: string, params?: readonly unknown[]): Promise<Row[]>; release(): void | Promise<void>; close?(options?: { timeout?: number }): Promise<void> };
     type Root = Session & { reserve(): Promise<Session>; close(): Promise<void> };
     const root = (f.provider as unknown as { sql: Root }).sql;

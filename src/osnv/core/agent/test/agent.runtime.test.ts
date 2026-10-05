@@ -1044,7 +1044,7 @@ describe("agent runtime", () => {
     }
   });
 
-  test("ARCP-DEF-001 rejects malformed provider envelopes before any tool effect", async () => {
+  test("rejects malformed provider envelopes before any tool effect", async () => {
     let effects = 0;
     @Tool({ name: "raw.effect", description: "Must not run.", sideEffect: "read" })
     class RawEffectTool { execute(): JsonObject { effects += 1; return { ok: true }; } }
@@ -1072,7 +1072,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-003 makes declared Agent contracts authoritative for direct invoke", async () => {
+  test("makes declared Agent contracts authoritative for direct invoke", async () => {
     class AgentInput { feature!: string; }
     class AgentOutput { goal!: string; }
     @Agent({ name: "declared-contract-agent", input: AgentInput, output: AgentOutput })
@@ -1105,7 +1105,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-003 rejects malformed declared Agent output after one provider call", async () => {
+  test("rejects malformed declared Agent output after one provider call", async () => {
     class DeclaredOutput { goal!: string; }
     @Agent({ name: "invalid-output-agent", output: DeclaredOutput })
     class InvalidOutputAgent {}
@@ -1129,7 +1129,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-004 bounds declared Agent output validation after provider completion", async () => {
+  test("bounds declared Agent output validation after provider completion", async () => {
     class SlowOutput { goal!: string; }
     @Agent({ name: "slow-output-agent", output: SlowOutput })
     class SlowOutputAgent {}
@@ -1158,7 +1158,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-004 bounds task validation and consumes late rejection", async () => {
+  test("bounds task validation and consumes late rejection", async () => {
     let providerCalls = 0;
     let rejectLate: ((reason?: unknown) => void) | undefined;
     class SlowInput { feature!: string; }
@@ -1184,7 +1184,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-004 aborts declared Agent validation before provider dispatch and consumes late rejection", async () => {
+  test("aborts declared Agent validation before provider dispatch and consumes late rejection", async () => {
     class AbortInput { feature!: string; }
     @Agent({ name: "abort-validation-agent", input: AbortInput })
     class AbortValidationAgent {}
@@ -1208,7 +1208,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-001 rejects an entire mixed provider tool batch before the valid Tool can execute", async () => {
+  test("rejects an entire mixed provider tool batch before the valid Tool can execute", async () => {
     let effects = 0;
     @Tool({ name: "batch.valid", description: "Must not execute in malformed batch.", sideEffect: "read" })
     class ValidBatchTool { execute(): JsonObject { effects += 1; return { ok: true }; } }
@@ -1235,7 +1235,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("AUD03 applies the runtime default to invokeTask input validation and keeps zero opt-out", async () => {
+  test("applies the runtime default to invokeTask input validation and keeps zero opt-out", async () => {
     class Input { value = ""; }
     @Agent({ name: "audit03-agent" })
     class AuditAgent { @Task({ name: "run", input: Input }) run(_input: Input): unknown { return agentOutput(); } }
@@ -1255,7 +1255,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("AUD05 contains hostile provider thrown values as redacted runtime failures", async () => {
+  test("contains hostile provider thrown values as redacted runtime failures", async () => {
     const hostile = [Object.create(null), { toString() { throw new Error("secret-hostile"); } }];
     for (const thrown of hostile) {
       const provider = { complete() { throw thrown; } } as AgentModelProvider;
@@ -1269,7 +1269,7 @@ describe("agent runtime", () => {
     }
   });
 
-  test("AUD03 applies default and zero timeout semantics to invokeTask output validation", async () => {
+  test("applies default and zero timeout semantics to invokeTask output validation", async () => {
     class Input { value = ""; }
     class Output { value = ""; }
     @Agent({ name: "audit03-output-agent" })
@@ -1297,7 +1297,7 @@ describe("agent runtime", () => {
     } finally { await optOut.container.dispose(); }
   });
 
-  test("AUD03 pre-aborted and invalid timeout invokeTask paths do not validate or dispatch", async () => {
+  test("pre-aborted and invalid timeout invokeTask paths do not validate or dispatch", async () => {
     class Input { value = ""; }
     @Agent({ name: "audit03-abort-agent" }) class AuditAgent { @Task({ name: "run", input: Input }) run(_input: Input): unknown { return agentOutput(); } }
     @Module({ agents: [AuditAgent] }) class AppModule {}
@@ -1312,7 +1312,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("AUD04 rejects a mixed raw OpenAI-compatible vendor batch before Tool execution", async () => {
+  test("rejects a mixed raw OpenAI-compatible vendor batch before Tool execution", async () => {
     let effects = 0;
     @Tool({ name: "adapter.valid", description: "valid", sideEffect: "read" }) class ValidTool { execute() { effects += 1; return { ok: true }; } }
     @Agent({ name: "adapter-batch-agent", tools: [ValidTool] }) class BatchAgent {}
@@ -1399,7 +1399,7 @@ describe("agent runtime", () => {
     } finally { await container.dispose(); }
   });
 
-  test("ARCP-DEF-007 rejects deprecated concrete model options before provider dispatch", async () => {
+  test("rejects deprecated concrete model options before provider dispatch", async () => {
     class CountingProvider implements AgentModelProvider {
       calls = 0;
       complete(): AgentModelResponse { this.calls += 1; throw new Error("must not run"); }

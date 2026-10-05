@@ -416,4 +416,4 @@ existing `orm.ensure-created.postgres.live.test.ts` on 15.7.
 covers an owned store with a v7 key and a uuid foreign key (admission, saving,
 exact replay); it runs only against a dedicated `osnv_v7_*` database with
 `OSNV_OWNED_STORE_V7_LIVE=1`. It passed on PostgreSQL 17 in a throwaway local
-container, together with the existing E327 owned-store live test.
+container, together with the existing `orm.owned-store.core.postgres.live.test.ts`.

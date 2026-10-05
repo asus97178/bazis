@@ -14,7 +14,7 @@ import {
   type Lazy,
 } from "../index";
 
-describe("DI audit regressions", () => {
+describe("DI regressions", () => {
   test.each(["scope", "root"] as const)("cached Lazy rejects access after %s disposal", async (disposedOwner) => {
     class Resource {
       disposed = false;

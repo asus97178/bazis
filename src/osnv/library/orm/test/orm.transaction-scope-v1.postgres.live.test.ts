@@ -28,10 +28,10 @@ class ClaimContext extends DbContext { readonly claims = this.set(ClaimRecord); 
 
 afterAll(async () => { if (!url) return; const p = await provider(); try { for (const name of [...owned].reverse()) await p.execute(`DROP TABLE IF EXISTS ${quote(name)}`, []); } finally { await p.close(); } });
 
-test.skipIf(Boolean(url))("ORM1-10 env-off never creates a connection and retains only run-owned cleanup", () => { expect(url).toBeUndefined(); expect(run).toMatch(/^[a-f0-9]{16}$/); expect(() => quote("foreign_table")).toThrow("foreign cleanup"); });
-test.skipIf(!url)("ORM1-10 env-on admits the authorized runner without exposing its DSN", () => { expect(typeof url).toBe("string"); expect(url!.length).toBeGreaterThan(0); expect(run).toMatch(/^[a-f0-9]{16}$/); });
+test.skipIf(Boolean(url))("without the opt-in env, never creates a connection and keeps only run-owned cleanup", () => { expect(url).toBeUndefined(); expect(run).toMatch(/^[a-f0-9]{16}$/); expect(() => quote("foreign_table")).toThrow("foreign cleanup"); });
+test.skipIf(!url)("with the opt-in env, admits the authorized runner without exposing its DSN", () => { expect(typeof url).toBe("string"); expect(url!.length).toBeGreaterThan(0); expect(run).toMatch(/^[a-f0-9]{16}$/); });
 
-describe("ORM1-10 separately authorized disposable PostgreSQL physical oracle", () => {
+describe("transaction scopes against a separately authorized disposable PostgreSQL database", () => {
   live("keeps outer and nested work on one backend session", async () => {
     const p = await provider(); const name = table("pid");
     try { await create(p, name); const pids: number[] = []; await p.transactionScope!(async () => { pids.push(Number((await p.query("SELECT pg_backend_pid() AS pid", []))[0]!.pid)); await p.transactionScope!(async () => { pids.push(Number((await p.query("SELECT pg_backend_pid() AS pid", []))[0]!.pid)); }); }); expect(new Set(pids).size).toBe(1); } finally { await p.close(); }

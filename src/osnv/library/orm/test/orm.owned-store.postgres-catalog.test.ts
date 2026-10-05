@@ -72,7 +72,7 @@ test("four catalog root DTO parsers copy complete closed records", () => {
   expect(parseOwnedCatalogArrayTypeV1({ oid: "4", elementTypeOid: "3", relationOid: "0", arrayTypeOid: "0", schema: "public", name: "_t", kind: "base", category: "array" }, catalogContext).category).toBe("array");
 });
 
-test("catalog class preserves all nine raw class kinds without B2 name semantics", () => {
+test("catalog class preserves all nine raw class kinds without verifier name semantics", () => {
   for (const kind of ["pg_class", "pg_type", "pg_constraint", "pg_proc", "pg_rewrite", "pg_namespace", "pg_attrdef", "pg_trigger", "other"] as const) { const parsed = parseOwnedCatalogClassV1({ oid: "1", schema: "other", name: "raw_name", kind }); expect(parsed.kind).toBe(kind); expect(parsed.schema).toBe("other"); expect(parsed.name).toBe("raw_name"); }
   expect(() => parseOwnedCatalogClassV1({ oid: "1", schema: "other", name: "raw_name", kind: "pg_operator" })).toThrow("ORM_OWNED_STORE_DRIFT");
 });
@@ -129,7 +129,7 @@ test("column is a closed hostile-safe frozen copy", () => {
   for (const value of [{ ...column(), extra: true }, new Proxy(column(), {}), Object.assign(column(), { [Symbol("x")]: true })]) expect(() => parseOwnedCatalogColumnV1(value)).toThrow("ORM_OWNED_STORE_DRIFT");
 });
 
-test("column default object OID is nullable, canonical, and B1 raw data", () => {
+test("column default object OID is nullable, canonical, and raw parser data", () => {
   expect(parseOwnedCatalogColumnV1(column()).defaultObjectOid).toBeNull();
   expect(parseOwnedCatalogColumnV1({ ...column(), defaultObjectOid: "1", default: { kind: "none" }, generation: "other" }).defaultObjectOid).toBe("1");
   expect(parseOwnedCatalogColumnV1({ ...column(), defaultObjectOid: "4294967295" }).defaultObjectOid).toBe("4294967295");
@@ -218,7 +218,7 @@ const catalogArrayType = () => ({ oid: "4", elementTypeOid: "3", relationOid: "0
 const registryAbsent = (publicSchemaExists = true) => ({ contract: "osnv.orm-owned-store-registry-snapshot/v1", publicSchemaExists, state: { kind: "absent" } });
 const catalogSnapshot = () => ({ contract: "osnv.orm-owned-store-catalog-snapshot/v1", requestedScopes: [], existingSchemas: [], catalogClasses: [], relations: [], rowTypes: [], arrayTypes: [], columns: [], indexes: [], constraints: [], triggers: [], rules: [], policies: [], inheritance: [], dependencies: [], sequences: [] });
 
-test("relation namespace OID is required, canonical, frozen, and remains raw B1 data", () => {
+test("relation namespace OID is required, canonical, frozen, and remains raw parser data", () => {
   const min = parseOwnedCatalogRelationV1(catalogRelation(), catalogContext); expect(min.namespaceOid).toBe("1"); expect(Object.isFrozen(min)).toBe(true);
   expect(parseOwnedCatalogRelationV1({ ...catalogRelation(), namespaceOid: "4294967295" }, catalogContext).namespaceOid).toBe("4294967295");
   const raw = parseOwnedCatalogRelationV1({ ...catalogRelation(), namespaceOid: "1", schema: "unrelated_schema", name: "unrelated_name" }, catalogContext); expect(raw.namespaceOid).toBe("1"); expect(raw.name).toBe("unrelated_name");
@@ -326,7 +326,7 @@ test("trigger, rule, and policy retain exact primitive raw DTO facts", () => {
   for (const field of ["usingExpression", "checkExpression"] as const) for (const value of ["\ud800", "\udc00", new String("x"), "x".repeat(4 * 1024 * 1024 + 1)]) expect(() => parseOwnedCatalogPolicyV1({ ...policy(), [field]: value })).toThrow("ORM_OWNED_STORE_DRIFT");
 });
 
-test("trigger function OID is required, canonical, and B1 raw data", () => {
+test("trigger function OID is required, canonical, and raw parser data", () => {
   expect(parseOwnedCatalogTriggerV1({ ...trigger(), functionOid: "1", functionSchema: "unrelated_schema", functionName: "unrelated_name" }).functionOid).toBe("1");
   expect(parseOwnedCatalogTriggerV1({ ...trigger(), functionOid: "4294967295" }).functionOid).toBe("4294967295");
   const missing = trigger() as Record<string, unknown>; delete missing.functionOid; expect(() => parseOwnedCatalogTriggerV1(missing)).toThrow("ORM_OWNED_STORE_DRIFT");
@@ -378,7 +378,7 @@ test("constraint context and complete raw DTO fields are closed frozen copies", 
   for (const value of [{ ...constraint(), extra: true }, hidden, inherited, new Proxy(constraint(), {}), revoked.proxy, Object.assign(constraint(), { [Symbol("x")]: true })]) expect(() => parseOwnedCatalogConstraintV1(value, catalogContext)).toThrow("ORM_OWNED_STORE_DRIFT");
 });
 
-test("constraint operator OID vectors are independent bounded raw B1 data", () => {
+test("constraint operator OID vectors are independent bounded raw parser data", () => {
   const fields = ["primaryForeignEqualityOperatorOids", "primaryPrimaryEqualityOperatorOids", "foreignForeignEqualityOperatorOids", "defaultEqualityOperatorOids"] as const;
   for (const field of fields) { expect(parseOwnedCatalogConstraintV1(constraint(), catalogContext)[field]).toEqual([]); expect(parseOwnedCatalogConstraintV1({ ...constraint(), [field]: ["1"] }, catalogContext)[field]).toEqual(["1"]); expect(parseOwnedCatalogConstraintV1({ ...constraint(), [field]: Array(65536).fill("4294967295") }, catalogContext)[field]).toHaveLength(65536); }
   for (const field of fields) {
@@ -614,7 +614,7 @@ const b2Snapshot = (): MutableCatalogSnapshot => ({
   dependencies: [{ dependentClassOid: "1", dependentOid: "10", dependentSubId: "0", referencedClassOid: "5", referencedOid: "12000", referencedSubId: "0", kind: "normal" }, { dependentClassOid: "2", dependentOid: "11", dependentSubId: "0", referencedClassOid: "1", referencedOid: "10", referencedSubId: "0", kind: "internal" }, { dependentClassOid: "2", dependentOid: "15", dependentSubId: "0", referencedClassOid: "2", referencedOid: "11", referencedSubId: "0", kind: "internal" }, { dependentClassOid: "4", dependentOid: "14", dependentSubId: "0", referencedClassOid: "1", referencedOid: "10", referencedSubId: "1", kind: "automatic" }, { dependentClassOid: "3", dependentOid: "16", dependentSubId: "0", referencedClassOid: "1", referencedOid: "10", referencedSubId: "1", kind: "automatic" }, { dependentClassOid: "1", dependentOid: "12", dependentSubId: "0", referencedClassOid: "3", referencedOid: "16", referencedSubId: "0", kind: "internal" }, { dependentClassOid: "1", dependentOid: "13", dependentSubId: "0", referencedClassOid: "1", referencedOid: "10", referencedSubId: "1", kind: "automatic" }, { dependentClassOid: "3", dependentOid: "17", dependentSubId: "0", referencedClassOid: "1", referencedOid: "10", referencedSubId: "1", kind: "automatic" }, { dependentClassOid: "3", dependentOid: "17", dependentSubId: "0", referencedClassOid: "1", referencedOid: "10", referencedSubId: "1", kind: "normal" }] 
 });
 
-test("B2.1 projects one B1-parsed ordinary table and closes its raw dependencies", () => {
+test("projects one parsed ordinary table and closes its raw dependencies", () => {
   const scopes = [{ schema: "public", tablePrefix: "osnv_" }]; const parsed = parseOwnedStoreCatalogSnapshotV1(b2Snapshot(), catalogContext); expect(() => verifyOwnedStoreCatalogAllV1(parsed, { stores: [{ definition: b2Definition, expectedSchema: b2Expected }], requestedScopes: scopes })).not.toThrow();
   for (const mutate of [(input: ReturnType<typeof b2Snapshot>) => { input.relations[0]!.namespaceOid = "11999"; }, (input: ReturnType<typeof b2Snapshot>) => { input.columns[0]!.compressionCode = "p"; }, (input: ReturnType<typeof b2Snapshot>) => { input.indexes[1]!.predicate = "id > 0"; }, (input: ReturnType<typeof b2Snapshot>) => { input.constraints[1]!.noInherit = true; }, (input: ReturnType<typeof b2Snapshot>) => { input.dependencies.pop(); }]) { const input = b2Snapshot(); mutate(input); expect(() => verifyOwnedStoreCatalogAllV1(parseOwnedStoreCatalogSnapshotV1(input, catalogContext), { stores: [{ definition: b2Definition, expectedSchema: b2Expected }], requestedScopes: scopes })).toThrow("ORM_OWNED_STORE_DRIFT"); }
 });
@@ -660,21 +660,21 @@ const preCreateError = (work: () => unknown, code: "ORM_OWNED_STORE_DRIFT" | "OR
   try { work(); throw new Error("expected admission error"); } catch (error) { expect(error).toBeInstanceOf(OrmOwnedStoreAdmissionError); expect((error as OrmOwnedStoreAdmissionError).code).toBe(code); expect((error as Error).message).toBe(code); }
 };
 
-test("B2 pre-create accepts fixed present Registry when public schema exists", () => {
+test("pre-create accepts fixed present Registry when public schema exists", () => {
   expect(inspectB2PreCreate(b2FixedRegistry())).toEqual({ kind: "ready", emptyMissingIdentityStoreKeys: [] });
 });
 
-test("B2 pre-create rejects present Registry without public schema as exact drift", () => {
+test("pre-create rejects present Registry without public schema as exact drift", () => {
   preCreateError(() => inspectB2PreCreate(b2FixedRegistry(false)), "ORM_OWNED_STORE_DRIFT");
 });
 
-test("B2 pre-create preserves actual inbound ownership conflict before Registry flag drift", () => {
+test("pre-create preserves actual inbound ownership conflict before Registry flag drift", () => {
   const input = b2Snapshot();
   input.constraints.push({ ...input.constraints[0]!, oid: "90", relationOid: "91", referencedRelationOid: "10", name: "inbound", kind: "foreignKey", columns: ["id"], referencedColumns: ["id"], backingIndexOid: "12" });
   preCreateError(() => inspectB2PreCreate(b2FixedRegistry(false), input), "ORM_OWNED_STORE_OWNERSHIP_CONFLICT");
 });
 
-test("B2 pre-create keeps absent Registry without public schema as B1 create failure", () => {
+test("pre-create keeps absent Registry without public schema as a create failure", () => {
   expect(() => parseOwnedStoreRegistrySnapshotV1(registryAbsent(false), [b2Definition], catalogContext)).toThrow("ORM_OWNED_STORE_CREATE_FAILED");
 });
 
@@ -693,7 +693,7 @@ const b2FixedRegistryWithToast = () => {
   ] } } } };
 };
 
-test("B2 durable fixed Registry closes shape, ordered facts, and dependency ledger", () => {
+test("durable fixed Registry closes shape, ordered facts, and dependency ledger", () => {
   expect(inspectB2PreCreate(b2FixedRegistry())).toEqual({ kind: "ready", emptyMissingIdentityStoreKeys: [] });
   const mutations: readonly [(registry: ReturnType<typeof b2FixedRegistry>) => void, string][] = [
     [(registry) => { registry.state.shape.columns[0]!.attnum = "2"; }, "column attnum"],
@@ -708,7 +708,7 @@ test("B2 durable fixed Registry closes shape, ordered facts, and dependency ledg
   for (const [mutate, label] of mutations) { const registry = b2FixedRegistry(); mutate(registry); preCreateError(() => inspectB2PreCreate(registry), "ORM_OWNED_STORE_DRIFT"); expect(label).toBeTruthy(); }
 });
 
-test("B2 durable fixed Registry TOAST accepts closure and rejects isolated facts", () => {
+test("durable fixed Registry TOAST accepts closure and rejects isolated facts", () => {
   expect(inspectB2PreCreate(b2FixedRegistryWithToast())).toEqual({ kind: "ready", emptyMissingIdentityStoreKeys: [] });
   const mutations: readonly [(registry: ReturnType<typeof b2FixedRegistryWithToast>) => void, string][] = [
     [(registry) => { registry.state.shape.toast!.ownerTableOid = "999"; }, "owner"],
@@ -719,7 +719,7 @@ test("B2 durable fixed Registry TOAST accepts closure and rejects isolated facts
   for (const [mutate, label] of mutations) { const registry = b2FixedRegistryWithToast(); mutate(registry); preCreateError(() => inspectB2PreCreate(registry), "ORM_OWNED_STORE_DRIFT"); expect(label).toBeTruthy(); }
 });
 
-test("B2 durable pre-create classifies every captured root kind without an identity", () => {
+test("durable pre-create classifies every captured root kind without an identity", () => {
   for (const kind of ["ordinaryTable", "partitionedTable", "foreignTable", "view", "materializedView", "sequence", "index", "partitionedIndex", "toastTable", "other"] as const) {
     const input = b2Snapshot(); input.relations[0]!.kind = kind; input.relations[0]!.rawKind = kind === "ordinaryTable" ? "r" : "x";
     const registry = b2FixedRegistry(); registry.state.rows = [];
@@ -727,7 +727,7 @@ test("B2 durable pre-create classifies every captured root kind without an ident
   }
 });
 
-test("B2 durable Registry keeps its local names separate from Main and rejects pg_type collisions", () => {
+test("durable Registry keeps its local names separate from Main and rejects pg_type collisions", () => {
   const main = b2Snapshot(), registry = b2FixedRegistry();
   expect(main.relations[0]!.name).toBe("osnv_items");
   expect(registry.state.shape.relation.name).toBe("__osnv_orm_owned_stores_v1");
@@ -747,7 +747,7 @@ const b2SevenNormalizedTypes = () => {
   return { input, expected };
 };
 
-test("B2 durable complete normalized seven-type model rejects aliases on a fresh reread", () => {
+test("durable complete normalized seven-type model rejects aliases on a fresh reread", () => {
   const fixture = b2SevenNormalizedTypes();
   expect(() => verifyB21(fixture.input, fixture.expected)).not.toThrow();
   const fresh = b2SevenNormalizedTypes(); fresh.input.columns[2]!.physicalType = "character varying";
@@ -764,7 +764,7 @@ const b2SevenDefaults = () => {
   return { input: fixture.input, expected };
 };
 
-test("B2 durable seven-type defaults bind every attrdef owner and reject fresh wrong owners", () => {
+test("durable seven-type defaults bind every attrdef owner and reject fresh wrong owners", () => {
   const fixture = b2SevenDefaults();
   expect(() => verifyB21(fixture.input, fixture.expected)).not.toThrow();
   for (let index = 1; index < 7; index++) {
@@ -791,7 +791,7 @@ const mixedDottedPreCreate = () => {
   return { fixture, registry };
 };
 
-test("B2 durable mixed existing A plus rootless B keeps the full context union", () => {
+test("durable mixed existing A plus rootless B keeps the full context union", () => {
   const { fixture, registry } = mixedDottedPreCreate();
   const snapshot = parseOwnedStoreCatalogSnapshotV1(fixture.input, catalogContext);
   const parsedRegistry = parseOwnedStoreRegistrySnapshotV1(registry, fixture.context.stores.map((store) => store.definition), catalogContext);
@@ -801,7 +801,7 @@ test("B2 durable mixed existing A plus rootless B keeps the full context union",
   if (outcome.kind === "ready") expect(Object.isFrozen(outcome.emptyMissingIdentityStoreKeys)).toBe(true);
 });
 
-test("B2 durable fresh post-create rejects rootless or partial B before complete A plus B passes", () => {
+test("durable fresh post-create rejects rootless or partial B before complete A plus B passes", () => {
   const rootless = mixedDottedPreCreate().fixture;
   expect(() => verifyOwnedStoreCatalogAllV1(parseOwnedStoreCatalogSnapshotV1(rootless.input, catalogContext), rootless.context)).toThrow("ORM_OWNED_STORE_DRIFT");
   const partial = b2DottedTwoStores();
@@ -811,7 +811,7 @@ test("B2 durable fresh post-create rejects rootless or partial B before complete
   expect(() => verifyOwnedStoreCatalogAllV1(parseOwnedStoreCatalogSnapshotV1(complete.input, catalogContext), complete.context)).not.toThrow();
 });
 
-test("B2 durable actual captured B inbound wins before Registry and model drift", () => {
+test("durable actual captured B inbound wins before Registry and model drift", () => {
   const fixture = b2DottedTwoStores(), registry = b2FixedRegistry();
   const first = fixture.context.stores[0]!.definition;
   registry.state.rows = [{ ...rowFor(first.storeKey, first.ownedScope.tablePrefix), ownedSchema: first.ownedScope.schema, ownedScopeHash: canonicalOwnedStoreScopeHashV1(first) }];
@@ -821,7 +821,7 @@ test("B2 durable actual captured B inbound wins before Registry and model drift"
   preCreateError(() => inspectOwnedStoreCatalogPreCreateV1(snapshot, parsedRegistry, fixture.context), "ORM_OWNED_STORE_OWNERSHIP_CONFLICT");
 });
 
-test("B2 durable rootless unknown target remains drift, not invented B ownership", () => {
+test("durable rootless unknown target remains drift, not invented B ownership", () => {
   const { fixture, registry } = mixedDottedPreCreate();
   fixture.input.constraints.push({ ...fixture.input.constraints[0]!, oid: "590", relationOid: "591", referencedRelationOid: "110", name: "unknown_b", kind: "foreignKey", columns: ["id"], referencedColumns: ["id"], backingIndexOid: "12" });
   const snapshot = parseOwnedStoreCatalogSnapshotV1(fixture.input, catalogContext);
@@ -829,7 +829,7 @@ test("B2 durable rootless unknown target remains drift, not invented B ownership
   preCreateError(() => inspectOwnedStoreCatalogPreCreateV1(snapshot, parsedRegistry, fixture.context), "ORM_OWNED_STORE_DRIFT");
 });
 
-test("B2 durable ready and occupied results are frozen independent values", () => {
+test("durable ready and occupied results are frozen independent values", () => {
   const readyInput = b2Snapshot(), ready = inspectB2PreCreate(b2FixedRegistry(), readyInput);
   expect(Object.isFrozen(ready)).toBe(true);
   if (ready.kind === "ready") { expect(Object.isFrozen(ready.emptyMissingIdentityStoreKeys)).toBe(true); readyInput.relations[0]!.name = "changed"; expect(ready.emptyMissingIdentityStoreKeys).toEqual([]); }
@@ -839,7 +839,7 @@ test("B2 durable ready and occupied results are frozen independent values", () =
   if (occupied.kind === "occupiedMissingIdentity") { expect(Object.isFrozen(occupied.storeKeys)).toBe(true); occupiedInput.relations[0]!.name = "changed"; expect(occupied.storeKeys).toEqual(["b2"]); }
 });
 
-test("B2 durable rootless-ready classification cannot hide unrelated class or dependency residue", () => {
+test("durable rootless-ready classification cannot hide unrelated class or dependency residue", () => {
   const cases: readonly [(fixture: ReturnType<typeof mixedDottedPreCreate>["fixture"]) => void, string][] = [
     [(fixture) => { fixture.input.catalogClasses.push({ oid: "590", schema: "other", name: "unrelated_class", kind: "other" }); }, "class"],
     [(fixture) => { fixture.input.dependencies.push({ dependentClassOid: "1", dependentOid: "590", dependentSubId: "0", referencedClassOid: "1", referencedOid: "591", referencedSubId: "0", kind: "normal" }); }, "dependency"],
@@ -852,22 +852,22 @@ test("B2 durable rootless-ready classification cannot hide unrelated class or de
     expect(label).toBeTruthy();
   }
 });
-test("TEST211 binds PK backing index name and ordered physical keys", () => { const input=b2Snapshot(); input.indexes[0]!.name="other"; input.relations[1]!.name="other"; drift(()=>verifyB21(input)); });
-test("TEST212 rejects duplicate raw row and array owners before semantic maps", () => { const rows=b2Snapshot(); rows.rowTypes.unshift({ ...rows.rowTypes[0]!, oid:"18" }); drift(()=>verifyB21(rows)); const arrays=b2Snapshot(); arrays.arrayTypes.unshift({ ...arrays.arrayTypes[0]!, oid:"19" }); drift(()=>verifyB21(arrays)); });
-test("TEST213 binds CHECK raw refs and forbids FK-only referenced columns", () => { const input=b2Snapshot(); input.constraints[1]!.columns=[]; drift(()=>verifyB21(input)); const foreign=b2Snapshot(); foreign.constraints[1]!.referencedColumns=["id"]; drift(()=>verifyB21(foreign)); });
-test("TEST214 accepts captured default collation and rejects its isolated drift", () => { const input=b2Snapshot(); const textDefault:CanonicalDefault={kind:"string",value:"one"}; const textCheck:CheckAst={kind:"compare",op:">=",left:"id",right:"a"}; input.columns[0]!.physicalType="text"; input.columns[0]!.typeOid="25"; input.columns[0]!.default=textDefault; input.columns[0]!.storageCode="x"; input.columns[0]!.typeDefaultStorageCode="x"; input.columns[0]!.collationOid="100"; input.columns[0]!.typeDefaultCollationOid="100"; input.constraints[1]!.checkExpression=textCheck; input.indexes.forEach(i=>i.collationOids=["100"]); const expected: OrmExpectedSchema={tables:[{...b2Expected.tables[0]!,columns:[{...b2Expected.tables[0]!.columns[0]!,physicalType:"text",default:textDefault}],checks:[{name:"ck_items_id",expression:textCheck}]}]}; expect(()=>verifyB21(input,expected)).not.toThrow(); input.indexes[1]!.collationOids=["0"]; drift(()=>verifyB21(input,expected)); });
-test("TEST215 fails closed for dangling TOAST and identity without sequence", () => { const toast=b2Snapshot(); toast.relations[0]!.toastRelationOid="99"; drift(()=>verifyB21(toast)); const identity=b2Snapshot(); identity.columns[0]!.generation="identityByDefault"; identity.columns[0]!.identityCode="d"; const expected: OrmExpectedSchema={tables:[{...b2Expected.tables[0]!,columns:[{...b2Expected.tables[0]!.columns[0]!,generation:"identityByDefault"}]}]}; drift(()=>verifyB21(identity,expected)); });
-test("TEST216 scopes OID 2200 namespace handling without scalar blanket rejection", () => { const input=b2Snapshot(); input.columns[0]!.typeOid="2200"; expect(()=>verifyB21(input)).not.toThrow(); });
-test("TEST217 requires numeric default attrdef AUTO and rejects wrong default owner", () => { expect(()=>verifyB21(b2Snapshot())).not.toThrow(); const input=b2Snapshot(); input.dependencies[3]!.referencedOid="99"; drift(()=>verifyB21(input)); });
-test("B2 rejects duplicate symbolic catalog classes before map collapse", () => { const input=b2Snapshot(); input.catalogClasses.unshift({ ...input.catalogClasses[0]!, oid:"99" }); drift(()=>verifyB21(input)); });
-test("B2 rejects unused unsupported catalog class facts", () => { const input=b2Snapshot(); input.catalogClasses.push({ oid:"99", schema:"other", name:"other", kind:"other" }); drift(()=>verifyB21(input)); });
-test("B2 collection order is not physical column order", () => { const input=b2Snapshot(); input.columns=[...input.columns].reverse(); expect(()=>verifyB21(input)).not.toThrow(); });
-test("B2 physical attnum order remains bound to expected order", () => { const input=b2Snapshot(); input.columns[0]!.attnum="2"; drift(()=>verifyB21(input)); });
+test("binds PK backing index name and ordered physical keys", () => { const input=b2Snapshot(); input.indexes[0]!.name="other"; input.relations[1]!.name="other"; drift(()=>verifyB21(input)); });
+test("rejects duplicate raw row and array owners before semantic maps", () => { const rows=b2Snapshot(); rows.rowTypes.unshift({ ...rows.rowTypes[0]!, oid:"18" }); drift(()=>verifyB21(rows)); const arrays=b2Snapshot(); arrays.arrayTypes.unshift({ ...arrays.arrayTypes[0]!, oid:"19" }); drift(()=>verifyB21(arrays)); });
+test("binds CHECK raw refs and forbids FK-only referenced columns", () => { const input=b2Snapshot(); input.constraints[1]!.columns=[]; drift(()=>verifyB21(input)); const foreign=b2Snapshot(); foreign.constraints[1]!.referencedColumns=["id"]; drift(()=>verifyB21(foreign)); });
+test("accepts captured default collation and rejects its isolated drift", () => { const input=b2Snapshot(); const textDefault:CanonicalDefault={kind:"string",value:"one"}; const textCheck:CheckAst={kind:"compare",op:">=",left:"id",right:"a"}; input.columns[0]!.physicalType="text"; input.columns[0]!.typeOid="25"; input.columns[0]!.default=textDefault; input.columns[0]!.storageCode="x"; input.columns[0]!.typeDefaultStorageCode="x"; input.columns[0]!.collationOid="100"; input.columns[0]!.typeDefaultCollationOid="100"; input.constraints[1]!.checkExpression=textCheck; input.indexes.forEach(i=>i.collationOids=["100"]); const expected: OrmExpectedSchema={tables:[{...b2Expected.tables[0]!,columns:[{...b2Expected.tables[0]!.columns[0]!,physicalType:"text",default:textDefault}],checks:[{name:"ck_items_id",expression:textCheck}]}]}; expect(()=>verifyB21(input,expected)).not.toThrow(); input.indexes[1]!.collationOids=["0"]; drift(()=>verifyB21(input,expected)); });
+test("fails closed for dangling TOAST and identity without sequence", () => { const toast=b2Snapshot(); toast.relations[0]!.toastRelationOid="99"; drift(()=>verifyB21(toast)); const identity=b2Snapshot(); identity.columns[0]!.generation="identityByDefault"; identity.columns[0]!.identityCode="d"; const expected: OrmExpectedSchema={tables:[{...b2Expected.tables[0]!,columns:[{...b2Expected.tables[0]!.columns[0]!,generation:"identityByDefault"}]}]}; drift(()=>verifyB21(identity,expected)); });
+test("scopes OID 2200 namespace handling without scalar blanket rejection", () => { const input=b2Snapshot(); input.columns[0]!.typeOid="2200"; expect(()=>verifyB21(input)).not.toThrow(); });
+test("requires numeric default attrdef AUTO and rejects wrong default owner", () => { expect(()=>verifyB21(b2Snapshot())).not.toThrow(); const input=b2Snapshot(); input.dependencies[3]!.referencedOid="99"; drift(()=>verifyB21(input)); });
+test("rejects duplicate symbolic catalog classes before map collapse", () => { const input=b2Snapshot(); input.catalogClasses.unshift({ ...input.catalogClasses[0]!, oid:"99" }); drift(()=>verifyB21(input)); });
+test("rejects unused unsupported catalog class facts", () => { const input=b2Snapshot(); input.catalogClasses.push({ oid:"99", schema:"other", name:"other", kind:"other" }); drift(()=>verifyB21(input)); });
+test("collection order is not physical column order", () => { const input=b2Snapshot(); input.columns=[...input.columns].reverse(); expect(()=>verifyB21(input)).not.toThrow(); });
+test("physical attnum order remains bound to expected order", () => { const input=b2Snapshot(); input.columns[0]!.attnum="2"; drift(()=>verifyB21(input)); });
 function b2TwoColumns() { const input=b2Snapshot(); input.columns.push({ ...input.columns[0]!, attnum:"2", name:"other", default:{kind:"none"}, defaultObjectOid:null }); input.dependencies.push({dependentClassOid:"3",dependentOid:"16",dependentSubId:"0",referencedClassOid:"1",referencedOid:"10",referencedSubId:"2",kind:"automatic"}); input.indexes[0]!.keyAttributeCount="2"; input.indexes[0]!.totalAttributeCount="2"; input.indexes[0]!.attributeNumbers=["1","2"]; input.indexes[0]!.columnNames=["id","other"]; input.indexes[0]!.collationOids=["0","0"]; input.indexes[0]!.opclassOids=["99","99"]; input.indexes[0]!.defaultOpclassOids=["99","99"]; input.indexes[0]!.options=["0","0"]; input.constraints[0]!.columns=["id","other"]; const expected=mutableB2Expected(), table=expected.tables[0]!; table.columns.push({property:"other",column:"other",physicalType:"integer",nullable:false,default:{kind:"none"},generation:"none"}); table.primaryKey={name:"pk_items",columns:["id","other"]}; return {input,expected}; }
-test("B2 two-column raw collection shuffle is not physical order",()=>{const {input,expected}=b2TwoColumns();input.columns.reverse();expect(()=>verifyB21(input,expected)).not.toThrow();});
-test("B2 coherent two-column attnum swap rejects",()=>{const {input,expected}=b2TwoColumns();expect(()=>verifyB21(input,expected)).not.toThrow();expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();input.columns[0]!.attnum="2";input.columns[1]!.attnum="1";for(const index of input.indexes){index.attributeNumbers=index.columnNames.map(name=>name==="id"?"2":"1");}for(const edge of input.dependencies)if(edge.referencedClassOid==="1"&&edge.referencedOid==="10"&&(edge.referencedSubId==="1"||edge.referencedSubId==="2"))edge.referencedSubId=edge.referencedSubId==="1"?"2":"1";expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();drift(()=>verifyB21(input,expected));});
-test("B2 PK ordered backing keys reject reversal",()=>{const {input,expected}=b2TwoColumns();input.indexes[0]!.attributeNumbers=["2","1"];input.indexes[0]!.columnNames=["other","id"];drift(()=>verifyB21(input,expected));});
-test("B2 pg_attrdef identity is unique across two defaulted column owners",()=>{const {input,expected}=b2TwoColumns();const secondDefault:CanonicalDefault={kind:"number",value:1};input.columns[1]!.default=secondDefault;input.columns[1]!.defaultObjectOid="18";expected.tables[0]!.columns[1]!.default=secondDefault;input.dependencies.push({dependentClassOid:"4",dependentOid:"18",dependentSubId:"0",referencedClassOid:"1",referencedOid:"10",referencedSubId:"2",kind:"automatic"});expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();expect(()=>verifyB21(input,expected)).not.toThrow();input.columns[1]!.defaultObjectOid="14";input.dependencies[input.dependencies.length-1]!.dependentOid="14";expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();drift(()=>verifyB21(input,expected));});
+test("two-column raw collection shuffle is not physical order",()=>{const {input,expected}=b2TwoColumns();input.columns.reverse();expect(()=>verifyB21(input,expected)).not.toThrow();});
+test("coherent two-column attnum swap rejects",()=>{const {input,expected}=b2TwoColumns();expect(()=>verifyB21(input,expected)).not.toThrow();expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();input.columns[0]!.attnum="2";input.columns[1]!.attnum="1";for(const index of input.indexes){index.attributeNumbers=index.columnNames.map(name=>name==="id"?"2":"1");}for(const edge of input.dependencies)if(edge.referencedClassOid==="1"&&edge.referencedOid==="10"&&(edge.referencedSubId==="1"||edge.referencedSubId==="2"))edge.referencedSubId=edge.referencedSubId==="1"?"2":"1";expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();drift(()=>verifyB21(input,expected));});
+test("PK ordered backing keys reject reversal",()=>{const {input,expected}=b2TwoColumns();input.indexes[0]!.attributeNumbers=["2","1"];input.indexes[0]!.columnNames=["other","id"];drift(()=>verifyB21(input,expected));});
+test("pg_attrdef identity is unique across two defaulted column owners",()=>{const {input,expected}=b2TwoColumns();const secondDefault:CanonicalDefault={kind:"number",value:1};input.columns[1]!.default=secondDefault;input.columns[1]!.defaultObjectOid="18";expected.tables[0]!.columns[1]!.default=secondDefault;input.dependencies.push({dependentClassOid:"4",dependentOid:"18",dependentSubId:"0",referencedClassOid:"1",referencedOid:"10",referencedSubId:"2",kind:"automatic"});expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();expect(()=>verifyB21(input,expected)).not.toThrow();input.columns[1]!.defaultObjectOid="14";input.dependencies[input.dependencies.length-1]!.dependentOid="14";expect(()=>parseOwnedStoreCatalogSnapshotV1(input,catalogContext)).not.toThrow();drift(()=>verifyB21(input,expected));});
 
 function b2DottedTwoStores() {
   const configure = (input: ReturnType<typeof b2Snapshot>, schema: string, table: string, namespaceOid: string, remap: ReadonlyMap<string, string>): void => {
@@ -911,7 +911,7 @@ function b2DottedTwoStores() {
   };
 }
 
-test("B2 keeps distinct dotted schema/table pairs in two-store global lookups", () => {
+test("keeps distinct dotted schema/table pairs in two-store global lookups", () => {
   const positive = b2DottedTwoStores();
   expect(() => verifyOwnedStoreCatalogAllV1(parseOwnedStoreCatalogSnapshotV1(positive.input, catalogContext), positive.context)).not.toThrow();
   const mismatch = b2DottedTwoStores();
@@ -920,7 +920,7 @@ test("B2 keeps distinct dotted schema/table pairs in two-store global lookups", 
   drift(() => verifyOwnedStoreCatalogAllV1(parseOwnedStoreCatalogSnapshotV1(mismatch.input, catalogContext), mismatch.context));
 });
 
-test("B2 keeps a global bijection between captured schemas and namespace OIDs", () => {
+test("keeps a global bijection between captured schemas and namespace OIDs", () => {
   const positive = b2DottedTwoStores();
   expect(() => verifyOwnedStoreCatalogAllV1(parseOwnedStoreCatalogSnapshotV1(positive.input, catalogContext), positive.context)).not.toThrow();
   const sameSchema = b2DottedTwoStores();
@@ -994,7 +994,7 @@ const foreignKeyDrift = (fixture: ReturnType<typeof b2SameStoreForeignKey>): voi
   drift(() => verifyB2ForeignKey(fixture));
 };
 
-test("B2 same-store FK has exact default vectors and four RI trigger roles", () => {
+test("same-store FK has exact default vectors and four RI trigger roles", () => {
   const fixture = b2SameStoreForeignKey();
   expect(() => parseOwnedStoreCatalogSnapshotV1(fixture.input, catalogContext)).not.toThrow();
   expect(() => verifyB2ForeignKey(fixture)).not.toThrow();
@@ -1007,7 +1007,7 @@ for (const vector of ["primaryForeignEqualityOperatorOids", "primaryPrimaryEqual
     foreignKeyDrift(fixture);
   });
 
-test("B2 FK rejects a nonpinned default operator", () => {
+test("FK rejects a nonpinned default operator", () => {
   const fixture = b2SameStoreForeignKey(), constraint = fixture.input.constraints.find((entry) => entry.oid === "118")!;
   constraint.primaryForeignEqualityOperatorOids = ["12000"];
   constraint.primaryPrimaryEqualityOperatorOids = ["12000"];
@@ -1034,13 +1034,13 @@ for (const mutate of [
   (fixture: ReturnType<typeof b2SameStoreForeignKey>) => { fixture.input.triggers[0]!.parentTriggerOid = "125"; },
   (fixture: ReturnType<typeof b2SameStoreForeignKey>) => { fixture.input.triggers[0]!.enabled = "always"; },
 ])
-  test("B2 FK rejects an RI trigger role or context mutation", () => {
+  test("FK rejects an RI trigger role or context mutation", () => {
     const fixture = b2SameStoreForeignKey();
     mutate(fixture);
     foreignKeyDrift(fixture);
   });
 
-test("B2 FK requires trigger INTERNAL and rejects a presented pinned PROC edge", () => {
+test("FK requires trigger INTERNAL and rejects a presented pinned PROC edge", () => {
   const missing = b2SameStoreForeignKey();
   missing.input.dependencies = missing.input.dependencies.filter((dependency) => !(dependency.dependentClassOid === "7" && dependency.dependentOid === "121"));
   foreignKeyDrift(missing);
@@ -1074,7 +1074,7 @@ const identityDrift = (fixture: ReturnType<typeof b2Identity>): void => {
   drift(() => verifyB2Identity(fixture));
 };
 
-test("B2 identity binds an actual sequence name, bigint tuple, and owner", () => {
+test("identity binds an actual sequence name, bigint tuple, and owner", () => {
   const fixture = b2Identity();
   expect(() => parseOwnedStoreCatalogSnapshotV1(fixture.input, catalogContext)).not.toThrow();
   expect(() => verifyB2Identity(fixture)).not.toThrow();
@@ -1105,13 +1105,13 @@ for (const mutate of [
   (fixture: ReturnType<typeof b2Identity>) => { fixture.input.dependencies.at(-1)!.referencedSubId = "2"; },
   (fixture: ReturnType<typeof b2Identity>) => { fixture.input.dependencies.at(-1)!.kind = "automatic"; },
 ])
-  test("B2 identity rejects owner class, table, attnum, or kind mutation", () => {
+  test("identity rejects owner class, table, attnum, or kind mutation", () => {
     const fixture = b2Identity();
     mutate(fixture);
     identityDrift(fixture);
   });
 
-test("B2 identity rejects missing or second sequence ownership", () => {
+test("identity rejects missing or second sequence ownership", () => {
   const missing = b2Identity();
   missing.input.dependencies = missing.input.dependencies.filter((dependency) => !(dependency.dependentClassOid === "1" && dependency.dependentOid === "18" && dependency.referencedClassOid === "1" && dependency.referencedOid === "10"));
   identityDrift(missing);
@@ -1120,7 +1120,7 @@ test("B2 identity rejects missing or second sequence ownership", () => {
   identityDrift(second);
 });
 
-test("B2 identity rejects nonidentity owners and unsupported physical markers", () => {
+test("identity rejects nonidentity owners and unsupported physical markers", () => {
   const nonidentity = b2Identity();
   nonidentity.input.columns[0]!.generation = "none";
   nonidentity.input.columns[0]!.identityCode = "";
@@ -1133,7 +1133,7 @@ test("B2 identity rejects nonidentity owners and unsupported physical markers", 
   }
 });
 
-test("B2 identity applies namespace expected-zero and expected-one rules", () => {
+test("identity applies namespace expected-zero and expected-one rules", () => {
   for (const namespaceOid of ["11999", "2200", "12000"]) {
     const fixture = b2Identity(namespaceOid);
     expect(() => parseOwnedStoreCatalogSnapshotV1(fixture.input, catalogContext)).not.toThrow();
@@ -1141,7 +1141,7 @@ test("B2 identity applies namespace expected-zero and expected-one rules", () =>
   }
 });
 
-test("B2 identity rejects sequence relation, row, and TOAST facts", () => {
+test("identity rejects sequence relation, row, and TOAST facts", () => {
   const relation = b2Identity();
   relation.input.relations.find((entry) => entry.oid === "18")!.rawKind = "r";
   identityDrift(relation);
@@ -1175,7 +1175,7 @@ const toastDrift = (fixture: ReturnType<typeof b2Toast>): void => {
   drift(() => verifyB2Toast(fixture));
 };
 
-test("B2 TOAST accepts special closure at both namespaces and arbitrary raw order", () => {
+test("TOAST accepts special closure at both namespaces and arbitrary raw order", () => {
   for (const namespaceOid of ["11999", "12000"]) {
     const fixture = b2Toast(namespaceOid);
     expect(() => parseOwnedStoreCatalogSnapshotV1(fixture.input, catalogContext)).not.toThrow();
@@ -1197,7 +1197,7 @@ for (const mutate of [
   (fixture: ReturnType<typeof b2Toast>) => { fixture.input.dependencies.at(-3)!.referencedOid = "99"; },
   (fixture: ReturnType<typeof b2Toast>) => { fixture.input.rowTypes.push({ ...fixture.input.rowTypes[0]!, oid: "32", relationOid: "30", schema: "pg_toast", name: "actual_toast_relation", arrayTypeOid: "33" }); },
 ])
-  test("B2 TOAST rejects relation, nested, or owner drift", () => {
+  test("TOAST rejects relation, nested, or owner drift", () => {
     const fixture = b2Toast();
     mutate(fixture);
     toastDrift(fixture);
@@ -1218,7 +1218,7 @@ for (const mutate of [
   (fixture: ReturnType<typeof b2Toast>) => { fixture.input.columns.find((column) => column.relationOid === "30")!.storageCode = "x"; },
   (fixture: ReturnType<typeof b2Toast>) => { fixture.input.columns.find((column) => column.relationOid === "30")!.compressionCode = "p"; },
 ])
-  test("B2 TOAST rejects fixed column fact drift", () => {
+  test("TOAST rejects fixed column fact drift", () => {
     const fixture = b2Toast();
     mutate(fixture);
     toastDrift(fixture);
@@ -1243,13 +1243,13 @@ for (const mutate of [
   (fixture: ReturnType<typeof b2Toast>) => { fixture.input.indexes.find((index) => index.indexRelationOid === "31")!.replicaIdentity = true; },
   (fixture: ReturnType<typeof b2Toast>) => { fixture.input.indexes.find((index) => index.indexRelationOid === "31")!.nullsNotDistinct = true; },
 ])
-  test("B2 TOAST rejects exact index or physical relation drift", () => {
+  test("TOAST rejects exact index or physical relation drift", () => {
     const fixture = b2Toast();
     mutate(fixture);
     toastDrift(fixture);
   });
 
-test("B2 TOAST requires three edges and rejects namespace or symbolic extras", () => {
+test("TOAST requires three edges and rejects namespace or symbolic extras", () => {
   for (const index of [-3, -2, -1]) {
     const missing = b2Toast();
     missing.input.dependencies.splice(index, 1);
@@ -1273,7 +1273,7 @@ for (const attach of [
   (fixture: ReturnType<typeof b2Toast>) => fixture.input.triggers.push({ ...trigger(), oid: "35", relationOid: "30", enabled: "origin" }),
   (fixture: ReturnType<typeof b2Toast>) => fixture.input.inheritance.push({ childRelationOid: "30", parentRelationOid: "10", sequence: "1" }),
 ])
-  test("B2 TOAST rejects forbidden attached facts", () => {
+  test("TOAST rejects forbidden attached facts", () => {
     const fixture = b2Toast();
     attach(fixture);
     toastDrift(fixture);
@@ -1305,7 +1305,7 @@ const addOpaqueInboundForeignKey = (input: ReturnType<typeof b2Snapshot>): void 
   });
 };
 
-test("TEST218 inbound ownership conflicts precede independent B2 drift families", () => {
+test("inbound ownership conflicts precede independent verifier drift families", () => {
   const cases: readonly [
     string,
     (input: ReturnType<typeof b2Snapshot>) => OrmExpectedSchema | undefined,
@@ -1355,7 +1355,7 @@ test("TEST218 inbound ownership conflicts precede independent B2 drift families"
   }
 });
 
-test("B2 raw pg_class names reject table, sequence, index, and catalogue collisions", () => {
+test("raw pg_class names reject table, sequence, index, and catalogue collisions", () => {
   const tableSequence = b2Identity();
   tableSequence.input.relations.find((relation) => relation.oid === "18")!.name = "osnv_items";
   expect(() => parseOwnedStoreCatalogSnapshotV1(tableSequence.input, catalogContext)).not.toThrow();
@@ -1373,7 +1373,7 @@ test("B2 raw pg_class names reject table, sequence, index, and catalogue collisi
   drift(() => verifyB21(catalogueRelation));
 });
 
-test("B2 raw pg_type names reject array and row collisions", () => {
+test("raw pg_type names reject array and row collisions", () => {
   const arrays = b2Snapshot();
   arrays.arrayTypes.push({ ...arrays.arrayTypes[0]!, oid: "19" });
   expect(() => parseOwnedStoreCatalogSnapshotV1(arrays, catalogContext)).not.toThrow();
@@ -1385,7 +1385,7 @@ test("B2 raw pg_type names reject array and row collisions", () => {
   drift(() => verifyB21(rowArray));
 });
 
-test("B2 raw object names allow cross-catalogue and cross-schema identity reuse", () => {
+test("raw object names allow cross-catalogue and cross-schema identity reuse", () => {
   const crossCatalogue = b2Snapshot();
   expect(crossCatalogue.relations[0]!.name).toBe(crossCatalogue.rowTypes[0]!.name);
   expect(() => verifyB21(crossCatalogue)).not.toThrow();
@@ -1399,7 +1399,7 @@ test("B2 raw object names allow cross-catalogue and cross-schema identity reuse"
   expect(() => verifyB2ForeignKey(duplicateCheckNames)).not.toThrow();
 });
 
-test("B2 inbound ownership conflict precedes raw object-name drift", () => {
+test("inbound ownership conflict precedes raw object-name drift", () => {
   const input = b2Snapshot();
   input.relations[1]!.name = "osnv_items";
   addOpaqueInboundForeignKey(input);
