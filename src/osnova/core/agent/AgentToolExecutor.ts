@@ -1933,7 +1933,7 @@ export class AgentToolExecutor {
 
     let recorded: void | Promise<void>;
     try {
-      // Invoke the legacy sink synchronously. A void return means the audit is
+      // Invoke the sink synchronously. A void return means the audit is
       // already recorded, including when the caller has just aborted.
       recorded = auditSinkFunction(audit.sink)(entry);
     } catch (error) {

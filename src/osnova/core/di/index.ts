@@ -64,7 +64,6 @@ export {
 } from "./module";
 export {
   CLASS_PROVIDER_HOOK,
-  registerClassProviderHook,
   type ClassProviderHook,
   type ClassProviderRegistration,
 } from "./module/classProviderHooks";

@@ -303,8 +303,9 @@ interface ServiceResolver {
 
 ### 3.11 Расширяемость через хуки
 
-- `registerClassProviderHook(hook)` — инфраструктура (кэш и т.п.) может перехватить
-  регистрацию class-провайдера (`ClassProviderHook`, `ClassProviderRegistration`).
+- `singletonValue(CLASS_PROVIDER_HOOK, hook)` — инфраструктура (кэш и т.п.) может
+  перехватить регистрацию class-провайдера в своём контейнере (`ClassProviderHook`,
+  `ClassProviderRegistration`). Процессный `registerClassProviderHook` удалён в 0.96.1.
 - `registerNamedDependencyEncapsulationHook(hook)` — кастомные правила видимости для
   named-зависимостей (open generics ORM и т.п.).
 
@@ -882,7 +883,7 @@ DI.singleton(DI.classProvider(Audit, Audit, [DI.keyed(LOGGER, "console")]));
 
 | Сигнатура | Описание |
 |---|---|
-| `registerClassProviderHook(hook: ClassProviderHook): void` | Перехват регистрации class-провайдера. |
+| `singletonValue(CLASS_PROVIDER_HOOK, hook)` | Перехват регистрации class-провайдера в контейнере. |
 | `registerNamedDependencyEncapsulationHook(hook): void` | Кастомные правила видимости named-зависимостей. |
 
 ### 8.11 Ошибки
@@ -1002,6 +1003,6 @@ await container.dispose();
   только ручной.
 - **Type-based авто-подбор аргументов в `createInstance`** — список DI-зависимостей задаётся явно.
 - **Декорирование/перехват уже зарезолвленных сервисов** (`Decorate`-стиль) — нет
-  (есть только `registerClassProviderHook` на этапе регистрации).
+  (есть только `CLASS_PROVIDER_HOOK` на этапе сборки контейнера).
 - **Фабричные шорткаты для scoped/transient** — есть только `singletonFactory*`.
 ```

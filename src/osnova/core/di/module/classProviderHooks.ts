@@ -28,16 +28,9 @@ export function collectClassProviderHooks(definitions: readonly ProviderDefiniti
   return [...hooks];
 }
 
-const classProviderHooks: ClassProviderHook[] = [];
-
-/** Legacy explicitly process-wide extension. Prefer CLASS_PROVIDER_HOOK for independent containers. */
-export function registerClassProviderHook(hook: ClassProviderHook): void {
-  classProviderHooks.push(hook);
-}
-
 export function applyClassProviderHooks(
   request: ClassProviderRegistration,
-  hooks: readonly ClassProviderHook[] = classProviderHooks,
+  hooks: readonly ClassProviderHook[],
 ): ProviderDefinition | undefined {
   for (let index = 0; index < hooks.length; index += 1) {
     const result = hooks[index]!(request);
@@ -51,7 +44,7 @@ export function applyClassProviderHooks(
 /** Applies hooks when a definition enters a collection, not only when shortcut syntax created it. */
 export function applyClassProviderHooksToDefinition(
   definition: ProviderDefinition,
-  hooks: readonly ClassProviderHook[] = classProviderHooks,
+  hooks: readonly ClassProviderHook[],
 ): ProviderDefinition {
   if (!isClassProvider(definition.provider) || definition.provider.activation !== undefined) {
     return definition;
