@@ -51,8 +51,8 @@ export interface OrmModuleConfig<TContext extends DbContext> {
   /** Создавать схему на старте (`CREATE TABLE IF NOT EXISTS`). По умолчанию false. */
   readonly ensureCreated?: boolean;
   /**
-   * Запускать аддитивную авто-миграцию на старте для сущностей с
-   * `@Entity({ migrate: true })`. По умолчанию false.
+   * Запускать аддитивную авто-миграцию на старте для всех сущностей контекста.
+   * Режим создания схемы задаёт только модуль. По умолчанию false.
    */
   readonly migrateOnStart?: boolean;
   /** Версионированные миграции (compile-safe массив). История в `__OsnovaMigrations`. */

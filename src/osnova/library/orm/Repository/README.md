@@ -310,7 +310,7 @@ IRepository.of(User) // эквивалент repositoryFor(User), но без у
 import { Column, DbContext, Entity, Key, ormModule } from "@osnova/core/orm";
 import { postgres } from "@osnova/library/orm";
 
-@Entity({ migrate: true })
+@Entity()
 class User {
   @Key() id = 0;
   @Column({ type: "text" }) name = "";
@@ -565,7 +565,7 @@ HTTP-запрос
 
 | Файл | Роль |
 | --- | --- |
-| `src/modules/users/User.ts` | ORM-сущность `@Entity({ migrate: true })` |
+| `src/modules/users/User.ts` | ORM-сущность `@Entity()` |
 | `src/modules/users/UsersDbContext.ts` | `DbContext` с `users = this.set(User)` |
 | `src/modules/users/UserService.ts` | Бизнес-логика через `IRepository<User>` |
 | `src/modules/users/IUserStore.ts` | Контракт для контроллера (не привязан к ORM) |

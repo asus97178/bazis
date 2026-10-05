@@ -77,9 +77,10 @@ AgentRuntime and the reasoning modelProfile. The CLI does not create them.
 No manual deps arrays. UI, events and own configuration are not used.
 
 ORM: context ${m}DbContext, entities [${e}], shared host provider.
-Table ${n.route}${profile === "full" ? `, schema ${n.dbSchema}` : ""}; the entity takes part in migrations.
-No startup flags create or update the schema. The host makes sure the schema
-exists before requests. The CLI and codegen do not create the database.
+Table ${n.route}${profile === "full" ? `, schema ${n.dbSchema}` : ""}.
+Only the module decides how tables are created: \`ensureCreated: true\` or
+\`migrateOnStart: true\` in \`ormOsnova\`. The scaffold sets neither, so the host
+must provide the schema before requests. The CLI and codegen do not create the database.
 
 | Model / response field | Type | null | Initial value / owner |
 | --- | --- | --- | --- |

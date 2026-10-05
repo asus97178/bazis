@@ -33,7 +33,7 @@ import {
 const PG_SECRET = "pg-live-test-secret";
 const PG_TENANT = "live";
 
-@Entity({ migrate: true, table: "pg_it_categories" })
+@Entity({ table: "pg_it_categories" })
 class Category {
   @Key()
   id = 0;
@@ -48,7 +48,7 @@ class Category {
   products: Product[] = [];
 }
 
-@Entity({ migrate: true, table: "pg_it_products" })
+@Entity({ table: "pg_it_products" })
 class Product {
   @Key()
   id = 0;
@@ -82,7 +82,7 @@ class ShopContext extends DbContext {
   readonly categories = this.set(Category);
 }
 
-@Entity({ migrate: true, table: "pg_it_docs" })
+@Entity({ table: "pg_it_docs" })
 @QueryFilter<PgDoc>((d) => d.tenantId.eq(PG_TENANT))
 class PgDoc {
   @Key()
@@ -99,7 +99,7 @@ class PgDoc {
   secret = "";
 }
 
-@Entity({ migrate: true, table: "pg_it_soft_docs" })
+@Entity({ table: "pg_it_soft_docs" })
 class PgSoftDoc {
   @Key()
   id = 0;

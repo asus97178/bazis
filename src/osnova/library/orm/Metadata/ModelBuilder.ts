@@ -133,7 +133,6 @@ export class ModelBuilder {
       name: ctor.name,
       tableName,
       schema: raw.schema,
-      autoMigrate: raw.migrate === true,
       properties,
       key: primaryKey,
       keyName: raw.keyDeclaration?.name,

@@ -162,7 +162,7 @@ function ormModelFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const schemaDecorator = profile === "full" ? `@Schema("${n.dbSchema}")\n` : "";
   return `import { Column, Entity, Index, UUID${schemaImport} } from "osnv/core/orm";
 
-${schemaDecorator}@Entity({ migrate: true, table: "${n.route}" })
+${schemaDecorator}@Entity({ table: "${n.route}" })
 export class ${n.entity} {
   @UUID()
   id = "";

@@ -1,6 +1,6 @@
 import { Column, Entity, Index, UUID } from "osnv/core/orm";
 
-@Entity({ migrate: true, table: "projects" })
+@Entity({ table: "projects" })
 export class Project {
   @UUID()
   id = "";

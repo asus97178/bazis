@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Column, Entity, Key, ModelBuilder, PostgresDialect, Schema } from "@/library/orm";
 
 @Schema("billing")
-@Entity({ migrate: true })
+@Entity()
 class InSchema {
   @Key()
   id = 0;
@@ -12,7 +12,7 @@ class InSchema {
 }
 
 @Schema()
-@Entity({ migrate: true })
+@Entity()
 class EmptySchema {
   @Key()
   id = 0;
@@ -21,7 +21,7 @@ class EmptySchema {
   name = "";
 }
 
-@Entity({ migrate: true })
+@Entity()
 class NoSchema {
   @Key()
   id = 0;

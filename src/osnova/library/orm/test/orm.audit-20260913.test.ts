@@ -284,9 +284,9 @@ for (const mutation of ["json", "date", "explicit", "key"] as const) {
 }
 
 @Schema('schema.with"quote')
-@Entity({ table: "uuid.parents", migrate: true })
+@Entity({ table: "uuid.parents" })
 class QualifiedUuidParent { @UUID() id = ""; }
-@Entity({ table: "uuid.children", migrate: true })
+@Entity({ table: "uuid.children" })
 class NavigationUuidChild {
   @Key({ generated: false }) id = 1;
   @Column({ type: "uuid" }) parentId: string | null = null;
@@ -550,10 +550,10 @@ test("A8: an uncertain external transaction does not suppress the owner's confir
   expect(await context.saveChanges()).toBe(1);
 });
 
-@Entity({ table: "audit_text_parent", migrate: true })
+@Entity({ table: "audit_text_parent" })
 class TextParent { @Key({ generated: false }) @Column({ type: "text" }) id = ""; }
 @Schema("must_not_be_created")
-@Entity({ table: "audit_conflicting_fk", migrate: true })
+@Entity({ table: "audit_conflicting_fk" })
 @ForeignKey(() => UuidParent, { properties: ["parentId"] })
 @ForeignKey(() => TextParent, { properties: ["parentId"] })
 class ConflictingForeignKeys {

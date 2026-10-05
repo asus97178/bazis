@@ -104,8 +104,6 @@ export interface EntityModel {
   readonly tableName: string;
   /** Схема БД PostgreSQL. */
   readonly schema?: string;
-  /** Включена ли авто-миграция схемы (`@Entity({ migrate: true })`). */
-  readonly autoMigrate: boolean;
   /** Все замапленные свойства в порядке объявления. */
   readonly properties: readonly PropertyModel[];
   /** The sole ordered primary-key authority. */

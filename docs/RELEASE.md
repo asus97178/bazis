@@ -230,6 +230,9 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 - ORM: нарушение уникального индекса в `saveChanges()` приходит как
   `UniqueViolationError` (`constraint`, `table`, `cause`) вместо сырой ошибки
   драйвера и HTTP 500.
+- ORM: создание и миграцию таблиц задаёт только модуль (`ensureCreated` или
+  `migrateOnStart` в `ormOsnova`). Флаг `@Entity({ migrate: true })` удалён:
+  `migrateOnStart` теперь мигрирует все сущности контекста модуля.
 - HTTP: поля тела запроса, объявленные как `string`/`number`/`boolean`,
   проверяются по типу JSON без `@Validator` (400, код `type`). gRPC и агенты
   не затронуты.
