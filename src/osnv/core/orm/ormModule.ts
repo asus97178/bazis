@@ -135,9 +135,9 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
 
   // Standalone: a context with its own provider value.
   if (config.provider) {
-    // Pre-D standalone construction eagerly captured only DbContextOptions.
-    // Lifecycle flags and migrations deliberately stayed resolve-time until an
-    // owned graph supplies a container-local effective snapshot.
+    // Only the static DbContextOptions are built eagerly here. Schema lifecycle
+    // flags and migrations are read at resolve time, because an owned-store graph
+    // may replace them with a container-local snapshot.
     const standaloneOptions = new DbContextOptions({
       provider: config.provider,
       entities: config.entities ?? [],

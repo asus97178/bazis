@@ -154,6 +154,12 @@ test("projection validates every primary-key and generation representation", asy
   await preflights(schema(table("osnv_td_compound", [column("tenant", "text"), column("id", "integer")], ["tenant", "id"])));
   await preflights(schema(table("osnv_td_identity", [column("id", "integer", false, defaultNone(), "identityByDefault")] )));
   await preflights(schema(table("osnv_td_uuid", [column("id", "uuid", false, { kind: "uuidV4" }, "uuidDefault")] )));
+  // A UUID v7 key is assigned by the ORM: a plain uuid column without a default.
+  await preflights(schema(table("osnv_td_uuid_v7", [column("id", "uuid")])));
+  await preflights(schema(
+    table("osnv_td_uuid_parent", [column("id", "uuid", false, { kind: "uuidV4" }, "uuidDefault")]),
+    table("osnv_td_uuid_child", [column("id", "uuid"), column("parentId", "uuid", true, { kind: "null" })], ["id"], { foreignKeys: [foreignKey(["parentId"], "osnv_td_uuid_parent", ["id"])] }),
+  ));
   const cases: readonly [string, OrmExpectedSchema][] = [
     ["missing", schema(table("osnv_td_keys", [column("id", "integer")], []))],
     ["duplicate", schema(table("osnv_td_keys", [column("id", "integer")], ["id", "id"]))],
@@ -163,6 +169,8 @@ test("projection validates every primary-key and generation representation", asy
     ["generated non-key", schema(table("osnv_td_keys", [column("id", "integer"), column("v", "integer", false, defaultNone(), "identityByDefault")]))],
     ["identity type", schema(table("osnv_td_keys", [column("id", "text", false, defaultNone(), "identityByDefault")]))],
     ["uuid type", schema(table("osnv_td_keys", [column("id", "text", false, { kind: "uuidV4" }, "uuidDefault")]))],
+    ["uuid default without generation", schema(table("osnv_td_keys", [column("id", "uuid", false, { kind: "uuidV4" })]))],
+    ["uuid string default", schema(table("osnv_td_keys", [column("id", "integer"), column("v", "uuid", false, { kind: "string", value: "x" })]))],
     ["non-generated default", schema(table("osnv_td_keys", [column("id", "integer", false, { kind: "number", value: 1 })]))],
     ["current timestamp", schema(table("osnv_td_keys", [column("id", "integer", false, { kind: "currentTimestamp" })]))],
   ];
@@ -357,7 +365,7 @@ test("admission snapshot enforces the exact per-model value-node budget without 
   // headroom for allocation/GC when the full suite runs on a busy machine.
 }, 15_000);
 
-/** B3 boundary controls use a local recording capability only; they do not model C SQL. */
+/** Boundary tests use a local recording capability; they do not model the PostgreSQL SQL. */
 function contextSession(maxIdentifierLength: unknown): RegistryLockedOwnedStoreSessionV1 {
   return Object.freeze({
     get maxIdentifierLength(): bigint { return maxIdentifierLength as bigint; },
@@ -398,7 +406,7 @@ test("B3 preserves an exact safe capability rejection before callback entry", as
   expect(callback).toBe(1);
 });
 
-/** Local B1 recording facts: raw parser inputs remain explicit and independent. */
+/** Recorded catalog rows for the parser tests; each fixture is an explicit, independent object. */
 function recordingColumn(): OwnedCatalogColumnV1 { return {
   relationOid: "10", attnum: "1", name: "id", dropped: false, local: true, inheritanceCount: "0", physicalType: "integer", typeOid: "23", notNull: true,
   default: { kind: "none" }, defaultObjectOid: null, generation: "none", identityCode: "", generatedCode: "", collationOid: "0", typeDefaultCollationOid: "0", storageCode: "p", typeDefaultStorageCode: "p", compressionCode: "",
