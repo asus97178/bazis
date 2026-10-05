@@ -1,66 +1,66 @@
 # Kernel Folder Map
 
-Application/Kernel-слой osnv: единый жизненный цикл приложения поверх DI.
-Лучшие практики: .NET Generic Host (two-phase builder, lifetime, shutdown timeout),
-Spring (фазы старта, события, profiles), Symfony (явный Kernel, конфиг-схема модуля),
-NestJS (granular lifecycle-хуки, global-модули) — всё без рефлексии и AOT-совместимо.
+The osnv Application/Kernel layer: one application lifecycle on top of DI.
+Borrowed practices: .NET Generic Host (two-phase builder, lifetime, shutdown timeout),
+Spring (startup phases, events, profiles), Symfony (explicit Kernel, module config schema),
+NestJS (granular lifecycle hooks, global modules), all without reflection and AOT-compatible.
 
-Контракты исправлений lifecycle и конфигурации: [частичный паспорт](MODULE.md).
+Contracts of the lifecycle and configuration fixes: [partial passport](MODULE.md).
 
-## Точка входа
+## Entry point
 
-- `Osnv.ts` — фасад: `Osnv.run(AppModule)` однострочник, `Osnv.createBuilder(...)` для тонкой настройки.
-- `KernelBuilder.ts` — мутабельная фаза конфигурирования; `build()` отдаёт иммутабельный `Kernel`.
-- `Kernel.ts` — ядро: `start()/stop()/run()` с общей операцией для повторных вызовов, сигналы, unhandled errors, exit codes, startup report. Startup deadline покрывает также started callbacks и события.
+- `Osnv.ts`: the facade: the `Osnv.run(AppModule)` one-liner and `Osnv.createBuilder(...)` for fine tuning.
+- `KernelBuilder.ts`: the mutable configuration phase; `build()` returns an immutable `Kernel`.
+- `Kernel.ts`: the kernel: `start()/stop()/run()` with one shared operation for repeated calls, signals, unhandled errors, exit codes, startup report. The startup deadline also covers started callbacks and events.
 
-## Жизненный цикл
+## Lifecycle
 
-- `LifecycleCoordinator.ts` — порядок boot/shutdown: options fail-fast → `onInit` → hosted services по фазам → `onBootstrap`; остановка в обратном порядке с `shutdownTimeout`; rollback при падении старта.
-- `ApplicationLifetime.ts` — инжектируемый lifetime: `onStarted/onStopping/onStopped` + программный `stop(exitCode)`.
-- `lifecycleHooks.ts` — токен `LIFECYCLE_HOOK` (enumerable) + `addLifecycleHook`.
-- `Environment.ts` — окружение (`development|production|test`) из `OSNV_ENV`/`NODE_ENV`, флаг `debug`.
-- `SupervisedHostedService.ts` — retry с экспоненциальным backoff; передаёт startup signal и прекращает повторы при отмене.
-- `logging/ConsoleLogger.ts` — стандартный structured logger; fields
-  редактируются через `osnv/library/redaction` по умолчанию. Сырые fields
-  разрешены только явным `redaction: false` для доверенной локальной
-  диагностики.
+- `LifecycleCoordinator.ts`: boot/shutdown order: options fail-fast → `onInit` → hosted services by phase → `onBootstrap`; shutdown in reverse order with `shutdownTimeout`; rollback when startup fails.
+- `ApplicationLifetime.ts`: injectable lifetime: `onStarted/onStopping/onStopped` + programmatic `stop(exitCode)`.
+- `lifecycleHooks.ts`: the `LIFECYCLE_HOOK` token (enumerable) + `addLifecycleHook`.
+- `Environment.ts`: the environment (`development|production|test`) from `OSNV_ENV`/`NODE_ENV`, the `debug` flag.
+- `SupervisedHostedService.ts`: retry with exponential backoff; passes the startup signal and stops retrying on cancellation.
+- `logging/ConsoleLogger.ts`: the standard structured logger; fields are
+  redacted through `osnv/library/redaction` by default. Raw fields are
+  allowed only with an explicit `redaction: false` for trusted local
+  diagnostics.
 
-## Конфигурация (`config/`)
+## Configuration (`config/`)
 
-- `Configuration.ts` — собственный снимок плоского конфига (`db.host` → строка), типизированные геттеры, `loadConfiguration`.
-- `defineConfig.ts` — неизменяемое объявление с overrides окружения, отдельным `resolve(environment?, configuration?)` и DI-токеном `token`. Одно объявление используется в нескольких kernel.
-- `ConfigRegistry.ts` — одно проверенное представление объявления на kernel; `get(definition)` возвращает тот же объект, что и DI по `definition.token`.
-- `sources.ts` — источники: `memorySource`, `envSource` (`OSNV_DB__HOST` → `db.host`), `argsSource` (`--db.host=x`), `jsonFileSource` (файл рядом с бинарником).
-- `addConfigOptions.ts` — `configOptions(token, { bind, validate })`: validated options модуля, читающие из `Configuration`; kernel валидирует все на старте одной ошибкой.
-- `Secret.ts` — секрет с redaction: `toString/toJSON/inspect` печатают `***`, значение только через `reveal()`.
+- `Configuration.ts`: an own snapshot of the flat config (`db.host` → string), typed getters, `loadConfiguration`.
+- `defineConfig.ts`: an immutable declaration with environment overrides, a separate `resolve(environment?, configuration?)` and the `token` DI token. One declaration is used in several kernels.
+- `ConfigRegistry.ts`: one validated view of a declaration per kernel; `get(definition)` returns the same object as DI by `definition.token`.
+- `sources.ts`: sources: `memorySource`, `envSource` (`OSNV_DB__HOST` → `db.host`), `argsSource` (`--db.host=x`), `jsonFileSource` (a file next to the binary).
+- `addConfigOptions.ts`: `configOptions(token, { bind, validate })`: validated module options read from `Configuration`; the kernel validates them all at startup with one error.
+- `Secret.ts`: a secret with redaction: `toString/toJSON/inspect` print `***`, the value is available only through `reveal()`.
 
-Реализована [архитектура конфигурации каждого kernel](../../../../docs/architecture/MODULE_ARCHITECTURE.md#kernel-config-isolation):
-объявление общее и неизменяемое, окружение и рассчитанные значения принадлежат
-отдельному kernel. Временный запрет повторного использования объявления снят.
-Прямые `get/has` объявления предназначены для standalone-кода; `ensureValid`
-больше не переключает их окружение. Контракты и проверки — в
-[паспорте](MODULE.md#config-isolation-decision) и [описании config](config/README.md).
+The [per-kernel configuration architecture](../../../../docs/architecture/MODULE_ARCHITECTURE.md#kernel-config-isolation)
+is implemented: the declaration is shared and immutable, while the environment and
+the computed values belong to each kernel. The temporary ban on reusing a declaration
+is lifted. A declaration's direct `get/has` are meant for standalone code; `ensureValid`
+no longer switches their environment. Contracts and checks are in the
+[passport](MODULE.md#config-isolation-decision) and the [config description](config/README.md).
 
-## События (`events/`)
+## Events (`events/`)
 
-- `EventToken.ts` — типизированные события без рефлексии (`createEventToken<T>`).
-- `EventBus.ts` — шина поверх DI (`resolveAllKeyed`); ошибки handler агрегируются. Опциональный `signal` прекращает ожидание и запуск оставшихся обработчиков, включая `isolate`-режим. Уже выполняющийся пользовательский код продолжает отвечать за свои эффекты.
-- `onEvent.ts` — подписка из модуля (`providers: [onEvent(EVT, handler)]`) или коллекции.
-- `kernelEvents.ts` — `APPLICATION_STARTED`, `APPLICATION_STOPPING`.
+- `EventToken.ts`: typed events without reflection (`createEventToken<T>`).
+- `EventBus.ts`: a bus on top of DI (`resolveAllKeyed`); handler errors are aggregated. An optional `signal` stops waiting and stops starting the remaining handlers, including the `isolate` mode. User code that is already running stays responsible for its effects.
+- `onEvent.ts`: subscription from a module (`providers: [onEvent(EVT, handler)]`) or a collection.
+- `kernelEvents.ts`: `APPLICATION_STARTED`, `APPLICATION_STOPPING`.
 
 ## Health (`health/`)
 
-- `HealthCheckContracts.ts` — `HEALTH_CHECK` токен (enumerable), типы отчёта.
-- `HealthService.ts` — агрегатор: упавший check помечается unhealthy, не валит отчёт; `kernel.health()`.
+- `HealthCheckContracts.ts`: the `HEALTH_CHECK` token (enumerable), report types.
+- `HealthService.ts`: the aggregator: a failed check is marked unhealthy without failing the report; `kernel.health()`.
 
-## Ошибки (`errors/`)
+## Errors (`errors/`)
 
-- `KernelError` (база), `StartupAbortedError`, `StartupTimeoutError`, `ShutdownTimeoutError`, `ConfigKeyMissingError`. При тайм-ауте очистки после неудачного старта `ShutdownTimeoutError.cause` сохраняет исходную ошибку.
+- `KernelError` (base), `StartupAbortedError`, `StartupTimeoutError`, `ShutdownTimeoutError`, `ConfigKeyMissingError`. When cleanup after a failed start times out, `ShutdownTimeoutError.cause` keeps the original error.
 
-## Принципы
+## Principles
 
-- Two-phase: после `build()` ничего нельзя дорегистрировать.
-- Kernel-инфраструктура (`Environment`, `Configuration`, `ApplicationLifetime`, `EventBus`, `HealthService`) — global-модуль: доступна любому модулю без импорта.
-- Никакой рефлексии и dynamic import; конфиг живёт снаружи бинарника.
-- Kernel работает только на старте/остановке — горячих путей в рантайме нет.
-- Внешний код импортирует kernel через `osnv/core/kernel`.
+- Two-phase: nothing can be registered after `build()`.
+- Kernel infrastructure (`Environment`, `Configuration`, `ApplicationLifetime`, `EventBus`, `HealthService`) is a global module: any module gets it without an import.
+- No reflection and no dynamic import; the config lives outside the binary.
+- The kernel works only at startup/shutdown; there are no runtime hot paths in it.
+- External code imports the kernel through `osnv/core/kernel`.

@@ -1,161 +1,161 @@
-# Шаблон паспорта модуля
+# Module passport template
 
-Для нового модуля сначала выполнить команду osnv CLI. Затем дополнить созданный
-генератором `<каталог модуля>/MODULE.md` разделами ниже до предметной реализации.
-Для существующего модуля этот шаблон используется при создании или обновлении
-паспорта перед изменением архитектуры/публичных входов.
-Основание: [MOD-ARCH-001](MODULE_ARCHITECTURE.md). Удалить подсказки и лишние
-примерные строки; не оставлять `<...>` в готовом паспорте.
+For a new module, first run the osnv CLI command. Then extend the generated
+`<module directory>/MODULE.md` with the sections below before the domain implementation.
+For an existing module, use this template when creating or updating the passport
+before changing the architecture/public inputs.
+Basis: [MOD-ARCH-001](MODULE_ARCHITECTURE.md). Remove the hints and extra sample
+rows; do not leave `<...>` in a finished passport.
 
-Если часть не нужна, написать «не используется» и короткую причину. Если часть
-ещё не реализована или не проверена, указать этот статус, а не заполнять её
-желаемыми фактами. Для существующего модуля, описываемого частично, явно назвать
-охваченные операции и оставшуюся область; частичный паспорт не считать полным.
+If a part is not needed, write "not used" and a short reason. If a part is not
+implemented or not checked yet, state that status instead of filling it with
+desired facts. For an existing module described partially, name the covered
+operations and the remaining scope explicitly; a partial passport is not complete.
 
 ---
 
-# <Имя модуля>
+# <Module name>
 
-Версия паспорта: <версия>. Дата сверки: <дата>.
-Статус: <проект / реализовано, проверки перечислены ниже / частично>.
-Тип: <атомарный / составной>.
-Путь: <путь от корня репозитория>.
-Точка подключения: <файл и класс либо фабрика>.
-Область паспорта: <весь модуль либо точные изменяемые операции>.
-Создание каркаса: <фактически выполненная команда CLI из корня репозитория;
-для части пакета — команда создания пакета; для исторического модуля —
-«существовал до обязательной генерации через CLI», если команда неизвестна>.
+Passport version: <version>. Check date: <date>.
+Status: <draft / implemented, checks listed below / partial>.
+Type: <atomic / composite>.
+Path: <path from the repository root>.
+Connection point: <file and class or factory>.
+Passport scope: <the whole module or the exact changed operations>.
+Scaffold creation: <the CLI command actually run from the repository root;
+for a pack part, the pack creation command; for a historical module,
+"existed before mandatory CLI generation" if the command is unknown>.
 
-## 1. Ответственность и выбор структуры
+## 1. Responsibility and choice of structure
 
-Назначение: <какую законченную функцию предоставляет модуль>.
-Почему выбран этот тип: <граница одной функции либо самостоятельные части>.
-Владелец данных и инвариантов: <модуль/сервисы>.
-Что находится за границей модуля: <соседние функции и внешние зависимости>.
+Purpose: <the complete feature the module provides>.
+Why this type: <the boundary of one feature or independent parts>.
+Owner of data and invariants: <module/services>.
+What is outside the module: <neighboring features and external dependencies>.
 
-Приоритеты решения по §2.1 MOD-ARCH-001: <как обеспечены ООП/SOLID, простота,
-производительность, отказоустойчивость и совместимость с бинарной сборкой>.
-Существенные компромиссы: <обоснование дополнительных абстракций, зависимостей
-или затрат; связь с требованиями и измерениями либо «нет»>.
+Decision priorities per MOD-ARCH-001 §2.1: <how OOP/SOLID, simplicity,
+performance, resilience and binary build compatibility are ensured>.
+Significant trade-offs: <the reason for extra abstractions, dependencies
+or costs; the link to requirements and measurements, or "none">.
 
-Для составного модуля заполнить таблицу атомарных частей; для атомарного
-написать «не используется: реализация одной функции».
+For a composite module fill in the table of atomic parts; for an atomic one
+write "not used: implements one feature".
 
-| Атомарная часть | Ответственность и данные | Публичные входы | Зависит от | Паспорт / исходники |
+| Atomic part | Responsibility and data | Public inputs | Depends on | Passport / sources |
 | --- | --- | --- | --- | --- |
-| <имя> | <обязанность> | <контракты> | <направленные зависимости> | <ссылка> |
+| <name> | <duty> | <contracts> | <directed dependencies> | <link> |
 
-## 2. Каталоги и компоненты
+## 2. Directories and components
 
-<Дерево только реально нужных файлов/каталогов. Указать существующие файлы и
-планируемые добавления раздельно.>
+<A tree of only the files/directories actually needed. List existing files and
+planned additions separately.>
 
-| Компонент / символ | Файл | Назначение | Входные данные / DI | Выход / эффект | Статус |
+| Component / symbol | File | Purpose | Input data / DI | Output / effect | Status |
 | --- | --- | --- | --- | --- | --- |
-| <сервис / модель / контроллер / обработчик> | <путь> | <роль> | <контракты> | <результат> | <статус> |
+| <service / model / controller / handler> | <path> | <role> | <contracts> | <result> | <status> |
 
-Учесть применимые роли из §6 MOD-ARCH-001: модуль/фабрика, контракты и tokens,
-сервисы, ORM, HTTP/list, response mapper, config/infra, background, UI, Tool-адаптеры,
-events, errors, internal и проверки. Не создавать роли ради таблицы.
+Consider the applicable roles from MOD-ARCH-001 §6: module/factory, contracts and tokens,
+services, ORM, HTTP/list, response mapper, config/infra, background, UI, Tool adapters,
+events, errors, internal and checks. Do not create roles for the sake of the table.
 
-Агенты объявляются самостоятельно по [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
-В паспорте модуля описываются его сервисы и Tool-адаптеры; конкретный агент
-не добавляется в состав модуля.
+Agents are declared independently per [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
+A module passport describes its services and Tool adapters; a concrete agent is
+not added to the module.
 
-## 3. Подключение и DI
+## 3. Connection and DI
 
-`imports`: <модули; роль каждого: атомарная часть / внешняя зависимость>.
-`exports`: <точный список, включая явный пустой список при необходимости>.
-TypeScript-публичный вход: <index.ts или существующие контрактные файлы>.
-Глобальная инфраструктура: <необходимые токены и источник>.
-Прочие поля `@Module`: <поле, значение, владелец регистрации>.
+`imports`: <modules; the role of each: atomic part / external dependency>.
+`exports`: <the exact list, including an explicit empty list when needed>.
+TypeScript public entry: <index.ts or the existing contract files>.
+Global infrastructure: <the required tokens and their source>.
+Other `@Module` fields: <field, value, registration owner>.
 
-| provide | useClass / factory / value | Типы зависимостей конструктора и их владельцы | Lifetime | Экспортируется |
+| provide | useClass / factory / value | Constructor dependency types and their owners | Lifetime | Exported |
 | --- | --- | --- | --- | --- |
-| <токен> | <реализация> | <зависимости> | <scoped / singleton / transient> | <да / нет> |
+| <token> | <implementation> | <dependencies> | <scoped / singleton / transient> | <yes / no> |
 
-Обычные зависимости связывает codegen; не копировать эту таблицу в ручной массив
-`deps`. Если нужен override, отдельно указать его причину и конкретную подмену.
+Codegen wires regular dependencies; do not copy this table into a manual `deps`
+array. If an override is needed, state its reason and the concrete substitution.
 
-Опции фабрики модуля описать как отдельную точку входа в §5. Если фабрики нет,
-указать «подключается класс, аргументы отсутствуют».
+Describe the module factory options as a separate entry point in §5. If there is no
+factory, write "the class is connected, there are no arguments".
 
-## 4. Данные, конфигурация и lifecycle
+## 4. Data, configuration and lifecycle
 
-ORM: <контексты, entities, режим общего provider, repositories, валидация>.
-Схема: <выбранные startup-флаги/миграции/ownedStore либо не используется>.
-Владение данными: <таблицы, ключи, связи, ограничения, транзакции>.
-Поля моделей: <таблица типов, nullability, defaults и инвариантов либо ссылка>.
-Конфигурация: <поля, источники overrides, defaults, валидация; без секретов>.
-Владение конфигурацией по [§5.4 MOD-ARCH-001](MODULE_ARCHITECTURE.md#kernel-config-isolation):
-<общее неизменяемое объявление; отдельное представление каждого kernel;
-граница фиксации источников и проверки; получение значений сервисами и
-коннекторами через DI или явный аргумент host-фабрики; статус реализации
-и переходные ограничения либо «не используется»>.
-Lifecycle: <запуск/остановка, scopes, расписание, отмена и dispose>.
-Внешние эффекты: <порты, ограничения, фактически поддерживаемые повторы>.
+ORM: <contexts, entities, shared provider mode, repositories, validation>.
+Schema: <the chosen startup flags/migrations/ownedStore, or not used>.
+Data ownership: <tables, keys, relations, constraints, transactions>.
+Model fields: <a table of types, nullability, defaults and invariants, or a link>.
+Configuration: <fields, override sources, defaults, validation; no secrets>.
+Configuration ownership per [MOD-ARCH-001 §5.4](MODULE_ARCHITECTURE.md#kernel-config-isolation):
+<a shared immutable declaration; a separate view per kernel; where sources are
+fixed and checked; how services and connectors get values through DI or an
+explicit host factory argument; the implementation status and transitional
+limits, or "not used">.
+Lifecycle: <start/stop, scopes, schedule, cancellation and dispose>.
+External effects: <ports, limits, retries that are actually supported>.
 
-## 5. Точки входа и поля
+## 5. Entry points and fields
 
-Перечислить все точки входа охваченной области: HTTP, DI, options фабрики,
-конфигурация, tool, события, фоновые payload. Для каждой повторить блок ниже.
-Общие DTO описывать один раз со ссылками из всех использующих операций.
-Для новой операции добавить её TypeScript-сигнатуру и корректный пример входа
-(JSON для HTTP либо вызов метода). Образцы: [примеры кода](MODULE_CODE_EXAMPLES.md).
+List all entry points of the covered scope: HTTP, DI, factory options,
+configuration, tool, events, background payloads. Repeat the block below for each.
+Describe shared DTOs once and link to them from every operation that uses them.
+For a new operation add its TypeScript signature and a correct input example
+(JSON for HTTP or a method call). Samples: [code examples](MODULE_CODE_EXAMPLES.md).
 
-### <Имя операции>
+### <Operation name>
 
-- Символ и файл: <путь>.
-- Способ вызова: <метод/route/событие/tool/расписание>.
-- Потребитель и доступ: <кто вызывает; проверка прав; источник server context>.
-- Request / args: <тип либо «входные поля отсутствуют»>.
-- Runtime-привязка и валидация: <кто и где проверяет этот конкретный путь>.
+- Symbol and file: <path>.
+- How it is called: <method/route/event/tool/schedule>.
+- Consumer and access: <who calls it; the permission check; the server context source>.
+- Request / args: <type, or "no input fields">.
+- Runtime binding and validation: <who checks this concrete path and where>.
 
-| Поле / вложенный путь | Тип / формат | Источник | Обязательность | null | Default и место применения | Ограничения / валидация | Пример |
+| Field / nested path | Type / format | Source | Required | null | Default and where it applies | Limits / validation | Example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| <поле> | <тип> | <источник> | <условие> | <да / нет> | <значение или нет> | <правила> | <значение> |
+| <field> | <type> | <source> | <condition> | <yes / no> | <value or none> | <rules> | <value> |
 
-Вложенные объекты/массивы: <ссылки на поля элементов и ограничения размера>.
-Неизвестные поля и преобразования: <отклоняются / удаляются / разрешены по схеме>.
+Nested objects/arrays: <links to the element fields and size limits>.
+Unknown fields and conversions: <rejected / removed / allowed by the schema>.
 
-| Выходное поле | Тип / сериализация | null / отсутствие | Значение |
+| Output field | Type / serialization | null / absence | Meaning |
 | --- | --- | --- | --- |
-| <поле> | <тип> | <условие> | <смысл> |
+| <field> | <type> | <condition> | <meaning> |
 
-Результат операции: <return type; HTTP status/headers, если применимо>.
+Operation result: <return type; HTTP status/headers if applicable>.
 
-| Ошибка / отказ | Условие | Результат на границе | Проверка |
+| Error / rejection | Condition | Result at the boundary | Check |
 | --- | --- | --- | --- |
-| <код/тип> | <вход/сбой> | <ответ/статус> | <сценарий/файл> |
+| <code/type> | <input/failure> | <response/status> | <scenario/file> |
 
-Эффект: <какие данные меняются / какие внешние действия выполняются>.
-Транзакция, повтор, конкурентность, отмена: <реальное поведение, ограничения
-либо неприменимость; не добавлять неподдерживаемые возможности в описание>.
+Effect: <which data changes / which external actions run>.
+Transaction, retry, concurrency, cancellation: <the actual behavior, limits or
+"not applicable"; do not describe unsupported capabilities>.
 
-## 6. Проверки и граница готовности
+## 6. Checks and the readiness boundary
 
-Для затронутого поведения описать применимые проверки приоритетов. Неприменимые
-проверки отметить с причиной; целевые значения не выдавать за измеренные.
+For the affected behavior describe the applicable priority checks. Mark checks that
+do not apply with a reason; do not present target values as measured ones.
 
-| Приоритет | Что зафиксировать |
+| Priority | What to record |
 | --- | --- |
-| ООП / SOLID | Владельцы инвариантов, границы ответственности и интерфейсов, условия подстановки реализаций |
-| Простота | Почему выбран минимальный достаточный вариант; назначение каждого добавленного слоя или механизма |
-| Производительность | Частый путь, объём данных и нагрузка, требуемые метрики/бюджеты, условия и результаты замеров |
-| Отказоустойчивость | Ошибки зависимостей, тайм-ауты, отмена, частичное выполнение, освобождение ресурсов и безопасность повторов |
-| Бинарная сборка | Затронутая цель, внешние ресурсы/инструменты, команда сборки и контрольный запуск артефакта, платформа и ограничения |
+| OOP / SOLID | Owners of invariants, boundaries of responsibility and interfaces, conditions for substituting implementations |
+| Simplicity | Why the minimal sufficient option was chosen; the purpose of every added layer or mechanism |
+| Performance | The hot path, data volume and load, required metrics/budgets, measurement conditions and results |
+| Resilience | Dependency errors, timeouts, cancellation, partial execution, resource release and retry safety |
+| Binary build | The affected target, external resources/tools, the build command and a control run of the artifact, platform and limits |
 
-| Требование / сценарий | Команда или проверка | Результат | Доказательство / ограничение |
+| Requirement / scenario | Command or check | Result | Evidence / limitation |
 | --- | --- | --- | --- |
-| <сценарий> | <точный способ> | <PASS / FAIL / SKIP / не запускалось> | <что подтверждено> |
+| <scenario> | <exact way> | <PASS / FAIL / SKIP / not run> | <what is confirmed> |
 
-Проверить применимое: регистрацию/изоляцию DI, входы и ошибки, lifetime,
-владение ORM, нужные адаптеры; для пакета также состав, отсутствие циклов и
-дублирующих регистраций. Тесты должны проверять поведение, а не пересказывать код.
-Для изменения конфигурации указать проверку двух kernel с общим объявлением,
-разными окружениями/источниками и независимым поведением при ошибке и остановке.
-Неприменимые проверки не запускать ради формального списка.
+Check what applies: DI registration/isolation, inputs and errors, lifetime,
+ORM ownership, the needed adapters; for a pack also the composition, no cycles and
+no duplicate registrations. Tests must check behavior, not retell the code.
+For a configuration change, describe the check of two kernels with a shared
+declaration, different environments/sources and independent behavior on error and
+shutdown. Do not run inapplicable checks for the sake of a formal list.
 
-Неизвестные значения, расхождения и блокеры: <конкретные факты и следующий шаг>.
-Разрешённые отклонения от общей спецификации: <причина, область, основание либо нет>.
-Источники: <ссылки на соответствующие исходники и проверки>.
+Unknown values, discrepancies and blockers: <concrete facts and the next step>.
+Allowed deviations from the general specification: <reason, scope, basis, or none>.
+Sources: <links to the relevant sources and checks>.

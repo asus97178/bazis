@@ -1,17 +1,17 @@
-# src/osnv/core/http — HTTP-модуль (в духе ASP.NET Core)
+# src/osnv/core/http: HTTP module (in the spirit of ASP.NET Core)
 
-Контроллеры — классы со стандартными TC39-декораторами; маршруты компилируются
-в radix-дерево на старте; каждый запрос живёт в собственном DI-scope.
-Без внешних зависимостей, без рефлексии, совместим с `bun build --compile`
-(проверяется общим `bun run build:bin`).
+Controllers are classes with standard TC39 decorators; routes are compiled into a
+radix tree at startup; each request lives in its own DI scope.
+No external dependencies, no reflection, compatible with `bun build --compile`
+(checked by the shared `bun run build:bin`).
 
-Полная спецификация middleware и `@Middleware`: [SPEC.md](./SPEC.md).
+The full specification of middleware and `@Middleware`: [SPEC.md](./SPEC.md).
 
-## Быстрый старт
+## Quick start
 
-Сначала создайте приложение по [руководству](../../../../docs/QUICKSTART.md),
-затем модуль `bunx osnv g module Echo --empty`. Для пробы без БД замените
-содержимое созданного `Echo.module.ts` этим кодом и заполните его `MODULE.md`:
+First create an application by the [guide](../../../../docs/QUICKSTART.md), then
+the module `bunx osnv g module Echo --empty`. To try it without a database, replace
+the content of the generated `Echo.module.ts` with this code and fill in its `MODULE.md`:
 
 ```ts
 import { Module } from "osnv/core/di";
@@ -37,42 +37,42 @@ export class EchoController {
 export class EchoModule {}
 ```
 
-`bun run dev` запускает codegen перед приложением. GET `/echo/42` возвращает
-`{"id":42}`; POST `/echo` с `{"text":"hello"}` — `{"text":"hello"}`.
-Невалидное тело получает HTTP 400. Если host задаёт prefix, добавьте его к пути.
-Привязки параметров выводятся из сигнатуры до запуска; на каждом запросе
-TypeScript не анализируется. Для зависимостей сервисов достаточно конструктора
-и `scoped(IService, Service)` — обычные `deps` выводит тот же codegen.
+`bun run dev` runs codegen before the application. GET `/echo/42` returns
+`{"id":42}`; POST `/echo` with `{"text":"hello"}` returns `{"text":"hello"}`.
+An invalid body gets HTTP 400. If the host sets a prefix, add it to the path.
+Parameter bindings are inferred from the signature before the run; TypeScript is
+not analyzed on each request. For service dependencies a constructor and
+`scoped(IService, Service)` are enough: the same codegen infers the usual `deps`.
 
-## Конвенции привязки (а не декораторы параметров)
+## Binding conventions (instead of parameter decorators)
 
-Декораторы **параметров** (`getUser(@Param("id") id)`) в стандарте TC39
-отсутствуют, а `experimentalDecorators` сломал бы остальные модули фреймворка.
-Вместо них — конвенции в стиле ASP.NET, выведенные codegen'ом из сигнатуры:
+**Parameter** decorators (`getUser(@Param("id") id)`) do not exist in the TC39
+standard, and `experimentalDecorators` would break the other framework modules.
+Instead there are ASP.NET-style conventions that codegen infers from the signature:
 
-| Параметр метода | Привязка |
+| Method parameter | Binding |
 |---|---|
-| имя совпадает с `:name` маршрута | значение из маршрута (конверсия по ограничению/типу) |
-| DTO-класс из исходников приложения | тело запроса + валидация `@Validator` (ошибки -> 400) |
-| `HttpContext` / `Request` / `ResponseBuilder` | контекст / сырой запрос / билдер ответа |
-| примитив (`string`/`number`/`boolean` или вывод из default) | query-параметр; `?` и default -> опциональный |
+| the name matches the route `:name` | the route value (converted by the constraint/type) |
+| a DTO class from the application sources | the request body + `@Validator` validation (errors -> 400) |
+| `HttpContext` / `Request` / `ResponseBuilder` | context / raw request / response builder |
+| a primitive (`string`/`number`/`boolean` or inferred from the default) | a query parameter; `?` and a default -> optional |
 
-Если конвенция не выводится (например, union из строковых литералов,
-нет аннотации или два класса-тела), `di:generate` завершается с ошибкой
-`OSNV_HTTP_BINDING_UNRESOLVED`, именем метода и причиной. Предыдущие generated-
-файлы не заменяются. Используйте поддерживаемый тип; для заголовков и сырых
-тел передавайте `ctx: HttpContext`, сервисы внедряйте в конструктор.
-Проверка допустимых значений принадлежит Validator или сервису.
+If no convention can be inferred (for example a union of string literals, no
+annotation or two body classes), `di:generate` fails with
+`OSNV_HTTP_BINDING_UNRESOLVED`, the method name and the reason. The previous
+generated files are not replaced. Use a supported type; for headers and raw
+bodies take `ctx: HttpContext`, and inject services into the constructor.
+Checking allowed values belongs to the Validator or the service.
 
-Параметр `ctx: HttpContext` остаётся обычным поддерживаемым входом. Для старой
-ручной сборки HTTP без generated metadata сохранён runtime fallback с одним
-HttpContext; он не заменяет codegen для типизированных actions.
+A `ctx: HttpContext` parameter stays a regular supported input. For older manual
+HTTP assembly without generated metadata there is a runtime fallback with one
+HttpContext; it does not replace codegen for typed actions.
 
-### Вложенные request DTO
+### Nested request DTOs
 
-`di:generate` также читает типы полей request-модели и регистрирует форму для
-рекурсивной гидрации без `reflect-metadata`. Поэтому обычный DX сохраняется и
-для объектов и массивов:
+`di:generate` also reads the field types of a request model and registers the shape
+for recursive hydration without `reflect-metadata`. So the usual DX works for
+objects and arrays too:
 
 ```ts
 export class AddressRequest {
@@ -89,52 +89,51 @@ export class CreateUserRequest {
 }
 ```
 
-Оба класса должны быть именованными top-level export. Binder создаёт настоящие
-экземпляры вложенных DTO, удаляет неизвестные и prototype-polluting поля на
-каждом уровне, затем запускает валидацию с путями вида `address.city` и
-`previousAddresses[0].city`. Неоднозначный тип у `nested: true` (например,
-union из двух классов) останавливает codegen; plain object при отсутствующей
-или устаревшей generated-метадате стандартный validator отклоняет fail-closed.
+Both classes must be named top-level exports. The binder creates real instances
+of nested DTOs, removes unknown and prototype-polluting fields at every level,
+then runs validation with paths like `address.city` and
+`previousAddresses[0].city`. An ambiguous type with `nested: true` (for example a
+union of two classes) stops codegen; with missing or stale generated metadata the
+standard validator rejects a plain object fail-closed.
 
-Поле тела запроса, объявленное ровно как `string`, `number` или `boolean`
-(также `| null`, необязательное или массив таких значений), проверяется по
-типу JSON без `@Validator`: `{"done":"yes"}` для `done?: boolean` даёт 400
-с кодом `type`. Тип берёт codegen из исходников; литеральные union-типы, enum,
-`Date` и смешанные union не проверяются — для них нужен `@Validator`.
-Обязательность по-прежнему задаёт `required: true`. Проверка действует только
-на HTTP-границе: gRPC и Agent используют тот же binder без неё.
+A request body field declared exactly as `string`, `number` or `boolean`
+(also `| null`, optional or an array of such values) is checked against the
+JSON type without `@Validator`: `{"done":"yes"}` for `done?: boolean` gives 400
+with the code `type`. Codegen takes the type from the sources; literal unions, enums,
+`Date` and mixed unions are not checked; they need `@Validator`.
+Required-ness is still set with `required: true`. The check applies only at the
+HTTP boundary: gRPC and Agent use the same binder without it.
 
-Открытые JSON-поля (`Record<string, unknown>`, `{}`, `unknown[]`) сохраняют
-обычные пользовательские ключи, но binder рекурсивно клонирует их и удаляет
-`__proto__`, `constructor`, `prototype` на любой глубине. Циклы, глубина более
-64 контейнеров и чрезмерно сложные графы отклоняются с 400 до передачи в action.
+Open JSON fields (`Record<string, unknown>`, `{}`, `unknown[]`) keep regular user
+keys, but the binder clones them recursively and removes `__proto__`,
+`constructor`, `prototype` at any depth. Cycles, nesting deeper than 64 containers
+and overly complex graphs are rejected with 400 before reaching the action.
 
-## Карта папки
+## Folder map
 
-| Папка/файл | Назначение |
+| Folder/file | Purpose |
 |---|---|
-| `Decorators/` | `@Controller`, `@Get`/`@Post`/... (+ inline-опции `{ code, produces, consumes, version, middleware }`), `@HttpCode`, `@Produces`, `@Consumes`, `@Middleware`, `@ApiVersion`, `@Catch`, `@ActionFilter`; хранение метаданных через `Symbol.metadata` |
-| `Routing/` | парсер шаблонов (`:id(int)`, `:u(uuid)`, `*rest`), radix-дерево с backtracking, сборка конвейеров на старте |
-| `Binding/` | дескрипторы привязок, конверсия типов (400 при ошибке), model binding c защитой от prototype pollution и валидацией `@Validator` |
-| `Results/` | `Ok`, `Created`, `NotFound`, `Redirect`, `File` (через `Bun.file`) и нормализация результата с авто Content-Type |
-| `Middleware/` | конвейер, `cors` (+ preflight), `errorHandler`, `rateLimit`; access log — `@/logging/http` |
-| `Versioning/` | чтение версии API из URL-сегмента, query-параметра или заголовка |
-| `HttpContext/` | контекст запроса (params, scope DI, кэш тела) и `ResponseBuilder` |
-| `Errors/` | `HttpError` и наследники (4xx/5xx), `ModelValidationError`, `HttpSetupError` |
-| `HttpServer.ts` | hosted service: `Bun.serve`, scope на запрос, 404/405/preflight без конвейера |
-| `httpModule.ts` | фабрика `OsnvModule`: scoped-контроллеры + сервер |
+| `Decorators/` | `@Controller`, `@Get`/`@Post`/... (+ inline options `{ code, produces, consumes, version, middleware }`), `@HttpCode`, `@Produces`, `@Consumes`, `@Middleware`, `@ApiVersion`, `@Catch`, `@ActionFilter`; metadata stored through `Symbol.metadata` |
+| `Routing/` | template parser (`:id(int)`, `:u(uuid)`, `*rest`), a radix tree with backtracking, pipeline assembly at startup |
+| `Binding/` | binding descriptors, type conversion (400 on error), model binding with prototype pollution protection and `@Validator` validation |
+| `Results/` | `Ok`, `Created`, `NotFound`, `Redirect`, `File` (through `Bun.file`) and result normalization with an automatic Content-Type |
+| `Middleware/` | the pipeline, `cors` (+ preflight), `errorHandler`, `rateLimit`; the access log is `@/logging/http` |
+| `Versioning/` | reads the API version from a URL segment, a query parameter or a header |
+| `HttpContext/` | the request context (params, DI scope, body cache) and `ResponseBuilder` |
+| `Errors/` | `HttpError` and subclasses (4xx/5xx), `ModelValidationError`, `HttpSetupError` |
+| `HttpServer.ts` | hosted service: `Bun.serve`, a scope per request, 404/405/preflight without the pipeline |
+| `httpModule.ts` | the `OsnvModule` factory: scoped controllers + the server |
 
-## Гарантии
+## Guarantees
 
-- **Производительность**: вся метадата обрабатывается на старте; на запрос —
-  radix-поиск O(сегментов), скомпилированный конвейер, scope DI; тело парсится
-  один раз (кэш в контексте).
-- **Отказоустойчивость**: глобальная граница ошибок всегда установлена
-  (`HttpError` -> статус, прочее -> 500 без деталей в production); `@Catch`
-  на контроллере для доменных ошибок; битые JSON/конверсии -> 400, не 500.
-- **Безопасность**: prototype pollution отфильтрован в model binding и именах
-  параметров маршрута; `..`/`%zz` в пути -> 400; CORS с preflight; точки
-  подключения auth — обычные middleware (`@Middleware` или глобально);
-  `rateLimit` подключается одной строкой.
-- **Ошибки конфигурации** (дубликат маршрута, неизвестное ограничение,
-  класс без `@Controller`) — `HttpSetupError` на старте, не в рантайме.
+- **Performance**: all metadata is processed at startup; per request there is a
+  radix lookup O(segments), a compiled pipeline and a DI scope; the body is parsed
+  once (cached in the context).
+- **Resilience**: a global error boundary is always installed
+  (`HttpError` -> status, anything else -> 500 without details in production);
+  `@Catch` on a controller for domain errors; broken JSON/conversions -> 400, not 500.
+- **Security**: prototype pollution is filtered in model binding and in route
+  parameter names; `..`/`%zz` in the path -> 400; CORS with preflight; auth hooks
+  in as regular middleware (`@Middleware` or global); `rateLimit` is one line.
+- **Configuration errors** (a duplicate route, an unknown constraint, a class
+  without `@Controller`) are `HttpSetupError` at startup, not at runtime.

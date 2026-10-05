@@ -1,273 +1,278 @@
-# Архитектура модулей и структура каталогов osnv
+# osnv module architecture and directory structure
 
-Идентификатор: **MOD-ARCH-001**. Версия: **1.10**. Дата: **2026-10-02**.
-Статус: **обязательное правило репозитория**.
+Identifier: **MOD-ARCH-001**. Version: **1.11**. Date: **2026-10-06**.
+Status: **mandatory repository rule**.
 
-Спецификация закрепляет выбор между атомарным и составным модулем, размещение
-компонентов, их входные контракты и порядок работы агента. Она применяется к
-новой разработке и изменяемой части существующего кода. Это не поручение
-перестроить все существующие модули.
+The specification fixes the choice between an atomic and a composite module, the
+placement of components, their input contracts and the agent's working order. It
+applies to new development and to the changed part of existing code. It is not an
+instruction to restructure all existing modules.
 
-«Обязан» и «нельзя» обозначают требования. «По умолчанию» допускает обоснованное
-решение, записанное в паспорте модуля. Примеры текущей реализации отделены от
-правил в [разборе существующих модулей](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/docs/architecture/EXISTING_MODULES.md).
-Сквозные TypeScript-примеры размещены в [приложении с кодом](MODULE_CODE_EXAMPLES.md).
+"Must" and "must not" mark requirements. "By default" allows a justified decision
+recorded in the module passport. Examples of the current implementation are kept
+apart from the rules in the [review of existing modules](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/docs/architecture/EXISTING_MODULES.md).
+End-to-end TypeScript examples are in the [code appendix](MODULE_CODE_EXAMPLES.md).
 
-## 1. Что считается модулем
+## 1. What counts as a module
 
-**Модуль** — именованная граница ответственности, регистрации зависимостей и
-публичного контракта. Обычная точка подключения — класс с `@Module(...)` в
-`<Name>.module.ts`. Настраиваемая фабрика может возвращать модуль. Каталог без
-собственного модульного контракта модулем не становится.
+A **module** is a named boundary of responsibility, dependency registration and
+public contract. The usual connection point is a class with `@Module(...)` in
+`<Name>.module.ts`. A configurable factory may return a module. A directory without
+its own module contract does not become a module.
 
-**Атомарный модуль** реализует одну связную предметную или техническую
-ответственность. Он сам владеет нужными моделями, ORM-контекстами, сервисами,
-контроллерами, входными/выходными контрактами и адаптерами. «Атомарный» не означает
-один файл, один класс, одну таблицу или отсутствие зависимостей.
+An **atomic module** implements one coherent domain or technical responsibility.
+It owns the models, ORM contexts, services, controllers, input/output contracts
+and adapters it needs. "Atomic" does not mean one file, one class, one table or
+no dependencies.
 
-**Составной модуль** (`module pack`) объединяет несколько атомарных модулей,
-каждый со своей самостоятельной ответственностью и контрактом. Корень пакета
-подключает их через `imports` и при необходимости переэкспортирует публичные
-DI-токены через `exports`. Собственная реализация находится в атомарных модулях.
+A **composite module** (`module pack`) combines several atomic modules, each with
+its own independent responsibility and contract. The pack root connects them
+through `imports` and, when needed, re-exports public DI tokens through `exports`.
+The implementation itself lives in the atomic modules.
 
-**Корень приложения** (`AppModule`) собирает функции приложения. Инфраструктурный
-манифест (`AppInfra`) и точка запуска (`runApp`) подключают окружение, транспорт и
-общие ресурсы. Они не являются образцом устройства каждой простой функции.
+The **application root** (`AppModule`) assembles the application features. The
+infrastructure manifest (`AppInfra`) and the entry point (`runApp`) connect the
+environment, transport and shared resources. They are not a template for the
+structure of every simple feature.
 
-**Каталог-группа**, например `actor_modules`, только организует файлы. Составным
-модулем он становится лишь при наличии соответствующей композиции.
+A **group directory**, for example `actor_modules`, only organizes files. It
+becomes a composite module only when the matching composition exists.
 
-Это архитектурная классификация. Новые поля `kind: "atomic"`, `submodules` или
-отдельный декоратор для неё не вводятся: оба вида используют существующий `@Module`.
+This is an architectural classification. No new `kind: "atomic"` or `submodules`
+fields or a separate decorator are introduced for it: both kinds use the existing `@Module`.
 
-**Агенты — самостоятельные сущности наряду с модулями.** Агент задаёт поведение
-и свой набор Tools; модуль предоставляет прикладные сервисы и данные, которыми
-может пользоваться реализация Tool. Конкретный агент не является частью модуля
-или его `imports`. Целевые границы и порядок перехода закреплены в
+**Agents are independent entities alongside modules.** An agent defines behaviour
+and its own set of Tools; a module provides the application services and data a
+Tool implementation can use. A concrete agent is not part of a module or of its
+`imports`. The target boundaries and the migration order are fixed in
 [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
-Наличие `@Module.agents` в текущем коде отражает прежний путь регистрации,
-сохраняемый на время миграции; он не является целевым способом создания новых агентов.
+`@Module.agents` in the current code reflects the previous registration path, kept
+for the migration period; it is not the target way to create new agents.
 
-## 2. Как выбирать атомарность
+## 2. Choosing atomicity
 
-| Ситуация | Решение | Основание |
+| Situation | Decision | Reason |
 | --- | --- | --- |
-| Задачи (`Task`): создать, прочитать, изменить статус в одной предметной области | Атомарный модуль | Одна связная функция, собственные данные и операции |
-| Гости (`Guest`): регистрация и учёт гостей | Атомарный модуль | HTTP, модель и сервис обслуживают одну функцию |
-| Users, Employee, Product | Атомарный модуль | Существующие примеры вертикальной функции |
-| DataManager | Составной модуль | Таблицы, поля, валидаторы и записи имеют самостоятельные обязанности |
-| Большая область с отдельными заказами, корзиной и историей | Составной, если границы действительно самостоятельны | Есть несколько собственных контрактов и владельцев поведения |
-| Добавился контроллер, worker, UI-профиль, tool или второй ORM-класс | Сохранить атомарный модуль | Новый технический компонент сам по себе не новая функция |
+| Tasks (`Task`): create, read, change status in one domain | Atomic module | One coherent feature, its own data and operations |
+| Guests (`Guest`): registering and tracking guests | Atomic module | HTTP, model and service serve one feature |
+| Users, Employee, Product (osnova application) | Atomic module | Existing examples of a vertical feature |
+| DataManager (osnova application) | Composite module | Tables, fields, validators and records have independent responsibilities |
+| A large area with separate orders, cart and history | Composite, if the boundaries are really independent | There are several own contracts and behaviour owners |
+| A controller, worker, UI profile, tool or second ORM class was added | Keep the atomic module | A new technical component alone is not a new feature |
 
-Для составного модуля до реализации необходимо перечислить его атомарные части.
-Для каждой части указываются ответственность, принадлежащие ей данные,
-публичные входы, зависимости и отдельные сценарии проверки. Если части отличаются
-только названиями слоёв (`HttpModule`, `ServiceModule`, `ModelModule`), оснований
-для такого деления нет.
+For a composite module, its atomic parts must be listed before implementation.
+For each part, state the responsibility, the data it owns, the public inputs, the
+dependencies and separate test scenarios. If the parts differ only by layer names
+(`HttpModule`, `ServiceModule`, `ModelModule`), there is no reason for such a
+split.
 
-По умолчанию новая функция атомарна. Рост объёма кода — повод проверить границы,
-но не автоматическое требование разделения. Наличие зависимости от Auth, ORM,
-кэша или другого модуля не делает атомарный модуль составным. Framework-модуль
-также выбирает структуру по ответственности, а не по слову «runtime» в названии.
+By default a new feature is atomic. Code growth is a reason to review the
+boundaries, but not an automatic requirement to split. A dependency on Auth, ORM,
+the cache or another module does not make an atomic module composite. A framework
+module also chooses its structure by responsibility, not by the word "runtime" in its name.
 
-### 2.1. Приоритеты проектирования и реализации
+### 2.1. Design and implementation priorities
 
-Для приложения, фреймворка и CLI приоритетны **ООП и SOLID, производительность,
-отказоустойчивость, сборка в бинарник и простота реализации**. Решения оцениваются
-по всем этим критериям с сохранением корректности и публичных контрактов.
-При выполнении требований предпочтителен самый простой понятный вариант.
-Существенные компромиссы фиксируются в паспорте затрагиваемого модуля.
+For the application, the framework and the CLI the priorities are **OOP and SOLID,
+performance, fault tolerance, binary builds and simplicity of implementation**.
+Decisions are assessed against all these criteria while keeping correctness and
+public contracts. When the requirements are met, the simplest clear option is
+preferred. Significant trade-offs are recorded in the affected module's passport.
 
-**ООП и SOLID.** Состояние и инварианты имеют явного владельца. Классы объединяют
-связное поведение, зависимости задаются через контракты и существующий DI.
-Чистые функции допустимы для вычислений и преобразований, которым не нужен объект
-с состоянием. Число классов и уровней наследования не является показателем качества.
+**OOP and SOLID.** State and invariants have an explicit owner. Classes group
+coherent behaviour; dependencies are expressed through contracts and the existing DI.
+Pure functions are fine for computations and transformations that need no stateful
+object. The number of classes and inheritance levels is not a quality measure.
 
-| Принцип | Правило применения |
+| Principle | How to apply it |
 | --- | --- |
-| S — одна ответственность | У класса и модуля есть связная обязанность и понятная причина изменения |
-| O — расширяемость | Новое поведение подключается через нужные контрактные точки расширения; абстракции не создаются для гипотетических вариантов |
-| L — подстановка | Альтернативная реализация сохраняет обещания контракта, включая результаты, ошибки и lifecycle |
-| I — разделение интерфейсов | Потребитель зависит от необходимых ему операций; несвязанные обязанности не объединяются в общий интерфейс |
-| D — инверсия зависимостей | Предметное поведение использует контракты портов; инфраструктурные реализации связываются в композиции через существующий DI |
+| S — single responsibility | A class and a module have a coherent duty and a clear reason to change |
+| O — open/closed | New behaviour plugs in through the needed contract extension points; abstractions are not created for hypothetical variants |
+| L — substitution | An alternative implementation keeps the contract's promises, including results, errors and lifecycle |
+| I — interface segregation | A consumer depends on the operations it needs; unrelated duties are not merged into a shared interface |
+| D — dependency inversion | Domain behaviour uses port contracts; infrastructure implementations are bound in the composition through the existing DI |
 
-**Производительность.** При проектировании учитывать сложность алгоритмов,
-количество обращений к БД и сети, объём обрабатываемых данных, память и параллелизм.
-Частые пути не должны содержать лишнюю работу, N+1-запросы или неограниченные
-буферы/выборки. Для существенных изменений таких путей сравнивать поведение
-на репрезентативной нагрузке: задержку (включая p95/p99, когда применимо),
-пропускную способность, память и число запросов. Указывать объём данных,
-окружение и результат. Бюджеты берутся из требований задачи; без замеров
-производительность не объявляется подтверждённой. Усложняющая оптимизация
-нуждается в измеримой необходимости.
+**Performance.** When designing, consider algorithmic complexity, the number of
+database and network calls, the volume of processed data, memory and concurrency.
+Hot paths must not contain extra work, N+1 queries or unbounded
+buffers/selections. For significant changes of such paths, compare the behaviour
+under a representative load: latency (including p95/p99 where applicable),
+throughput, memory and the number of queries. State the data volume, the
+environment and the result. Budgets come from the task requirements; without
+measurements performance is not declared confirmed. An optimization that adds
+complexity needs a measurable need.
 
-**Отказоустойчивость.** Для операций с внешними эффектами и долгой работой
-описывать ошибки зависимостей, ограничения времени, отмену, частичное выполнение
-и восстановление. Ресурсы и scopes освобождаются при успехе и ошибке. Повторы
-ограничены, учитывают характер отказа и безопасность повторного эффекта;
-идемпотентность и транзакционные границы определяются там, где нужны по контракту.
-Нельзя скрывать сбой за успешным результатом или обещать гарантии, которых
-используемый API не предоставляет. Существенные сценарии отказов проверяются
-с контролируемыми сбоями и явным ожидаемым результатом.
+**Fault tolerance.** For operations with external effects and long-running work,
+describe dependency errors, time limits, cancellation, partial completion and
+recovery. Resources and scopes are released on success and on error. Retries are
+bounded and take into account the kind of failure and whether repeating the effect
+is safe; idempotency and transaction boundaries are defined where the contract needs them.
+Do not hide a failure behind a successful result or promise guarantees the API in
+use does not provide. Significant failure scenarios are tested with controlled
+faults and an explicit expected result.
 
-**Сборка в бинарник.** Исполнение приложения и CLI из собранных бинарников —
-приоритетный сценарий поставки. Зависимости, импорты, codegen и ресурсы должны
-поддерживать `bun build --compile`. Предпочтительны статически определяемые
-точки входа и сгенерированные привязки. Доступ к ресурсам не должен неявно
-зависеть от рабочего каталога разработчика или наличия исходного дерева.
-Необходимые внешние конфигурации, данные и инструменты описываются явно;
-например, команда CLI `codegen` использует проект и его инструментальную цепочку.
+**Binary builds.** Running the application and the CLI from built binaries is a
+priority delivery scenario. Dependencies, imports, codegen and resources must
+support `bun build --compile`. Statically resolvable entry points and generated
+bindings are preferred. Resource access must not implicitly depend on the
+developer's working directory or on the presence of the source tree.
+Required external configuration, data and tools are described explicitly;
+for example, the CLI `codegen` command uses the project and its toolchain.
 
-Текущие цели сборки определены в [package.json](../../package.json):
+The current build targets of this repository are defined in [package.json](../../package.json):
 
-| Скрипт | Артефакт |
+| Script | Artifact |
 | --- | --- |
-| `build:bin:app` | `bin/osnv-app` |
-| `build:bin:cli` | `bin/osnv` |
-| `build:bin` | Оба бинарника; перед сборкой выполняется проектный codegen |
+| `build:bin` | `bin/osnv`: the CLI built from `src/osnv/cli/main.ts` |
+| — | Application binaries are built by the application repository (for example osnova) |
+| — | Codegen runs as a separate step before an application build |
 
-Использовать квалифицированный Bun через `scripts/osnv-bun`. При проверке
-отдельной цели предварительно актуализировать требуемые результаты codegen.
-Изменение, влияющее на бинарную сборку или исполнение, проверяется сборкой
-затронутой цели и контрольным запуском соответствующего сценария в управляемом
-окружении. Typecheck, unit-тесты и запуск из TypeScript не заменяют эту проверку.
-Непроверенную платформу, внешнюю зависимость или путь исполнения отмечать отдельно.
+Use the qualified Bun through `scripts/osnv-bun`. When checking a single target,
+first refresh the required codegen results.
+A change that affects the binary build or execution is checked by building the
+affected target and a control run of the matching scenario in a controlled
+environment. Typecheck, unit tests and running from TypeScript do not replace this check.
+Mark an unchecked platform, external dependency or execution path separately.
 
-**Простота реализации.** Использовать существующие ORM, DI и другие механизмы,
-явные потоки данных и минимальное число необходимых компонентов. Не добавлять
-слои, фабрики, наследование, подмодули и зависимости без конкретной обязанности.
-Простота оценивается по понятности поведения и стоимости изменения, а не только
-по числу строк. ООП и SOLID применяются соразмерно задаче и сохраняют эту простоту.
+**Simplicity of implementation.** Use the existing ORM, DI and other mechanisms,
+explicit data flows and the minimum number of necessary components. Do not add
+layers, factories, inheritance, submodules or dependencies without a concrete duty.
+Simplicity is judged by how clear the behaviour is and how costly a change is, not
+only by line count. OOP and SOLID are applied in proportion to the task and keep this simplicity.
 
-Проверки соразмерны затронутому поведению. Для изменения только документации
-достаточно проверки содержания, ссылок и согласованности правил; запуск
-приложения, измерение нагрузки и сборка бинарников для такой правки не требуются.
+Checks are proportional to the affected behaviour. For a documentation-only change,
+checking the content, the links and the consistency of the rules is enough;
+running the application, load measurements and binary builds are not needed for such an edit.
 
-## 3. Направление зависимостей и владельцы
+## 3. Dependency direction and owners
 
-1. `src/osnv/library` содержит библиотечные механизмы; не зависит от приложения
-   и интеграционного слоя `core`.
-2. `src/osnv/core` интегрирует библиотечные механизмы, DI, HTTP, ORM и lifecycle;
-   не импортирует `src/app` или `admin-ui`. Нижний слой DI не импортирует ORM/HTTP:
-   расширения регистрируются верхним слоем через существующие механизмы.
-3. `src/app` задаёт прикладные функции, конфигурацию и композицию. Потребители
-   используют публичные входы osnv (`osnv/core/di`, `osnv/core/orm` и т. п.),
-   а не внутренние файлы реализации фреймворка.
-4. `admin-ui` и `client-ui` — клиентские адаптеры. Сервисы предметной области не
-   зависят от Vue, компонентов интерфейса или браузерного состояния.
-5. Между модулями зависимости объявляются явно через `imports` и публичные
-   контракты. Граф предметных зависимостей должен оставаться без циклов.
-6. У каждой ORM-сущности, контекста, provider и обработчика есть один модуль-владелец.
-   Корень пакета не регистрирует их повторно. Зависимость от чужого сервиса
-   не передаёт потребителю владение его таблицами или миграциями.
-7. Общие подключения создаются инфраструктурой. Атомарный модуль получает
-   `DATABASE_PROVIDER` и другие клиенты через DI; не создаёт второй пул для
-   удобства доступа. Изолированная standalone-композиция описывается отдельно.
+1. `src/osnv/library` contains library mechanisms; it does not depend on the
+   application or on the `core` integration layer.
+2. `src/osnv/core` integrates library mechanisms, DI, HTTP, ORM and lifecycle;
+   it does not import application code (`src/app`, `admin-ui` in osnova). The lower DI layer does not import ORM/HTTP:
+   extensions are registered by the upper layer through existing mechanisms.
+3. The application (`src/app` in osnova) defines features, configuration and composition. Consumers
+   use the public osnv entry points (`osnv/core/di`, `osnv/core/orm` and so on),
+   not internal framework implementation files.
+4. `admin-ui` and `client-ui` in osnova are client adapters. Domain services do not
+   depend on Vue, UI components or browser state.
+5. Dependencies between modules are declared explicitly through `imports` and public
+   contracts. The domain dependency graph must stay acyclic.
+6. Every ORM entity, context, provider and handler has one owning module.
+   The pack root does not register them again. Depending on another module's service
+   does not give the consumer ownership of its tables or migrations.
+7. Shared connections are created by the infrastructure. An atomic module gets
+   `DATABASE_PROVIDER` and other clients through DI; it does not create a second pool
+   for convenience. An isolated standalone composition is described separately.
 
-Публичный сервис может физически находиться в `services/`: значим объявленный
-контракт, а не глубина пути. Существующий импорт такого экспортированного сервиса
-допустим. Импорт приватного store, внутреннего ORM-контекста или `internal/`
-соседа для обхода его API недопустим. TypeScript-импорт типа и `@Module.imports`
-решают разные задачи; один не заменяет другой.
+A public service may physically live in `services/`: what matters is the declared
+contract, not the path depth. Importing such an exported service is allowed. Importing
+a private store, an internal ORM context or a neighbour's `internal/` to bypass its
+API is not allowed. A TypeScript type import and `@Module.imports` solve different
+tasks; one does not replace the other.
 
-## 4. Структура каталогов
+## 4. Directory structure
 
-### 4.1. Уровень репозитория
+### 4.1. Repository level
 
 ```text
-AGENTS.md                          обязательная точка входа для агента
-docs/architecture/                 общая спецификация и шаблон паспорта
+AGENTS.md                          mandatory entry point for the agent
+docs/architecture/                 the shared specification and the passport template
 src/
-  index.ts                         запуск и публикация поверхностей приложения
-  app/
-    config/                        конфигурация приложения и общих ресурсов
-    infra/App.infra.ts             подключение инфраструктуры
-    agents/                        самостоятельные объявления агентов (целевая структура)
-    modules/
-      App.module.ts                композиция функций приложения
-      <feature>/                   самостоятельный атомарный модуль
-      <feature>_modules/           составной модуль и его атомарные части
-      actor_modules/               существующая группировка по субъектам
   osnv/
-    index.ts                       публичный вход фреймворка
-    library/<capability>/          библиотечная реализация
-    core/<capability>/             интеграция с runtime и DI
-    cli/                           генератор и шаблоны
-  generated/                       результаты codegen; не править вручную
-admin-ui/                          клиент приложения
-client-ui/                         пользовательский Vue-чат
+    index.ts                       the framework's public entry
+    library/<capability>/          library implementation
+    core/<capability>/             runtime and DI integration
+    cli/                           the generator and templates
+  generated/                       codegen results; do not edit by hand
+
+An application on osnv (the osnova layout):
+src/
+  index.ts                         startup and publishing of the application surfaces
+  app/
+    config/                        configuration of the application and shared resources
+    infra/App.infra.ts             infrastructure connection
+    agents/                        standalone agent declarations (target structure)
+    modules/
+      App.module.ts                composition of the application features
+      <feature>/                   a standalone atomic module
+      <feature>_modules/           a composite module and its atomic parts
+      actor_modules/               the existing grouping by actor
+  generated/                       codegen results; do not edit by hand
+admin-ui/                          the application client
+client-ui/                         the user-facing Vue chat
 ```
 
-Это карта ответственности, а не требование добавить отсутствующие каталоги.
-Существующие дополнительные точки запуска и каталоги сохраняются.
+This is a responsibility map, not a requirement to add missing directories.
+Existing additional entry points and directories are kept.
 
-### 4.2. Новый атомарный модуль
+### 4.2. A new atomic module
 
-Новый модуль создаётся только командой CLI по §8.1. Базовая раскладка согласована
-с [CLI-шаблоном](../../src/osnv/cli/templates/module.ts).
-Пример `task/` ниже — шаблон для будущего модуля, а не существующая реализация.
+A new module is created only by a CLI command per §8.1. The base layout matches
+the [CLI template](../../src/osnv/cli/templates/module.ts).
+The `task/` example below is a template for a future module, not an existing implementation.
 
 ```text
 task/
-  MODULE.md                        паспорт: ответственность, входы, состав
-  Task.module.ts                   единственная обычная точка подключения
-  index.ts                         публичный TS-фасад, если нужен потребителям
+  MODULE.md                        passport: responsibility, inputs, contents
+  Task.module.ts                   the single regular connection point
+  index.ts                         the public TS facade, if consumers need it
   model/
-    Task.model.ts                  ORM-сущность
-    TaskDbContext.ts               контекст и наборы сущностей
+    Task.model.ts                  ORM entity
+    TaskDbContext.ts               context and entity sets
   services/
-    ITask.service.ts               интерфейс и DI-токен
-    Task.service.ts                операции предметной области
-  contracts/                       общие для нескольких адаптеров контракты
+    ITask.service.ts               interface and DI token
+    Task.service.ts                domain operations
+  contracts/                       contracts shared by several adapters
   http/
-    TaskController.ts              HTTP-входы
+    TaskController.ts              HTTP inputs
     contracts/
-      TaskRequests.ts              входные runtime-модели
-      TaskResponses.ts             выходные модели
-      TaskListQuery.ts             разрешённая поверхность list-запроса
-  background/                      hosted services / периодические обработчики
-  ui/                              декларации @UiProfile
+      TaskRequests.ts              input runtime models
+      TaskResponses.ts             output models
+      TaskListQuery.ts             the allowed surface of a list query
+  background/                      hosted services / periodic handlers
+  ui/                              @UiProfile declarations
   ai/
-    tools/                         инструменты, вызывающие сервисы модуля
-    contracts/                     входы и выходы AI-адаптеров
-  events/                          события и их обработчики, если нужны
-  config/                          принадлежащая функции конфигурация
-  infra/                           прикладные коннекторы и внешние клиенты
-  migrations/                      принадлежащие модулю миграции
-  errors/                          ошибки предметной области
-  internal/                        приватные детали реализации
-  test/                            проверки ответственности и контрактов
+    tools/                         tools that call the module's services
+    contracts/                     inputs and outputs of AI adapters
+  events/                          events and their handlers, if needed
+  config/                          configuration owned by the feature
+  infra/                           application connectors and external clients
+  migrations/                      migrations owned by the module
+  errors/                          domain errors
+  internal/                        private implementation details
+  test/                            checks of responsibility and contracts
 ```
 
-Обязательны паспорт и точка подключения; остальные файлы появляются только
-при наличии соответствующего поведения. Например, SMS-функции без собственной
-БД не нужны `model/`, `DbContext` и `migrations/`. HTTP и AI также необязательны.
-Пустые каталоги и заглушки «на будущее» не создаются.
+The passport and the connection point are mandatory; other files appear only when
+the matching behaviour exists. For example, an SMS feature without its own database
+needs no `model/`, `DbContext` or `migrations/`. HTTP and AI are optional as well.
+Empty directories and "for the future" stubs are not created.
 
-Объявления агентов и принадлежащие им промпты находятся вне модуля по
-[AGENT-ARCH-001](AGENT_ARCHITECTURE.md). Каталог `ai/tools` может содержать
-адаптеры публичных сервисов этого модуля; состав агентов он не определяет.
-Текущий CLI `--full` ещё создаёт агента внутри модуля: разделение генерации
-входит в первый этап перехода, а не считается выполненным изменением этой схемы.
+Agent declarations and the prompts they own live outside the module per
+[AGENT-ARCH-001](AGENT_ARCHITECTURE.md). The `ai/tools` directory may contain
+adapters of this module's public services; it does not define the set of agents.
+The current CLI `--full` still creates an agent inside the module: splitting the
+generation is part of the first migration stage, not a completed change of this layout.
 
-Имена новых самостоятельных каталогов — lowercase/kebab-case, как у CLI.
-Для составных модулей сохраняется принятая схема `<feature>_modules` и
-`<responsibility>_module`. В существующем модуле сохраняется его локальное
-именование: плоский Users и раскладка Product через `api/` и `dbContext/`
-не требуют переезда только ради этой спецификации.
+Names of new standalone directories are lowercase/kebab-case, as in the CLI.
+Composite modules keep the accepted `<feature>_modules` and
+`<responsibility>_module` scheme. An existing module keeps its local naming:
+the flat Users and the Product layout with `api/` and `dbContext/` in osnova
+do not need to move just because of this specification.
 
-Для новых и переименовываемых компонентов обязательно
-[простое именование из AGENTS.md](../../AGENTS.md#code-naming).
-Имена в текущих CLI-шаблонах и примерах не отменяют это правило; существующие
-публичные контракты и область изменения сохраняются.
+New and renamed components must follow the
+[simple naming from AGENTS.md](../../AGENTS.md#code-naming).
+Names in the current CLI templates and examples do not cancel this rule; existing
+public contracts and the scope of the change are kept.
 
-Один существенный runtime-класс — отдельный файл. Короткие связанные DTO
-допускаются вместе в `*Requests.ts`/`*Responses.ts`, как в генераторе.
-Type-only контракты находятся рядом с владельцем в `contracts/` или `types/`.
-Не создавать глобальные `services/` и `models/` для реализации всех функций.
+One significant runtime class per file. Short related DTOs may share
+`*Requests.ts`/`*Responses.ts`, as in the generator.
+Type-only contracts live next to the owner in `contracts/` or `types/`.
+Do not create global `services/` and `models/` for the implementation of all features.
 
-Пример точки подключения атомарного Task. Полные определения импортируемых
-классов приведены в [приложении с кодом](MODULE_CODE_EXAMPLES.md).
+An example connection point of the atomic Task. The full definitions of the imported
+classes are in the [code appendix](MODULE_CODE_EXAMPLES.md).
 
 ```ts
 // file: src/app/modules/task/Task.module.ts
@@ -289,36 +294,36 @@ import { TaskController } from "./http/TaskController";
 export class TaskModule {}
 ```
 
-Task владеет реализацией целиком. `imports: [AuthModule]` — зависимость от
-авторизации; она не превращает Task в составной модуль. Общий provider и
-готовность схемы обеспечивает host-композиция.
+Task owns its whole implementation. `imports: [AuthModule]` is a dependency on
+authorization; it does not make Task a composite module. The shared provider and
+schema readiness are provided by the host composition.
 
-### 4.3. Составной модуль
+### 4.3. A composite module
 
 ```text
 datamanager_modules/
-  MODULE.md                        паспорт пакета и карта зависимостей
-  DataManager.module.ts            imports / exports и фабрика композиции
-  tables_module/                   атомарная ответственность «таблицы»
-  fields_module/                   атомарная ответственность «поля»
-  validators_module/               атомарная ответственность «валидаторы»
-  records_module/                  атомарная ответственность «записи»
-  test/                            проверки композиции и совместных сценариев
+  MODULE.md                        pack passport and dependency map
+  DataManager.module.ts            imports / exports and the composition factory
+  tables_module/                   atomic responsibility "tables"
+  fields_module/                   atomic responsibility "fields"
+  validators_module/               atomic responsibility "validators"
+  records_module/                  atomic responsibility "records"
+  test/                            checks of the composition and joint scenarios
 ```
 
-Корень пакета и каждая новая атомарная часть создаются через CLI по §8.1.
-Каждая часть использует собственную раскладку из §4.2 и паспорт.
-Корень пакета не содержит своих предметных `providers`, `controllers`, `config`,
-`ormOsnv`, `background`, `uiProfiles` и исполняемых AI-обработчиков.
-Если нужна оркестрация нескольких частей, она получает явного атомарного
-владельца; не размещается скрытым бизнес-сервисом в корне пакета.
+The pack root and every new atomic part are created through the CLI per §8.1.
+Each part uses its own layout from §4.2 and its own passport.
+The pack root has no domain `providers`, `controllers`, `config`,
+`ormOsnv`, `background`, `uiProfiles` or executable AI handlers of its own.
+If orchestration of several parts is needed, it gets an explicit atomic
+owner; it is not placed as a hidden business service in the pack root.
 
-Фабрика модуля может подставлять зависимость и возвращать настроенную композицию.
-Её аргументы описываются как
-публичные входы пакета. Потребителю достаточно подключить корень пакета;
-внутренние зависимости частей при этом остаются явно объявленными.
+A module factory may substitute a dependency and return a configured composition.
+Its arguments are described as
+public inputs of the pack. A consumer only needs to connect the pack root;
+the internal dependencies of the parts stay explicitly declared.
 
-Пример кода существующего составного модуля:
+A code example of an existing composite module (DataManager in osnova):
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
@@ -342,417 +347,417 @@ import { DataManagerRecordsModule } from "./records_module/DataManagerRecords.mo
 export class DataManagerModule {}
 ```
 
-Здесь корень только собирает части. Код атомарной части Records и зависимости
-между частями показаны в [приложении с кодом](MODULE_CODE_EXAMPLES.md).
+Here the root only assembles the parts. The code of the atomic Records part and the
+dependencies between parts are shown in the [code appendix](MODULE_CODE_EXAMPLES.md).
 
-## 5. Поля подключения модуля
+## 5. Module connection fields
 
-### 5.1. Базовые метаданные `@Module`
+### 5.1. Base `@Module` metadata
 
-Источник типов: [OsnvModuleMetadata](../../src/osnv/core/di/module/types/OsnvModule.ts).
-Все перечисленные поля опциональны в TypeScript. Правила проекта могут требовать
-явного значения, например `exports` у нового функционального модуля.
+Type source: [OsnvModuleMetadata](../../src/osnv/core/di/module/types/OsnvModule.ts).
+All listed fields are optional in TypeScript. Project rules may require an explicit
+value, for example `exports` on a new feature module.
 
-| Поле | Входной тип / значение | Назначение и правило |
+| Field | Input type / value | Purpose and rule |
 | --- | --- | --- |
-| `imports` | `readonly OsnvModuleRef[]` | Подключаемые зависимости; у пакета также его атомарные части |
-| `config` | `ModuleConfig` или readonly-массив | Объявления и валидаторы; kernel разрешает значения и проверяет их до создания клиентов по [§5.4](#kernel-config-isolation) |
-| `providers` | `readonly ProviderDefinition[]` | Собственные DI-регистрации; токен, реализация, зависимости и lifetime описываются в паспорте |
-| `controllers` | `readonly Class<object>[]` | Классы HTTP-контроллеров; автоматически регистрируются scoped |
-| `uiProfiles` | `readonly unknown[]` | Объявления UI-профилей; ссылки на controller/request/response проверяет верхний слой |
-| `background` | `readonly Class<HostedService>[]` | Singleton-обработчики с управляемым запуском и остановкой |
-| `exports` | `readonly ModuleExport[]` | Доступные импортирующим модулям токены/классы/open generic families |
-| `global` | `boolean` | Глобальная видимость экспортов; предназначена для инфраструктуры, не для обхода `imports` |
-| `configure` | `(di: DiRegistrar) => void` | Программная регистрация при необходимости; обычные регистрации задаются декларативно |
+| `imports` | `readonly OsnvModuleRef[]` | Connected dependencies; for a pack also its atomic parts |
+| `config` | `ModuleConfig` or a readonly array | Declarations and validators; the kernel resolves the values and checks them before clients are created per [§5.4](#kernel-config-isolation) |
+| `providers` | `readonly ProviderDefinition[]` | Own DI registrations; the token, implementation, dependencies and lifetime are described in the passport |
+| `controllers` | `readonly Class<object>[]` | HTTP controller classes; registered as scoped automatically |
+| `uiProfiles` | `readonly unknown[]` | UI profile declarations; the upper layer checks the controller/request/response references |
+| `background` | `readonly Class<HostedService>[]` | Singleton handlers with managed start and stop |
+| `exports` | `readonly ModuleExport[]` | Tokens/classes/open generic families available to importing modules |
+| `global` | `boolean` | Global visibility of exports; meant for infrastructure, not for bypassing `imports` |
+| `configure` | `(di: DiRegistrar) => void` | Programmatic registration when needed; regular registrations are declarative |
 
-Имя модуля берётся из класса с `@Module`, отдельного поля `name` у этих метаданных
-нет. `OsnvModuleRef` допускает также plain metadata для внутренних/совместимых
-сценариев; для нового прикладного модуля используется именованный класс.
+The module name comes from the class with `@Module`; this metadata has no separate
+`name` field. `OsnvModuleRef` also allows plain metadata for internal/compatibility
+scenarios; a new application module uses a named class.
 
-Семантика `exports` принципиальна:
+The semantics of `exports` matter:
 
-- поле отсутствует — модуль открыт для импортирующих модулей;
-- `exports: []` — его providers приватны;
-- `exports: [IService]` — наружу объявлен конкретный контракт;
-- корень DI-контейнера технически может разрешать любые регистрации. Это не
-  разрешение прикладному коду обходить модульные границы;
-- `exports: []` не отключает контроллеры, фоновые задачи или зарегистрированные
-  инструменты. Их публикация и авторизация проверяются отдельно;
-- `index.ts` ограничивает TypeScript-поверхность, но не заменяет DI-экспорты.
+- the field is absent — the module is open to importing modules;
+- `exports: []` — its providers are private;
+- `exports: [IService]` — a specific contract is declared outward;
+- the DI container root can technically resolve any registration. This does not
+  permit application code to bypass module boundaries;
+- `exports: []` does not disable controllers, background jobs or registered
+  tools. Their publication and authorization are checked separately;
+- `index.ts` limits the TypeScript surface but does not replace DI exports.
 
-Новые функциональные модули и пакеты задают `exports` явно. Существующий корень
-приложения не требуется менять ради этого правила.
+New feature modules and packs set `exports` explicitly. The existing application
+root does not have to change because of this rule.
 
 ### 5.2. ORM: `ormOsnv`
 
-Это расширение метаданных из `osnv/core/orm`, а не поле нижнего слоя DI.
-Принимает один `OrmModuleConfig<DbContext>` или readonly-массив конфигураций.
-Обычный атомарный модуль использует `context` и `entities` на общем подключении.
-Несколько ORM-контекстов не означают автоматически несколько атомарных модулей.
+This is a metadata extension from `osnv/core/orm`, not a field of the lower DI layer.
+It takes one `OrmModuleConfig<DbContext>` or a readonly array of configurations.
+A regular atomic module uses `context` and `entities` on the shared connection.
+Several ORM contexts do not automatically mean several atomic modules.
 
-Источник и точные проверки сочетаний: [ormModule.ts](../../src/osnv/core/orm/ormModule.ts).
+Source and the exact combination checks: [ormModule.ts](../../src/osnv/core/orm/ormModule.ts).
 
-| Поле | Входной тип | Значение / условие |
+| Field | Input type | Value / condition |
 | --- | --- | --- |
-| `context` | класс-наследник `DbContext` | Обязателен для feature-режима; конструктор получает `DbContextOptions` |
-| `entities` | readonly-массив классов сущностей | Явный список принадлежащих контексту моделей |
-| `provider` | `DatabaseProvider` | Без него используется общий `DATABASE_PROVIDER`; с ним — connection/standalone-режим |
-| `validateOnSave` | `boolean` | По умолчанию `true`; отключение требует описанной альтернативной валидации |
-| `ensureCreated` | `boolean` | По умолчанию `false`; режим создания схемы, не универсальное правило для новых функций |
-| `migrateOnStart` | `boolean` | По умолчанию `false`; аддитивная миграция моделей с соответствующими метаданными |
-| `migrations` | `readonly Migration[]` | Версионированные миграции модуля |
-| `runMigrationsOnStart` | `boolean` | По умолчанию `false`; запуск версионированных миграций |
-| `executionStrategy` | `DbContextOptionsConfig["executionStrategy"]` | Настройки повторов при transient-ошибках сохранения |
-| `healthCheck` | `boolean` | По умолчанию включён для connection/standalone и выключен для feature |
-| `registerRepositories` | `boolean` | По умолчанию `true`; scoped `IRepository<T>` |
-| `imports` | `readonly OsnvModuleRef[]` | Дополнительные зависимости контекста |
-| `ownedStore` | `OrmOwnedStoreDefinitionV1` | Специальный контракт управляемого PostgreSQL-хранилища и его lifecycle |
+| `context` | a `DbContext` subclass | Required for feature mode; the constructor receives `DbContextOptions` |
+| `entities` | a readonly array of entity classes | An explicit list of the models owned by the context |
+| `provider` | `DatabaseProvider` | Without it the shared `DATABASE_PROVIDER` is used; with it — connection/standalone mode |
+| `validateOnSave` | `boolean` | `true` by default; disabling it needs a described alternative validation |
+| `ensureCreated` | `boolean` | `false` by default; a schema creation mode, not a universal rule for new features |
+| `migrateOnStart` | `boolean` | `false` by default; additive migration of models with the matching metadata |
+| `migrations` | `readonly Migration[]` | The module's versioned migrations |
+| `runMigrationsOnStart` | `boolean` | `false` by default; runs the versioned migrations |
+| `executionStrategy` | `DbContextOptionsConfig["executionStrategy"]` | Retry settings for transient save errors |
+| `healthCheck` | `boolean` | On by default for connection/standalone and off for feature |
+| `registerRepositories` | `boolean` | `true` by default; scoped `IRepository<T>` |
+| `imports` | `readonly OsnvModuleRef[]` | Extra dependencies of the context |
+| `ownedStore` | `OrmOwnedStoreDefinitionV1` | A special contract of a managed PostgreSQL store and its lifecycle |
 
-Нельзя смешивать `ensureCreated` с активными startup-миграциями или непустым
-списком `migrations`. Для `ownedStore` обязательны context и непустой entities;
-нельзя передавать provider, активировать перечисленные startup-флаги или
-передавать `migrations`. Standalone PostgreSQL с `ensureCreated` также ограничен
-текущим ORM-контрактом. Режим схемы выбирается явно по задаче и окружению;
-CLI-каркас не задаёт startup-флаги создания или обновления схемы: её готовность
-обеспечивает host-композиция.
+Do not combine `ensureCreated` with active startup migrations or a non-empty
+`migrations` list. `ownedStore` requires a context and non-empty entities;
+it must not get a provider, activate the listed startup flags or get
+`migrations`. Standalone PostgreSQL with `ensureCreated` is also limited by the
+current ORM contract. The schema mode is chosen explicitly for the task and environment;
+the CLI scaffold sets no startup flags for creating or updating the schema: its
+readiness is provided by the host composition.
 
-### 5.3. AI и дополнительные расширения
+### 5.3. AI and other extensions
 
-gRPC подключается импортом `osnv/core/grpc`: поле
-`grpcControllers?: readonly Class<object>[]` регистрирует классы с
-`@GrpcController` как scoped на один RPC через существующее owner-bound
-расширение DI. Функциональный модуль может одновременно владеть `controllers`
-и `grpcControllers`; разделение на подмодули по транспорту не требуется.
-Сервер включается через `runApp(..., { grpc: ... })` либо `grpcModule(options)`.
-Контракты и проверки — в [паспорте gRPC](../../src/osnv/core/grpc/MODULE.md).
+gRPC is connected by importing `osnv/core/grpc`: the field
+`grpcControllers?: readonly Class<object>[]` registers classes with
+`@GrpcController` as scoped per RPC through the existing owner-bound DI
+extension. A feature module can own both `controllers`
+and `grpcControllers`; splitting into submodules by transport is not needed.
+The server is enabled through `runApp(..., { grpc: ... })` or `grpcModule(options)`.
+Contracts and checks are in the [gRPC passport](../../src/osnv/core/grpc/MODULE.md).
 
-Источник действующих AI-полей: [agent/index.ts](../../src/osnv/core/agent/index.ts).
-Таблица описывает текущую реализацию. Решение от 2026-09-20 отделяет агентов
-от модулей; переход выполняется по [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
+Source of the current AI fields: [agent/index.ts](../../src/osnv/core/agent/index.ts).
+The table describes the current implementation. The decision of 2026-09-20 separates
+agents from modules; the migration follows [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
 
-| Поле текущего API | Входной тип | Что описать в паспорте |
+| Current API field | Input type | What to describe in the passport |
 | --- | --- | --- |
-| `agents` | `readonly Class<object>[]` | Прежний модульный путь, только для совместимости на время перехода; новые агенты объявляются отдельно |
-| `tools` | `readonly Class<object>[]` | Класс с `@Tool`, input/output schema, побочные эффекты, доступ, DI-зависимости |
-| `prompts` | `readonly Class<object>[]` | Действующий модульный путь регистрации; промпты агента переходят вместе с его самостоятельным объявлением |
-| `agentToolHooks` | `readonly AgentToolHookRegistrationV1[]` | Вид и идентичность hook, handler, порядок, timeout, входное событие и результат |
+| `agents` | `readonly Class<object>[]` | The previous module path, only for compatibility during the migration; new agents are declared separately |
+| `tools` | `readonly Class<object>[]` | A class with `@Tool`, input/output schema, side effects, access, DI dependencies |
+| `prompts` | `readonly Class<object>[]` | The current module registration path; an agent's prompts move together with its standalone declaration |
+| `agentToolHooks` | `readonly AgentToolHookRegistrationV1[]` | The hook kind and identity, handler, order, timeout, input event and result |
 
-У записи `agentToolHooks` поля `kind`, `id`, `version`, `handler` обязательны;
-`order` и `timeoutMs` опциональны. `kind` — `enforcement`, `settlement` или
-`observer`; `id` — 1–128 печатных ASCII-символов; `version` — положительное safe
-integer; `order` — safe integer; `timeoutMs` — положительное safe integer.
-Handler реализует соответствующий `enforce`, `settle` или `observe`. Точные
-контракты событий берутся из [AgentToolHooks.ts](../../src/osnv/core/agent/AgentToolHooks.ts).
+In an `agentToolHooks` entry the `kind`, `id`, `version` and `handler` fields are required;
+`order` and `timeoutMs` are optional. `kind` is `enforcement`, `settlement` or
+`observer`; `id` is 1–128 printable ASCII characters; `version` is a positive safe
+integer; `order` is a safe integer; `timeoutMs` is a positive safe integer.
+The handler implements the matching `enforce`, `settle` or `observe`. The exact
+event contracts come from [AgentToolHooks.ts](../../src/osnv/core/agent/AgentToolHooks.ts).
 
-`tools` автоматически создаёт обычный scoped provider класса у объявившего его
-модуля. Точная существующая scoped-регистрация того же владельца переиспользуется;
-другой lifetime, фабрика, дубликат имени или конфликт владельцев дают ошибку
-сборки контейнера. Повторять Tool в `providers` для обычного подключения не нужно.
-Hook по-прежнему регистрируется как приватный вклад владельца. Источник —
+`tools` automatically creates a regular scoped provider of the class in the declaring
+module. An exact existing scoped registration of the same owner is reused;
+a different lifetime, a factory, a duplicate name or an owner conflict fail the
+container build. Repeating a Tool in `providers` for a regular connection is not needed.
+A hook is still registered as the owner's private contribution. Source:
 [moduleContributions-v1.ts](../../src/osnv/core/agent/moduleContributions-v1.ts).
 
-Связь реализации Tool с DI-владельцем не означает включение агента в модуль.
-Назначение Tools агенту и фактические права на действие определяются отдельно.
-В приложении общий [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
-находится в области агентов. `AgentRegistry.fromContainer` собирает каталог
-фактических регистраций без создания экземпляров Tools; `AgentCatalogExtras`
-и прежние фабрики реестра сохраняются для существующих потребителей.
+Linking a Tool implementation to a DI owner does not put the agent into the module.
+Assigning Tools to an agent and the actual permissions to act are defined separately.
+In the osnova application the shared [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
+lives in the agents area. `AgentRegistry.fromContainer` builds a catalog of the
+actual registrations without instantiating Tools; `AgentCatalogExtras`
+and the previous registry factories are kept for existing consumers.
 
-Не изобретать недостающий API и не считать произвольный ключ `@Module`
-автоматически исполняемым. Появление новой декларативной возможности требует
-типизированного поля, подключённого обработчика и проверки регистрации.
+Do not invent a missing API and do not treat an arbitrary `@Module` key as
+automatically executable. A new declarative capability needs a typed field, a
+connected handler and a registration check.
 
 <a id="kernel-config-isolation"></a>
 
-### 5.4. Объявление конфигурации и значения каждого kernel
+### 5.4. Configuration declaration and the values of each kernel
 
-**Принятое решение от 2026-09-14:** объявление конфигурации общее и неизменяемое;
-выбранное окружение и рассчитанные значения принадлежат конкретному kernel.
-Один объект объявления допускается использовать в нескольких kernel одного
-процесса, в том числе одновременно с разными окружениями.
+**Decision accepted on 2026-09-14:** a configuration declaration is shared and immutable;
+the selected environment and the computed values belong to a specific kernel.
+One declaration object may be used in several kernels of one process, including
+at the same time with different environments.
 
-Модель реализована через `ConfigDefinition`, `ConfigRegistry` и существующий DI.
-Состояние проверок и границы приведены в
-[отчёте реализации](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
+The model is implemented through `ConfigDefinition`, `ConfigRegistry` and the existing DI.
+The state of the checks and the boundaries are in the
+[implementation report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
 
-| Часть | Содержание | Владелец и время жизни |
+| Part | Contents | Owner and lifetime |
 | --- | --- | --- |
-| Объявление конфигурации | Префикс, ключи и типы, defaults, секции `development` / `test` / `production`, правила проверки и секретов | Предметный или инфраструктурный модуль; допускает повторное использование без изменения |
-| Представление конфигурации | Выбранное окружение, проверенные значения из снимка источников и кэш разрешения | Один kernel; потребители его DI-контейнера получают это представление |
+| Configuration declaration | Prefix, keys and types, defaults, `development` / `test` / `production` sections, validation and secret rules | A domain or infrastructure module; can be reused without change |
+| Configuration view | The selected environment, validated values from the source snapshot and the resolution cache | One kernel; consumers of its DI container get this view |
 
-Поток данных: **объявление + окружение kernel + снимок источников → проверенное
-представление этого kernel**. Host-композиция разрешает и проверяет конфигурацию
-до создания использующих её клиентов и запуска служб. Модули сохраняют владение
-своими объявлениями и подключают их через существующие `@Module` / `@Infra`.
-Сборка kernel не изменяет общие метаданные модулей или объявления конфигурации.
+Data flow: **declaration + kernel environment + source snapshot → the validated
+view of this kernel**. The host composition resolves and validates the configuration
+before the clients that use it are created and services start. Modules keep ownership
+of their declarations and connect them through the existing `@Module` / `@Infra`.
+Building a kernel does not change shared module metadata or configuration declarations.
 
-Обязательные свойства целевой модели:
+Required properties of the target model:
 
-1. В общем объявлении нет `activeStand`, выбранных значений, секретов из env
-   или кэша, зависящего от конкретного запуска. Чтение и валидация для одного
-   kernel не переключают конфигурацию другого.
-2. Каждый kernel получает собственный неизменяемый результат разрешения.
-   Одинаковое имя окружения не делает кэш общим: исходные значения у двух
-   kernel могут различаться. Повторное подключение одного объявления внутри
-   одного kernel использует его уже разрешённое представление.
-3. Выбор окружения выполняется на границе host-композиции. Сохраняются правила
-   `defineConfig`: `default` → секция выбранного окружения → снимок настроенных
-   источников kernel, включая `OSNV_*`; сохраняются типизированное преобразование
-   и `Secret`. Значения источников
-   фиксируются для разрешения данного kernel; последующее изменение `process.env`
-   не меняет готовый результат. Переключать `process.env` для выбора контекста
-   при чтении нельзя. Порядок источников задан в
-   [контракте конфигурации](../../src/osnv/core/kernel/config/README.md).
-4. Сервисы получают представление своего kernel через существующий DI;
-   host-фабрики могут получать его явным аргументом. Общий импорт объявления
-   сам по себе не определяет, значения какого kernel нужно читать. Глобальный
-   «текущий kernel» и ручное копирование объявления потребителем не требуются.
-5. Ошибка разрешения или валидации прерывает сборку затронутого kernel,
-   сохраняя общее объявление и готовые представления других kernel. Остановка
-   kernel также не меняет чужую конфигурацию. Секреты сохраняют существующее
-   маскирование в диагностике.
+1. The shared declaration holds no `activeStand`, selected values, secrets from env
+   or a cache that depends on a specific run. Reading and validating for one
+   kernel do not switch the configuration of another.
+2. Each kernel gets its own immutable resolution result.
+   The same environment name does not make the cache shared: the source values of two
+   kernels may differ. Connecting the same declaration again inside
+   one kernel uses its already resolved view.
+3. The environment is chosen at the host composition boundary. The
+   `defineConfig` rules are kept: `default` → the selected environment section → the snapshot
+   of the kernel's configured sources, including `OSNV_*`; typed conversion
+   and `Secret` are kept. Source values
+   are fixed for this kernel's resolution; a later change of `process.env`
+   does not change a ready result. Switching `process.env` to pick a context
+   while reading is not allowed. The source order is set in the
+   [configuration contract](../../src/osnv/core/kernel/config/README.md).
+4. Services get their kernel's view through the existing DI;
+   host factories may get it as an explicit argument. A shared declaration import
+   alone does not define which kernel's values to read. A global
+   "current kernel" and manual copying of the declaration by a consumer are not needed.
+5. A resolution or validation error aborts the build of the affected kernel,
+   keeping the shared declaration and the ready views of other kernels. Stopping a
+   kernel does not change another kernel's configuration either. Secrets keep the existing
+   masking in diagnostics.
 
-Реализация находится внутри существующих kernel/config, DI и Infra.
-`defineConfig` возвращает неизменяемое объявление с `resolve(environment?, configuration?)`
-и `token`. Сервис получает `ConfigView<T>` по `definition.token` через DI;
-`ConfigRegistry.get(definition)` возвращает то же представление своего kernel.
-Коннектор получает реестр аргументом `create(configs?)`. Прямые `get/has` объявления
-сохранены для standalone-кода и читают process env; `ensureValid` не переключает
-их окружение. Внутри kernel требуется его DI-представление.
+The implementation lives inside the existing kernel/config, DI and Infra.
+`defineConfig` returns an immutable declaration with `resolve(environment?, configuration?)`
+and `token`. A service gets `ConfigView<T>` by `definition.token` through DI;
+`ConfigRegistry.get(definition)` returns the same view of its kernel.
+A connector gets the registry as the `create(configs?)` argument. The declaration's direct `get/has`
+are kept for standalone code and read the process env; `ensureValid` does not switch
+their environment. Inside a kernel its DI view is required.
 
-Составное пользовательское объявление может реализовать
-`AppConfig.resolve(environment?, configuration?)`, возвращая независимый
-неизменяемый результат. Объект только с `ensureValid` сохраняет совместимость
-как валидатор/готовое значение; kernel не может изолировать произвольное
-изменяемое состояние, скрытое в его пользовательских замыканиях.
+A composite user declaration may implement
+`AppConfig.resolve(environment?, configuration?)`, returning an independent
+immutable result. An object with only `ensureValid` stays compatible
+as a validator/ready value; the kernel cannot isolate arbitrary
+mutable state hidden in its user closures.
 
-**Критерии приёмки реализации:** два kernel с общим объявлением успешно
-собираются для `production` и `test`; последовательное и конкурентное чтение
-через их сервисы и коннекторы сохраняет значения каждого. Отдельно проверяются
-два kernel одного окружения с разными снимками источников, ошибка сборки одного
-и остановка другого, отсутствие влияния последующих изменений источников и
-сохранение правил defaults, преобразования типов и `Secret`.
+**Implementation acceptance criteria:** two kernels with a shared declaration build
+successfully for `production` and `test`; sequential and concurrent reads
+through their services and connectors keep each kernel's values. Separately checked:
+two kernels of one environment with different source snapshots, a build error of one
+and stopping the other, no effect of later source changes, and
+keeping the rules for defaults, type conversion and `Secret`.
 
-**Переход выполнен:** общее объявление больше не хранит `activeStand` и не
-запрещает использование в другом окружении. Встроенные коннекторы, JWT и адаптер
-защиты сессий получают представление kernel. Готовое представление остаётся
-неизменяемым; для другого kernel повторно используется объявление.
-Состояние и границы зафиксированы в
-[паспорте kernel](../../src/osnv/core/kernel/MODULE.md#config-isolation-decision).
+**Migration done:** the shared declaration no longer stores `activeStand` and does not
+forbid use in another environment. The built-in connectors, JWT and the session
+protection adapter get the kernel view. A ready view stays
+immutable; for another kernel the declaration is reused.
+The state and boundaries are recorded in the
+[kernel passport](../../src/osnv/core/kernel/MODULE.md#config-isolation-decision).
 
-## 6. Компоненты атомарного модуля и их входы
+## 6. Components of an atomic module and their inputs
 
-Ниже перечислены роли компонентов. В паспорте необходимо перечислить конкретные
-файлы и символы, а не только скопировать названия каталогов. Неприменимые части
-отмечаются «не используется» с короткой причиной, без создания заглушек.
+The component roles are listed below. The passport must list the concrete
+files and symbols, not just copy directory names. Parts that do not apply are
+marked "not used" with a short reason, without creating stubs.
 
-| Компонент | Где находится | Что получает на вход | Ответственность / выход |
+| Component | Where it lives | What it gets as input | Responsibility / output |
 | --- | --- | --- | --- |
-| Декларация модуля / фабрика | `*.module.ts` | Поля §5; типизированные options фабрики, если есть | Граф зависимостей и публичные DI-контракты |
-| Интерфейс и DI-токен | `services/`, `contracts/` | Аргументы каждой публичной операции | Типизированные результаты и ошибки |
-| Бизнес-сервис | `services/` | Constructor DI-deps; DTO/command/query; контекст операции, если нужен | Предметные правила, транзакции, вызовы ORM и внешних портов |
-| ORM-сущность | `model/` | Поля модели с типами, ключами, nullability, defaults и ограничениями | Принадлежащие модулю данные; не автоматическая HTTP-модель |
-| DbContext / repository | `model/` | Options, provider, сущности; критерии чтения и изменения | Доступ к данным через существующий ORM |
-| Миграция | `migrations/` | Версия, контекст исполнения, ожидаемое состояние схемы | Конкретное изменение схемы и его условия выполнения |
-| HTTP-контроллер | `http/` | DI-сервис; path/query/body/header; серверный HTTP/auth-контекст | Привязка и проверка запроса, вызов сервиса, HTTP-результат |
-| Request/command | `http/contracts/`, `contracts/` | Каждое входное поле по правилам §7 | Runtime-валидация на соответствующей границе |
-| List/query-модель | `http/contracts/` | Разрешённые sort/filter/page, операторы и лимиты | Типизированный запрос, не произвольный доступ к колонкам |
-| Response и mapper | `http/contracts/`, `contracts/` | Результат сервиса/модель; список публикуемых полей | Стабильный выходной DTO с описанным форматом сериализации |
-| Конфигурация | `config/` или существующий `infra/` | Общее объявление, окружение kernel и источники значений | Представление каждого kernel по [§5.4](#kernel-config-isolation); секреты не дублируются в паспорте |
-| Внешний адаптер / клиент | `infra/` | Настройки соединения, DI-порт, запрос и ограничения времени | Перевод внешнего контракта в контракт модуля |
-| Фоновый обработчик | `background/` | DI; расписание/событие; `AbortSignal`; payload, если есть | Управляемая работа и корректное освобождение ресурсов |
-| UI-профиль | `ui/` | `surface`, controller/request/response references, операции и навигация | Декларация интерфейса; не замена серверной авторизации |
-| Tool-адаптер модуля | `ai/tools/`, `ai/contracts/` | Контракты §5.3; input schema, DI и runtime-context | Вызов публичных прикладных операций и проверяемый output; агент объявляется отдельно |
-| Event-адаптер | `events/` | Тип/версия события, payload и контекст по API интеграции | Перевод события в операции модуля |
-| Ошибки | `errors/` | Код, предметные детали и исходная причина по контракту | Определённая ошибка без утечки внутренних данных |
-| Внутренняя реализация | `internal/`, рядом с владельцем | Типизированные локальные аргументы и deps | Деталь реализации, не публичный вход |
-| Проверки | `test/` или существующие colocated tests | Фикстуры, конкретные inputs, подменённые порты | Проверка поведения, границ и негативных случаев |
+| Module declaration / factory | `*.module.ts` | The §5 fields; typed factory options, if any | The dependency graph and public DI contracts |
+| Interface and DI token | `services/`, `contracts/` | The arguments of each public operation | Typed results and errors |
+| Business service | `services/` | Constructor DI deps; DTO/command/query; operation context, if needed | Domain rules, transactions, ORM and external port calls |
+| ORM entity | `model/` | Model fields with types, keys, nullability, defaults and constraints | Data owned by the module; not an automatic HTTP model |
+| DbContext / repository | `model/` | Options, provider, entities; read and change criteria | Data access through the existing ORM |
+| Migration | `migrations/` | Version, execution context, expected schema state | A concrete schema change and its execution conditions |
+| HTTP controller | `http/` | DI service; path/query/body/header; server HTTP/auth context | Request binding and validation, the service call, the HTTP result |
+| Request/command | `http/contracts/`, `contracts/` | Each input field per the §7 rules | Runtime validation at the matching boundary |
+| List/query model | `http/contracts/` | Allowed sort/filter/page, operators and limits | A typed query, not arbitrary column access |
+| Response and mapper | `http/contracts/`, `contracts/` | The service result/model; the list of published fields | A stable output DTO with a described serialization format |
+| Configuration | `config/` or the existing `infra/` | The shared declaration, the kernel environment and value sources | The view of each kernel per [§5.4](#kernel-config-isolation); secrets are not duplicated in the passport |
+| External adapter / client | `infra/` | Connection settings, DI port, request and time limits | Translating the external contract into the module contract |
+| Background handler | `background/` | DI; schedule/event; `AbortSignal`; payload, if any | Managed work and correct resource release |
+| UI profile | `ui/` | `surface`, controller/request/response references, operations and navigation | An interface declaration; not a replacement for server authorization |
+| Module Tool adapter | `ai/tools/`, `ai/contracts/` | The §5.3 contracts; input schema, DI and runtime context | Calls public application operations and returns a checkable output; the agent is declared separately |
+| Event adapter | `events/` | Event type/version, payload and context per the integration API | Translating the event into module operations |
+| Errors | `errors/` | Code, domain details and the original cause per the contract | A defined error without leaking internal data |
+| Internal implementation | `internal/`, next to the owner | Typed local arguments and deps | An implementation detail, not a public input |
+| Checks | `test/` or existing colocated tests | Fixtures, concrete inputs, substituted ports | Checking behaviour, boundaries and negative cases |
 
-Не добавлять новые поля в рабочие API только потому, что они названы в таблице
-описания. Например, `context`, `timeout` или `idempotencyKey` нужны в сигнатуре
-лишь тогда, когда этого требует конкретная операция и поддерживает её API.
+Do not add new fields to working APIs just because the description table names them.
+For example, `context`, `timeout` or `idempotencyKey` belong in a signature
+only when a concrete operation needs them and its API supports them.
 
-### 6.1. DI и время жизни
+### 6.1. DI and lifetime
 
-В паспорте каждой регистрации указать: `provide` (токен/класс), `useClass` или
-фабрику/значение, типы зависимостей конструктора, lifetime, модуль-источник каждой
-зависимости и доступность через `exports`. Описание зависимостей в паспорте
-не требует повторять их массивом в регистрации.
+For each registration the passport states: `provide` (token/class), `useClass` or
+a factory/value, the constructor dependency types, the lifetime, the source module of each
+dependency and its availability through `exports`. Describing dependencies in the passport
+does not require repeating them as an array in the registration.
 
-Обычный путь — `scoped`, `singleton`, `transient` и существующие factory/value
-shortcuts из [shortcuts.ts](../../src/osnv/core/di/module/shortcuts.ts).
-Для обычного класса используется `scoped(IService, Service)` либо `scoped(Service)`.
-Зависимости объявляются в конструкторе; codegen извлекает их типы, включая
-`IRepository<Entity>`, а DI использует сгенерированную привязку.
-Ручной третий аргумент `deps` не нужен для повторения этих же зависимостей.
-Он допускается для конкретного обоснованного override, а не как стандарт
-нового модуля. После изменения конструктора обновляется codegen.
+The regular path is `scoped`, `singleton`, `transient` and the existing factory/value
+shortcuts from [shortcuts.ts](../../src/osnv/core/di/module/shortcuts.ts).
+A regular class uses `scoped(IService, Service)` or `scoped(Service)`.
+Dependencies are declared in the constructor; codegen extracts their types, including
+`IRepository<Entity>`, and DI uses the generated binding.
+A manual third `deps` argument is not needed to repeat these same dependencies.
+It is allowed for a concrete justified override, not as the standard for a
+new module. After a constructor changes, codegen is refreshed.
 
-Контроллер уже регистрируется через `controllers` (HTTP) либо `grpcControllers`
-(gRPC), фоновый класс — через
-`background`: не дублировать их без отдельного основания в `providers`.
-Singleton не удерживает scoped-сервис. Фоновый обработчик создаёт scope для
-единицы работы и освобождает его; пример — `UserStatsReporter`.
+A controller is already registered through `controllers` (HTTP) or `grpcControllers`
+(gRPC), a background class through
+`background`: do not duplicate them in `providers` without a separate reason.
+A singleton does not hold a scoped service. A background handler creates a scope for
+a unit of work and releases it; an example is `UserStatsReporter` in osnova.
 
-## 7. Контракты входа и выхода
+## 7. Input and output contracts
 
-### 7.1. Паспорт каждой точки входа
+### 7.1. Passport of each entry point
 
-Для каждого публичного метода, HTTP-маршрута, options фабрики, tool, фонового
-payload и события необходимо зафиксировать:
+For each public method, HTTP route, factory options, tool, background
+payload and event, record:
 
-1. Имя операции, файл/символ и способ вызова: route + method, DI-метод,
-   конфигурационная фабрика, расписание, событие или tool name.
-2. Вызывающего потребителя, права доступа и источник контекста. Пользовательские
-   поля не подменяют серверную идентичность или разрешения.
-3. Входную модель со всеми полями, включая вложенные объекты и массивы.
-4. Результат: тип, поля, формат дат/идентификаторов, null/empty semantics;
-   для HTTP также status и существенные headers.
-5. Ошибки, условия возникновения и отображение на границе; в частности,
-   поведение при неизвестном идентификаторе и невалидном вводе.
-6. Изменяемое состояние и внешние эффекты. Для операций с повторами или долгой
-   работой — фактически поддерживаемые идемпотентность, конкурентность,
-   транзакция, deadline и отмена. Если не поддерживаются, указать это прямо.
-7. Проверки: обычный запрос, граничные значения, невалидные входы и отказы
-   зависимостей, существенные для этой операции.
+1. The operation name, the file/symbol and how it is invoked: route + method, DI method,
+   configuration factory, schedule, event or tool name.
+2. The calling consumer, access rights and the source of the context. User
+   fields do not replace server identity or permissions.
+3. The input model with all fields, including nested objects and arrays.
+4. The result: type, fields, date/identifier format, null/empty semantics;
+   for HTTP also the status and significant headers.
+5. Errors, when they happen and how they map at the boundary; in particular,
+   the behaviour for an unknown identifier and invalid input.
+6. Changed state and external effects. For operations with retries or long-running
+   work — the actually supported idempotency, concurrency,
+   transaction, deadline and cancellation. If they are not supported, say so plainly.
+7. Checks: a regular request, boundary values, invalid inputs and dependency
+   failures that matter for this operation.
 
-Операцию без аргументов также описать: «входные поля отсутствуют», отдельно её
-DI-зависимости и запускающий механизм. Не придумывать ей пустой Request-класс.
+Describe an operation without arguments too: "no input fields", plus its
+DI dependencies and the triggering mechanism. Do not invent an empty Request class for it.
 
-### 7.2. Таблица полей
+### 7.2. Field table
 
-Для каждого поля обязательны следующие сведения:
+Each field requires the following information:
 
-| Сведение | Что записывать |
+| Item | What to record |
 | --- | --- |
-| Путь | Точное имя: `name`, `options.limit`, `items[].id`; внешний alias, если есть |
-| Тип и формат | TS/runtime-тип; enum, дата/время, UUID, числовые единицы и диапазон |
-| Источник | `body`, `path`, `query`, `header`, `config`, аргумент метода, событие или серверный context |
-| Обязательность | Обязательно ли присутствие; условные зависимости от других полей |
-| Nullability | Допускается ли `null`, отдельно от отсутствия/`undefined` и пустой строки |
-| Default | Значение при отсутствии и где оно применяется; «нет», если отсутствует |
-| Проверки | Required, длина, диапазон, enum, вложенная проверка, предметные инварианты |
-| Пример | Без секретов и реальных персональных данных; допустимое значение |
+| Path | The exact name: `name`, `options.limit`, `items[].id`; the external alias, if any |
+| Type and format | TS/runtime type; enum, date/time, UUID, numeric units and range |
+| Source | `body`, `path`, `query`, `header`, `config`, a method argument, an event or the server context |
+| Required | Whether presence is required; conditional dependencies on other fields |
+| Nullability | Whether `null` is allowed, separately from absence/`undefined` and an empty string |
+| Default | The value when absent and where it is applied; "none" if there is none |
+| Checks | Required, length, range, enum, nested validation, domain invariants |
+| Example | A valid value without secrets or real personal data |
 
-Для массива указать тип элемента и ограничения длины; для вложенной модели
-раскрыть поля либо дать точную ссылку на её контракт. Для открытого словаря
-описать схему допустимых ключей/значений и ограничения. Нельзя писать только
-«`input: object`», «`data: any`» или «поля стандартные».
+For an array, state the element type and the length limits; for a nested model,
+expand its fields or give an exact link to its contract. For an open dictionary,
+describe the schema of the allowed keys/values and the limits. Do not write only
+"`input: object`", "`data: any`" or "standard fields".
 
-Отдельно указывается поведение неизвестных полей и преобразований типов.
-Не обещать запрет дополнительных полей, если binder их удаляет, и не называть
-`age?: number` разрешением на `null` без проверки runtime-пути.
-Обязательность, initializer класса и domain default — разные сведения.
+State separately how unknown fields and type conversions behave.
+Do not promise that extra fields are rejected if the binder strips them, and do not call
+`age?: number` permission for `null` without checking the runtime path.
+Being required, a class initializer and a domain default are different facts.
 
-Для HTTP-запросов нужны runtime-классы и действующая привязка/валидация:
-codegen по конвенции либо явная регистрация `@RequestModel()`/binding, если
-этого требует используемый путь. Один TypeScript-интерфейс runtime-валидацию
-не выполняет. Вызов сервиса из tool, события или другого сервиса не получает
-HTTP-валидацию автоматически: её владелец должен быть определён для каждого входа.
+HTTP requests need runtime classes and working binding/validation:
+codegen by convention or an explicit `@RequestModel()`/binding registration if
+the path in use requires it. A TypeScript interface alone does no runtime
+validation. Calling a service from a tool, an event or another service does not get
+HTTP validation automatically: its owner must be defined for each input.
 
-Локальный паспорт не подменяет код схемы. После изменения DTO, validator,
-настроек или сигнатуры паспорт актуализируется в той же задаче. Если данные
-из кода и прежнего документа расходятся, агент записывает расхождение и
-исправляет его в пределах задачи; не объявляет желаемое поведение проверенным.
+A local passport does not replace the schema code. After a DTO, validator,
+settings or signature change, the passport is updated in the same task. If the code
+and the previous document disagree, the agent records the discrepancy and
+fixes it within the task; it does not declare the desired behaviour verified.
 
-## 8. Применение правила агентом
+## 8. How the agent applies the rule
 
-Обязательный порядок работы:
+The mandatory working order:
 
-1. Прочитать `AGENTS.md`, эту спецификацию и паспорт затрагиваемого модуля.
-2. Проверить текущие точки подключения, входные модели, публичные exports,
-   владельцев ORM/DI-регистраций и относящиеся к задаче тесты.
-3. Выбрать атомарный либо составной модуль и записать основание. Для составного
-   перечислить атомарные части и направленные зависимости между ними.
-   Оценить решение по приоритетам §2.1; указать существенные компромиссы
-   и применимые проверки производительности, отказов и бинарного исполнения.
-4. До генерации или изменения кода описать затрагиваемые компоненты и входные
-   поля в плане задачи. Новый модуль создать командой CLI по §8.1, затем заполнить
-   созданный генератором `<module>/MODULE.md` по [шаблону](MODULE_SPEC_TEMPLATE.md).
-   Для существующего модуля при изменении архитектуры/публичных входов создать
-   либо обновить его паспорт.
-5. Реализовать предметное поведение в созданном каркасе или существующем модуле
-   через действующие API. Дополнять паспорт вместе с компонентами и входами.
-6. При изменении конструкторов или генерируемых контрактов выполнить нужный
-   codegen существующим проектным способом, затем применимые проверки.
-   Перед запуском проверить доступность скриптов и требования toolchain.
-7. Сопоставить результат с паспортом и критериями ниже; сообщить отдельно
-   выполненные проверки, ошибки и то, что не проверялось.
+1. Read `AGENTS.md`, this specification and the passport of the affected module.
+2. Check the current connection points, input models, public exports,
+   owners of ORM/DI registrations and the tests relevant to the task.
+3. Choose an atomic or a composite module and record the reason. For a composite
+   one, list the atomic parts and the directed dependencies between them.
+   Assess the decision against the §2.1 priorities; state significant trade-offs
+   and the applicable performance, failure and binary execution checks.
+4. Before generating or changing code, describe the affected components and input
+   fields in the task plan. Create a new module with a CLI command per §8.1, then fill in
+   the generator-created `<module>/MODULE.md` per the [template](MODULE_SPEC_TEMPLATE.md).
+   For an existing module, when its architecture/public inputs change, create
+   or update its passport.
+5. Implement the domain behaviour in the created scaffold or the existing module
+   through the current APIs. Extend the passport together with the components and inputs.
+6. When constructors or generated contracts change, run the needed
+   codegen in the existing project way, then the applicable checks.
+   Before running, check that the scripts exist and the toolchain requirements.
+7. Compare the result with the passport and the criteria below; report separately
+   the checks performed, the errors and what was not checked.
 
-Для обычного локального исправления без изменения архитектуры или публичных
-входов достаточно существующего паспорта и описания затронутого поведения;
-полная инвентаризация соседних функций не требуется. Если паспорта ещё нет,
-это не повод прерывать разрешённое исправление: использовать общие правила и код.
+For a regular local fix without architecture or public input changes,
+the existing passport and a description of the affected behaviour are enough;
+a full inventory of neighbouring features is not needed. If there is no passport yet,
+that is no reason to stop an allowed fix: use the general rules and the code.
 
-### 8.1. Создание модулей только через CLI
+### 8.1. Creating modules only through the CLI
 
-Все новые архитектурные модули приложения и фреймворка создаются **только
-командами osnv CLI**. Правило охватывает атомарные модули, составные корни и
-атомарные части, в том числе добавляемые в существующий пакет. Ручное создание
-каркаса, копирование соседнего модуля и создание файлов по примерам документации
-вместо запуска CLI запрещены.
+All new architectural modules of the application and the framework are created **only
+by osnv CLI commands**. The rule covers atomic modules, composite roots and
+atomic parts, including those added to an existing pack. Creating the scaffold by hand,
+copying a neighbouring module and creating files from documentation examples
+instead of running the CLI are forbidden.
 
-| Вид | Команда CLI | Результат |
+| Kind | CLI command | Result |
 | --- | --- | --- |
-| Атомарный без готовой реализации | `g module <Name> --empty` | Точка подключения и паспорт |
-| Атомарный с CRUD | `g module <Name>` или `g module <Name> --minimal` | Учебный CRUD и паспорт |
-| Расширенный атомарный | `g module <Name> --full` | CRUD с дополнительными адаптерами и паспорт; это один атомарный модуль |
-| Составной | `g pack <Name> --parts <part-a,part-b,...>` | Корень композиции и пустые атомарные части со своими паспортами |
+| Atomic without a ready implementation | `g module <Name> --empty` | The connection point and the passport |
+| Atomic with CRUD | `g module <Name>` or `g module <Name> --minimal` | A sample CRUD and the passport |
+| Extended atomic | `g module <Name> --full` | CRUD with extra adapters and the passport; this is one atomic module |
+| Composite | `g pack <Name> --parts <part-a,part-b,...>` | The composition root and empty atomic parts with their own passports |
 
-Команды запускаются из корня репозитория через
-`./scripts/osnv-bun run osnv <команда>` с квалифицированным `OSNV_BUN_BIN`.
-Параметры путей, подключения и codegen описаны в
-[паспорте CLI](../../src/osnv/cli/MODULE.md). `--dry-run` служит для просмотра
-плана; он не заменяет фактическое создание модуля.
+Commands run from the repository root through
+`./scripts/osnv-bun run osnv <command>` with a qualified `OSNV_BUN_BIN`.
+Path, connection and codegen parameters are described in the
+[CLI passport](../../src/osnv/cli/MODULE.md). `--dry-run` shows the
+plan; it does not replace actually creating the module.
 
-После успешной генерации автор заполняет предметную ответственность, входные
-поля и остальные разделы `MODULE.md`, записывает фактическую команду создания
-и дорабатывает исходники каркаса. Для частей пакета указывается команда создания
-пакета. Учебные поля CLI не становятся требованиями предметной области.
+After a successful generation the author fills in the domain responsibility, the input
+fields and the other `MODULE.md` sections, records the actual creation command
+and finishes the scaffold sources. For pack parts, the pack creation command
+is recorded. The CLI sample fields do not become domain requirements.
 
-Если CLI не поддерживает нужный вариант, расположение или добавление части,
-сначала расширить генератор и проверить изменение, затем выполнить команду
-создания. Ошибку генератора необходимо исправить; переход к ручному созданию
-модуля не допускается.
+If the CLI does not support the needed variant, location or adding a part,
+first extend the generator and check the change, then run the creation
+command. A generator error must be fixed; falling back to creating the
+module by hand is not allowed.
 
-Обычная доработка существующего модуля и исходников созданного каркаса разрешена,
-включая добавление моделей, сервисов, DTO и других необходимых компонентов.
-Файлы с результатами codegen обновляются только соответствующим генератором.
-Существовавшие до этого правила модули пересоздавать не требуется; неизвестную
-историческую команду создания нельзя выдумывать.
+Regular work on an existing module and on the sources of a created scaffold is allowed,
+including adding models, services, DTOs and other needed components.
+Codegen result files are updated only by the matching generator.
+Modules that existed before this rule do not need to be recreated; an unknown
+historical creation command must not be made up.
 
-Обязательное чтение спецификации и создание через CLI закреплены в корневом
-`AGENTS.md`. Это правила работы агента и ревью. Автоматической проверки CI,
-доказывающей факт чтения или запуска CLI, сейчас нет.
+Mandatory reading of the specification and creation through the CLI are fixed in the root
+`AGENTS.md`. These are rules for the agent's work and for review. There is currently no
+automatic CI check proving that the specification was read or the CLI was run.
 
-## 9. Критерии соответствия изменения
+## 9. Change compliance criteria
 
-- [ ] Тип модуля выбран по самостоятельной ответственности, а не по слоям.
-- [ ] Соблюдены ООП/SOLID и простота реализации; дополнительные абстракции
-  имеют конкретное основание, существенные компромиссы описаны.
-- [ ] Для затронутых частых путей оценены затраты и применимые метрики
-  производительности; выводы об улучшении подкреплены замерами.
-- [ ] Определены и проверены применимые сценарии отказа, отмены, частичного
-  выполнения и освобождения ресурсов; повторы имеют безопасные границы.
-- [ ] Изменения, влияющие на бинарный путь, проверены сборкой затронутой цели
-  и контрольным запуском; ограничения окружения и SKIP перечислены явно.
-- [ ] Каждый новый модуль создан фактической командой CLI; команда записана
-  в его паспорте. Каркас не создан вручную и не скопирован из соседнего модуля.
-- [ ] Для составного модуля перечислены атомарные части и их контракты;
-  корень выполняет композицию без повторных регистраций реализации.
-- [ ] У каждого изменяемого компонента указаны файл, роль, входы и результат.
-- [ ] Новые имена файлов, классов и методов соответствуют простому предметному
-  стилю из [AGENTS.md](../../AGENTS.md#code-naming) и фактическому поведению.
-- [ ] Для новых/изменённых публичных входов заполнены поля, defaults,
-  nullability, проверки, выходы и ошибки; паспорт соответствует коду.
-- [ ] Объявлены зависимости, lifetime и DI-экспорты; нет обхода приватного API
-  или дублирования владения ORM-моделями, миграциями и обработчиками.
-- [ ] Для изменения конфигурации разделены общее объявление и представление
-  каждого kernel по §5.4; изоляция проверена либо явно описано переходное состояние.
-- [ ] Созданы только необходимые каталоги; чужие пути и публичные API сохранены.
-- [ ] Проверено применимое поведение. Отсутствующая инфраструктура, скрипты,
-  непройденные live-проверки и недоступные интеграции не выданы за PASS.
+- [ ] The module type is chosen by independent responsibility, not by layers.
+- [ ] OOP/SOLID and simplicity of implementation are kept; extra abstractions
+  have a concrete reason, significant trade-offs are described.
+- [ ] For affected hot paths the costs and applicable performance metrics
+  are assessed; claims of improvement are backed by measurements.
+- [ ] The applicable failure, cancellation, partial completion and resource
+  release scenarios are defined and checked; retries have safe bounds.
+- [ ] Changes affecting the binary path are checked by building the affected target
+  and a control run; environment limits and SKIPs are listed explicitly.
+- [ ] Each new module is created by an actual CLI command; the command is recorded
+  in its passport. The scaffold is not created by hand or copied from a neighbouring module.
+- [ ] For a composite module the atomic parts and their contracts are listed;
+  the root does the composition without repeated implementation registrations.
+- [ ] Each changed component has its file, role, inputs and result stated.
+- [ ] New file, class and method names follow the simple domain
+  style from [AGENTS.md](../../AGENTS.md#code-naming) and the actual behaviour.
+- [ ] For new/changed public inputs the fields, defaults,
+  nullability, checks, outputs and errors are filled in; the passport matches the code.
+- [ ] Dependencies, lifetime and DI exports are declared; there is no private API bypass
+  and no duplicated ownership of ORM models, migrations and handlers.
+- [ ] For a configuration change, the shared declaration and the view of
+  each kernel are separated per §5.4; isolation is checked or the transitional state is described explicitly.
+- [ ] Only the needed directories are created; other paths and public APIs are kept.
+- [ ] The applicable behaviour is checked. Missing infrastructure, scripts,
+  failed live checks and unavailable integrations are not reported as PASS.
 
-Правила и формат паспорта обновляются вместе с разрешённым архитектурным
-решением. Неизменённая историческая раскладка сама по себе не причина
-переоткрывать все существующие модули.
+The rules and the passport format are updated together with an approved architectural
+decision. An unchanged historical layout alone is no reason
+to reopen all existing modules.

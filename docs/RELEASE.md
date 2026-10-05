@@ -1,276 +1,277 @@
-# Подготовка кандидата Osnova
+# Release history and the former Osnova candidate procedure
 
-Процедура зафиксирована 2026-10-02 при подготовке **0.95.0**. Это SemVer-номер
-запрошенной версии «0.95», а не версия HTTP API, схем БД или wire-протоколов.
-Номер в исходниках сам по себе не подтверждает прохождение проверок или выпуск.
-Автоматического publish/tag workflow в репозитории нет; оба пакета private.
+This document is a history from the time when the framework and the osnova application
+lived in one repository; the commands and paths below refer to that layout. Current osnv
+releases follow [CHANGELOG.md](../CHANGELOG.md) and the tag-triggered `publish` job in
+[ci.yml](../.github/workflows/ci.yml). The procedure was recorded on 2026-10-02 while
+preparing **0.95.0**. That is the SemVer number of the requested version "0.95", not a
+version of the HTTP API, database schemas or wire protocols. A number in the sources does
+not by itself confirm that checks passed or that a release happened. At that time the
+repository had no automatic publish/tag workflow, and both packages were private.
 
-## Исходное состояние и границы
+## Starting state and boundaries
 
-При работе поверх незакоммиченных изменений сначала сохранить отдельный снимок
-текущих исходников, их SHA-256, HEAD и Git status. Чистый HEAD не заменяет этот
-снимок. Не включать credentials, рабочие env, БД, runtime data, node_modules,
-бинарники и кэши. Исправления делать в отдельной копии; финальный diff строить
-от сохранённого состояния, а не присваивать себе прежние изменения checkout.
-Не применять reset/clean/stash к чужому дереву. Интегрировать только согласованный
-список файлов после повторной сверки исходных хешей и независимого review.
+When working on top of uncommitted changes, first save a separate snapshot of the
+current sources, their SHA-256, HEAD and Git status. A clean HEAD does not replace this
+snapshot. Do not include credentials, working env, databases, runtime data, node_modules,
+binaries or caches. Make fixes in a separate copy; build the final diff from the saved
+state, and do not claim earlier changes of the checkout as your own.
+Do not apply reset/clean/stash to someone else's tree. Integrate only the agreed list of
+files after rechecking the original hashes and an independent review.
 
-## Версии и зависимости
+## Versions and dependencies
 
-Согласовать `package.json` и `src/osnova/package.json`, затем активные metadata
-приложения в `src/index.ts` и Codex `clientInfo.version`.
-Пакеты admin-ui/client-ui имеют независимую версию `0.1.0`.
-API/schema versions, исторические отчёты и версии примеров автоматически не менять.
+Align `package.json` and `src/osnova/package.json`, then the active application metadata
+in `src/index.ts` and the Codex `clientInfo.version`.
+The admin-ui/client-ui packages have an independent version `0.1.0`.
+Do not change API/schema versions, historical reports or example versions automatically.
 
-Использовать квалифицированный Bun из [toolchain](../toolchain/README.md).
-Обновление версии без Git-операций:
+Use the qualified Bun from the [toolchain](../toolchain/README.md).
+Bumping the version without Git operations:
 
 ```sh
 ./scripts/osnova-bun --no-env-file pm version 0.95.0 --no-git-tag-version --allow-same-version
-# В src/osnova, через ../../scripts/osnova-bun — та же команда.
+# The same command in src/osnova, through ../../scripts/osnova-bun.
 ./scripts/osnova-bun --no-env-file install --lockfile-only --ignore-scripts
 ```
 
-Проверить полученный `bun.lock`: версии внешних пакетов и integrity должны
-остаться прежними. Bun 1.4.0 может оставить старую версию неиспользуемого workspace
-при отсутствии изменений графа. В таком случае в изолированной копии временно
-добавить корневую зависимость `osnova: "workspace:0.95.0"`, выполнить тот же
-lockfile-only, восстановить исходный состав manifest и выполнить команду снова.
-Временная локальная зависимость не остаётся в результате. Не использовать
-`--force`: он запрашивает свежие версии внешних зависимостей. Generated TypeScript
-и lockfile вручную не редактировать. Поведение `pm version` описано в
-[официальной документации Bun](https://bun.com/docs/pm/cli/pm#version).
+Check the resulting `bun.lock`: the versions and integrity of external packages must
+stay the same. Bun 1.4.0 may leave an old version of an unused workspace when the
+graph does not change. In that case, in an isolated copy temporarily add the root
+dependency `osnova: "workspace:0.95.0"`, run the same lockfile-only command, restore the
+original manifest and run the command again.
+The temporary local dependency does not stay in the result. Do not use `--force`: it
+requests fresh versions of external dependencies. Do not edit generated TypeScript and
+the lockfile by hand. The `pm version` behavior is described in the
+[official Bun documentation](https://bun.com/docs/pm/cli/pm#version).
 
-## Последовательность проверок
+## Check sequence
 
-Перед запуском сверить наличие команд в `package.json`. Все команды выполняются
-с явным `OSNV_BUN_BIN`, без рабочих env и provider credentials. Общий codegen
-и тестовые серверы имеют одного владельца; одновременно их не запускать.
+Before running, check that the commands exist in `package.json`. All commands run with
+an explicit `OSNV_BUN_BIN`, without working env and provider credentials. The shared
+codegen and the test servers have one owner; do not run them concurrently.
 
-1. `toolchain:check` и `di:generate --target all`.
-2. `build`: codegen production и полный TypeScript `tsc --noEmit`.
-3. `test`: проектный pretest/codegen и полный isolated suite. Не считать SKIP
-   физических PostgreSQL/Redis тестов успешной проверкой инфраструктуры.
-4. `admin:ui:check`, `admin:ui:build`, `client:ui:build`. Обе UI-сборки запускают
-   установленный `vue-tsc --noEmit` через настоящий Node ≥22.12 и только затем
-   Vite. Bun 1.4.0 обходит нужный hook и может пропускать Vue SFC без ошибки.
-   При необходимости путь к Node задаётся через `OSNV_VUE_NODE_BIN`.
-5. `build:bin` создаёт `bin/osnova-app` и `bin/osnova`. Выполнить оба вне checkout:
-   app `config check --environment=test`, CLI `--help`, а затронутые runtime-пути
-   проверить отдельной контролируемой compiled-фикстурой.
-6. Проверить public API/barrels и переносимость framework package: публичные
-   smoke/boundary tests, создание переносимого CLI-проекта; при упаковке — только
-   `pm pack --ignore-scripts`, без публикации. Проверить версию внутри артефакта.
-7. Для каждого дефекта сохранить исходное воспроизведение FAIL и fixed PASS.
-   Физические проверки проводить только на своих временных сервисах и проверять
-   cleanup. UI: запоздавшие ответы, смена сессии, HTTP-target действий и доступность.
+1. `toolchain:check` and `di:generate --target all`.
+2. `build`: production codegen and the full TypeScript `tsc --noEmit`.
+3. `test`: the project pretest/codegen and the full isolated suite. Do not count SKIP of
+   physical PostgreSQL/Redis tests as a successful infrastructure check.
+4. `admin:ui:check`, `admin:ui:build`, `client:ui:build`. Both UI builds run the
+   installed `vue-tsc --noEmit` through a real Node ≥22.12 and only then Vite. Bun 1.4.0
+   bypasses the needed hook and may let Vue SFCs through without an error.
+   If needed, the Node path is set through `OSNV_VUE_NODE_BIN`.
+5. `build:bin` creates `bin/osnova-app` and `bin/osnova`. Run both outside the checkout:
+   the app with `config check --environment=test`, the CLI with `--help`, and check the
+   affected runtime paths with a separate controlled compiled fixture.
+6. Check the public API/barrels and the portability of the framework package: public
+   smoke/boundary tests, creating a portable CLI project; when packing, only
+   `pm pack --ignore-scripts`, without publishing. Check the version inside the artifact.
+7. For every defect keep the original FAIL reproduction and the fixed PASS.
+   Run physical checks only on your own temporary services and check the cleanup.
+   UI: late responses, session changes, the HTTP target of actions and accessibility.
 
-Скрипта lint в текущих manifests нет: его отсутствие указывается явно.
-Результаты, команды, SHA-256 исходников/артефактов и ограничения записываются
-в отчёт конкретного кандидата. Исторические PASS туда не переносятся как новые.
+The current manifests have no lint script: state its absence explicitly.
+Results, commands, SHA-256 of sources/artifacts and limits are recorded in the report
+of the specific candidate. Historical PASS results are not carried over as new ones.
 
-## Миграция defaults 0.95.0
+## 0.95.0 defaults migration
 
-- Production bootstrap первого администратора закрыт до настройки установочного
-  Secret и подтверждения `X-Osnova-Setup-Token`. Оператор доставляет секрет
-  через защищённый источник конфигурации, не через argv/URL, и отправляет header
-  своим доверенным HTTP-клиентом. Не записывать значение в логи/историю shell,
-  не коммитить его. После установки сохраняется прежний постоянный bootstrap
-  marker; лишний установочный секрет следует убрать. Процедура не создаёт и
-  не сохраняет реальное значение автоматически. Контракт и условия локального
-  development/test setup: [AdminAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md).
-  Локальный reverse proxy виден как loopback peer: при внешнем доступе к dev/test
-  установочный Secret также нужен, либо setup должен быть закрыт сетью.
-- Client cookie получает Secure в production. При TLS-терминации оператор задаёт
-  точный внешний origin, общий для HTTP и WS. Произвольным forwarded headers
-  доверия нет. Для локального HTTP используется development/test либо осознанная
-  настройка оператора: [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
-- Launcher по умолчанию даёт 15 секунд на остановку. При большем kernel-бюджете
-  согласовать `OSNV_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
-- SMS endpoint должен принимать конечный POST без redirects. Перенаправления
-  завершаются ошибкой: [SMS](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/sms/MODULE.md).
-- Admin UI и OpenAPI поставляются вместе: UI берёт разрешённые сортировки из
-  `x-osnova-sort-fields`; при отсутствии metadata не предлагает неизвестные поля.
-- Auth ограничивает запросы до разбора тела; административные операции имеют
-  предел конкурентного выполнения на процесс. Клиенты за одним proxy делят
-  лимит его непосредственного IP. Значения и поведение 429 описаны в паспортах
+- Production bootstrap of the first administrator is closed until the installation
+  Secret is configured and `X-Osnova-Setup-Token` is confirmed. The operator delivers
+  the secret through a protected configuration source, not through argv/URL, and sends
+  the header with their trusted HTTP client. Do not write the value to logs/shell
+  history, do not commit it. After installation the existing persistent bootstrap
+  marker is kept; remove the no longer needed installation secret. The procedure does
+  not create or store a real value automatically. The contract and the conditions of a
+  local development/test setup: [AdminAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md).
+  A local reverse proxy is seen as a loopback peer: with external access to dev/test
+  the installation Secret is needed as well, or the setup must be closed by the network.
+- The client cookie gets Secure in production. With TLS termination the operator sets
+  the exact external origin shared by HTTP and WS. Arbitrary forwarded headers are not
+  trusted. Local HTTP uses development/test or a deliberate operator setting:
+  [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
+- The launcher allows 15 seconds for shutdown by default. With a larger kernel budget,
+  align `OSNV_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
+- The SMS endpoint must accept a final POST without redirects. Redirects end with an
+  error: [SMS](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/sms/MODULE.md).
+- Admin UI and OpenAPI ship together: the UI takes the allowed sorts from
+  `x-osnova-sort-fields`; without the metadata it offers no unknown fields.
+- Auth limits requests before parsing the body; administrative operations have a
+  per-process concurrency limit. Clients behind one proxy share the limit of its
+  direct IP. The values and the 429 behavior are described in the passports of
   [AdminAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md)
-  и [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
-- После превышения верхней границы длины framework пропускает проверки содержимого
-  того же декоратора, поэтому массив ошибок короче. Отдельные pattern/custom
-  остаются ответственностью автора: [валидация](../src/osnova/library/validation/SPEC.md).
+  and [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
+- After the upper length bound is exceeded, the framework skips the content checks of
+  the same decorator, so the error array is shorter. Separate pattern/custom checks
+  stay the author's responsibility: [validation](../src/osnv/library/validation/SPEC.md).
 
-## Решение о готовности
+## Readiness decision
 
-Отдельно оценивать framework, приложение с внешними зависимостями, admin/client
-UI, исходники, упакованный framework и бинарники. Перечислить непроверенные
-платформы и реальные провайдеры. Даже полный локальный PASS не означает абсолютной
-безопасности или проверки production-среды. Tag, push, publish и принятие чужого
-baseline не входят в подготовку кандидата и требуют отдельного решения.
+Assess separately the framework, the application with external dependencies, the
+admin/client UI, the sources, the packed framework and the binaries. List the unchecked
+platforms and real providers. Even a full local PASS does not mean absolute security or
+a check of the production environment. Tag, push, publish and accepting someone else's
+baseline are not part of preparing a candidate and need a separate decision.
 
-## Удаление ручной HTTP-привязки (2026-10-03, изменение после кандидата 0.95)
+## Removal of manual HTTP binding (2026-10-03, a change after the 0.95 candidate)
 
-Breaking change: удалены `@Bind` и его дескрипторы `Param`, `Query`, `Body`,
-`Header`, `Req`, `Res`, `Ctx`, `FromServices`, `List`, алиасы `FromRoute`,
-`FromQuery`, `FromBody`, `FromHeader` и `ValueBindingOptions` из публичного HTTP API.
-Удалите их imports и декораторы. Источники параметров выводит штатный codegen:
+Breaking change: `@Bind` and its descriptors `Param`, `Query`, `Body`, `Header`, `Req`,
+`Res`, `Ctx`, `FromServices`, `List`, the aliases `FromRoute`, `FromQuery`, `FromBody`,
+`FromHeader` and `ValueBindingOptions` were removed from the public HTTP API.
+Remove their imports and decorators. Regular codegen infers the parameter sources:
 
 ```ts
 @Put("tables/:table/validators")
 replace(table: string, input: ReplaceValidatorsRequest) { /* ... */ }
 ```
 
-`table` берётся из маршрута, DTO — из JSON-тела с прежней валидацией.
-Заголовки и произвольные тела читайте через `ctx: HttpContext`; сервисы
-внедряйте в конструктор. Для query default указывайте default параметра метода,
-для list используйте подкласс `ListRequest` с `Sortable`/`Filterable`/`ListOptions`.
-После миграции выполните `di:generate --target all` и typecheck.
-`@RequestModel()` остаётся для совместимости; для DTO текущего приложения
-штатная генерация обходится без него. Binding runtime и generated descriptors
-сохраняются. Генерация дополнительно публикует схемы `ReplaceValidatorsRequest`
-и `ValidatorRuleRequest` в OpenAPI; маршруты и правила валидации не меняются.
+`table` comes from the route, the DTO from the JSON body with the same validation as before.
+Read headers and arbitrary bodies through `ctx: HttpContext`; inject services into the
+constructor. For a query default use the method parameter default; for lists use a
+`ListRequest` subclass with `Sortable`/`Filterable`/`ListOptions`.
+After the migration run `di:generate --target all` and the typecheck.
+`@RequestModel()` stays for compatibility; regular generation handles the DTOs of the
+current application without it. The binding runtime and generated descriptors are kept.
+Generation additionally publishes the `ReplaceValidatorsRequest` and
+`ValidatorRuleRequest` schemas in OpenAPI; routes and validation rules do not change.
 
-Это изменение исходников не обновляет ранее одобренный tarball. Новый артефакт
-и переход Docs на него требуют отдельной проверки и согласованного шага.
+This source change does not update the previously approved tarball. A new artifact and
+moving Docs to it need a separate check and an agreed step.
 
-Устранена коллизия consumer `UsersController.list()` со старой картой
-привязок исходного приложения. Codegen записывает пустой descriptor для
-методов без параметров, runtime использует только конкретный класс target,
-а package compatibility-карта больше не содержит метаданные приложения.
+The collision of a consumer `UsersController.list()` with the old binding map of the
+source application is fixed. Codegen writes an empty descriptor for methods without
+parameters, the runtime uses only the concrete target class, and the package
+compatibility map no longer holds application metadata.
 
-## Квалификация на живом PostgreSQL (2026-10-04, изменение после кандидата 0.95)
+## Qualification on live PostgreSQL (2026-10-04, a change after the 0.95 candidate)
 
-Физическая проверка выполняется одной командой на одноразовом PostgreSQL 17 с TLS:
+The physical check runs with one command on a throwaway PostgreSQL 17 with TLS:
 
 ```sh
-python3 ops/live-postgres/runner.py <каталог-вне-репозитория>/<имя-прогона>
+python3 ops/live-postgres/runner.py <directory-outside-the-repository>/<run-name>
 ```
 
-Runner прогоняет полный набор и каждый гейтированный live-набор в своей базе,
-проверяет отсутствие сессий и удаляет контейнер. Нативная отмена Bun.SQL
-отмечается как известный внешний дефект и не считается PASS. Redis-наборы
-требуют надёжной конфигурации сервера (`appendonly yes`, `appendfsync always`,
-`maxmemory-policy noeviction`). Результаты: [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/release-0.95-live-postgres-2026-10-04/REPORT.md).
+The runner runs the full suite and every gated live suite in its own database, checks
+that no sessions remain and removes the container. The native Bun.SQL cancellation is
+marked as a known external defect and is not counted as PASS. The Redis suites need a
+durable server configuration (`appendonly yes`, `appendfsync always`,
+`maxmemory-policy noeviction`). Results: [report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/release-0.95-live-postgres-2026-10-04/REPORT.md).
 
-Изменения поведения:
+Behavior changes:
 
-- Новый ключ `db.tlsCa` (`OSNV_DB__TLS_CA`): PEM дополнительного CA для
-  `db.tls=verify-full`; пусто — только системное доверие. В ORM-коннекторе
-  пустой `tlsCa` теперь означает «CA не задан» вместо ошибки конфигурации.
-- Kernel, `Application` и hosted-helpers запускают singleton, на который
-  указывают несколько регистраций `HOSTED_SERVICE`, один раз. Модуль с
-  несколькими `ownedStore`-контекстами теперь стартует.
+- A new key `db.tlsCa` (`OSNV_DB__TLS_CA`): the PEM of an extra CA for
+  `db.tls=verify-full`; empty means system trust only. In the ORM connector an empty
+  `tlsCa` now means "no CA set" instead of a configuration error.
+- The Kernel, `Application` and the hosted helpers start a singleton that several
+  `HOSTED_SERVICE` registrations point to only once. A module with several
+  `ownedStore` contexts now starts.
 
-## Выпуск 0.96.0 (2026-10-04)
+## Release 0.96.0 (2026-10-04)
 
-Инкрементный выпуск поверх кандидата 0.95.0. Версия согласована в
-`package.json`, `src/osnova/package.json`, `bun.lock`, metadata `src/index.ts`,
-`src/admin-ui-dev.ts` и Codex `clientInfo` (включая `ops/codex/check-skills.ts`).
+An incremental release on top of the 0.95.0 candidate. The version is aligned in
+`package.json`, `src/osnova/package.json`, `bun.lock`, the `src/index.ts` metadata,
+`src/admin-ui-dev.ts` and the Codex `clientInfo` (including `ops/codex/check-skills.ts`).
 
-Изменения относительно 0.95.0:
+Changes since 0.95.0:
 
-- `db.tlsCa` / `OSNV_DB__TLS_CA` для production `verify-full` с частным CA;
-  пустой `tlsCa` в ORM-коннекторе означает «CA не задан».
-- Singleton с несколькими регистрациями `HOSTED_SERVICE` запускается один раз;
-  модуль с несколькими `ownedStore` стартует в kernel.
-- `build:bin:*` компилируют через `scripts/build-bin.ts`: launcher больше не
-  оставляет неудаляемые `.bun-build` в checkout.
-- Удалены ручные `deps`, дублировавшие codegen в DataManager; явный
-  `exports: []` у `AdminDeveloperTools`; паспорта корней DataManager/Admin и
-  частей Access, DeveloperTools, Observability.
-- Физическая квалификация: `ops/live-postgres/runner.py`.
+- `db.tlsCa` / `OSNV_DB__TLS_CA` for production `verify-full` with a private CA;
+  an empty `tlsCa` in the ORM connector means "no CA set".
+- A singleton with several `HOSTED_SERVICE` registrations starts once;
+  a module with several `ownedStore` contexts starts in the kernel.
+- `build:bin:*` compile through `scripts/build-bin.ts`: the launcher no longer leaves
+  undeletable `.bun-build` files in the checkout.
+- Removed the manual `deps` that duplicated codegen in DataManager; an explicit
+  `exports: []` on `AdminDeveloperTools`; passports of the DataManager/Admin roots and
+  of the Access, DeveloperTools, Observability parts.
+- Physical qualification: `ops/live-postgres/runner.py`.
 
-Миграция: действий не требуется; `OSNV_DB__TLS_CA` — опционально.
+Migration: no action needed; `OSNV_DB__TLS_CA` is optional.
 
-## Выпуск 0.96.1 (2026-10-04): пакет `osnv`
+## Release 0.96.1 (2026-10-04): the `osnv` package
 
-Фреймворк приведён к виду публикуемого npm-пакета для Bun. Поставляется
-исходниками TypeScript, сборка в JavaScript не нужна; работает только в Bun ≥ 1.4.0.
+The framework was turned into a publishable npm package for Bun. It ships TypeScript
+sources, no JavaScript build is needed; it runs only on Bun ≥ 1.4.0.
 
-- Имя пакета `osnova` заменено на `osnv`: в npm `osnova` занято чужим пакетом.
-  Сгенерированный код и шаблоны CLI импортируют фреймворк по имени пакета
-  (`osnv/core/di`), а не через алиасы `@osnova/*` и `@/*`. Новый проект из
-  `osnv new` не содержит `paths` в `tsconfig.json`; снимок лежит в `vendor/osnv`.
-- Манифест: снят `private`, добавлены `license: MIT`, `bin: osnv`,
-  `engines.bun >= 1.4.0`, `peerDependencies.typescript` (нужен только
-  кодогенерации и CLI; runtime внешних зависимостей не имеет). Из пакета
-  исключены тесты и фикстуры (537 файлов, 0.92 МБ вместо 792 и 1.47 МБ).
-- Самоимпорты `@/…` в `core/agent/session` заменены относительными.
-- `scripts/package-check.ts` (входит в `run ci`): pack → установка в пустой
-  проект → `osnv new` → codegen → модуль → typecheck → `/health`.
+- The package name `osnova` was replaced with `osnv`: on npm `osnova` is taken by another package.
+  Generated code and CLI templates import the framework by the package name
+  (`osnv/core/di`), not through the `@osnova/*` and `@/*` aliases. A new project from
+  `osnv new` has no `paths` in `tsconfig.json`; the snapshot lives in `vendor/osnv`.
+- Manifest: `private` removed; `license: MIT`, `bin: osnv`, `engines.bun >= 1.4.0`,
+  `peerDependencies.typescript` added (needed only by codegen and the CLI; the runtime
+  has no external dependencies). Tests and fixtures are excluded from the package
+  (537 files, 0.92 MB instead of 792 and 1.47 MB).
+- The `@/…` self-imports in `core/agent/session` were replaced with relative ones.
+- `scripts/package-check.ts` (part of `run ci`): pack → install into an empty project →
+  `osnv new` → codegen → module → typecheck → `/health`.
 
-Миграция существующего приложения: зависимость `osnova` → `osnv`, пути
-`tsconfig` `osnova/*` → `osnv/*` (алиасы `@osnova/*` можно оставить для
-своего кода), затем `di:generate --target all` — сгенерированные файлы
-импортируют `osnv/...`.
+Migrating an existing application: the dependency `osnova` → `osnv`, the `tsconfig`
+paths `osnova/*` → `osnv/*` (the `@osnova/*` aliases may stay for your own code), then
+`di:generate --target all`: the generated files import `osnv/...`.
 
-CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv …`; в этом репозитории
-`./scripts/osnova-bun run osnv …`, бинарник CLI — `bin/osnv`). Новые команды
-`osnv dev`, `osnv build`, `osnv build --bin [--outfile]`; скрипты созданного
-проекта — обёртки над ними. `g module --full` больше не требует auth-модуля
-приложения: без него маршруты генерируются публичными с предупреждением.
-`agent run` перенесён в приложение (`bun run agent:run`).
+CLI 0.96.1: all commands are called as `osnv` (`bunx osnv …`; in this repository
+`./scripts/osnv-bun run osnv …`, the CLI binary is `bin/osnv`). New commands:
+`osnv dev`, `osnv build`, `osnv build --bin [--outfile]`; the scripts of a created
+project wrap them. `g module --full` no longer needs an application auth module:
+without it the routes are generated public with a warning.
+`agent run` moved into the application (`bun run agent:run`).
 
-Также в 0.96.1: `osnv codegen` вызывает генератор фреймворка напрямую (скрипт
-`di:generate` в проекте больше не нужен); `osnv dev --watch`; `osnv test`;
-предупреждение при старте из исходников, изменённых после кодогенерации
-(`src/generated/osnv/fingerprint.ts`). Новый проект получает скрипты `test` и
-`start`, `.env.example`, тест `/health`, `HOST`; копия `vendor/osnv` совпадает по
-составу с npm-пакетом.
+Also in 0.96.1: `osnv codegen` calls the framework generator directly (the project no
+longer needs a `di:generate` script); `osnv dev --watch`; `osnv test`; a warning at
+startup from sources changed after codegen (`src/generated/osnv/fingerprint.ts`). A new
+project gets the `test` and `start` scripts, `.env.example`, a `/health` test and `HOST`;
+the `vendor/osnv` copy matches the npm package contents.
 
-`osnv dev` запускает приложение с `OSNV_ENV=development`, если переменная не
-задана в оболочке (раньше без `.env` приложение стартовало как `production`
-и требовало продовые секреты). README пакета переписан на английском.
-Добавлен пример `examples/todo` (модули project, task, report; PostgreSQL с
-автомиграцией, межмодульный DI, валидация, JSON:API, e2e-тест, бинарник);
-`run ci` собирает его как пользователь (`example install/build/test`), e2e-тест
-выполняется при заданном `OSNV_DB__HOST`, иначе помечается skip.
+`osnv dev` starts the application with `OSNV_ENV=development` if the variable is not set
+in the shell (before, without `.env` the application started as `production` and
+required production secrets). The package README was rewritten in English.
+The `examples/todo` example was added (project, task, report modules; PostgreSQL with
+auto-migration, cross-module DI, validation, JSON:API, an e2e test, a binary);
+`run ci` builds it as a user would (`example install/build/test`), and the e2e test runs
+when `OSNV_DB__HOST` is set, otherwise it is marked skip.
 
-Перед выпуском доделано:
-- ORM: нарушение уникального индекса в `saveChanges()` приходит как
-  `UniqueViolationError` (`constraint`, `table`, `cause`) вместо сырой ошибки
-  драйвера и HTTP 500.
-- ORM: создание и миграцию таблиц задаёт только модуль (`ensureCreated` или
-  `migrateOnStart` в `ormOsnova`). Флаг `@Entity({ migrate: true })` удалён:
-  `migrateOnStart` теперь мигрирует все сущности контекста модуля.
-- HTTP: поля тела запроса, объявленные как `string`/`number`/`boolean`,
-  проверяются по типу JSON без `@Validator` (400, код `type`). gRPC и агенты
-  не затронуты.
-- CLI: имена по модулю, как его ввели. `g module Stats` создаёт файлы
-  `<Модуль>.<роль>.ts` (`Stats.module.ts`, `Stats.controller.ts`,
-  `Stats.service.ts`, `IStats.service.ts`, `Stats.model.ts`, `Stats.dbContext.ts`,
-  `Stats.requests.ts`, `Stats.responses.ts`, `StatsList.query.ts`) и классы ролей
-  `StatsModule`, `StatsController`, `StatsService`, `StatsDbContext`. Единственное
-  число остаётся у записи и её DTO (`Stat`, `CreateStatRequest`, `StatResponse`).
-  Раньше: `Stat.module.ts`, `StatController.ts`, `StatService`.
-- Встроенные тексты фреймворка и шаблоны CLI — на английском. Русские наборы:
-  `RU_VALIDATION_MESSAGES`, `RU_CODEX_MESSAGES`, `RU_UI_LABELS`. Приложение
-  подключает их при старте. Ошибки конфигурации и заголовки промпта агента
-  только английские.
+Finished before the release:
+- ORM: a unique index violation in `saveChanges()` arrives as `UniqueViolationError`
+  (`constraint`, `table`, `cause`) instead of a raw driver error and HTTP 500.
+- ORM: only the module decides table creation and migration (`ensureCreated` or
+  `migrateOnStart` in `ormOsnv`). The `@Entity({ migrate: true })` flag was removed:
+  `migrateOnStart` now migrates all entities of the module's context.
+- HTTP: request body fields declared as `string`/`number`/`boolean` are checked
+  against the JSON type without `@Validator` (400, code `type`). gRPC and agents are
+  not affected.
+- CLI: names follow the module as it was typed. `g module Stats` creates the files
+  `<Module>.<role>.ts` (`Stats.module.ts`, `Stats.controller.ts`, `Stats.service.ts`,
+  `IStats.service.ts`, `Stats.model.ts`, `Stats.dbContext.ts`, `Stats.requests.ts`,
+  `Stats.responses.ts`, `StatsList.query.ts`) and the role classes `StatsModule`,
+  `StatsController`, `StatsService`, `StatsDbContext`. The record and its DTOs stay
+  singular (`Stat`, `CreateStatRequest`, `StatResponse`).
+  Before: `Stat.module.ts`, `StatController.ts`, `StatService`.
+- Built-in framework texts and CLI templates are in English. Russian sets:
+  `RU_VALIDATION_MESSAGES`, `RU_CODEX_MESSAGES`, `RU_UI_LABELS`. The application
+  connects them at startup. Configuration errors and the agent prompt headings are
+  English only.
 
-В корне `src/` осталась только точка входа `index.ts`. Вспомогательные скрипты
-перенесены к модулям-владельцам (команды `bun run …` прежние):
+Only the `index.ts` entry point stayed in the `src/` root. Helper scripts moved to their
+owner modules (the `bun run …` commands are the same):
 `admin:token` → `src/app/modules/auth/AdminToken.cli.ts`, `agent:run` →
 `src/app/modules/agent-chat/client/AgentRun.cli.ts`, `config:check`/`config:inspect`
-→ `src/app/config/ConfigCheck.cli.ts`. Удалены заглушка снятой фичи Workflow
-(`src/system-workflow-producer.ts`) и отдельный dev-backend админки
-(`admin:backend`, `AdminUiDevModule`, настройки `http.admin*` и переменные
-`OSNV_ADMIN_*`): он поднимал устаревший набор модулей без DataManager.
-Admin UI разрабатывается на обычном `bun run dev` + `bun run admin:ui`.
+→ `src/app/config/ConfigCheck.cli.ts`. Removed: the stub of the dropped Workflow feature
+(`src/system-workflow-producer.ts`) and the separate admin dev backend (`admin:backend`,
+`AdminUiDevModule`, the `http.admin*` settings and the `OSNV_ADMIN_*` variables): it
+started an outdated set of modules without DataManager.
+The Admin UI is developed with the regular `bun run dev` + `bun run admin:ui`.
 
-Имена: фреймворк называется `osnv` везде (приложение остаётся `osnova`).
-Переименованы публичный API (`OsnovaModuleRef` → `OsnvModuleRef`, `ormOsnova` →
-`ormOsnv`, `ormOsnovaConnect` → `ormOsnvConnect`, `registerOsnovaGeneratedRuntime`
-→ `registerOsnvGeneratedRuntime`, `OsnovaSocket` → `OsnvSocket`, класс ядра
-`Osnova` → `Osnv` и т. д.), папка пакета `src/osnova` → `src/osnv`, алиас
-`@osnova/*` → импорты `osnv/*`, `scripts/osnova-bun` → `scripts/osnv-bun`, схема
-toolchain `osnv.bun-toolchain/v1`. Идентификаторы в данных: таблицы
-`__osnv_orm_owned_stores_v1`, `__OsnvMigrations`, контракты `osnv.orm-owned-store/v1`,
-`osnv.agent-execution-state/v1`, `osnv.websocket.publication/v1` и др.; эталонные
-байты owned-store пересчитаны и доказанно отличаются только доменом. Базы, где
-уже есть таблицы `__osnova_*`, нужно мигрировать вручную (в приложении osnova их нет).
+Names: the framework is called `osnv` everywhere (the application stays `osnova`).
+Renamed: the public API (`OsnovaModuleRef` → `OsnvModuleRef`, `ormOsnova` → `ormOsnv`,
+`ormOsnovaConnect` → `ormOsnvConnect`, `registerOsnovaGeneratedRuntime` →
+`registerOsnvGeneratedRuntime`, `OsnovaSocket` → `OsnvSocket`, the kernel class
+`Osnova` → `Osnv` and so on), the package folder `src/osnova` → `src/osnv`, the alias
+`@osnova/*` → `osnv/*` imports, `scripts/osnova-bun` → `scripts/osnv-bun`, the toolchain
+schema `osnv.bun-toolchain/v1`. Data identifiers: the tables
+`__osnv_orm_owned_stores_v1`, `__OsnvMigrations`, the contracts `osnv.orm-owned-store/v1`,
+`osnv.agent-execution-state/v1`, `osnv.websocket.publication/v1` and others; the
+owned-store golden bytes were recomputed and provably differ only in the domain.
+Databases that already have `__osnova_*` tables must be migrated by hand (the osnova
+application has none).
 
-Миграция: сообщения валидации, ошибки конфигурации, тексты Codex и подписи UI
-по умолчанию стали английскими — для прежнего поведения подключите русские
-наборы; тесты, сравнивающие эти тексты, нужно обновить. `RequestModelFieldShape`
-стал объединением (`model` или `primitive`).
+Migration: validation messages, configuration errors, Codex texts and UI labels are
+English by default; to keep the old behavior connect the Russian sets, and update tests
+that compare these texts. `RequestModelFieldShape` became a union (`model` or `primitive`).

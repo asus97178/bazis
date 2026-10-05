@@ -1,121 +1,121 @@
 # osnv CLI
 
-Версия паспорта: 1.9. Дата сверки: 2026-10-05. Тип: атомарный технический модуль.
-Область: разбор команд, генерация проектов и модулей, регистрация в host, codegen,
-запуск приложения и сборка (`osnv dev`, `osnv build`, `osnv build --bin`).
-Точка входа: [main.ts](main.ts), функция `runCli(argv, runtime)`.
-CLI выполняется отдельным процессом и не регистрируется в `AppModule`.
+Passport version: 1.9. Check date: 2026-10-05. Type: atomic technical module.
+Scope: command parsing, project and module generation, host registration, codegen,
+running the application and building (`osnv dev`, `osnv build`, `osnv build --bin`).
+Entry point: [main.ts](main.ts), the `runCli(argv, runtime)` function.
+The CLI runs as a separate process and is not registered in `AppModule`.
 
-## Запуск и сборка
+## Running and building
 
 ```sh
-bunx osnv dev                         # codegen, затем src/index.ts из исходников (OSNV_ENV=development, если не задан)
-bunx osnv dev --watch                 # то же; изменение в src/ перезапускает codegen и приложение
-bunx osnv test [<аргументы bun test>]  # codegen, затем bun test
-bunx osnv build                       # codegen и проверка типов (tsc --noEmit)
-bunx osnv build --bin                 # + исполняемый файл bin/<имя из package.json>
+bunx osnv dev                         # codegen, then src/index.ts from sources (OSNV_ENV=development if not set)
+bunx osnv dev --watch                 # the same; a change in src/ restarts codegen and the application
+bunx osnv test [<bun test arguments>]  # codegen, then bun test
+bunx osnv build                       # codegen and a type check (tsc --noEmit)
+bunx osnv build --bin                 # + the executable bin/<name from package.json>
 bunx osnv build --bin --outfile dist/app
 ```
 
-Реализация — [build.ts](build.ts). Точка входа берётся из `osnv.config.json`
-(первый entrypoint цели по умолчанию), TypeScript — из `node_modules` проекта.
-`dev` передаёт SIGINT/SIGTERM приложению и возвращает его код завершения.
-`dev --watch` следит за `src/` рекурсивно (кроме `src/generated`, иначе codegen
-перезапускал бы сам себя), склеивает события за 150 мс, останавливает
-приложение, перезапускает codegen и стартует заново; при ошибке codegen ждёт
-следующего изменения. `test` передаёт всё после `test` (или `test --`) в `bun test`.
+Implementation: [build.ts](build.ts). The entry point comes from `osnv.config.json`
+(the first entrypoint of the default target), TypeScript from the project's `node_modules`.
+`dev` forwards SIGINT/SIGTERM to the application and returns its exit code.
+`dev --watch` watches `src/` recursively (except `src/generated`, otherwise codegen
+would restart itself), merges events within 150 ms, stops the application, reruns
+codegen and starts again; on a codegen error it waits for the next change. `test`
+passes everything after `test` (or `test --`) to `bun test`.
 
-`codegen` запускает генератор фреймворка напрямую, скрипт проекта не нужен:
-сначала `node_modules/osnv`, затем исходник `src/osnv` (checkout фреймворка),
-затем пакет самого CLI. Генератор пишет `src/generated/osnv/fingerprint.ts`:
-список исходников цели, их SHA-256 и версию `osnv`. Сгенерированный `runtime.ts`
-при старте из исходников сверяет их и громко предупреждает, если код или версия
-фреймворка изменились после генерации (около 10 мс на 750 файлов). В бинарнике
-исходников нет — проверка пропускается. В репозитории фреймворка `fingerprint.ts`
-не коммитится: он меняется с каждой правкой исходников.
-`build --bin` компилирует из временного каталога (`compileBinary`): Bun 1.4.0
-оставляет `.bun-build` в рабочем каталоге, если его исполняемый файл read-only
-или помечен `uchg`. Bun для дочерних процессов — `scripts/osnv-bun`, иначе
-`OSNV_BUN_BIN`, иначе `bun` из PATH.
+`codegen` runs the framework generator directly; no project script is needed: first
+`node_modules/osnv`, then the `src/osnv` source (a framework checkout), then the CLI's
+own package. The generator writes `src/generated/osnv/fingerprint.ts`: the list of the
+target's sources, their SHA-256 and the `osnv` version. The generated `runtime.ts`
+checks them at startup from sources and warns loudly if the code or the framework
+version changed after generation (about 10 ms for 750 files). A binary has no sources,
+so the check is skipped. In the framework repository `fingerprint.ts` is not committed:
+it changes with every source edit.
+`build --bin` compiles from a temporary directory (`compileBinary`): Bun 1.4.0 leaves
+`.bun-build` in the working directory if its executable is read-only or has the `uchg`
+flag. The Bun for child processes is `scripts/osnv-bun`, otherwise `OSNV_BUN_BIN`,
+otherwise `bun` from PATH.
 
-Команда `agent run` (клиент чат-API приложения) перенесена в приложение:
-`bun run agent:run` и `src/app/modules/agent-chat/client/AgentClient.service.ts`.
-Фреймворк не знает об адресах и cookie конкретного приложения.
+The `agent run` command (a client of the application chat API) moved into the osnova
+application: `bun run agent:run` and `src/app/modules/agent-chat/client/AgentClient.service.ts`.
+The framework knows nothing about the addresses and cookies of a concrete application.
 
-## Ответственность и компоненты
+## Responsibility and components
 
-CLI создаёт каркас по [MOD-ARCH-001](../../../docs/architecture/MODULE_ARCHITECTURE.md).
-По обязательному правилу §8.1 все новые модули приложения и фреймворка, включая
-составные корни и их атомарные части, создаются командами CLI. Автор дорабатывает
-созданный каркас, заполняет паспорт и записывает фактическую команду создания.
-Если нужного варианта нет или генератор ошибается, сначала дорабатывается CLI.
-Ручное создание или копирование каркаса вместо CLI запрещено.
-Предметные поля CRUD — учебные `name`/`email`; автор заменяет их и обновляет паспорт.
-`full` остаётся атомарным модулем. `pack` содержит независимые пустые атомарные части.
+The CLI creates scaffolds per [MOD-ARCH-001](../../../docs/architecture/MODULE_ARCHITECTURE.md).
+By the mandatory rule of §8.1, all new application and framework modules, including
+composite roots and their atomic parts, are created with CLI commands. The author
+adapts the created scaffold, fills in the passport and records the actual creation
+command. If the needed variant is missing or the generator is wrong, the CLI is
+improved first. Creating or copying a scaffold by hand instead of the CLI is forbidden.
+The domain CRUD fields are the learning `name`/`email`; the author replaces them and
+updates the passport. `full` stays an atomic module. `pack` holds independent empty atomic parts.
 
-**Переход Agent/Module:** по [AGENT-ARCH-001](../../../docs/architecture/AGENT_ARCHITECTURE.md)
-агенты создаются отдельно от модулей. Текущий `--full` ещё генерирует
-AnalystAgent внутри модуля и поле `@Module.agents`; это известное расхождение
-с целевой архитектурой. Разделение генерации входит в первый этап доработки.
-Отдельной команды генерации агента сейчас нет. Таблицы ниже описывают действующий
-CLI; шаблон `--full` этим шагом не менялся. AgentsModule создан штатным `--empty`.
+**Agent/Module transition:** per [AGENT-ARCH-001](../../../docs/architecture/AGENT_ARCHITECTURE.md)
+agents are created separately from modules. The current `--full` still generates an
+AnalystAgent inside the module and the `@Module.agents` field; this is a known mismatch
+with the target architecture. Separating the generation is part of the first stage of work.
+There is no separate agent generation command yet. The tables below describe the
+current CLI; the `--full` template was not changed by this step. AgentsModule was
+created with the regular `--empty`.
 
-Проектный OpenAPI codegen теперь учитывает унаследованные свойства DTO, включая
-пустой RequestModel-подкласс импортированного входного контракта. Валидаторы берутся
-из исходных деклараций базового класса. Без наследования сохраняется прежний
-быстрый путь анализа members. Исправление находится в
-[OpenAPI analyzer](../library/openapi/codegen.ts) и вызывается штатным
-[di-generate](../core/scripts/di-generate.ts); результат обновляется только генератором.
+Project OpenAPI codegen now takes inherited DTO properties into account, including an
+empty RequestModel subclass of an imported input contract. Validators come from the
+source declarations of the base class. Without inheritance the former fast path of
+analyzing members is kept. The fix is in the [OpenAPI analyzer](../library/openapi/codegen.ts)
+and is called by the regular [di-generate](../core/scripts/di-generate.ts); only the
+generator updates the result.
 
-Agent-схемы (R4, 2026-10-04) используют ту же функцию именования OpenAPI analyzer
-для реальных объявлений входных/выходных DTO. Отбор схем сохраняет входы/выходы
-Agent, Task, Tool и их ссылки; constructor → schema связи корневых и вложенных
-class DTO дополняют существующий `GENERATED_OPENAPI_SCHEMA_MODELS`.
-Одноимённый независимый интерфейс больше не приводит к потере схемы класса.
-Неимпортируемый связанный class DTO отклоняется с
-`OSNV_AGENT_SCHEMA_MODEL_UNIMPORTABLE` до записи generated-файлов.
-Прежние ограничения Agent collector на неоднозначные class-имена и named exports
-сохраняются. Публичные команды и входные DTO этого CLI не меняются.
-Проверка [Agent standalone integration](../core/agent/test/agent.standalone.integration.test.ts)
-выполняет настоящий codegen, типизацию, source и binary для копии пакета вне checkout.
+Agent schemas (R4, 2026-10-04) use the same OpenAPI analyzer naming function for the
+real declarations of input/output DTOs. Schema selection keeps the inputs/outputs of
+Agent, Task, Tool and their references; the constructor → schema links of root and
+nested class DTOs extend the existing `GENERATED_OPENAPI_SCHEMA_MODELS`.
+An unrelated interface with the same name no longer loses the class schema.
+A linked class DTO that cannot be imported is rejected with
+`OSNV_AGENT_SCHEMA_MODEL_UNIMPORTABLE` before generated files are written.
+The Agent collector's existing limits on ambiguous class names and named exports are
+kept. The public commands and input DTOs of this CLI do not change.
+The [Agent standalone integration](../core/agent/test/agent.standalone.integration.test.ts)
+check runs real codegen, typing, source and binary for a copy of the package outside the checkout.
 
-DI-codegen (D3, 2026-10-02) хранит классы по точному объявлению TypeScript,
-поэтому одноимённые сервисы разных файлов одного target допустимы. В generated
-descriptor попадают уникальные import aliases на конкретные конструкторы;
-поддерживаются export alias/default и переименование импортированных типов
-зависимостей через re-export. Named-зависимости связывает существующий DI
-в области видимости модуля. Два одноимённых видимых named-токена остаются явной
-неоднозначностью, а приватные токены разных модулей не смешиваются.
-Программа TypeScript и target pipeline остаются общими; runtime-компилятор
-не добавляется. Экспортируемые классы-зависимости, включая Lazy, передаются
-точными constructor-токенами: переименование при bundling не меняет identity.
-Интерфейсы/IRepository остаются named; runtime принимает и прежние строковые
-descriptors. Проверка: `di-class-identity.integration.test.ts` выполняет
-генерацию, типизацию, DI и compiled-приложение из другого cwd.
+DI codegen (D3, 2026-10-02) stores classes by their exact TypeScript declaration, so
+services with the same name in different files of one target are allowed. The generated
+descriptor gets unique import aliases for the concrete constructors; export
+alias/default and renaming imported dependency types through a re-export are supported.
+The existing DI wires named dependencies within the module's visibility. Two visible
+named tokens with the same name stay an explicit ambiguity, and private tokens of
+different modules are not mixed. The TypeScript program and the target pipeline stay
+shared; no runtime compiler is added. Exported dependency classes, including Lazy, are
+passed as exact constructor tokens: renaming during bundling does not change identity.
+Interfaces/IRepository stay named; the runtime also accepts the older string
+descriptors. Check: `di-class-identity.integration.test.ts` runs generation, typing,
+DI and a compiled application from another cwd.
 
-DI-codegen также выводит зависимости унаследованного конструктора с подстановкой
-generic-параметров и связывает их с конкретным наследником. Собственный constructor
-и явно заданные deps сохраняют приоритет. Локальные неэкспортируемые helpers
-пропускаются; private class в обычной DI-регистрации без собственной metadata
-получает `OSNV_DI_CLASS_UNIMPORTABLE` до записи generated-файлов. Достаточно
-экспортировать класс или его alias, чтобы продолжить обычную автоматическую
-привязку. Подробности и проверка binary — в [паспорте DI](../core/di/MODULE.md).
+DI codegen also infers the dependencies of an inherited constructor with generic
+parameters substituted and binds them to the concrete subclass. An own constructor and
+explicitly set deps keep priority. Local non-exported helpers are skipped; a private
+class in a regular DI registration without its own metadata gets
+`OSNV_DI_CLASS_UNIMPORTABLE` before generated files are written. Exporting the class or
+its alias is enough to continue with the regular automatic binding. Details and the
+binary check are in the [DI passport](../core/di/MODULE.md).
 
-| Компонент | Файл | Вход | Выход / эффект |
+| Component | File | Input | Output / effect |
 | --- | --- | --- | --- |
-| `parseCliArgs` | [parseCli.ts](parseCli.ts) | `readonly string[]` | Команда, справка или ошибка; без I/O |
-| `generateProject` | [generateProject.ts](generateProject.ts) | Имя, путь, локальный пакет фреймворка, dry-run | Отдельный стартовый проект или план файлов |
-| `parseModuleName` | [naming.ts](naming.ts) | Строка имени | Имена каталогов, классов, маршрута и таблицы |
-| `generateModule` / `generateModulePack` | [generateModule.ts](generateModule.ts) | Опции генерации | План файлов; запись, если не dry-run |
-| `registerModuleInSource` | [moduleRegistration.ts](moduleRegistration.ts) | Исходник host, абсолютные пути, класс | TypeScript с импортом и регистрацией |
-| Шаблоны | [templates/module.ts](templates/module.ts), [templates/pack.ts](templates/pack.ts), [templates/passport.ts](templates/passport.ts) | Нормализованное имя и профиль | Файлы и `MODULE.md` |
-| `runCodegen` | [codegen.ts](codegen.ts) | cwd и target | Запуск проектного `di:generate`, код завершения |
-| `runDev`, `runBuild`, `compileBinary` | [build.ts](build.ts) | cwd, `{ bin, outfile }`, функция codegen | Запуск приложения; проверка типов; исполняемый файл без `.bun-build` в проекте |
+| `parseCliArgs` | [parseCli.ts](parseCli.ts) | `readonly string[]` | A command, help or an error; no I/O |
+| `generateProject` | [generateProject.ts](generateProject.ts) | Name, path, local framework package, dry-run | A separate starter project or a file plan |
+| `parseModuleName` | [naming.ts](naming.ts) | The name string | Names of directories, classes, the route and the table |
+| `generateModule` / `generateModulePack` | [generateModule.ts](generateModule.ts) | Generation options | A file plan; writes it unless dry-run |
+| `registerModuleInSource` | [moduleRegistration.ts](moduleRegistration.ts) | Host source, absolute paths, class | TypeScript with the import and registration |
+| Templates | [templates/module.ts](templates/module.ts), [templates/pack.ts](templates/pack.ts), [templates/passport.ts](templates/passport.ts) | The normalized name and profile | Files and `MODULE.md` |
+| `runCodegen` | [codegen.ts](codegen.ts) | cwd and target | Runs the framework generator for the project, the exit code |
+| `runDev`, `runBuild`, `compileBinary` | [build.ts](build.ts) | cwd, `{ bin, outfile }`, the codegen function | Runs the application; type check; an executable without `.bun-build` in the project |
 
-DI, ORM, HTTP, AI и background самого CLI не используются. Генерируемые модули
-подключают существующие публичные ORM/DI API; зависимости конструкторов связывает codegen.
+The CLI itself uses no DI, ORM, HTTP, AI or background. Generated modules connect the
+existing public ORM/DI APIs; codegen wires the constructor dependencies.
 
-## Команды и входные поля
+## Commands and input fields
 
 ```sh
 bunx osnv --help
@@ -129,163 +129,162 @@ bunx osnv g pack DataManager --parts tables,fields,validators,records --dry-run
 bunx osnv codegen --target production
 ```
 
-В этом репозитории команды Bun выполняются через `scripts/osnv-bun` с
-квалифицированным `OSNV_BUN_BIN` (`./scripts/osnv-bun run osnv …`).
-Скомпилированный CLI: `bin/osnv`. В созданном проекте скрипты `dev`, `build`,
-`build:bin`, `codegen` — обёртки над `osnv dev|build|build --bin|codegen`.
+In this repository Bun commands run through `scripts/osnv-bun` with a qualified
+`OSNV_BUN_BIN` (`./scripts/osnv-bun run osnv …`). The compiled CLI is `bin/osnv`.
+In a created project the `dev`, `build`, `build:bin`, `codegen` scripts wrap
+`osnv dev|build|build --bin|codegen`.
 
-| Поле | Тип / источник | Обязательность / default | Проверка / поведение |
+| Field | Type / source | Required / default | Check / behavior |
 | --- | --- | --- | --- |
-| command | positional string | Обязательно | `g` / `generate`, `codegen` |
-| `new <Name>` | positional string | Для нового проекта | Создаёт независимую папку с kebab-case именем; правила имени как у модулей |
-| `--path` | path string | Только `new`, default `./<kebab-name>` | Точный путь нового каталога; родитель должен существовать, существующий каталог не перезаписывается |
-| `--framework` | path string | Только `new`, default `./src/osnv` или пакет рядом с исходным CLI | Локальный пакет `osnv` с CLI и codegen; по умолчанию копируется в `vendor/osnv` |
-| `--link-framework` | flag | Только `new`, false | Вместо копии сохранить относительную `file:`-ссылку на внешний checkout; требует его при переносе |
-| generator | positional string | Для `g` | `module` / `m`; `pack` / `p` / `module-pack` |
-| name | positional string | Для `g` | Латинская буква, затем буквы/цифры; части через одиночный дефис |
-| `--parts` | CSV string | Только pack, обязательно | Не менее 2 непустых разных частей, имена как у модуля |
-| `--modules-root` | path string, cwd | `src/app/modules` | Непустое значение; разрешён абсолютный путь |
-| `--app-module` | path string, cwd | `{modules-root}/App.module.ts` | Импорт вычисляется относительно этого файла |
-| `--empty` | flag | false | Только module: точка подключения и паспорт |
-| `--minimal` | flag | true | Только module: CRUD и паспорт |
-| `--full` | flag | false | Только module: CRUD/list/cache/auth/background/AI; старый алиас `--enterprise`. `@Authorize` генерируется, если в проекте есть `src/app/modules/auth/{tokenKinds,jwtAuth}.ts`; иначе маршруты публичные и CLI предупреждает. Для запуска host нужен кэш (`runApp({ cache: memory() })`) и provider БД |
-| `--no-register` | flag | false | Пропустить host и автоматический codegen |
-| `--no-codegen` | flag | false | Создать и подключить, не запускать codegen |
-| `--target` | string | Проектный default | Имя из `osnv.config.json` или `all`; для codegen или генерации с регистрацией |
-| `--dry-run` | flag | false | Прочитать и проверить план, не писать и не запускать codegen |
-| `--force` | flag | false | Разрешить перезапись файлов каркаса, включая паспорт; чужие файлы не удаляются |
-| `-h`, `--help` | flag | false | Справка в любой позиции; без записи и codegen |
+| command | positional string | Required | `g` / `generate`, `codegen` |
+| `new <Name>` | positional string | For a new project | Creates a separate folder with a kebab-case name; name rules as for modules |
+| `--path` | path string | Only `new`, default `./<kebab-name>` | The exact path of the new directory; the parent must exist, an existing directory is never overwritten |
+| `--framework` | path string | Only `new`, default `./src/osnv` or the package next to the source CLI | The local `osnv` package with the CLI and codegen; copied into `vendor/osnv` by default |
+| `--link-framework` | flag | Only `new`, false | Keep a relative `file:` link to the external checkout instead of a copy; the project needs it when moved |
+| generator | positional string | For `g` | `module` / `m`; `pack` / `p` / `module-pack` |
+| name | positional string | For `g` | A Latin letter, then letters/digits; parts joined by a single hyphen |
+| `--parts` | CSV string | Only pack, required | At least 2 non-empty distinct parts, names as for a module |
+| `--modules-root` | path string, cwd | `src/app/modules` | A non-empty value; an absolute path is allowed |
+| `--app-module` | path string, cwd | `{modules-root}/App.module.ts` | The import is computed relative to this file |
+| `--empty` | flag | false | Only module: the connection point and the passport |
+| `--minimal` | flag | true | Only module: CRUD and the passport |
+| `--full` | flag | false | Only module: CRUD/list/cache/auth/background/AI; the old alias is `--enterprise`. `@Authorize` is generated if the project has `src/app/modules/auth/{tokenKinds,jwtAuth}.ts`; otherwise the routes are public and the CLI warns. Running the host needs a cache (`runApp({ cache: memory() })`) and a database provider |
+| `--no-register` | flag | false | Skip the host and the automatic codegen |
+| `--no-codegen` | flag | false | Create and connect, do not run codegen |
+| `--target` | string | The project default | A name from `osnv.config.json` or `all`; for codegen or generation with registration |
+| `--dry-run` | flag | false | Read and check the plan, do not write and do not run codegen |
+| `--force` | flag | false | Allow overwriting scaffold files, including the passport; other files are not deleted |
+| `-h`, `--help` | flag | false | Help in any position; no writes and no codegen |
 
-CLI не принимает null. Пропущенные значения флагов, неизвестные опции, лишние
-позиционные аргументы и конфликтующие профили отклоняются до записи.
-`--target` несовместим с `--no-codegen` и `--no-register`.
-Имя target следует проектному codegen: строчная латинская буква, затем строчные
-буквы, цифры и дефисы. `all` выбирает все настроенные targets.
+The CLI does not accept null. Missing flag values, unknown options, extra positional
+arguments and conflicting profiles are rejected before writing.
+`--target` is incompatible with `--no-codegen` and `--no-register`.
+The target name follows project codegen: a lowercase Latin letter, then lowercase
+letters, digits and hyphens. `all` selects all configured targets.
 
-`new` принимает только `--path`, `--framework`, `--link-framework`, `--dry-run` и `--help`. Он не
-запускает установку пакетов, codegen или приложение. Создаёт `package.json`,
-`tsconfig.json`, `osnv.config.json`, `.gitignore`, `AGENTS.md`, локальную
-архитектурную памятку, `README.md`,
-`src/index.ts` и корневой `App.module.ts`. Корень приложения — композиция с
-`imports: []`, без предметного модуля. Вход HTTP слушает loopback на порту
-`PORT` (по умолчанию 3000) и включает `/health`. Генерация модулей остаётся
-командой `bunx osnv g module ...` в новом проекте; для первой функции
-без готовой БД подходит `--empty`. DI-экспорты корня: `[]`; TypeScript-вход —
-`src/index.ts`; опубликованный HTTP-вход — `/health`.
+`new` accepts only `--path`, `--framework`, `--link-framework`, `--dry-run` and `--help`.
+It does not install packages, run codegen or start the application. It creates
+`package.json`, `tsconfig.json`, `osnv.config.json`, `.gitignore`, `AGENTS.md`, a local
+architecture note, `README.md`, `src/index.ts` and the root `App.module.ts`. The
+application root is a composition with `imports: []`, without a domain module. The HTTP
+entry listens on loopback on port `PORT` (3000 by default) and enables `/health`.
+Modules are still generated with `bunx osnv g module ...` in the new project; for a
+first feature without a ready database, `--empty` fits. The root's DI exports: `[]`;
+the TypeScript entry: `src/index.ts`; the published HTTP entry: `/health`.
 
-По умолчанию новый проект получает снимок пакета в `vendor/osnv` и зависимость
-`file:./vendor/osnv`. Переносится весь проект, включая vendor; исходный checkout
-больше не нужен. В снимок входят index.ts, package.json, core, library, cli,
-LICENSE и README.md; node_modules, тесты, скрытые файлы и compile scratch исключены.
-Симлинк внутри копируемых исходников — явная ошибка до публикации проекта.
-Снимок не обновляется автоматически. Режим `--link-framework` сохраняет прежнюю
-связь с живым checkout для совместной разработки. С 0.96.1 пакет называется
-`osnv` и готовится к публикации в npm: проект импортирует фреймворк по имени
-пакета (`osnv/core/di`), поэтому сгенерированный `tsconfig.json` не содержит
-алиасов `@/*` и `osnv/*`. Скомпилированному CLI вне checkout нужно
-передать `--framework`. Исходный пакет не меняется. `dry-run` возвращает число
-файлов снимка, но ничего не записывает; CLI не печатает сотни путей vendor.
+By default a new project gets a snapshot of the package in `vendor/osnv` and the
+dependency `file:./vendor/osnv`. The whole project moves, including vendor; the source
+checkout is no longer needed. The snapshot holds index.ts, package.json, core, library,
+cli, LICENSE and README.md; node_modules, tests, hidden files and compile scratch are
+excluded. A symlink inside the copied sources is an explicit error before the project
+is published. The snapshot is not updated automatically. The `--link-framework` mode
+keeps the live link to a checkout for joint development. Since 0.96.1 the package is
+called `osnv` and is prepared for npm: the project imports the framework by the package
+name (`osnv/core/di`), so the generated `tsconfig.json` has no `@/*` and `osnv/*`
+aliases. A compiled CLI outside the checkout needs `--framework`. The source package
+does not change. `dry-run` returns the number of snapshot files but writes nothing; the
+CLI does not print hundreds of vendor paths.
 
-Профили module: `empty` — 2 файла; `minimal` — 10; `full` — 14, включая паспорт.
-В `full` Tool регистрируется один раз в `tools`; scoped provider создаёт
-модульное расширение Agent API. Повторной записи в `providers` нет.
-Пакет с N частями — 2 + 2N файлов. CRUD использует RequestModel и email-validator;
-оба CRUD-профиля создают getAll(query): PageResult с пагинацией (HTTP: 20 по
-умолчанию, максимум 100). Контроллер собирает JSON:API; summary возвращает общее
-count и максимум 20 имён в порядке id. Сервис получает DbContext через codegen
-и вызывает db.saveChanges() для всех изменений контекста. IRepository API не
-менял семантику. У `full` кэш сбрасывается после успешной записи. HTTP Location и ссылки списка
-берут фактический префикс host. Startup-флаги ORM не задаются: host обеспечивает
-готовность схемы. `--full` проверяет наличие auth helpers до записи, относительные
-импорты учитывают выбранный каталог и реальные пути за симлинками.
+Module profiles: `empty` is 2 files; `minimal` is 10; `full` is 14, including the passport.
+In `full` the Tool is registered once in `tools`; the scoped provider is created by the
+module extension of the Agent API. There is no second entry in `providers`.
+A pack with N parts is 2 + 2N files. CRUD uses RequestModel and the email validator;
+both CRUD profiles create getAll(query): PageResult with paging (HTTP: 20 by default,
+at most 100). The controller builds JSON:API; summary returns the total count and at
+most 20 names in id order. The service gets the DbContext through codegen and calls
+db.saveChanges() for all changes of the context. The IRepository API semantics did not
+change. In `full` the cache is reset after a successful write. HTTP Location and list
+links take the actual host prefix. ORM startup flags are not set: the host makes sure
+the schema is ready. `--full` checks for the auth helpers before writing, and relative
+imports take the chosen directory and real paths behind symlinks into account.
 
-## Результаты, эффекты и ошибки
+## Results, effects and errors
 
-Генераторы возвращают `moduleDir`, `files`, `registered`, `dryRun`, `changes`
-(`path`, `action: create | update`) и `warnings`. Пути файлов в отчёте относительны cwd.
-В dry-run `registered` отражает план; в обычном запуске — итоговую регистрацию.
-Папка пакета: `{kebab-name}_modules`, часть: `{kebab-part}_module`.
-Имена по модулю, как его ввели (`g module Stats`). Имя файла — имя класса,
-у которого роль вынесена в суффикс: `StatsController` → `http/Stats.controller.ts`,
+Generators return `moduleDir`, `files`, `registered`, `dryRun`, `changes`
+(`path`, `action: create | update`) and `warnings`. File paths in the report are relative to cwd.
+In dry-run `registered` reflects the plan; in a regular run, the final registration.
+The pack folder is `{kebab-name}_modules`, a part is `{kebab-part}_module`.
+Names follow the module as it was typed (`g module Stats`). A file name is the class
+name with the role moved into a suffix: `StatsController` → `http/Stats.controller.ts`,
 `StatsListQuery` → `http/contracts/StatsList.query.ts`, `StatsSummaryTool` →
-`ai/tools/StatsSummary.tool.ts`. Полный состав: `Stats.module.ts`,
+`ai/tools/StatsSummary.tool.ts`. The full set: `Stats.module.ts`,
 `model/Stats.model.ts`, `model/Stats.dbContext.ts`, `services/IStats.service.ts`,
 `services/Stats.service.ts`, `http/Stats.controller.ts`,
 `http/contracts/Stats.requests.ts`, `Stats.responses.ts`, `StatsList.query.ts`;
-в `--full` ещё `background/Stats.reporter.ts`, `ai/agents/StatsAnalyst.agent.ts`,
-`ai/tools/StatsSummary.tool.ts`, `ai/contracts/Stats.brief.ts`. Классы ролей:
+`--full` adds `background/Stats.reporter.ts`, `ai/agents/StatsAnalyst.agent.ts`,
+`ai/tools/StatsSummary.tool.ts`, `ai/contracts/Stats.brief.ts`. Role classes:
 `StatsModule`, `StatsController`, `IStatsService`/`StatsService`, `StatsDbContext`,
 `StatsListQuery`, `StatsReporter`, `StatsSummaryTool`, `StatsAnalystAgent`.
-Единственное число остаётся у записи и её DTO: `class Stat`, `CreateStatRequest`,
-`StatResponse`; маршрут `/stats`. До 0.96.1 имена строились от сущности
-(`StatController.ts`, `StatService`). Части пакета, совпадающие в единственном
-числе (`records,record`), отклоняются. Это ограниченные правила английских имён,
-не универсальный словарь.
+The record and its DTOs stay singular: `class Stat`, `CreateStatRequest`,
+`StatResponse`; the route is `/stats`. Before 0.96.1 names were built from the entity
+(`StatController.ts`, `StatService`). Pack parts that coincide in the singular
+(`records,record`) are rejected. These are bounded rules for English names, not a
+universal dictionary.
 
-Существующая папка без `--force` — ошибка. Host проверяется до записи файлов.
-Регистрация поддерживает объект `@Module` с литеральным массивом `imports`
-(либо добавляет отсутствующее поле); динамические метаданные требуют ручного
-подключения. Комментарии не считаются регистрацией. Повторное подключение не
-дублирует импорт. При отсутствии host выводится предупреждение, файлы создаются,
-автоматический codegen пропускается. Регистрация в host не доказывает его
-достижимость из выбранного target; её проверяет проектный codegen.
+An existing folder without `--force` is an error. The host is checked before files are
+written. Registration supports a `@Module` object with a literal `imports` array (or
+adds the missing field); dynamic metadata needs a manual connection. Comments do not
+count as a registration. Connecting again does not duplicate the import. Without a host
+a warning is printed, the files are created, and the automatic codegen is skipped.
+Registration in the host does not prove it is reachable from the chosen target; project
+codegen checks that.
 
-Каждый файл записывается через временный файл и rename. При ошибке записи
-выполненные изменения откатываются; это не транзакция для параллельных читателей.
-Codegen запускается после записи; его ошибка сохраняет каркас для исправления
-и возвращает ненулевой код. Общая успешная команда возвращает 0, ошибка CLI — 1,
-ошибка codegen — код дочернего процесса. Повторы автоматом не выполняются.
+Each file is written through a temporary file and a rename. On a write error the
+completed changes are rolled back; this is not a transaction for concurrent readers.
+Codegen runs after writing; its error keeps the scaffold for fixing and returns a
+non-zero code. A successful command returns 0, a CLI error 1, a codegen error the child
+process's code. There are no automatic retries.
 
-`new` готовит содержимое во временной папке рядом с итоговым каталогом и
-публикует её переименованием после проверки; при ошибке временные файлы
-удаляются. Существующий итоговый путь — ошибка без изменения файлов. Проектный
-codegen исключает исходники установленного фреймворка вне корня приложения и
-не записывает framework-shim-файлы в проект без локального `src/osnv`.
+`new` prepares the content in a temporary folder next to the final directory and
+publishes it with a rename after the check; on an error the temporary files are
+removed. An existing final path is an error without changing files. Project codegen
+excludes the sources of the installed framework outside the application root and does
+not write framework shim files into a project without a local `src/osnv`.
 
-## Проверки
+## Checks
 
-Регрессии находятся в [test](test). Проверки запускаются в временных каталогах;
-живое приложение, PostgreSQL и LLM для проверки CLI не нужны.
-Историческая проверка генератора: исходная база 15 PASS / 0 FAIL, затем 93 PASS / 0 FAIL,
-361 assertions в 6 файлах. Команда (после настройки OSNV_BUN_BIN):
+Regressions are in [test](test). The checks run in temporary directories; a live
+application, PostgreSQL and an LLM are not needed to check the CLI.
+Historical generator check: the original base 15 PASS / 0 FAIL, then 93 PASS / 0 FAIL,
+361 assertions in 6 files. The command (after setting OSNV_BUN_BIN):
 
 ```sh
 ./scripts/osnv-bun test --isolate ./src/osnv/cli/test
 ```
 
-Проверены разбор CLI, отсутствие эффектов help/dry-run, регистрация TypeScript,
-откат записи, сохранение чужих файлов при force, структура и ссылки паспортов,
-типы всех генерируемых профилей против текущего API, кэш и HTTP-префикс.
-[Интеграционная проверка](test/codegen.integration.test.ts) запускает настоящий
-codegen в копии фреймворка и проверяет DbContext DI, HTTP и AI metadata.
-Также собран и проверен отдельный бинарник CLI во временном каталоге.
-TypeScript-проверка CLI и его тестов с публичными декларациями фреймворка — PASS.
-При текущей интеграции Agents: общий `build` — PASS; отдельный CLI binary build
-и `bin/osnv --help` — PASS. Реальная интеграция CLI/codegen — 1/1 PASS,
-full-scan codegen — 10/10 PASS. Для full-scan понадобился test timeout 30000 ms:
-один процесс генерации превысил исходный лимит 5000 ms; исходный отказ не считается
-успехом. Унаследованные DTO и существующий Product UiProfile также проверены.
-Полные команды и свидетельства — в [отчёте Agents](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agents-module-2026-09-20.md).
+Checked: CLI parsing, no effects of help/dry-run, TypeScript registration, write
+rollback, keeping other files with force, the structure and links of passports, the
+types of all generated profiles against the current API, the cache and the HTTP prefix.
+The [integration check](test/codegen.integration.test.ts) runs real codegen in a copy of
+the framework and checks DbContext DI, HTTP and AI metadata.
+A separate CLI binary was also built and checked in a temporary directory.
+The TypeScript check of the CLI and its tests against the framework's public
+declarations: PASS. With the current Agents integration: the shared `build` PASS; a
+separate CLI binary build and `bin/osnv --help` PASS. Real CLI/codegen integration:
+1/1 PASS, full-scan codegen: 10/10 PASS. Full-scan needed a test timeout of 30000 ms:
+one generation process exceeded the original 5000 ms limit; the original failure is not
+counted as success. Inherited DTOs and the existing Product UiProfile were checked too.
+Full commands and evidence are in the [Agents report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agents-module-2026-09-20.md).
 
-### Доработка удобства API, 2026-10-03
+### API usability work, 2026-10-03
 
-Проверка затронутых CLI/ORM/HTTP/DI и сервисов приложения: 247 уникальных тестов
-в 29 файлах. Общий прогон: 244 PASS, 3 тайм-аута на сильно загруженном хосте;
-отдельный повтор этих трёх тестов с тем же лимитом 30000 ms: 3 PASS / 0 FAIL.
-TypeScript всего проекта и codegen production/test — PASS. Для двух full-scan
-тестов, запускающих компилятор, установлен явный лимит 30000 ms вместо 5000 ms;
-проверяемые условия сохранены. Стандартная команда test исключает browser specs.
+Check of the affected CLI/ORM/HTTP/DI and application services: 247 unique tests in
+29 files. The shared run: 244 PASS, 3 timeouts on a heavily loaded host; a separate
+rerun of these three tests with the same 30000 ms limit: 3 PASS / 0 FAIL.
+TypeScript of the whole project and production/test codegen: PASS. The two full-scan
+tests that run the compiler got an explicit 30000 ms limit instead of 5000 ms; the
+checked conditions are kept. The standard test command excludes browser specs.
 
 [standalone-runtime.integration.test.ts](test/standalone-runtime.integration.test.ts)
-собирает CLI, создаёт проект со снимком vendor, переносит его, генерирует модуль,
-проверяет типы и запускает исходник и собранное приложение из другого cwd — PASS.
-Основной бинарник приложения также собран; config check из внешнего каталога:
-52 settings, PASS, без создания клиентов. Проверены loopback HTTP-конвенции.
-Физические PostgreSQL, LLM и production-нагрузка в этот прогон не входят.
+builds the CLI, creates a project with a vendor snapshot, moves it, generates a module,
+checks types and runs the source and the built application from another cwd: PASS.
+The main application binary was built too; config check from an external directory:
+52 settings, PASS, without creating clients. Loopback HTTP conventions were checked.
+Physical PostgreSQL, an LLM and production load are not part of this run.
 
-Регрессии ограничений выборки и сохранения кэша:
-[templates.test.ts](test/templates.test.ts). Привязка контекста и маршрутов:
-[codegen.integration.test.ts](test/codegen.integration.test.ts). Ошибки генерации:
+Regressions of query limits and cache saving:
+[templates.test.ts](test/templates.test.ts). Context and route binding:
+[codegen.integration.test.ts](test/codegen.integration.test.ts). Generation errors:
 [codegen-dx.integration.test.ts](../core/scripts/test/codegen-dx.integration.test.ts).
-Команды выполнялись через квалифицированный scripts/osnv-bun; для compiler-
-интеграций используется test --isolate --timeout 30000 с точными путями ./src/… .
+The commands ran through the qualified scripts/osnv-bun; compiler integrations use
+test --isolate --timeout 30000 with exact ./src/… paths.

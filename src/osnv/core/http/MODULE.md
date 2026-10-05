@@ -1,155 +1,154 @@
 # HTTP server
 
-Версия паспорта: 2. Дата: 2026-09-14. Статус: реализовано, проверки ниже.
-Тип: атомарный инфраструктурный модуль. Путь: `src/osnv/core/http`.
-Точка подключения: `httpModule(options)`; публичный вход: `index.ts`.
-Область паспорта: согласованные redirects, затронутый lifecycle ответа и политика заполнения rate limiter; остальные options описаны в `options.ts`.
+Passport version: 2. Date: 2026-09-14. Status: implemented, checks below.
+Type: atomic infrastructure module. Path: `src/osnv/core/http`.
+Connection point: `httpModule(options)`; public entry: `index.ts`.
+Passport scope: negotiated redirects, the affected response lifecycle and the rate limiter fill policy; the other options are described in `options.ts`.
 
-## Ответственность и компоненты
+## Responsibility and components
 
-Модуль принимает HTTP-запросы и управляет маршрутизацией, middleware и request scope. Согласованные redirects — дополнительное представление ответа в существующем транспорте, отдельного модуля и прокси нет. ORM, UI и исходящие запросы сервер здесь не добавляет.
+The module accepts HTTP requests and manages routing, middleware and the request scope. Negotiated redirects are an additional response representation in the existing transport; there is no separate module or proxy. The server adds no ORM, UI or outgoing requests here.
 
-`HttpServer` после pipeline применяет согласованное представление и передаёт окончательный ответ наблюдателю scope. `HttpContext/inspectableRedirects.ts` преобразует заголовки/status без чтения тела. Общие константы wire-протокола принадлежат `library/http-client`; направление зависимости — core → library.
+After the pipeline `HttpServer` applies the negotiated representation and passes the final response to the scope observer. `HttpContext/inspectableRedirects.ts` converts headers/status without reading the body. The shared wire protocol constants belong to `library/http-client`; the dependency direction is core → library.
 
-## Подключение и DI
+## Connection and DI
 
-`httpModule` сохраняет существующие imports и singleton `HOSTED_SERVICE`, создающий `HttpServer` через фабрику resolver. Контроллеры остаются scoped. Новых DI-токенов, конструкторных зависимостей, экспортов сервисов и generated-регистраций нет. TypeScript экспорт `HttpModuleOptions` уже доступен из `index.ts`.
+`httpModule` keeps the existing imports and the singleton `HOSTED_SERVICE` that creates `HttpServer` through a resolver factory. Controllers stay scoped. There are no new DI tokens, constructor dependencies, service exports or generated registrations. The `HttpModuleOptions` TypeScript export is already available from `index.ts`.
 
-## Входы и результаты
+## Inputs and results
 
-| Поле | Источник / тип | Обязательность / null | Default | Проверка / значение |
+| Field | Source / type | Required / null | Default | Check / meaning |
 |---|---|---|---|---|
-| `inspectableRedirects` | options, boolean | необязательно; null запрещён | false | Небулевое значение → `HttpSetupError`; true разрешает протокол только по запросу клиента |
-| `X-osnv-Redirect` | request header, string | необязательно | отсутствует | Только точное `manual-v1` включает согласованное представление; другое значение сохраняет обычный HTTP |
+| `inspectableRedirects` | options, boolean | optional; null is forbidden | false | A non-boolean value → `HttpSetupError`; true allows the protocol only on the client's request |
+| `X-osnv-Redirect` | request header, string | optional | absent | Only the exact `manual-v1` enables the negotiated representation; any other value keeps regular HTTP |
 
-Пример: `httpModule({ inspectableRedirects: true })`. Клиент отдельно включает `new HttpClient({ inspectableRedirects: true, maxRedirects: 2 })`.
+Example: `httpModule({ inspectableRedirects: true })`. The client separately enables `new HttpClient({ inspectableRedirects: true, maxRedirects: 2 })`.
 
-У активированного сервера ответы различаются по `Vary: X-osnv-Redirect`. При согласованном запросе ответ получает `X-osnv-Redirect: manual-v1`, `Cache-Control: no-store` и CORS exposure протокольных заголовков. Redirect 301/302/303/307/308 с Location передаётся как HTTP 200 с `X-osnv-Redirect-Status` исходного статуса и исходным Location. Тело не читается и не копируется; HEAD сохраняет эти метаданные без тела. Обычный ответ сохраняет статус и тело. Без согласования сервер сохраняет обычные HTTP redirects.
+On an enabled server responses vary by `Vary: X-osnv-Redirect`. On a negotiated request the response gets `X-osnv-Redirect: manual-v1`, `Cache-Control: no-store` and CORS exposure of the protocol headers. A 301/302/303/307/308 redirect with Location is sent as HTTP 200 with `X-osnv-Redirect-Status` holding the original status and the original Location. The body is neither read nor copied; HEAD keeps this metadata without a body. A regular response keeps its status and body. Without negotiation the server keeps regular HTTP redirects.
 
-Согласование применяется после обычных auth/middleware/CORS, включая framework 404/405/health/docs. Оно не добавляет `Access-Control-Allow-Origin`, не разрешает credentials и не обходит CORS. Подключение разрешает клиентам, имеющим доступ к ответу, читать Location; приложение включает его только на нужном HTTP-сервере. Строгий CORS `allowedHeaders` должен разрешать `X-osnv-Redirect`; по умолчанию текущий preflight отражает запрошенные имена.
+Negotiation applies after the regular auth/middleware/CORS, including the framework 404/405/health/docs. It adds no `Access-Control-Allow-Origin`, does not allow credentials and does not bypass CORS. Enabling it lets clients that can access the response read Location; the application enables it only on the HTTP server that needs it. A strict CORS `allowedHeaders` must allow `X-osnv-Redirect`; by default the current preflight reflects the requested names.
 
-Нативные файловые ответы сохраняют исходный Response при доступных для записи headers. Только изменение статуса или immutable headers требует нового Response с тем же телом. Scope наблюдает окончательный ответ; EOF/error/отмена и shutdown сохраняют существующую семантику.
+Native file responses keep the original Response when the headers are writable. Only a status change or immutable headers need a new Response with the same body. The scope observes the final response; EOF/error/cancellation and shutdown keep the existing semantics.
 
-## Проверки
+## Checks
 
-Исправление HTTP-E05 и повторная проверка исходников/HTTP-бинарника без клиентского
-приложения: [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-enterprise-fixes/REPORT.md).
-Следующие ссылки и счётчики относятся к предыдущим снимкам.
+The HTTP-E05 fix and the recheck of the sources/HTTP binary without the client
+application: [report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-enterprise-fixes/REPORT.md).
+The following links and counters refer to earlier snapshots.
 
-Дополнительная [квалификация приложения, браузеров, Node-клиента и нагрузки](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-qualification/REPORT.md)
-проверяет ту же серверную реализацию с реально включённой общей конфигурацией
-приложения. Отдельно указаны Safari WebDriver и результаты текущей Vue-сборки.
-Ниже — результаты предыдущего снимка согласованного протокола.
+An additional [qualification of the application, browsers, the Node client and load](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-qualification/REPORT.md)
+checks the same server implementation with the application's shared configuration
+actually enabled. Safari WebDriver and the results of the current Vue build are listed
+separately. Below are the results of the earlier snapshot of the negotiated protocol.
 
-Проверено: opt-in с обеих сторон, обычные redirects без согласования, HEAD, CORS и cache metadata, immutable Response, raw file Range, задержанный поток и ошибка конфигурации. Полный HTTP-набор — 274 PASS / 0 FAIL; согласованный режим в Chromium — 28 сценариев / 73 assertions; штатный режим — ещё 22 сценария / 68 assertions. TypeScript — PASS. [Отчёт и команды](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-redirects/REPORT.md).
+Checked: opt-in on both sides, regular redirects without negotiation, HEAD, CORS and cache metadata, an immutable Response, raw file Range, a delayed stream and a configuration error. The full HTTP suite: 274 PASS / 0 FAIL; the negotiated mode in Chromium: 28 scenarios / 73 assertions; the regular mode: another 22 scenarios / 68 assertions. TypeScript: PASS. [Report and commands](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-redirects/REPORT.md).
 
-Нативная ошибка открытия файла возникает после pipeline и может не содержать подтверждения протокола; клиент сохраняет такой HTTP 500 как ошибку HTTP. CORS для этой нативной ошибки сохраняет существующие ограничения сервера. Нагрузка, Node, другие браузеры и production в эти проверки не входят.
+A native file-open error happens after the pipeline and may lack the protocol confirmation; the client keeps such an HTTP 500 as an HTTP error. CORS for this native error keeps the server's existing limits. Load, Node, other browsers and production are not part of these checks.
 
-## Заполнение rate limiter
+## Rate limiter fill
 
-Публичное middleware `rateLimit(options)` сохраняет фиксированные окна и состояние
-в памяти одного процесса. При заполнении таблицы новые ключи получают 429 с
-`Retry-After` до ближайшего истечения окна. Действующие buckets не вытесняются:
-исчерпанные квоты сохраняются, существующие ключи с остатком квоты продолжают работу.
-Истёкший ключ может обновить свой bucket; завершённые окна освобождают место новым.
+The public `rateLimit(options)` middleware keeps fixed windows and state in the
+memory of one process. When the table is full, new keys get 429 with `Retry-After`
+until the nearest window expires. Active buckets are not evicted: exhausted quotas
+are kept, and existing keys with quota left keep working. An expired key may renew
+its bucket; finished windows free space for new keys.
 
-| Вход | Тип / обязательность | Default | Проверка и действие |
+| Input | Type / required | Default | Check and action |
 |---|---|---|---|
-| `windowMs` | number, обязателен | нет | Положительное конечное число; длительность окна |
-| `max` | number, обязателен | нет | Положительное безопасное целое; запросов на ключ за окно |
-| `maxBuckets` | number, необязателен | 10000 | Положительное безопасное целое; при заполнении отказ новым ключам |
-| `keyOf` | функция, необязательна | прямой IP или общий `*` | Приложение выбирает идентификатор клиента/пользователя |
-| `trustProxy` | boolean, необязателен | false | При включении допускается первый forwarded IP |
-| `proxyHeader` | string, необязателен | `x-forwarded-for` | Источник forwarded IP только при `trustProxy` |
+| `windowMs` | number, required | none | A positive finite number; the window length |
+| `max` | number, required | none | A positive safe integer; requests per key per window |
+| `maxBuckets` | number, optional | 10000 | A positive safe integer; new keys are rejected when it is full |
+| `keyOf` | function, optional | the direct IP or a shared `*` | The application chooses the client/user identifier |
+| `trustProxy` | boolean, optional | false | When on, the first forwarded IP is accepted |
+| `proxyHeader` | string, optional | `x-forwarded-for` | The forwarded IP source, only with `trustProxy` |
 
-Обычный запрос и отказ при заполненной таблице выполняют O(1) операций с Map.
-Поиск завершённых окон O(maxBuckets) допускается при необходимости свободного места,
-когда достигнуто ближайшее время истечения; повторные новые ключи до этого времени
-не запускают полный обход. Память ограничена `maxBuckets`. Это осознанная политика
-доступности: при насыщении приложение выбирает размер таблицы и разбиение ключей;
-распределённая квота требует отдельного общего хранилища и здесь не обещается.
+A regular request and a rejection at a full table do O(1) Map operations.
+A search of finished windows, O(maxBuckets), is allowed when free space is needed
+and the nearest expiry time has passed; repeated new keys before that time do not
+trigger a full scan. Memory is bounded by `maxBuckets`. This is a deliberate
+availability policy: under saturation the application chooses the table size and
+key partitioning; a distributed quota needs separate shared storage and is not
+promised here.
 
-## Повторное использование привязки DTO в Agent
+## Reusing DTO binding in Agent
 
-Внутренний `Binding/modelBinder.ts` принимает необязательную политику четвёртым
-аргументом `bindModel`: `unknownFields: "strip" | "reject"` (default `strip`) и
-`declaredFields(model)` (default отсутствует). Последняя может задать точный
-список разрешённых полей класса из generated schema. Agent использует `reject`
-на всех уровнях, сохраняя generated hydration вложенных DTO и массивов, лимиты
-глубины/сложности и защиту ключей. Обычные HTTP-вызовы сохраняют удаление лишних
-полей и существующий валидатор. Эти options не добавлены в HTTP barrel exports.
-Проверки: [исправления Agent/Tool](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
+The internal `Binding/modelBinder.ts` accepts an optional policy as the fourth
+`bindModel` argument: `unknownFields: "strip" | "reject"` (default `strip`) and
+`declaredFields(model)` (no default). The latter can set the exact list of allowed
+class fields from the generated schema. Agent uses `reject` at every level, keeping
+the generated hydration of nested DTOs and arrays, the depth/complexity limits and
+key protection. Regular HTTP calls keep removing extra fields and the existing
+validator. These options are not added to the HTTP barrel exports.
+Checks: [Agent/Tool fixes](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
 
-## Проверка примитивных типов (0.96.1)
+## Primitive type checks (0.96.1)
 
-Codegen добавляет в shape поля `{ primitive: "string" | "number" | "boolean" }`
-для полей, объявленных ровно этими типами (с `null`/`?`/массивом). Binder
-проверяет `typeof` только при `primitiveTypes: true`; эту опцию передаёт
-`ParameterBinder` для JSON-тела. gRPC (int64 как string/bigint) и Agent её не
-включают. DTO, который не является именованным top-level export, остаётся без
-проверки и не получает новой ошибки codegen. Проверки:
-`test/modelBinder.primitives.test.ts`, `core/scripts/test/request-model-codegen.test.ts`.
+Codegen adds `{ primitive: "string" | "number" | "boolean" }` to the shape for
+fields declared exactly with these types (with `null`/`?`/an array). The binder
+checks `typeof` only with `primitiveTypes: true`; `ParameterBinder` passes this
+option for a JSON body. gRPC (int64 as string/bigint) and Agent do not enable it.
+A DTO that is not a named top-level export stays unchecked and gets no new codegen
+error. Checks: `test/modelBinder.primitives.test.ts`, `core/scripts/test/request-model-codegen.test.ts`.
 
-## Повторное использование привязки DTO в gRPC
+## Reusing DTO binding in gRPC
 
-Дополнение 2026-09-26: тот же binder используется gRPC с внутренней опцией
-`allowBinary: true`. Она копирует protobuf Buffer/Uint8Array без превращения в
-JSON; по умолчанию false, поэтому HTTP и Agent по-прежнему отклоняют binary
-объекты. BigInt проходит как скаляр. Generated nested shapes, удаление неизвестных
-полей и защита от прототипов/глубины/циклов сохраняются. HTTP-публичный API и
-статусы не изменены. Ошибки binder преобразует владелец gRPC-границы;
-[контракт и проверки](../grpc/MODULE.md).
+Addendum 2026-09-26: gRPC uses the same binder with the internal option
+`allowBinary: true`. It copies protobuf Buffer/Uint8Array without turning them into
+JSON; the default is false, so HTTP and Agent still reject binary objects. BigInt
+passes as a scalar. Generated nested shapes, removal of unknown fields and the
+prototype/depth/cycle protection are kept. The public HTTP API and statuses did not
+change. The owner of the gRPC boundary converts binder errors;
+[contract and checks](../grpc/MODULE.md).
 
-## Строгая привязка параметров (DX, 2026-10-02)
+## Strict parameter binding (DX, 2026-10-02)
 
-Дополнительная область паспорта — ошибка вывода HTTP bindings в существующем
-[codegen](../scripts/di-generate.ts). Неподдерживаемый
-тип параметра, отсутствие типа или несколько body-параметров завершают генерацию
-с OSNV_HTTP_BINDING_UNRESOLVED. Сообщение содержит контроллер, метод, файл и
-причину. До исправления предыдущие generated-файлы остаются на месте; codegen
-возвращает ненулевой код, поэтому штатный dev/build не продолжается.
+An extra passport scope: the HTTP binding inference error in the existing
+[codegen](../scripts/di-generate.ts). An unsupported parameter type, a missing type
+or several body parameters stop generation with OSNV_HTTP_BINDING_UNRESOLVED. The
+message holds the controller, method, file and reason. Until the fix the previous
+generated files stay in place; codegen returns a non-zero code, so the regular
+dev/build does not continue.
 
-Поддерживаемые примитивы, DTO, ListRequest, Request/ResponseBuilder/HttpContext
-сохраняют контракты. Для ручной сборки маршрутов без codegen
-сохранён старый runtime fallback HttpContext; гарантии статической проверки
-на такой способ запуска не распространяются. Нового анализа на запросе нет.
+Supported primitives, DTOs, ListRequest, Request/ResponseBuilder/HttpContext keep
+their contracts. For manual route assembly without codegen the old runtime
+HttpContext fallback is kept; the static check guarantees do not cover that way of
+running. There is no new analysis per request.
 
-Проверки: [codegen-dx.integration.test.ts](../scripts/test/codegen-dx.integration.test.ts),
+Checks: [codegen-dx.integration.test.ts](../scripts/test/codegen-dx.integration.test.ts),
 [test/http.conventions.test.ts](test/http.conventions.test.ts),
 [test/listBinding.test.ts](test/listBinding.test.ts).
 
-## Разрешённая сортировка в OpenAPI (2026-10-02)
+## Allowed sorting in OpenAPI (2026-10-02)
 
-Существующий атомарный HTTP-модуль публикует у query-параметра `sort`
-необязательное расширение `x-osnv-sort-fields: readonly string[]`.
-Источник — те же `listOptions.sort` либо `optionsFromSchema(model)`, которые
-использует binder. Имена не содержат `+`/`-`; пустой массив запрещает сортировку.
-Формат запроса `sort: string`, HTTP-маршруты и правила парсера не меняются.
-Колонки ответа не дают разрешения на сортировку. UI при отсутствии расширения
-не предлагает неизвестные поля; при обновлении сервер и UI поставляются вместе.
+The existing atomic HTTP module publishes an optional `x-osnv-sort-fields: readonly string[]`
+extension on the `sort` query parameter. The source is the same `listOptions.sort`
+or `optionsFromSchema(model)` that the binder uses. Names hold no `+`/`-`; an empty
+array forbids sorting. The `sort: string` request format, HTTP routes and parser
+rules do not change. Response columns do not grant sorting. Without the extension
+the UI offers no unknown fields; on upgrade the server and the UI ship together.
 
-Проекция OpenAPI для UI сохраняет расширение. Если несколько API-версий
-объединены в одну операцию, публикуется пересечение разрешённых полей: каждое
-предложенное поле принимается любой из этих версий. Новых DI-регистраций нет.
-Регрессии: [openApi.sort-contract.test.ts](test/openApi.sort-contract.test.ts).
+The OpenAPI projection for the UI keeps the extension. If several API versions are
+merged into one operation, the intersection of allowed fields is published: any of
+these versions accepts every offered field. There are no new DI registrations.
+Regressions: [openApi.sort-contract.test.ts](test/openApi.sort-contract.test.ts).
 
-## Ограничение запросов до проверки DTO (2026-10-02)
+## Rate limiting before DTO checks (2026-10-02)
 
-Server/controller/action middleware выполняется до DTO binding. Ограничитель
-подключается через `options.middleware` или `@Middleware(rateLimit(...))`;
-`routeMiddlewareComposer` и `ActionFilter.before` выполняются после binding.
-Превышение `maxLength`/`length` сохраняет HTTP 400 с `Validation failed` и
-публичными `details`, но не запускает `pattern` сверх верхней границы в том же
-декораторе. Проверка: [validation-admission.test.ts](test/validation-admission.test.ts).
+Server/controller/action middleware runs before DTO binding. The limiter is
+connected through `options.middleware` or `@Middleware(rateLimit(...))`;
+`routeMiddlewareComposer` and `ActionFilter.before` run after binding.
+Exceeding `maxLength`/`length` keeps HTTP 400 with `Validation failed` and the
+public `details`, but does not run `pattern` beyond the upper bound in the same
+decorator. Check: [validation-admission.test.ts](test/validation-admission.test.ts).
 
-## Удаление ручной HTTP-привязки и изоляция targets (2026-10-03)
+## Removal of manual HTTP binding and target isolation (2026-10-03)
 
-Удалены `@Bind`, фабрики ручных дескрипторов и их HTTP exports.
-ActionMeta больше не содержит bindings; RouterBuilder, OpenAPI и UI получают
-привязки исключительно из generated target по конкретному классу контроллера.
-Методы без параметров получают пустой descriptor; поиск чужих привязок
-по имени класса удалён, package compatibility-карта генерируется пустой.
-Автоматическая обработка route, query, DTO body, ListRequest, Request,
-ResponseBuilder и HttpContext сохранена. Заголовки и сырые тела доступны
-через HttpContext, DI — через конструктор. RequestModel и fallback HttpContext
-для маршрутов без регистрации сохраняются. Миграция: [RELEASE](../../../../docs/RELEASE.md).
+`@Bind`, the manual descriptor factories and their HTTP exports are removed.
+ActionMeta no longer holds bindings; RouterBuilder, OpenAPI and the UI get the
+bindings only from the generated target by the concrete controller class.
+Methods without parameters get an empty descriptor; looking up foreign bindings by
+class name is removed, and the package compatibility map is generated empty.
+Automatic handling of route, query, DTO body, ListRequest, Request,
+ResponseBuilder and HttpContext is kept. Headers and raw bodies are available
+through HttpContext, DI through the constructor. RequestModel and the HttpContext
+fallback for routes without a registration are kept. Migration: [RELEASE](../../../../docs/RELEASE.md).

@@ -1,89 +1,89 @@
-# Repository — спецификация
+# Repository: specification
 
-Repository (`IRepository<T>` / `Repository<T>`) — **тонкая обёртка над ORM** для работы с **одной сущностью**.  
-Он не пишет SQL и не дублирует логику ORM: всё делегируется в `DbSet<T>` и `DbContext`.
+Repository (`IRepository<T>` / `Repository<T>`) is a **thin wrapper over the ORM** for working with **one entity**.
+It writes no SQL and does not duplicate ORM logic: everything is delegated to `DbSet<T>` and `DbContext`.
 
 ---
 
-## Что это простыми словами
+## In plain words
 
-Представь три слоя:
+Picture three layers:
 
 ```
-Сервис (UserService)
+Service (UserService)
        ↓
-Repository<User>     ← «работай только с пользователями»
+Repository<User>     ← "work only with users"
        ↓
-DbSet<User> + DbContext   ← весь ORM (запросы, трекинг, SaveChanges)
+DbSet<User> + DbContext   ← the whole ORM (queries, tracking, SaveChanges)
        ↓
-База данных
+Database
 ```
 
-**Repository** — это «дверь» в ORM для конкретной таблицы/сущности.  
-Вместо того чтобы в каждом сервисе писать `ctx.users.where(...)` или таскать за собой весь `DbContext`, сервис получает готовый объект `IRepository<User>` через DI.
+**Repository** is the "door" into the ORM for a concrete table/entity.
+Instead of writing `ctx.users.where(...)` in every service or carrying the whole `DbContext` around, the service gets a ready `IRepository<User>` object through DI.
 
 ---
 
-## Зачем пользоваться
+## Why use it
 
-| Без Repository | С Repository |
+| Without Repository | With Repository |
 | --- | --- |
-| Сервис зависит от всего `AppDbContext` | Сервис зависит только от `IRepository<User>` |
-| Легко случайно трогать чужие таблицы | Видна одна сущность — меньше ошибок |
-| Сложнее тестировать (нужен полный контекст) | Можно подменить `IRepository<User>` моком |
-| Один стиль доступа к данным размыт по проекту | Единый паттерн: `query()` / `add()` / `saveChanges()` |
+| The service depends on the whole `AppDbContext` | The service depends only on `IRepository<User>` |
+| Easy to touch other tables by accident | One entity is visible, so fewer mistakes |
+| Harder to test (needs the full context) | `IRepository<User>` can be replaced with a mock |
+| Data access style is scattered across the project | One pattern: `query()` / `add()` / `saveChanges()` |
 
-**Repository не заменяет ORM** — он **организует** доступ к нему в прикладном коде (сервисы, контроллеры, фоновые задачи).
+**Repository does not replace the ORM**: it **organizes** access to it in application code (services, controllers, background tasks).
 
-### Когда Repository подходит
+### When Repository fits
 
-- CRUD и LINQ-подобные запросы к одной сущности
-- Сервисный слой приложения с DI
-- Несколько репозиториев в одном запросе (все делят один scoped `DbContext`)
+- CRUD and LINQ-like queries over one entity
+- The application service layer with DI
+- Several repositories in one request (they all share one scoped `DbContext`)
 
-### Когда лучше напрямую `DbContext`
+### When to use `DbContext` directly
 
-- Сложная транзакция с несколькими несвязанными сущностями и ручной оркестрацией
-- Скрипты/миграции, где DI не нужен (`DbContextFactory`)
-- Сырой SQL через `database.executeSqlRaw` без привязки к одной сущности
+- A complex transaction over several unrelated entities with manual orchestration
+- Scripts/migrations that need no DI (`DbContextFactory`)
+- Raw SQL through `database.executeSqlRaw` that is not tied to one entity
 
 ---
 
-## Файлы модуля
+## Module files
 
-| Файл | Назначение |
+| File | Purpose |
 | --- | --- |
-| `IRepository.ts` | Интерфейс + DI-токены `IRepository` и `repositoryFor()` |
-| `Repository.ts` | Scoped-реализация (делегирование в ORM) |
-| `registerRepositories.ts` | Регистрация репозиториев в DI-контейнере |
+| `IRepository.ts` | The interface + the `IRepository` and `repositoryFor()` DI tokens |
+| `Repository.ts` | The scoped implementation (delegates to the ORM) |
+| `registerRepositories.ts` | Registers repositories in the DI container |
 
-Экспорт: `@/core/orm` (`IRepository`, `repositoryFor`, `registerRepositories`); сам класс `Repository` — в `@/library/orm`.
+Exports: `osnv/core/orm` (`IRepository`, `repositoryFor`, `registerRepositories`); the `Repository` class itself is in `osnv/library/orm`.
 
 ---
 
-## Жизненный цикл и DI
+## Lifecycle and DI
 
-- **Lifetime:** `scoped` — один экземпляр `Repository<T>` на scope (обычно один HTTP-запрос)
-- **DbContext** тоже scoped → репозитории, зарегистрированные для одного типа контекста в одном scope, **делят его ChangeTracker**. Репозитории разных контекстов независимы
-- `saveChanges()` на любом репозитории сохраняет **все** накопленные изменения контекста (не только «свою» таблицу)
-- Для новой прикладной операции границу записи показывайте явно: внедрите свой
-  `DbContext`, работайте с его DbSet и вызовите `db.saveChanges()`. Репозиторный
-  метод остаётся совместимым сокращением той же операции, а не отдельным commit.
+- **Lifetime:** `scoped`: one `Repository<T>` instance per scope (usually one HTTP request)
+- **DbContext** is scoped too → repositories registered for one context type in one scope **share its ChangeTracker**. Repositories of different contexts are independent
+- `saveChanges()` on any repository saves **all** pending changes of the context (not only "its own" table)
+- For a new application operation, make the write boundary explicit: inject your
+  `DbContext`, work with its DbSet and call `db.saveChanges()`. The repository
+  method stays a compatible shortcut for the same operation, not a separate commit.
 
-Регистрация автоматическая при `ormModule({ ... })`:
+Registration is automatic with `ormModule({ ... })`:
 
 ```ts
 const DataModule = ormModule({
   context: AppDbContext,
   entities: [User, Post],
   provider: postgres({ url: Bun.env.OSNV_PG_URL! }),
-  registerRepositories: true, // по умолчанию true
+  registerRepositories: true, // true by default
 });
 ```
 
-`ormModule` экспортирует family-токен `IRepository`, чтобы импортирующие модули могли инжектить `repositoryFor(User)`.
+`ormModule` exports the `IRepository` family token so importing modules can inject `repositoryFor(User)`.
 
-Отключить репозитории:
+Turning repositories off:
 
 ```ts
 ormModule({ ..., registerRepositories: false })
@@ -93,13 +93,13 @@ ormModule({ ..., registerRepositories: false })
 
 ## API: `IRepository<T>`
 
-Ниже — все члены интерфейса. У `Repository<T>` поведение **идентично** (только делегирование).
+Below are all the interface members. `Repository<T>` behaves **identically** (it only delegates).
 
-### Запросы
+### Queries
 
 #### `query(): DbSet<T>`
 
-Точка входа в LINQ-подобные запросы ORM. Возвращает тот же объект, что и `dbSet`.
+The entry point to the ORM's LINQ-like queries. Returns the same object as `dbSet`.
 
 ```ts
 const adults = await users
@@ -112,130 +112,130 @@ const adults = await users
 
 #### `readonly dbSet: DbSet<T>`
 
-Прямой доступ к `DbSet` — «escape hatch» для продвинутых сценариев.  
-`query()` и `dbSet` — одно и то же; выбирай то, что читается лучше в коде.
+Direct access to the `DbSet` is an escape hatch for advanced scenarios.
+`query()` and `dbSet` are the same thing; pick whichever reads better in the code.
 
-**Что умеет `DbSet` / цепочка после `query()`** (полный список ORM):
+**What `DbSet` / the chain after `query()` can do** (the full ORM list):
 
-| Метод | Что делает |
+| Method | What it does |
 | --- | --- |
-| `where(predicate)` | Фильтр (несколько `where` = AND) |
-| `orderBy(selector)` | Сортировка по возрастанию |
-| `orderByDescending(selector)` | Сортировка по убыванию |
+| `where(predicate)` | Filter (several `where` = AND) |
+| `orderBy(selector)` | Ascending sort |
+| `orderByDescending(selector)` | Descending sort |
 | `take(n)` | LIMIT |
 | `skip(n)` | OFFSET |
-| `asNoTracking()` | Не отслеживать результат (быстрее для read-only) |
-| `ignoreQueryFilters()` | Отключить `@QueryFilter` и soft-delete фильтр |
-| `select(u => ({ ... }))` | Проекция в plain-объект |
-| `include(u => u.nav)` | Жадная загрузка навигации |
-| `thenInclude(...)` | Вложенная загрузка после `include` |
-| `toList()` | Выполнить запрос, вернуть массив |
-| `first(predicate?)` | Первый элемент или ошибка |
-| `firstOrDefault(predicate?)` | Первый элемент или `null` |
-| `count(predicate?)` | Количество строк |
-| `any(predicate?)` | Есть ли хотя бы одна строка |
+| `asNoTracking()` | Do not track the result (faster for read-only) |
+| `ignoreQueryFilters()` | Turn off `@QueryFilter` and the soft-delete filter |
+| `select(u => ({ ... }))` | Projection into a plain object |
+| `include(u => u.nav)` | Eager loading of a navigation |
+| `thenInclude(...)` | Nested loading after `include` |
+| `toList()` | Run the query, return an array |
+| `first(predicate?)` | The first element or an error |
+| `firstOrDefault(predicate?)` | The first element or `null` |
+| `count(predicate?)` | Number of rows |
+| `any(predicate?)` | Whether there is at least one row |
 
-**Предикаты** (Proxy-DSL, не строки в SQL):
+**Predicates** (a Proxy DSL, not strings in SQL):
 
-`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `startsWith`, `endsWith`, `contains`, `in`, `isNull`, `isNotNull`, комбинаторы `.and()`, `.or()`, `.not()`.
+`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `startsWith`, `endsWith`, `contains`, `in`, `isNull`, `isNotNull`, the combinators `.and()`, `.or()`, `.not()`.
 
-> Важно: в предикатах используй `.and()` / `.or()`, а не JavaScript `&&` / `||`.
+> Important: in predicates use `.and()` / `.or()`, not JavaScript `&&` / `||`.
 
 ---
 
-### Чтение по ключу
+### Reading by key
 
 #### `find(key: unknown): Promise<T | null>`
 
-Поиск по первичному ключу выполняет SQL с учётом фильтров доступа и soft delete.
-Если найденная сущность уже отслеживается, возвращается тот же объект (identity
-map). Наличие объекта в трекере само по себе не позволяет пропустить запрос.
+A primary key lookup runs SQL with the access filters and soft delete applied.
+If the found entity is already tracked, the same object is returned (identity map).
+Having the object in the tracker does not by itself allow skipping the query.
 
 ```ts
 const user = await users.find(42);
 if (user === null) {
-  // не найден
+  // not found
 }
 ```
 
 ---
 
-### Изменения (change tracking)
+### Changes (change tracking)
 
-Изменения **не попадают в БД сразу** — они копятся в `ChangeTracker` до вызова `saveChanges()`.
+Changes **do not reach the database right away**: they pile up in the `ChangeTracker` until `saveChanges()` is called.
 
 #### `add(entity: T): T`
 
-Пометить сущность на **INSERT**. Возвращает ту же ссылку.
+Marks the entity for **INSERT**. Returns the same reference.
 
 ```ts
 const user = users.add(Object.assign(new User(), { name: "Ann" }));
-await users.saveChanges(); // INSERT, id сгенерируется
+await users.saveChanges(); // INSERT, the id is generated
 ```
 
 #### `addRange(entities: readonly T[]): void`
 
-Пакетная вставка (несколько `Added` за один вызов).
+Batch insert (several `Added` in one call).
 
 #### `update(entity: T): T`
 
-Пометить на **полное UPDATE** всех не-ключевых колонок.
+Marks a **full UPDATE** of all non-key columns.
 
 #### `remove(entity: T): T`
 
-Пометить на удаление. Для `@SoftDelete` — ставит метку времени, а не DELETE.
+Marks for deletion. For `@SoftDelete` it sets a timestamp instead of DELETE.
 
 #### `attach(entity: T): T`
 
-Прикрепить существующий объект как `Unchanged` (со снимком для отслеживания изменений).
+Attaches an existing object as `Unchanged` (with a snapshot for change tracking).
 
 #### `stateOf(entity: T): EntityState`
 
-Текущее состояние в трекере:
+The current state in the tracker:
 
-| `EntityState` | Значение |
+| `EntityState` | Meaning |
 | --- | --- |
-| `Detached` | Не отслеживается |
-| `Unchanged` | Загружена, изменений нет |
-| `Added` | Будет INSERT |
-| `Modified` | Будет UPDATE |
-| `Deleted` | Будет DELETE (или soft delete) |
+| `Detached` | Not tracked |
+| `Unchanged` | Loaded, no changes |
+| `Added` | Will be INSERTed |
+| `Modified` | Will be UPDATEd |
+| `Deleted` | Will be DELETEd (or soft-deleted) |
 
 ---
 
-### Сохранение (Unit of Work)
+### Saving (Unit of Work)
 
 #### `saveChanges(): Promise<number>`
 
-Применить **все** изменения текущего `DbContext` в **одной транзакции**.  
-Возвращает число обработанных сущностей. `0` — если нечего сохранять.
+Applies **all** changes of the current `DbContext` in **one transaction**.
+Returns the number of processed entities; `0` if there is nothing to save.
 
-Перед сохранением ORM:
+Before saving, the ORM runs:
 
-1. `DetectChanges` (сравнение со snapshot)
-2. Валидация (`@Validator`, если `validateOnSave: true`)
-3. INSERT / UPDATE / DELETE параметризованным SQL
-4. `AcceptChanges` при успехе
+1. `DetectChanges` (comparison with the snapshot)
+2. Validation (`@Validator`, if `validateOnSave: true`)
+3. INSERT / UPDATE / DELETE with parameterized SQL
+4. `AcceptChanges` on success
 
-При ошибке транзакция откатывается, состояние трекера сохраняется — можно исправить данные и вызвать `saveChanges()` снова.
+On an error the transaction is rolled back and the tracker state is kept: you can fix the data and call `saveChanges()` again.
 
 ```ts
 users.add(newUser);
 posts.add(newPost);
-await users.saveChanges(); // сохранит и User, и Post — один контекст
+await users.saveChanges(); // saves both User and Post: one context
 ```
 
 ---
 
-### Инфраструктура (read-only)
+### Infrastructure (read-only)
 
 #### `readonly changeTracker: ChangeTracker`
 
-Прямой доступ к трекеру контекста (редко нужен в сервисах; для отладки и продвинутых кейсов).
+Direct access to the context's tracker (rarely needed in services; for debugging and advanced cases).
 
 #### `readonly database: DatabaseFacade`
 
-Фасад БД того же контекста:
+The database facade of the same context:
 
 - `ensureCreated()` / `migrate()` / `migrateVersioned()`
 - `executeSqlRaw()` / `querySqlRaw()`
@@ -252,11 +252,11 @@ await users.database.executeSqlRaw(
 
 ---
 
-## DI: токены и внедрение
+## DI: tokens and injection
 
-### `repositoryFor(User)` — рекомендуемый способ
+### `repositoryFor(User)`: the recommended way
 
-Типизированный токен для конкретной сущности:
+A typed token for a concrete entity:
 
 ```ts
 import { repositoryFor, type IRepository } from "@/core/orm";
@@ -266,7 +266,7 @@ class UserService {
 }
 ```
 
-Регистрация в модуле (если не используешь `ormModule`):
+Registration in a module (if you do not use `ormModule`):
 
 ```ts
 import { Module } from "@/core/di";
@@ -279,7 +279,7 @@ import { registerRepositories } from "@/core/orm";
 class MyModule {}
 ```
 
-### Явные зависимости в провайдере
+### Explicit dependencies in a provider
 
 ```ts
 import { scoped, DI } from "@/core/di";
@@ -294,17 +294,17 @@ providers: [
 
 ### `IRepository` — open generic family
 
-Низкоуровневый токен для расширений DI:
+A low-level token for DI extensions:
 
 ```ts
-IRepository.of(User) // эквивалент repositoryFor(User), но без улучшенной типизации
+IRepository.of(User) // the same as repositoryFor(User), but without the richer typing
 ```
 
 ---
 
-## Полный пример
+## Full example
 
-### 1. Сущность и контекст
+### 1. Entity and context
 
 ```ts
 import { Column, DbContext, Entity, Key, ormModule } from "osnv/core/orm";
@@ -322,7 +322,7 @@ class AppDbContext extends DbContext {
 }
 ```
 
-### 2. Модуль данных
+### 2. Data module
 
 ```ts
 export const DataModule = ormModule({
@@ -333,10 +333,10 @@ export const DataModule = ormModule({
 });
 ```
 
-### 3. Сервис
+### 3. Service
 
 ```ts
-import { repositoryFor, type IRepository } from "@/core/orm";
+import { repositoryFor, type IRepository } from "osnv/core/orm";
 
 export class UserService {
   constructor(private readonly users: IRepository<User>) {}
@@ -357,13 +357,13 @@ export class UserService {
   async create(name: string, age: number) {
     const user = this.users.add(Object.assign(new User(), { name, age }));
     await this.users.saveChanges();
-    return user; // id уже заполнен после saveChanges
+    return user; // the id is filled in after saveChanges
   }
 
   async rename(id: number, name: string) {
     const user = await this.users.find(id);
     if (user === null) return false;
-    user.name = name; // snapshot-трекинг подхватит изменение
+    user.name = name; // snapshot tracking picks up the change
     await this.users.saveChanges();
     return true;
   }
@@ -378,7 +378,7 @@ export class UserService {
 }
 ```
 
-### 4. Модуль приложения
+### 4. Application module
 
 ```ts
 import { Module, scoped } from "@/core/di";
@@ -396,9 +396,9 @@ class UsersModule {}
 
 ---
 
-## Примеры запросов
+## Query examples
 
-### Фильтр и пагинация
+### Filter and paging
 
 ```ts
 const page = await users
@@ -410,7 +410,7 @@ const page = await users
   .toList();
 ```
 
-### Проекция (только нужные поля)
+### Projection (only the needed fields)
 
 ```ts
 const labels = await users
@@ -421,7 +421,7 @@ const labels = await users
 // [{ id: 1, name: "Ann" }, ...]
 ```
 
-### Жадная загрузка связей
+### Eager loading of relations
 
 ```ts
 const authors = await authorsRepo
@@ -431,30 +431,30 @@ const authors = await authorsRepo
   .toList();
 ```
 
-### Глобальный фильтр и soft delete
+### Global filter and soft delete
 
 ```ts
-// @QueryFilter на сущности — автоматически в WHERE
+// @QueryFilter on the entity goes into WHERE automatically
 await docs.query().toList();
 
-// Увидеть «скрытые» строки:
+// See the "hidden" rows:
 await docs.query().ignoreQueryFilters().toList();
 
-// @SoftDelete — remove() ставит deletedAt, не DELETE
+// @SoftDelete: remove() sets deletedAt instead of DELETE
 docs.remove(doc);
 await docs.saveChanges();
 ```
 
-### Read-only без трекинга
+### Read-only without tracking
 
 ```ts
 const rows = await users.query().asNoTracking().toList();
-// объекты не в changeTracker — быстрее для отчётов и списков
+// the objects are not in the changeTracker, which is faster for reports and lists
 ```
 
 ---
 
-## Несколько репозиториев в одном сервисе
+## Several repositories in one service
 
 ```ts
 class OrderService {
@@ -470,193 +470,92 @@ class OrderService {
     this.orders.add(Object.assign(new Order(), { productId, qty }));
     product.stock -= qty;
 
-    await this.orders.saveChanges(); // сохранит и Order, и Product
+    await this.orders.saveChanges(); // saves both Order and Product
   }
 }
 ```
 
-Оба репозитория используют **один** scoped `DbContext` → одна транзакция на `saveChanges()`.
+Both repositories use **one** scoped `DbContext` → one transaction per `saveChanges()`.
 
 ---
 
-## Что Repository **не** делает
+## What Repository does **not** do
 
-- Не создаёт отдельный Unit of Work — это `DbContext.saveChanges()`
-- Не генерирует SQL — это `SqlTranslator` / `SaveExecutor`
-- Не валидирует сам по себе — валидация ORM при `saveChanges()`
-- Не изолирует транзакции между разными scope — у каждого scope свой контекст
-- Не регистрирует сущности — только те, что переданы в `ormModule({ entities: [...] })`
+- It does not create a separate Unit of Work: that is `DbContext.saveChanges()`
+- It does not generate SQL: that is `SqlTranslator` / `SaveExecutor`
+- It does not validate on its own: the ORM validates on `saveChanges()`
+- It does not isolate transactions across scopes: each scope has its own context
+- It does not register entities: only those passed to `ormModule({ entities: [...] })`
 
 ---
 
-## Частые ошибки
+## Common mistakes
 
-### 1. Забыли `saveChanges()`
+### 1. Forgot `saveChanges()`
 
 ```ts
 users.add(user);
-// данные ещё не в БД!
+// the data is not in the database yet!
 await users.saveChanges();
 ```
 
-### 2. `add()` не той сущности
+### 2. `add()` of the wrong entity
 
 ```ts
-// ❌ книгу добавили через authorsRepo — ORM воспримет как Author
+// ❌ a book added through authorsRepo: the ORM treats it as an Author
 authors.add(book);
 
-// ✅ свой репозиторий
+// ✅ its own repository
 books.add(book);
 ```
 
-### 3. Ожидали auto deps для `IRepository<User>`
+### 3. Dependencies of `IRepository<User>` without codegen
 
-Open generic не подхватывается `di:generate` автоматически. Указывай deps явно:
+`di:generate` wires a constructor parameter typed `IRepository<User>` automatically. Explicit deps are needed only when the class is registered without codegen (for example in a hand-built test container):
 
 ```ts
 scoped(UserService, UserService, [repositoryFor(User)] as const)
 ```
 
-### 4. `ensureCreated` в тестах без старта приложения
+### 4. `ensureCreated` in tests without starting the application
 
-`ensureCreated: true` в `ormModule` срабатывает в `OrmLifecycle.start()` (при запуске приложения).  
-В тестах вызови вручную:
+`ensureCreated: true` in `ormModule` runs in `OrmLifecycle.start()` (at application start).
+In tests call it by hand:
 
 ```ts
 await scope.resolve(AppDbContext).database.ensureCreated();
 ```
 
-### 5. Разные scope — разные данные в трекере
+### 5. Different scopes have different data in the tracker
 
 ```ts
 const scopeA = container.createScope();
 const scopeB = container.createScope();
-// resolve в scopeA и scopeB — разные DbContext и Repository
+// resolve in scopeA and scopeB gives different DbContext and Repository instances
 ```
 
 ---
 
-## Связь с `DbContext.setOf()`
+## Relation to `DbContext.setOf()`
 
-Repository внутри вызывает:
+Inside, Repository calls:
 
 ```ts
 context.setOf(EntityClass) // → DbSet<T>
 ```
 
-Метод `setOf` добавлен в `DbContext` именно для generic-доступа без объявления поля `readonly users = this.set(User)` в наследнике.  
-В прикладном коде предпочтительнее **Repository**, а не прямой `setOf`.
+The `setOf` method was added to `DbContext` exactly for generic access without declaring a `readonly users = this.set(User)` field in the subclass.
+In application code prefer **Repository** over a direct `setOf`.
 
 ---
 
-## Интеграция в приложении (`UsersModule`)
+## Mocks and testing without a database
 
-В проекте модуль пользователей уже подключён к Repository. Схема:
+Repository is easy to replace in unit tests: the service is tested without PostgreSQL and without a `DbContext`.
 
-```
-HTTP-запрос
-    → UsersController (IUserStore)
-    → UserService (IRepository<User>)
-    → UsersDbContext (scoped)
-    → PostgreSQL
-```
+### Level 1: a mock `IRepository<User>`
 
-### Файлы
-
-| Файл | Роль |
-| --- | --- |
-| `src/modules/users/User.ts` | ORM-сущность `@Entity()` |
-| `src/modules/users/UsersDbContext.ts` | `DbContext` с `users = this.set(User)` |
-| `src/modules/users/UserService.ts` | Бизнес-логика через `IRepository<User>` |
-| `src/modules/users/IUserStore.ts` | Контракт для контроллера (не привязан к ORM) |
-| `src/modules/users/UsersModule.ts` | `ormModule` + scoped `UserService` |
-| `src/modules/users/InMemoryUserStore.ts` | In-memory реализация для тестов без БД |
-
-### Регистрация модуля (как в коде)
-
-```ts
-// src/modules/users/UsersModule.ts
-const UsersDataModule = ormModule({
-  context: UsersDbContext,
-  entities: [User],
-  provider: postgres({ url: Bun.env.OSNV_PG_URL! }),
-  migrateOnStart: true,
-});
-
-@Module({
-  imports: [UsersDataModule],
-  controllers: [UsersController],
-  providers: [scoped(IUserStore, UserService, [repositoryFor(User)] as const)],
-  exports: [IUserStore],
-})
-class UsersModule {}
-```
-
-Контроллер **не знает** про Repository — он зависит только от `IUserStore`.  
-ORM и DI спрятаны в `UserService`.
-
-### UserService — тонкая обёртка над Repository
-
-```ts
-export class UserService implements IUserStore {
-  constructor(private readonly users: IRepository<User>) {}
-
-  list(limit: number) {
-    return this.users.query().take(limit).toList();
-  }
-
-  async byId(id: number) {
-    return (await this.users.find(id)) ?? undefined;
-  }
-
-  async add(name: string) {
-    const user = this.users.add(Object.assign(new User(), { name }));
-    await this.users.saveChanges();
-    return user;
-  }
-
-  async remove(id: number) {
-    const user = await this.users.find(id);
-    if (user === null) return false;
-    this.users.remove(user);
-    await this.users.saveChanges();
-    return true;
-  }
-}
-```
-
-### Запуск
-
-```bash
-bun run dev
-# или
-bun run src/examples/osnv/orm.ts
-```
-
-```bash
-curl http://localhost:3000/api/users
-curl -X POST http://localhost:3000/api/users -H 'Content-Type: application/json' -d '{"name":"Bob"}'
-```
-
-База подключается через `OSNV_PG_URL`. Схема создаётся при старте через `migrateOnStart`.
-
-### Почему контроллер → IUserStore, а не IRepository
-
-- **Контроллер** описывает HTTP-контракт (`list`, `byId`, `add`, `remove`)
-- **Repository** — инфраструктурный доступ к таблице
-- Между ними **UserService** — место для правил домена (проверки, несколько репозиториев, события)
-
-Если логики мало, можно инжектить `IRepository<User>` прямо в контроллер — но отдельный сервис масштабируется лучше.
-
----
-
-## Моки и тестирование без БД
-
-Repository удобно подменять в unit-тестах: сервис тестируется без PostgreSQL и без `DbContext`.
-
-### Уровень 1: мок `IRepository<User>`
-
-Тест `UserService` без БД — подставь объект с нужными методами:
+Testing `UserService` without a database: pass an object with the needed methods:
 
 ```ts
 import { describe, expect, test } from "bun:test";
@@ -687,14 +586,14 @@ test("add calls repository add and saveChanges", async () => {
 });
 ```
 
-Полный рабочий мок с in-memory хранилищем: `src/modules/users/users.service.test.ts`.
+A mock usually needs only the methods the service calls.
 
-### Уровень 2: `InMemoryUserStore` (без Repository)
+### Level 2: an in-memory store (without Repository)
 
-Для тестов **контроллера** достаточно подменить `IUserStore`:
+For **controller** tests it is enough to replace the store contract the controller depends on (here a hypothetical `IUserStore`):
 
 ```ts
-import { Module, createContainer, DI } from "@/core/di";
+import { Module, createContainer, DI } from "osnv/core/di";
 import { InMemoryUserStore } from "./InMemoryUserStore";
 import { IUserStore } from "./IUserStore";
 import { UsersController } from "./UsersController";
@@ -710,14 +609,14 @@ class TestUsersModule {}
 const container = createContainer(TestUsersModule);
 const scope = container.createScope();
 const controller = scope.resolve(UsersController);
-// вызывай методы контроллера или HTTP e2e поверх модуля
+// call the controller methods or run HTTP e2e over the module
 ```
 
-Контроллер и HTTP-слой не трогают ORM — только контракт `IUserStore`.
+The controller and the HTTP layer do not touch the ORM, only the `IUserStore` contract.
 
-### Уровень 3: интеграционный тест с настоящим Repository
+### Level 3: an integration test with a real Repository
 
-Как в `src/orm/test/orm.repository.test.ts`:
+As in [orm.repository.test.ts](../../../core/orm/test/orm.repository.test.ts):
 
 ```ts
 const DataModule = ormModule({
@@ -736,51 +635,50 @@ await service.add("Integration");
 expect(await service.list(10)).toHaveLength(1);
 ```
 
-### Что мокать в каких тестах
+### What to mock in which tests
 
-| Тестируешь | Мокай | БД нужна? |
+| You test | Mock | Database needed? |
 | --- | --- | --- |
-| `UserService` (правила домена) | `IRepository<User>` | Нет |
-| `UsersController` (HTTP, @Catch) | `IUserStore` / `InMemoryUserStore` | Нет |
-| Repository + ORM (запросы, трекинг) | — | Да (PostgreSQL) |
-| Полный HTTP e2e | — | Да (или test module с in-memory store) |
+| `UserService` (domain rules) | `IRepository<User>` | No |
+| `UsersController` (HTTP, @Catch) | the store contract / an in-memory store | No |
+| Repository + ORM (queries, tracking) | — | Yes (PostgreSQL) |
+| Full HTTP e2e | — | Yes (or a test module with an in-memory store) |
 
-### Советы
+### Tips
 
-1. **Не мокай `query()`**, если тестируешь SQL/фильтры — используй PostgreSQL qualification.
-2. **Мокай `saveChanges()`**, чтобы проверить, что сервис вообще сохраняет данные.
-3. **Один scope на тест** — `scope.dispose()` в `afterEach`, иначе утечки scoped-сервисов.
-4. Для `validateOnBuild: true` в DI-тестах с Repository указывай deps явно: `[repositoryFor(User)]`.
-
----
-
-## Тесты
-
-Живые примеры и сценарии:
-
-- ORM Repository: `src/orm/test/orm.repository.test.ts`
-- UserService + mock Repository: `src/modules/users/users.service.test.ts`
-
-Покрыто: CRUD, запросы, include, `@QueryFilter`, `@SoftDelete`, DI scoped, encapsulation модулей.
+1. **Do not mock `query()`** if you test SQL/filters: use PostgreSQL qualification.
+2. **Mock `saveChanges()`** to check that the service saves data at all.
+3. **One scope per test**: `scope.dispose()` in `afterEach`, otherwise scoped services leak.
+4. In hand-built DI test containers (without codegen) with `validateOnBuild: true`, give Repository deps explicitly: `[repositoryFor(User)]`.
 
 ---
 
-## Краткая шпаргалка
+## Tests
+
+Live examples and scenarios:
+
+- ORM Repository: [orm.repository.test.ts](../../../core/orm/test/orm.repository.test.ts)
+
+Covered: CRUD, queries, include, `@QueryFilter`, `@SoftDelete`, scoped DI, module encapsulation.
+
+---
+
+## Cheat sheet
 
 ```ts
 // DI
 constructor(private readonly users: IRepository<User>) {}
 
-// Читать
+// Read
 await users.find(id);
 await users.query().where(...).toList();
 
-// Писать
+// Write
 users.add(entity);
 users.update(entity);
 users.remove(entity);
 await users.saveChanges();
 
-// Токен DI
+// DI token
 repositoryFor(User)
 ```

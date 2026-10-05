@@ -1,17 +1,17 @@
-# Примеры кода модулей osnv
+# osnv module code examples
 
-Приложение к [MOD-ARCH-001](MODULE_ARCHITECTURE.md), версия 1.3.
-Примеры используют публичные API текущего репозитория. Task — учебная функция
-создания и чтения задач. Здесь приведён код для указанных файлов; сам модуль
-в `src/app/modules` этой документационной задачей не создаётся и не подключается.
-DataManager ниже воспроизводит существующую композицию.
+An appendix to [MOD-ARCH-001](MODULE_ARCHITECTURE.md), version 1.3.
+The examples use the public osnv APIs. Task is a learning feature that creates and
+reads tasks. The code is given for the named files of an application's
+`src/app/modules`; this document does not create or connect the module.
+DataManager below reproduces a composition from the osnova application.
 
-При реализации нового модуля сначала создать его командой osnv CLI по
-§8.1 спецификации. Например, для Task подходит `g module Task --empty`;
-после генерации заполнить `MODULE.md` и доработать исходники по примерам ниже.
-Копирование этих примеров не заменяет обязательную генерацию каркаса через CLI.
+To implement a new module, first create it with the osnv CLI command per §8.1 of
+the specification. For Task, `g module Task --empty` fits; after generation fill
+in `MODULE.md` and adapt the sources to the examples below.
+Copying these examples does not replace the mandatory CLI scaffold generation.
 
-## 1. Атомарный Task: файлы и поток вызова
+## 1. Atomic Task: files and call flow
 
 ```text
 task/
@@ -32,14 +32,14 @@ task/
     contracts/TaskRequests.ts
 ```
 
-Поток создания: `POST /api/tasks` → `CreateTaskRequest` →
+The creation flow: `POST /api/tasks` → `CreateTaskRequest` →
 `TaskController.create` → `ITaskService.create` → `TaskService` →
-`TaskDbContext` → `TaskResponse`. Все эти компоненты принадлежат одному
-атомарному модулю. Фон, UI и tool в §2 добавляются к нему только при необходимости.
+`TaskDbContext` → `TaskResponse`. All these components belong to one atomic
+module. The background job, UI and tool in §2 are added to it only when needed.
 
-### 1.1. Входная модель: поля и правила
+### 1.1. Input model: fields and rules
 
-Общая модель входа не зависит от HTTP: ею пользуется сервис и любой его адаптер.
+The shared input model does not depend on HTTP: the service and any of its adapters use it.
 
 ```ts
 // file: src/app/modules/task/contracts/CreateTaskInput.ts
@@ -54,8 +54,8 @@ export class CreateTaskInput {
 }
 ```
 
-HTTP-модель наследует эти поля. `@RequestModel()` явно регистрирует класс для
-привязки по имени; metadata маршрутов и DI формируется штатным codegen.
+The HTTP model inherits these fields. `@RequestModel()` explicitly registers the class
+for binding by name; regular codegen builds the route and DI metadata.
 
 ```ts
 // file: src/app/modules/task/http/contracts/TaskRequests.ts
@@ -66,25 +66,25 @@ import { CreateTaskInput } from "../../contracts/CreateTaskInput";
 export class CreateTaskRequest extends CreateTaskInput {}
 ```
 
-| Поле | Тип | Источник | Присутствие в HTTP body | null | Default | Проверка |
+| Field | Type | Source | Presence in the HTTP body | null | Default | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `title` | `string` | body → аргумент сервиса | Обязательно | Нет | Нет | Длина 2–200 |
-| `priority` | `number`, целое | body → аргумент сервиса | Можно опустить | Нет | `0`, initializer модели | Целое 0–5 |
+| `title` | `string` | body → service argument | Required | No | None | Length 2–200 |
+| `priority` | `number`, integer | body → service argument | May be omitted | No | `0`, the model initializer | Integer 0–5 |
 
-`required` у priority проверяет полученное значение: отсутствие поля сохраняет
-initializer `0`, а явно переданный `null` не должен превращаться в default.
-Неизвестные поля HTTP binder удаляет. Пример корректного тела запроса:
+`required` on priority checks the received value: a missing field keeps the
+initializer `0`, while an explicit `null` must not turn into the default.
+The HTTP binder removes unknown fields. An example of a correct request body:
 
 ```json
 {
-  "title": "Подготовить спецификацию",
+  "title": "Prepare the specification",
   "priority": 2
 }
 ```
 
-### 1.2. ORM-модель и контекст
+### 1.2. ORM model and context
 
-Модель хранения отделена от входа. `id` и `createdAt` задаются ORM, а не клиентом.
+The storage model is separate from the input. The ORM sets `id` and `createdAt`, not the client.
 
 ```ts
 // file: src/app/modules/task/model/Task.model.ts
@@ -116,10 +116,10 @@ export class TaskDbContext extends DbContext {
 }
 ```
 
-### 1.3. Выходная модель и преобразование
+### 1.3. Output model and mapping
 
-Для HTTP дата публикуется строкой ISO 8601 UTC. Внутренняя ORM-сущность наружу
-не возвращается; mapper явно перечисляет разрешённые поля.
+For HTTP the date is published as an ISO 8601 UTC string. The internal ORM entity is
+never returned; the mapper lists the allowed fields explicitly.
 
 ```ts
 // file: src/app/modules/task/contracts/TaskResponse.ts
@@ -142,7 +142,7 @@ export function toTaskResponse(task: Task): TaskResponse {
 }
 ```
 
-### 1.4. Публичный интерфейс, DI-токен и ошибка входа
+### 1.4. Public interface, DI token and input error
 
 ```ts
 // file: src/app/modules/task/services/ITask.service.ts
@@ -165,16 +165,16 @@ import type { ValidationError } from "osnv/library/validation";
 
 export class TaskInputError extends Error {
   constructor(readonly errors: readonly ValidationError[]) {
-    super("Некорректные поля задачи.");
+    super("Invalid task fields.");
     this.name = "TaskInputError";
   }
 }
 ```
 
-### 1.5. Сервис: валидация и ORM
+### 1.5. Service: validation and ORM
 
-Сервис получает scoped-контекст TaskDbContext. Он проверяет вход сам, поэтому прямой
-DI-вызов не зависит от того, прошёл ли запрос через HTTP-validator.
+The service gets the scoped TaskDbContext. It checks the input itself, so a direct
+DI call does not depend on whether the request went through the HTTP validator.
 
 ```ts
 // file: src/app/modules/task/services/Task.service.ts
@@ -190,7 +190,7 @@ export class TaskService implements ITaskService {
   constructor(private readonly db: TaskDbContext) {}
 
   async create(input: CreateTaskInput): Promise<TaskResponse> {
-    // Создаём экземпляр с правилами и копируем только разрешённые поля.
+    // Create an instance with the rules and copy only the allowed fields.
     const command = new CreateTaskInput();
     command.title = input.title;
     if (input.priority !== undefined) command.priority = input.priority;
@@ -217,14 +217,14 @@ export class TaskService implements ITaskService {
 }
 ```
 
-`create` добавляет одну задачу и сохраняет все накопленные изменения TaskDbContext. Автоматический повтор создания и ключ
-идемпотентности этим примером не реализуются. `getById` возвращает `null`,
-если запись не найдена. `count` не имеет входных полей.
+`create` adds one task and saves all pending changes of TaskDbContext. This example
+implements no automatic retry of the creation and no idempotency key. `getById`
+returns `null` if the record is not found. `count` has no input fields.
 
-### 1.6. HTTP-контроллер
+### 1.6. HTTP controller
 
-Контроллер определяет маршруты, права и преобразование ошибок; сохранением
-занимается сервис. Здесь используется существующая авторизация приложения.
+The controller defines routes, permissions and error mapping; the service does the
+saving. The application's existing authorization is used here.
 
 ```ts
 // file: src/app/modules/task/http/TaskController.ts
@@ -264,12 +264,12 @@ export class TaskController {
 }
 ```
 
-Входы: `POST /api/tasks` принимает body; `GET /api/tasks/:id` принимает целый
-`id` из path. Создание возвращает 201 и Location; чтение — 200 либо 404.
-Ошибки полей преобразуются в 400. `/api` задаётся настройками host, а
-`ctx.path` сохраняет фактический префикс в Location.
+Inputs: `POST /api/tasks` takes a body; `GET /api/tasks/:id` takes an integer `id`
+from the path. Creation returns 201 and Location; reading returns 200 or 404.
+Field errors map to 400. `/api` comes from the host settings, and `ctx.path` keeps
+the actual prefix in Location.
 
-### 1.7. Регистрация атомарного модуля
+### 1.7. Registering the atomic module
 
 ```ts
 // file: src/app/modules/task/Task.module.ts
@@ -291,21 +291,21 @@ import { TaskController } from "./http/TaskController";
 export class TaskModule {}
 ```
 
-Зависимость сервиса уже объявлена в его конструкторе:
+The service dependency is already declared in its constructor:
 `constructor(private readonly db: TaskDbContext) {}`.
-Codegen извлекает `TaskDbContext` и связывает его с контекстом этого модуля;
-дублировать эту зависимость третьим аргументом `scoped` не нужно.
-Контроллер регистрируется через `controllers`; его зависимости также связывает codegen.
-ORM-контекст получает общий `DATABASE_PROVIDER`. Схема должна быть подготовлена
-выбранным для приложения способом; пример не включает startup-изменение схемы.
+Codegen extracts `TaskDbContext` and wires it with this module's context; there is
+no need to repeat the dependency as a third `scoped` argument.
+The controller is registered through `controllers`; codegen wires its dependencies too.
+The ORM context gets the shared `DATABASE_PROVIDER`. The schema must be prepared the
+way the application chose; the example includes no startup schema change.
 
-## 2. Дополнительные компоненты той же атомарной функции
+## 2. Extra components of the same atomic feature
 
-### 2.1. Фоновый обработчик
+### 2.1. Background handler
 
-Этот файл добавляется только при необходимости фоновой статистики.
-Входы: constructor `ServiceProvider` и `Logger`, метод `tick(AbortSignal)`.
-Интервал — 60 секунд; первый запуск после интервала.
+Add this file only if background statistics are needed.
+Inputs: the `ServiceProvider` and `Logger` constructor arguments and the
+`tick(AbortSignal)` method. The interval is 60 seconds; the first run comes after one interval.
 
 ```ts
 // file: src/app/modules/task/background/TaskStatsReporter.ts
@@ -328,7 +328,7 @@ export class TaskStatsReporter extends PeriodicBackgroundService {
     const scope = this.provider.createScope();
     try {
       const count = await scope.resolve(ITaskService).count();
-      if (!signal.aborted) this.logger.info("Число задач", { count });
+      if (!signal.aborted) this.logger.info("Task count", { count });
     } finally {
       await scope.dispose();
     }
@@ -336,10 +336,11 @@ export class TaskStatsReporter extends PeriodicBackgroundService {
 }
 ```
 
-Singleton-фон не держит scoped `ITaskService` в конструкторе: scope создаётся
-на одну итерацию. Проверка сигнала не означает отмену уже отправленного SQL.
+The singleton background job does not hold the scoped `ITaskService` in its
+constructor: a scope is created per iteration. Checking the signal does not cancel
+SQL that was already sent.
 
-### 2.2. UI-профиль
+### 2.2. UI profile
 
 ```ts
 // file: src/app/modules/task/ui/TasksAdminUiProfile.ts
@@ -351,19 +352,19 @@ import { TaskController } from "../http/TaskController";
   surface: "admin",
   controller: TaskController,
   response: TaskResponse,
-  title: "Задачи",
-  singularTitle: "Задача",
+  title: "Tasks",
+  singularTitle: "Task",
 })
 export class TasksAdminUiProfile {}
 ```
 
-Профиль ссылается на существующие controller/response, не объявляет второй
-набор HTTP-операций. Surface `admin` должна быть опубликована host-приложением.
+The profile refers to the existing controller/response and does not declare a second
+set of HTTP operations. The host application must publish the `admin` surface.
 
-### 2.3. Tool с типизированным входом
+### 2.3. Tool with a typed input
 
-Tool читает задачу через тот же публичный сервис. Вход — положительное целое
-`id`; выход — `TaskResponse` либо `null` в поле `task`.
+The tool reads a task through the same public service. The input is a positive
+integer `id`; the output is a `TaskResponse` or `null` in the `task` field.
 
 ```ts
 // file: src/app/modules/task/ai/tools/TaskLookupTool.ts
@@ -383,7 +384,7 @@ export class TaskLookupOutput {
 
 @Tool({
   name: "tasks.lookup",
-  description: "Читает задачу по идентификатору.",
+  description: "Reads a task by its identifier.",
   input: TaskLookupInput,
   output: TaskLookupOutput,
   sideEffect: "read",
@@ -402,13 +403,13 @@ export class TaskLookupTool {
 }
 ```
 
-Вход проверяется штатным выполнением Tool в Agent Runtime. Прямой `new` и вызов
-`execute` не получают эту проверку автоматически. Доступ агента к инструменту
-задаётся отдельно; HTTP-декоратор `@Authorize` на него не распространяется.
+The input is checked by the regular Tool execution in the Agent Runtime. A direct
+`new` and an `execute` call do not get this check automatically. An agent's access
+to the tool is configured separately; the HTTP `@Authorize` decorator does not apply to it.
 
-### 2.4. Как зарегистрировать дополнительные компоненты
+### 2.4. Registering the extra components
 
-Изменения в существующем Task.module.ts при включении всех трёх возможностей:
+Changes in the existing Task.module.ts when all three capabilities are enabled:
 
 ```diff
  import { TaskController } from "./http/TaskController";
@@ -428,21 +429,21 @@ export class TaskLookupTool {
    exports: [ITaskService],
 ```
 
-`background` автоматически регистрирует singleton; `tools` связывает tool
-с явно объявленным scoped provider. Конструкторную зависимость tool от
-`ITaskService` извлекает codegen, отдельный массив `deps` не нужен.
-Они остаются внутри TaskModule.
+`background` registers a singleton automatically; `tools` binds the tool to an
+explicitly declared scoped provider. Codegen extracts the tool's constructor
+dependency on `ITaskService`; no separate `deps` array is needed.
+They stay inside TaskModule.
 
-Этот пример показывает DI-регистрацию адаптера сервиса, а не включение агента
-в модуль. По [AGENT-ARCH-001](AGENT_ARCHITECTURE.md) агент и его набор Tools
-объявляются отдельно. Поле `tools` выше отражает действующий способ публикации
-адаптера; новая самостоятельная регистрация агентов дорабатывается отдельно.
+This example shows the DI registration of a service adapter, not adding an agent to
+the module. Per [AGENT-ARCH-001](AGENT_ARCHITECTURE.md) an agent and its set of Tools
+are declared separately. The `tools` field above reflects the current way to publish
+an adapter; the new standalone agent registration is being developed separately.
 
-## 3. Составной DataManager и его атомарная часть
+## 3. The composite DataManager and its atomic part
 
-### 3.1. Корень пакета
+### 3.1. Pack root
 
-Источник: [DataManager.module.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/datamanager_modules/DataManager.module.ts).
+Source: [DataManager.module.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/datamanager_modules/DataManager.module.ts).
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
@@ -466,9 +467,9 @@ import { DataManagerRecordsModule } from "./records_module/DataManagerRecords.mo
 export class DataManagerModule {}
 ```
 
-### 3.2. Records владеет реализацией
+### 3.2. Records owns the implementation
 
-Источник: [DataManagerRecords.module.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts).
+Source: [DataManagerRecords.module.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts).
 
 ```ts
 // file: src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts
@@ -488,16 +489,16 @@ import { RecordManager } from "./services/RecordManager";
 export class DataManagerRecordsModule {}
 ```
 
-Records получает каталог/валидацию через imports, сам регистрирует свой
-контроллер и сервисы. `exports: []` делает его DI-провайдеры приватными;
-контроллер по-прежнему входит в HTTP-композицию пакета.
-Остальные части и конкретные входные поля описаны в
-[разборе DataManager](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/docs/architecture/EXISTING_MODULES.md).
+Records gets the catalog/validation through imports and registers its own controller
+and services. `exports: []` makes its DI providers private; the controller is still
+part of the pack's HTTP composition.
+The other parts and the concrete input fields are described in the
+[DataManager walkthrough](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/docs/architecture/EXISTING_MODULES.md).
 
-## 4. Подключение атомарного и составного модулей в приложении
+## 4. Connecting the atomic and composite modules in an application
 
-Сокращённая отдельная host-композиция для примера; существующий App.module.ts
-не следует заменять этим кодом, теряя остальные функции приложения.
+A shortened separate host composition for the example; do not replace an existing
+App.module.ts with this code and lose the application's other features.
 
 ```ts
 // file: src/app/modules/TaskExampleApp.module.ts
@@ -521,34 +522,36 @@ await runApp(TaskExampleAppModule, {
 });
 ```
 
-Это пример подключения через существующую инфраструктуру; для его запуска
-нужны её настройки и подготовленная схема. При переносе кода в приложение
-сначала подключить его к выбранной точке входа и target в `osnv.config.json`,
-затем выполнить штатный `di:generate` с закреплённым Bun. Документирование
-этих примеров не запускает приложение, сервер, внешние коннекторы или миграции.
+This connects through the existing infrastructure; running it needs that
+infrastructure's settings and a prepared schema. When moving the code into an
+application, first connect it to the chosen entry point and target in
+`osnv.config.json`, then run the regular `di:generate` with the pinned Bun.
+Documenting these examples does not run the application, a server, external
+connectors or migrations.
 
-## 5. Что фиксировать рядом с кодом
+## 5. What to record next to the code
 
-В `MODULE.md` для `TaskService.create` записать сигнатуру выше, два входных поля,
-default `priority = 0`, запрет null, результат `TaskResponse`, ошибку
-`TaskInputError` и эффект сохранения одной записи. Для HTTP указать привязку,
-Admin-доступ, 201/400 и Location; для DI-вызова не приписывать HTTP-авторизацию.
-Для фона описать interval, `AbortSignal`, новый scope на tick и dispose.
+In `MODULE.md` for `TaskService.create` record the signature above, the two input
+fields, the default `priority = 0`, the null ban, the `TaskResponse` result, the
+`TaskInputError` error and the effect of saving one record. For HTTP state the
+binding, Admin access, 201/400 and Location; for a DI call do not attribute HTTP
+authorization. For the background job describe the interval, `AbortSignal`, a new
+scope per tick and dispose.
 
-Для DataManager перечислить четыре атомарных владельца и их imports/exports.
-Не регистрировать `RecordManager` второй раз в корне пакета и не делить Task
-на отдельные модули по каталогам `http`, `services` и `model`.
+For DataManager list the four atomic owners and their imports/exports.
+Do not register `RecordManager` a second time in the pack root, and do not split Task
+into separate modules by the `http`, `services` and `model` directories.
 
-Проверка примеров должна различать синтаксис TypeScript, разрешение импортов,
-типы и фактическое выполнение. Статическая проверка не доказывает запуск
-codegen, работу авторизации, HTTP, UI/Agent Runtime или физической БД.
+Checking the examples must distinguish TypeScript syntax, import resolution, types
+and actual execution. A static check does not prove that codegen ran or that
+authorization, HTTP, UI/Agent Runtime or a physical database work.
 
-### Результат проверки примеров
+### Example check result
 
-На 2026-09-13 TypeScript 5.9.3 проверил 19 блоков `ts` из этого приложения и
-основной спецификации: 17 уникальных виртуальных файлов, 60 импортов,
-**0 диагностик** в примерах и их зависимостях. Использованы настройки текущего
-`tsconfig.json`; исходники примеров подставлялись в памяти, без записи в `src/`.
-Повторяющиеся примеры в двух документах совпадают. Фрагмент `diff` показывает
-правку регистрации дополнительных компонентов и не считается отдельным TS-файлом.
-Runtime, codegen, HTTP, UI, Agent Runtime, инфраструктура и миграции не запускались.
+On 2026-09-13 TypeScript 5.9.3 checked 19 `ts` blocks from this appendix and the main
+specification: 17 unique virtual files, 60 imports, **0 diagnostics** in the examples
+and their dependencies. The settings of the `tsconfig.json` at that time were used;
+the example sources were substituted in memory, without writing to `src/`.
+The examples repeated in both documents match. The `diff` fragment shows the change
+of the extra component registration and is not counted as a separate TS file.
+Runtime, codegen, HTTP, UI, Agent Runtime, infrastructure and migrations were not run.
