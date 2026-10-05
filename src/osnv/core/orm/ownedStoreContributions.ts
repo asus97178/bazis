@@ -132,9 +132,10 @@ export function ownedStoreRegistrations(snapshot: ModuleOwnedContributionSnapsho
       for (const foreignKey of table.foreignKeys) if (foreignKey.target.schema !== record.definition.ownedScope.schema || !foreignKey.target.table.startsWith(record.definition.ownedScope.tablePrefix)) fail("ORM_OWNED_STORE_OWNERSHIP_CONFLICT");
     }
   }
-  // The complete ORM graph is compiled only in owned mode. This catches a
-  // legacy context mapping an owned/rejected table before any provider or DI
-  // activation while preserving ordinary-only graph behaviour.
+  // The complete ORM graph is compiled only when an owned store is present. This
+  // catches an ordinary context that maps an owned or rejected table before any
+  // provider or DI activation; containers without owned stores keep the
+  // ordinary behaviour.
   const effectiveConfigs = new Map<object, object>();
   for (const entry of graph) {
     // In owned mode every registration receives exactly one container-local

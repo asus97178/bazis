@@ -1034,7 +1034,7 @@ export class PostgresProvider implements DatabaseProvider {
     return code.value as OrmOwnedStoreAdmissionError["code"];
   }
 
-  /** Projection follows in the next C2 chunk; no partial snapshot is admitted. */
+  /** Reads the registry snapshot under the registry lock; any failure poisons the attempt, so a partial snapshot is never admitted. */
   private async ownedStoreRegistryV1(attempt: OwnedStoreAttemptV1, generation: number): Promise<OwnedStoreRegistrySnapshotV1> {
     if (attempt.phase !== "registryLocked" || attempt.generation !== generation || attempt.busy) { if (attempt.phase !== "callbackClosed" && attempt.phase !== "released" && attempt.phase !== "committing") this.ownedStoreLockUncertainty(attempt); throw failure("ORM_OWNED_STORE_LOCK_UNAVAILABLE"); }
     attempt.busy = true;

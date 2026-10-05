@@ -13,7 +13,14 @@ export class OrmLifecycle implements HostedService {
   readonly phase: number;
   /** Internal hosted-plan marker; public hosted services never receive it. */
   readonly __osnvOrmLegacyLifecycle = true;
+  /**
+   * Internal hosted-plan marker: this lifecycle changes the schema at phase -100
+   * without exact admission (`ensureCreated` on a non-PostgreSQL provider,
+   * `migrateOnStart` or startup migrations). The hosted-plan validator rejects
+   * it in a container that also uses exact schema admission.
+   */
   readonly __osnvLegacySchemaAuthority: boolean;
+  /** Internal hosted-plan marker: tables and foreign keys of the phase -105 exact `ensureCreated` admission on PostgreSQL. */
   readonly __osnvSchemaAdmission?: {
     readonly unit: readonly string[];
     readonly tables: readonly string[];
@@ -105,8 +112,11 @@ export class OrmLifecycle implements HostedService {
   }
 }
 
-/** Strict owner admission intentionally precedes the legacy -100 lifecycle. */
-/** Establishes the required -110 provider slot without taking connection ownership. */
+/**
+ * Occupies the phase -110 provider slot that exact schema admission requires:
+ * it runs before the phase -105 admissions and the phase -100 ORM lifecycle,
+ * without taking connection ownership.
+ */
 export class OrmProviderReadyLifecycle implements HostedService {
   readonly planValidator = ormHostedPlanValidator;
   public readonly phase = -110;

@@ -26,7 +26,8 @@ First public release on npm.
 - `@UUID({ version: "v7" })`: the ORM assigns a time-ordered UUID v7 key
   before INSERT (native `uuid` column, no database default, any supported
   PostgreSQL version). Dynamic tables with `uuidVersion: "v7"` keys get the same
-  behavior instead of a v4 database default.
+  behavior instead of a v4 database default. Owned stores accept v7 keys and
+  plain `uuid` columns without a default, such as foreign keys to uuid keys.
 - Built-in texts are English; Russian sets `RU_VALIDATION_MESSAGES`,
   `RU_CODEX_MESSAGES` and `RU_UI_LABELS` are included.
 - `examples/todo` in the repository: three modules, PostgreSQL,

@@ -397,8 +397,13 @@ the `uuid` physical type as for v4 keys.
 `ChangeTracker` use it, so a v7 key is treated as an application key. The
 duplicate-key preflight skips only unassigned v7 keys and rechecks after the
 ORM assigns them. `insertIfAbsent` keeps its contract: it inserts the given
-values and does not apply conventions. Owned stores still accept only
-`uuidDefault` uuid columns, so a v7 key there is rejected by admission.
+values and does not apply conventions.
+
+Owned-store admission accepts a `uuid` column either as a single v4 key with
+`uuidDefault` generation and the `gen_random_uuid()` default, or as a plain
+column without generation and without a default (`DEFAULT NULL` for a nullable
+column). The second form covers v7 keys and foreign keys to uuid keys; before
+2026-10-06 admission rejected it with `ORM_OWNED_STORE_IDENTITY_MISMATCH`.
 
 Checks: [orm.uuid-v7.test.ts](test/orm.uuid-v7.test.ts) (model, DDL, expected
 schema, assignment, kept and duplicate keys, dynamic tables) and
@@ -407,3 +412,8 @@ schema, assignment, kept and duplicate keys, dynamic tables) and
 foreign key, a round trip through a fresh context). The live test passed on
 PostgreSQL 17 and 15.7 in throwaway local containers, together with the
 existing `orm.ensure-created.postgres.live.test.ts` on 15.7.
+[orm.owned-store.uuid-v7.postgres.live.test.ts](../../core/orm/test/orm.owned-store.uuid-v7.postgres.live.test.ts)
+covers an owned store with a v7 key and a uuid foreign key (admission, saving,
+exact replay); it runs only against a dedicated `osnv_v7_*` database with
+`OSNV_OWNED_STORE_V7_LIVE=1`. It passed on PostgreSQL 17 in a throwaway local
+container, together with the existing E327 owned-store live test.
