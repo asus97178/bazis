@@ -47,7 +47,7 @@ Validator.setDefaultMessages({ required: "Поле {property} обязатель
 | `ValidationResult.ts` | итог: `isValid`, `errors`, `getErrorsFor`, `hasErrorsFor` |
 | `RuleEngine.ts` | движок: один проход по плану, sync/async, nested, защита от циклов |
 | `RuleCompiler.ts` | компиляция правил класса в план + WeakMap-кэш (RegExp, enum-Set) |
-| `MessageRegistry.ts` | шаблоны сообщений, плейсхолдеры, приоритет local > global > built-in |
+| `MessageRegistry.ts` | шаблоны сообщений, плейсхолдеры, приоритет local > global > built-in; встроенные на английском, `RU_VALIDATION_MESSAGES` — русский набор для `setDefaults` |
 | `metadata.ts` | хранение правил через `context.metadata` / `Symbol.metadata` |
 | `types/ValidatorOptions.ts` | все опции декоратора |
 | `types/ValidationCode.ts` | коды ошибок |

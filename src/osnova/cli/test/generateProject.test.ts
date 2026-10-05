@@ -48,7 +48,7 @@ describe("new project", () => {
     expect(manifest.scripts["di:generate"]).toBeUndefined();
     expect(manifest.scripts).toMatchObject({ codegen: "osnv codegen", dev: "osnv dev", build: "osnv build", "build:bin": "osnv build --bin" });
     expect(manifest.scripts.osnova).toBeUndefined();
-    expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("атомарный модуль");
+    expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("atomic module");
     expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toContain("registerOsnovaGeneratedRuntime");
     await expect(generateProject(options)).rejects.toThrow("already exists");
     await expect(generateProject({ name: "Bad", outputPath: path.join(root, "bad"), frameworkPath: root })).rejects.toThrow("Local Osnova package not found");

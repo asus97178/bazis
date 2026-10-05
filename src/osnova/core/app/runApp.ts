@@ -22,7 +22,7 @@ import {
   type RunAppUiSurfaceOptions,
   type UiSurfaceHostingOptions,
 } from "./ui/uiSurfaceHosting";
-import { resolveUiProfileAuthoringV1, UiProfileV1Registry } from "./ui/uiProfileResolver";
+import { resolveUiProfileAuthoringV1, UiProfileV1Registry, type UiLabels } from "./ui/uiProfileResolver";
 import { UiSurfaceDocumentProvider, UiSurfaceHttpController } from "./ui/uiSurfaceHttp";
 
 /**
@@ -94,7 +94,7 @@ function withUiRuntime(
 ): OsnovaModuleRef {
   const declarations = collectModuleUiProfiles([root]);
   const openApi = http === undefined ? undefined : buildUiOpenApiDocument(root, http);
-  const profiles = resolveUiProfiles(root, declarations, http, openApi);
+  const profiles = resolveUiProfiles(root, declarations, http, openApi, option?.labels);
   const profileRegistry = new UiProfileV1Registry(profiles, openApi);
   const httpOptions = http === undefined ? undefined : normalizeUiSurfaceHostingOptions(option, http);
   if (httpOptions === undefined || openApi === undefined) {
@@ -126,6 +126,7 @@ export function resolveUiProfiles(
   declarations: readonly unknown[],
   http: HttpModuleOptions | undefined,
   prebuiltOpenApi?: ReturnType<typeof buildHttpOpenApiDocument>,
+  labels?: UiLabels,
 ): readonly UiProfileV1[] {
   const authoring: object[] = [];
   for (const declaration of declarations) {
@@ -144,7 +145,7 @@ export function resolveUiProfiles(
   const openApi = prebuiltOpenApi ?? buildUiOpenApiDocument(root, http ?? {});
   const profiles: UiProfileV1[] = [];
   for (const declaration of authoring) {
-    const result = resolveUiProfileAuthoringV1({ declaration, openApi });
+    const result = resolveUiProfileAuthoringV1({ declaration, openApi, labels });
     if (!result.ok) {
       const details = result.diagnostics
         .map((diagnostic) => `${diagnostic.code}: ${diagnostic.message}`)

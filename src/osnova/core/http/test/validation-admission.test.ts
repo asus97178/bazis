@@ -49,7 +49,7 @@ registerGeneratedBindings(LoginController, {
       const body = await ctx.response!.json();
       expect(body).toEqual({
         error: "Validation failed",
-        details: [{ property: "email", message: 'Поле "email" должно содержать не более 120 символов', code: "maxLength" }],
+        details: [{ property: "email", message: 'Field "email" must be at most 120 characters long', code: "maxLength" }],
       });
       expect(JSON.stringify(body)).not.toContain(email);
     } finally {

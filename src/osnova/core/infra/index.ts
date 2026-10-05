@@ -8,7 +8,7 @@ export { InfraError, errorMessage, type InfraConnector } from "./InfraConnector"
 export { InfraLifecycle } from "./InfraLifecycle";
 export { reader, requireValue, type ConfigReader } from "./connectorConfig";
 export { codexAppServerConnect, CODEX_APP_SERVER } from "./connectors/codex";
-export { CodexError, CODEX_MODEL_ID, CODEX_REASONING_EFFORT, type CodexClient, type CodexConfigShape, type CodexLogin, type CodexLoginMethod, type CodexModel, type CodexStatus, type CodexRunInput, type CodexChatMessage, type CodexTool, type CodexToolCall, type CodexToolResult } from "./connectors/codex/contracts";
+export { CodexError, RU_CODEX_MESSAGES, type CodexErrorCode, CODEX_MODEL_ID, CODEX_REASONING_EFFORT, type CodexClient, type CodexConfigShape, type CodexLogin, type CodexLoginMethod, type CodexModel, type CodexStatus, type CodexRunInput, type CodexChatMessage, type CodexTool, type CodexToolCall, type CodexToolResult } from "./connectors/codex/contracts";
 
 export { postgres, POSTGRES, postgresConnectionOptions, type PostgresConfigShape, type PostgresSslMode, type PostgresConnectorOptions } from "./connectors/postgres";
 export {

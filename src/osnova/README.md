@@ -100,6 +100,12 @@ Configuration values can be overridden from the environment
 (`OSNV_DB__HOST`, `OSNV_DB__PASSWORD`, ...). Invalid configuration or a
 missing production secret stops startup with an error that names the key.
 
+A unique index violation in `saveChanges()` rejects with
+`UniqueViolationError` (with `constraint` and `table`); catch it to answer 409.
+Request-body fields declared as `string`, `number` or `boolean` are checked
+against the JSON type automatically (400 on mismatch); other rules come from
+`@Validator`.
+
 ## Example
 
 The source repository contains `examples/todo`: three modules (projects,
@@ -113,12 +119,27 @@ Import from the subpaths listed in `exports` of `package.json`:
 `osnv/core/infra`, `osnv/core/kernel`, `osnv/library/validation`,
 `osnv/library/jsonapi` and others. Anything not listed there is internal.
 
+## Language of built-in texts
+
+Built-in texts are English. Russian sets ship with the package; apply them
+once at startup:
+
+```ts
+import { MessageRegistry, RU_VALIDATION_MESSAGES } from "osnv/library/validation";
+import { CodexError, RU_CODEX_MESSAGES } from "osnv/core/infra";
+import { RU_UI_LABELS } from "osnv/core/app";
+
+MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES); // validation errors
+CodexError.useMessages(RU_CODEX_MESSAGES);           // Codex connector errors
+await runApp(AppModule, { ui: { labels: RU_UI_LABELS, surfaces: [/* ... */] } }); // generated UI texts
+```
+
+Either call also accepts your own texts for some codes.
+
 ## Status
 
 Pre-1.0: a minor version (0.x) can contain breaking changes; a patch version
-does not. Some built-in texts (validation messages, parts of the CLI
-scaffold) are in Russian for now. Validation messages can be replaced with
-`MessageRegistry.setDefaults` from `osnv/library/validation`.
+does not.
 
 ## License
 

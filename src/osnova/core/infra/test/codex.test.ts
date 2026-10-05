@@ -7,7 +7,7 @@ import { codexAppServerConnect } from "../connectors/codex";
 import { CodexAppServerClient } from "../connectors/codex/CodexAppServerClient";
 import { CodexAppServer } from "../connectors/codex/CodexAppServer";
 import { checkCodexPolicy, codexConversation, codexPaths, codexProcessOptions } from "../connectors/codex/CodexPolicy";
-import { CodexError, type CodexRunInput } from "../connectors/codex/contracts";
+import { CodexError, RU_CODEX_MESSAGES, type CodexRunInput } from "../connectors/codex/contracts";
 
 const binary = resolve(import.meta.dir, "fixtures/codex-server.py");
 async function fixture(authorized = true) {
@@ -233,4 +233,17 @@ test("context is bounded by whole turns; child environment drops application sec
     expect(options.options.env).not.toHaveProperty("OSNV_DB__PASSWORD");
     expect(() => checkCodexPolicy({ config: { features: {} } })).toThrow();
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("CodexError texts are English by default and switch with useMessages", () => {
+  expect(new CodexError("TIMEOUT").message).toBe("Codex App Server timed out.");
+  try {
+    CodexError.useMessages(RU_CODEX_MESSAGES);
+    expect(new CodexError("TIMEOUT").message).toBe("Время ожидания Codex App Server истекло.");
+    CodexError.useMessages({ BUSY: "custom" });
+    expect(new CodexError("BUSY").message).toBe("custom");
+    expect(new CodexError("TIMEOUT").message).toBe("Codex App Server timed out.");
+  } finally {
+    CodexError.useMessages({});
+  }
 });

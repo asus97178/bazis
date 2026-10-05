@@ -29,44 +29,44 @@ export class ${naming.moduleClass} {}
       relativePath: "MODULE.md",
       content: `# ${naming.moduleClass}
 
-Версия паспорта: 1.0. Тип: составной.
-Статус: сгенерирован каркас композиции; части ещё не реализованы.
-Точка подключения: [${naming.module}.module.ts](${naming.module}.module.ts).
-До изменения прочитать AGENTS.md и docs/architecture/MODULE_ARCHITECTURE.md.
+Passport version: 1.0. Type: composite.
+Status: composition scaffold generated; the parts are not implemented yet.
+Entry: [${naming.module}.module.ts](${naming.module}.module.ts).
+Before changing it, read AGENTS.md and docs/architecture/MODULE_ARCHITECTURE.md.
 
-## Ответственность и части
+## Responsibility and parts
 
-Корень объединяет самостоятельные обязанности; точные границы данных и
-инварианты частей автор фиксирует в их паспортах до реализации.
-Если обязанности не самостоятельны, использовать один атомарный модуль.
+The root combines self-contained responsibilities; the author fixes the exact
+data boundaries and invariants of each part in its passport before implementing
+it. If the responsibilities are not self-contained, use one atomic module.
 
-| Часть | Ответственность и данные | Публичные входы | Зависит от | Паспорт |
+| Part | Responsibility and data | Public entries | Depends on | Passport |
 | --- | --- | --- | --- | --- |
-${parts.map((part) => `| ${part.moduleClass} | Ещё не определены: ${part.input} | Класс модуля без аргументов | imports: [] | [MODULE.md](${part.folder}/MODULE.md) |`).join("\n")}
+${parts.map((part) => `| ${part.moduleClass} | Not defined yet: ${part.input} | Module class, no arguments | imports: [] | [MODULE.md](${part.folder}/MODULE.md) |`).join("\n")}
 
-## Каталог и подключение
+## Layout and wiring
 
-Корневые файлы: этот паспорт, ${naming.module}.module.ts.
-${parts.map((part) => `Каталог ${part.folder}: ${part.module}.module.ts и MODULE.md.`).join("\n")}
+Root files: this passport, ${naming.module}.module.ts.
+${parts.map((part) => `Directory ${part.folder}: ${part.module}.module.ts and MODULE.md.`).join("\n")}
 imports: [${parts.map((part) => part.moduleClass).join(", ")}]. exports: [].
-TypeScript-вход — ${naming.moduleClass}; фабрика и входные поля отсутствуют.
-Публичные токены частей при необходимости реэкспортируются корнем явно.
-Предметные providers, ORM, HTTP, config, background, UI, AI и события корню
-не принадлежат; их владельцы — атомарные части. Потребитель подключает корень.
-Оркестрация нескольких частей также получает отдельного атомарного владельца.
+TypeScript entry: ${naming.moduleClass}; no factory or input fields.
+Public tokens of the parts are re-exported by the root explicitly when needed.
+Domain providers, ORM, HTTP, config, background, UI, AI and events do not
+belong to the root; the atomic parts own them. Consumers import the root.
+Orchestration across parts also gets its own atomic owner.
 
-## Входы, выходы, ошибки и lifecycle
+## Inputs, outputs, errors and lifecycle
 
-Корень только подключает классы; публичных операций и собственных эффектов нет.
-Аргументы, данные, обязательность/null/default, валидация, результаты, ошибки,
-scopes и эффекты будущих операций описываются в паспортах частей.
-Связи между частями, общая инфраструктура и нужные экспорты пока не определены.
+The root only wires classes; it has no public operations or effects of its own.
+Arguments, data, required/null/default, validation, results, errors, scopes and
+effects of future operations are described in the parts' passports.
+Links between parts, shared infrastructure and needed exports are not defined yet.
 
-## Проверки
+## Checks
 
-Не запускались для нового пакета. После реализации: codegen, проверка
-композиции, exports, отсутствия циклов и дублирующих регистраций, тесты частей.
-Генерация каркаса не подтверждает предметную готовность пакета.
+None run for the new pack. After implementation: codegen, the composition,
+exports, no cycles or duplicate registrations, the parts' tests.
+A generated scaffold does not prove the pack is ready.
 `,
     },
     ...parts.flatMap((part) => buildModuleTemplates(part, "empty").map((file) => ({

@@ -377,7 +377,7 @@ describe("agent runtime", () => {
       expect(provider.requests[0]?.messages.map((message) => message.role)).toEqual(["system", "user"]);
       expect(provider.requests[0]?.messages[0]?.content[0]).toMatchObject({
         kind: "text",
-        text: expect.stringContaining("Роль промпта: Рантайм-промпт"),
+        text: expect.stringContaining("Prompt role: Рантайм-промпт"),
       });
       const contextMetadata = provider.requests[0]?.metadata.agentContext as JsonObject | undefined;
       expect(contextMetadata?.messageCount).toBe(2);

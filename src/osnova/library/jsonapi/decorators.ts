@@ -63,10 +63,10 @@ function fieldOf(schema: ListSchema, name: string): FieldSchema {
 
 function assertInstanceField(context: ClassFieldDecoratorContext, decorator: string): void {
   if (context.static) {
-    throw new Error(`${decorator}: статическое поле "${String(context.name)}" не поддерживается.`);
+    throw new Error(`${decorator}: static field "${String(context.name)}" is not supported.`);
   }
   if (context.private) {
-    throw new Error(`${decorator}: приватное поле "${String(context.name)}" не поддерживается.`);
+    throw new Error(`${decorator}: private field "${String(context.name)}" is not supported.`);
   }
 }
 

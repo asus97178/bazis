@@ -1,9 +1,9 @@
-# Архитектура модулей приложения
+# Application module architecture
 
-`src/index.ts` запускает `runApp`; `src/app/modules/App.module.ts` собирает функциональные модули через `imports`. Корень приложения не владеет предметной логикой.
+`src/index.ts` calls `runApp`; `src/app/modules/App.module.ts` composes feature modules through `imports`. The application root owns no domain logic.
 
-Одна самостоятельная функция — атомарный модуль. Он владеет своими данными, сервисами, HTTP и фоновыми обработчиками. Составной модуль нужен только для нескольких независимых функций; его корень выполняет композицию. Слои и число файлов сами по себе не создают подмодули.
+One self-contained function is an atomic module. It owns its data, services, HTTP and background handlers. A composite module is only for several independent functions; its root does composition. Layers and file counts alone do not create submodules.
 
-Создавайте новые модули только через `bunx osnv g module <Name> --empty|--minimal|--full` или `bunx osnv g pack <Name> --parts <a,b>`. Перед реализацией определите ответственность и публичные входы, затем заполните сгенерированный `MODULE.md`: поля, ошибки, зависимости, exports и проверки. Пользуйтесь публичными API пакета `osnv`, существующими DI и ORM. Не редактируйте `src/generated/` вручную; запускайте `bunx osnv codegen`.
+Create new modules only with `bunx osnv g module <Name> --empty|--minimal|--full` or `bunx osnv g pack <Name> --parts <a,b>`. Before implementing, define the responsibility and public entries, then fill in the generated `MODULE.md`: fields, errors, dependencies, exports and checks. Use the public APIs of the `osnv` package and its DI and ORM. Do not edit `src/generated/` by hand; run `bunx osnv codegen`.
 
-`--minimal` создаёт учебный CRUD с ORM. Для его запуска приложению нужны provider БД и готовая схема. Для первой функции без БД используйте `--empty`. Проверяйте типы и бинарную сборку после изменений, влияющих на запуск.
+`--minimal` creates a sample CRUD with the ORM. To run it the application needs a database provider and a ready schema. For a first function without a database use `--empty`. Check types and the binary build after changes that affect startup.

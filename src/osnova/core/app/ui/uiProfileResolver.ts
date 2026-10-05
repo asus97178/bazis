@@ -43,7 +43,43 @@ import {
 export interface ResolveUiProfileAuthoringV1Options {
   readonly declaration: object;
   readonly openApi: OpenApiSchema;
+  /** Texts generated when a profile does not set its own; default English. */
+  readonly labels?: UiLabels;
 }
+
+/** Default texts of generated UI profiles (detail section, form and delete titles). */
+export interface UiLabels {
+  readonly detailSection: string;
+  readonly create: (resource: string) => string;
+  readonly edit: (resource: string) => string;
+  readonly delete: string;
+  readonly deleteConfirm: (resource: string) => string;
+  /** Resource name when a profile has no title. */
+  readonly resource: string;
+  /** Locale used to lower-case the resource title inside the texts above. */
+  readonly locale: string;
+}
+
+export const EN_UI_LABELS: UiLabels = Object.freeze({
+  detailSection: "General",
+  create: (resource: string) => `Create ${resource}`,
+  edit: (resource: string) => `Edit ${resource}`,
+  delete: "Delete",
+  deleteConfirm: (resource: string) => `Delete ${resource}?`,
+  resource: "resource",
+  locale: "en-US",
+});
+
+/** Russian texts: `runApp(App, { ui: { labels: RU_UI_LABELS, ... } })`. */
+export const RU_UI_LABELS: UiLabels = Object.freeze({
+  detailSection: "Основное",
+  create: (resource: string) => `Создать ${resource}`,
+  edit: (resource: string) => `Редактировать ${resource}`,
+  delete: "Удалить",
+  deleteConfirm: (resource: string) => `Удалить ${resource}?`,
+  resource: "ресурс",
+  locale: "ru-RU",
+});
 
 export type ResolveUiProfileAuthoringV1Result =
   | {
@@ -126,6 +162,8 @@ const CRUD_ROLES: readonly CrudRole[] = Object.freeze([
 export function resolveUiProfileAuthoringV1(
   options: ResolveUiProfileAuthoringV1Options,
 ): ResolveUiProfileAuthoringV1Result {
+  const labels = options.labels ?? EN_UI_LABELS;
+  const titleOf = (value: string) => lowercaseTitle(value, labels);
   const diagnostics: UiDiagnosticV1[] = [];
   const metadata = uiProfileAuthoringMetadataOf(options.declaration);
   if (metadata === undefined) {
@@ -242,7 +280,7 @@ export function resolveUiProfileAuthoringV1(
                   ...(defaultTitleField(responseFields) !== undefined
                     ? { titleField: defaultTitleField(responseFields) }
                     : {}),
-                  sections: [{ id: "main", title: "Основное", fields: responseFields }],
+                  sections: [{ id: "main", title: labels.detailSection, fields: responseFields }],
                 },
               }
             : {}),
@@ -253,7 +291,7 @@ export function resolveUiProfileAuthoringV1(
                     ? {
                         create: {
                           title: resourceAuthoring.create?.title
-                            ?? `Создать ${lowercaseTitle(resourceAuthoring.singularTitle ?? resourceAuthoring.title ?? resourceId)}`,
+                            ?? labels.create(titleOf(resourceAuthoring.singularTitle ?? resourceAuthoring.title ?? resourceId)),
                           uiSchema: formUiSchema(
                             resourceAuthoring.create?.fields,
                             requestEntitySchemaV1(openApiResult.index, createAction.operation),
@@ -265,7 +303,7 @@ export function resolveUiProfileAuthoringV1(
                     ? {
                         edit: {
                           title: resourceAuthoring.edit?.title
-                            ?? `Редактировать ${lowercaseTitle(resourceAuthoring.singularTitle ?? resourceAuthoring.title ?? resourceId)}`,
+                            ?? labels.edit(titleOf(resourceAuthoring.singularTitle ?? resourceAuthoring.title ?? resourceId)),
                           uiSchema: formUiSchema(
                             resourceAuthoring.edit?.fields,
                             requestEntitySchemaV1(openApiResult.index, updateAction.operation),
@@ -280,12 +318,12 @@ export function resolveUiProfileAuthoringV1(
             ? {
                 actions: [{
                   id: "delete",
-                  title: resourceAuthoring.delete?.title ?? "Удалить",
+                  title: resourceAuthoring.delete?.title ?? labels.delete,
                   operation: operationRef(deleteAction),
                   placements: resourceAuthoring.delete?.placements ?? ["list.row", "detail.header"],
                   intent: resourceAuthoring.delete?.intent ?? "danger",
                   confirm: resourceAuthoring.delete?.confirm
-                    ?? `Удалить ${lowercaseTitle(resourceAuthoring.singularTitle ?? resourceAuthoring.title ?? resourceId)}?`,
+                    ?? labels.deleteConfirm(titleOf(resourceAuthoring.singularTitle ?? resourceAuthoring.title ?? resourceId)),
                   refresh: resourceAuthoring.delete?.refresh ?? "resource",
                 }],
               }
@@ -905,9 +943,9 @@ function resourceIdOf(
   return id;
 }
 
-function lowercaseTitle(value: string): string {
+function lowercaseTitle(value: string, labels: UiLabels): string {
   const trimmed = value.trim();
-  return trimmed.length === 0 ? "ресурс" : `${trimmed[0]?.toLocaleLowerCase("ru-RU") ?? ""}${trimmed.slice(1)}`;
+  return trimmed.length === 0 ? labels.resource : `${trimmed[0]?.toLocaleLowerCase(labels.locale) ?? ""}${trimmed.slice(1)}`;
 }
 
 function record(value: unknown): Readonly<Record<string, unknown>> {

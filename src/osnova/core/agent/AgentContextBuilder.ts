@@ -466,20 +466,20 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
   private promptMessage(agent: AgentDefinition): AgentMessage | undefined {
     const lines: string[] = [];
     if (agent.metadata.role !== undefined) {
-      lines.push(`Роль: ${agent.metadata.role}`);
+      lines.push(`Role: ${agent.metadata.role}`);
     }
     if (agent.metadata.description !== undefined) {
-      lines.push(`Описание: ${agent.metadata.description}`);
+      lines.push(`Description: ${agent.metadata.description}`);
     }
     if (agent.metadata.goal !== undefined) {
-      lines.push(`Цель: ${agent.metadata.goal}`);
+      lines.push(`Goal: ${agent.metadata.goal}`);
     }
     if (agent.metadata.instructions.length > 0) {
-      lines.push("Инструкции:");
+      lines.push("Instructions:");
       lines.push(...agent.metadata.instructions.map((item) => `- ${item}`));
     }
     if (agent.metadata.constraints.length > 0) {
-      lines.push("Ограничения:");
+      lines.push("Constraints:");
       lines.push(...agent.metadata.constraints.map((item) => `- ${item}`));
     }
     for (let index = 0; index < agent.metadata.sections.length; index += 1) {
@@ -489,23 +489,23 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     const prompt = agent.prompt?.metadata;
     if (prompt !== undefined) {
       if (prompt.description !== undefined) {
-        lines.push(`Описание промпта: ${prompt.description}`);
+        lines.push(`Prompt description: ${prompt.description}`);
       }
       if (prompt.version !== undefined) {
-        lines.push(`Версия промпта: ${prompt.version}`);
+        lines.push(`Prompt version: ${prompt.version}`);
       }
       if (prompt.role !== undefined) {
-        lines.push(`Роль промпта: ${prompt.role}`);
+        lines.push(`Prompt role: ${prompt.role}`);
       }
       if (prompt.goal !== undefined) {
-        lines.push(`Цель: ${prompt.goal}`);
+        lines.push(`Goal: ${prompt.goal}`);
       }
       if (prompt.instructions.length > 0) {
-        lines.push("Инструкции:");
+        lines.push("Instructions:");
         lines.push(...prompt.instructions.map((item) => `- ${item}`));
       }
       if (prompt.constraints.length > 0) {
-        lines.push("Ограничения:");
+        lines.push("Constraints:");
         lines.push(...prompt.constraints.map((item) => `- ${item}`));
       }
       for (let index = 0; index < prompt.sections.length; index += 1) {
@@ -540,28 +540,28 @@ function appendPromptSection(
 function promptSectionTitle(kind: string): string {
   switch (kind) {
     case "system":
-      return "Система";
+      return "System";
     case "developer":
-      return "Разработчик";
+      return "Developer";
     case "role":
-      return "Роль";
+      return "Role";
     case "task":
-      return "Задача";
+      return "Task";
     case "instructions":
-      return "Инструкции";
+      return "Instructions";
     case "constraints":
-      return "Ограничения";
+      return "Constraints";
     case "examples":
-      return "Примеры";
+      return "Examples";
     case "output":
-      return "Формат ответа";
+      return "Output format";
     case "tool-policy":
-      return "Политика инструментов";
+      return "Tool policy";
     case "memory":
-      return "Память";
+      return "Memory";
     case "knowledge":
-      return "Знания";
+      return "Knowledge";
     default:
-      return "Раздел промпта";
+      return "Prompt section";
   }
 }

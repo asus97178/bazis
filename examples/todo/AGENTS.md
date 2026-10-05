@@ -1,3 +1,3 @@
-# Работа с проектом Osnova
+# Working on this osnv project
 
-Перед изменением приложения прочитайте [архитектуру модулей](docs/architecture/MODULE_ARCHITECTURE.md). Новые модули создавайте только командой `bunx osnv g module` или `bunx osnv g pack`; после генерации заполните `MODULE.md`. Файлы `src/generated/` обновляет только codegen.
+Before changing the application, read the [module architecture](docs/architecture/MODULE_ARCHITECTURE.md). Create new modules only with `bunx osnv g module` or `bunx osnv g pack`; fill in the generated `MODULE.md` afterwards. Only codegen updates `src/generated/`.
