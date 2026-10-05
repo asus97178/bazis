@@ -56,3 +56,52 @@ jobs:
           name: live-postgres-${{ github.run_id }}
           path: ${{ runner.temp }}/live-postgres-${{ github.run_id }}
           if-no-files-found: ignore
+
+  # Tag vX.Y.Z (after a green linux job): pack with the qualified Bun, publish
+  # to npm with provenance, attach the tarball to a GitHub Release whose notes
+  # are the CHANGELOG section of that version.
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # GitHub Release
+      id-token: write   # npm provenance
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Qualified Bun (hash-pinned in toolchain/bun.json)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip
+          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
+          echo "OSNV_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
+
+      - name: Tag matches the package version and the changelog
+        run: |
+          version="$(node -p "require('./src/osnv/package.json').version")"
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != package version $version"; exit 1; }
+          awk -v v="$version" '$0 ~ "^## " v " " {f=1; next} /^## / {f=0} f' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          test -s "$RUNNER_TEMP/notes.md" || { echo "CHANGELOG.md has no section for $version"; exit 1; }
+
+      - name: Pack
+        run: |
+          ./scripts/osnv-bun --no-env-file run toolchain:check
+          mkdir -p "$RUNNER_TEMP/pkg"
+          (cd src/osnv && "$OSNV_BUN_BIN" pm pack --destination "$RUNNER_TEMP/pkg")
+          ls -l "$RUNNER_TEMP/pkg"
+
+      - name: Publish to npm with provenance
+        run: npm publish "$RUNNER_TEMP"/pkg/osnv-*.tgz --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/pkg/osnv-*.tgz --title "osnv $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -3,6 +3,16 @@
   "version": "0.96.1",
   "description": "Modular backend framework for Bun in TypeScript: DI wired by codegen, HTTP, a PostgreSQL ORM, JWT, WebSocket, agents and a CLI.",
   "license": "MIT",
+  "author": "Alexander Alenin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asus97178/osnv.git",
+    "directory": "src/osnv"
+  },
+  "homepage": "https://github.com/asus97178/osnv/tree/main/src/osnv#readme",
+  "bugs": {
+    "url": "https://github.com/asus97178/osnv/issues"
+  },
   "keywords": [
     "bun",
     "typescript",
@@ -62,5 +72,9 @@
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
