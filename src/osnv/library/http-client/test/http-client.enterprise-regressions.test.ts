@@ -5,7 +5,7 @@ import type { RequestConfig } from "../types";
 const url = "https://api.test/body";
 const encoder = new TextEncoder();
 
-describe("HTTP-E01: normalize transport body errors at the read boundary", () => {
+describe("normalize transport body errors at the read boundary", () => {
   for (const mode of ["text", "json", "arrayBuffer", "blob", "inferred-json", "progress"] as const) {
     for (const limit of [0, 1024]) {
       test(`${mode}, response cap ${limit}`, async () => {
@@ -62,7 +62,7 @@ describe("HTTP-E01: normalize transport body errors at the read boundary", () =>
   }
 });
 
-describe("HTTP-E02: one-shot uploads use the Fetch stream contract", () => {
+describe("one-shot uploads use the Fetch stream contract", () => {
   test("stream upload carries duplex without buffering the request", async () => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) { controller.enqueue(encoder.encode("stream upload")); controller.close(); },
@@ -87,7 +87,7 @@ describe("HTTP-E02: one-shot uploads use the Fetch stream contract", () => {
   });
 });
 
-describe("HTTP-E03: response cap measures bytes exposed by Fetch", () => {
+describe("response cap measures bytes exposed by Fetch", () => {
   test("CORS can hide Content-Encoding while exposing the encoded Content-Length", async () => {
     const raw = new Response("ok", { headers: { "content-length": "22" } });
     Object.defineProperty(raw, "type", { value: "cors" });
@@ -124,7 +124,7 @@ describe("HTTP-E03: response cap measures bytes exposed by Fetch", () => {
   });
 });
 
-describe("HTTP-E04: wrappers preserve the original Fetch response", () => {
+describe("wrappers preserve the original Fetch response", () => {
   const wrappers: Record<string, RequestConfig> = {
     limit: { maxResponseBytes: 1024 },
     progress: { onDownloadProgress: () => {} },

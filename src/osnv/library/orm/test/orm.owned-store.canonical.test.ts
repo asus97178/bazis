@@ -143,7 +143,7 @@ test("set-like collections sort by UTF-8 while semantic lists retain order", () 
   expect(canonicalOwnedStoreModelHashV1(definition, inChanged)).not.toBe(canonicalOwnedStoreModelHashV1(definition, schema));
 });
 
-test("minus zero canonicalizes to plus zero and C1 model data remains literal", () => {
+test("minus zero canonicalizes to plus zero and model data remains literal", () => {
   const negative: OrmExpectedSchema = { tables: [{ ...schema.tables[0]!, columns: [{ ...schema.tables[0]!.columns[0]!, default: { kind: "number", value: -0 } }, ...schema.tables[0]!.columns.slice(1)] }] };
   const positive: OrmExpectedSchema = { tables: [{ ...schema.tables[0]!, columns: [{ ...schema.tables[0]!.columns[0]!, default: { kind: "number", value: 0 } }, ...schema.tables[0]!.columns.slice(1)] }] };
   expect(canonicalOwnedStoreModelHashV1(definition, negative)).toBe(canonicalOwnedStoreModelHashV1(definition, positive));

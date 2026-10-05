@@ -61,7 +61,7 @@ class Broken {
   @Column({ type: "text" }) name = "broken";
 }
 
-test("A1: caught SaveChanges failure must not commit earlier statements of that failed save", async () => {
+test("caught SaveChanges failure must not commit earlier statements of that failed save", async () => {
   const { provider, statements } = mockPostgres();
   const context = ctx(provider, [Item, Broken]);
   const item = new Item(); context.add(item); context.add(new Broken());
@@ -81,7 +81,7 @@ test("control: uncaught top-level SaveChanges conversion failure rolls back", as
   expect(statements).toContain("ROLLBACK"); expect(statements).not.toContain("COMMIT");
 });
 
-test("A2: locking reload must preserve or reject pending snapshot-tracked changes", async () => {
+test("locking reload must preserve or reject pending snapshot-tracked changes", async () => {
   const { provider } = recording(() => [{ id: 1, name: "database value" }]);
   const context = ctx(provider, [Item]); const items = context.setOf(Item);
   const item = (await items.find(1))!; item.name = "unsaved edit";
@@ -110,7 +110,7 @@ class UuidChild {
   @Key({ generated: false }) id = 1;
   @Column({ type: "uuid", nullable: false }) parentId = "00000000-0000-4000-8000-000000000001";
 }
-test("A3: a declared FK to UUID must compile to compatible physical column types", () => {
+test("a declared FK to UUID must compile to compatible physical column types", () => {
   const expected = compileExpectedSchema(new OrmModel([UuidParent, UuidChild]));
   const parent = expected.tables.find(t => t.table === "audit_uuid_parents")!;
   const child = expected.tables.find(t => t.table === "audit_uuid_children")!;
@@ -127,7 +127,7 @@ function identityCatalog(identityKind: "a" | "d") {
     return [];
   });
 }
-test("A4: ensureCreated must reject GENERATED ALWAYS drift from BY DEFAULT", async () => {
+test("ensureCreated must reject GENERATED ALWAYS drift from BY DEFAULT", async () => {
   const { provider, statements } = identityCatalog("a");
   const context = ctx(provider, [Identity]);
   let rejected = false;
@@ -152,7 +152,7 @@ class BigChild {
   @Column({ type: "integer" }) parentId = 9223372036854775806n;
   @ManyToOne(() => BigParent, { foreignKey: ["tenant", "parentId"] }) parent?: BigParent;
 }
-test("A5a: include supports bigint composite keys", async () => {
+test("include supports bigint composite keys", async () => {
   const { provider } = recording(sql => sql.includes('FROM "audit_big_children"')
     ? [{ id: 1, tenant: "a", parentId: 9223372036854775806n }]
     : [{ tenant: "a", id: 9223372036854775806n }]);
@@ -171,7 +171,7 @@ class DateChild {
   @Column({ type: "datetime" }) parentId = new Date(0);
   @ManyToOne(() => DateParent, { foreignKey: "parentId" }) parent?: DateParent;
 }
-test("A5b: include matches equal Date keys by value", async () => {
+test("include matches equal Date keys by value", async () => {
   const { provider, statements } = recording(sql => sql.includes('FROM "audit_date_children"')
     ? [{ id: 1, parentId: new Date(0) }] : [{ id: new Date(0) }]);
   const context = ctx(provider, [DateChild, DateParent]);
@@ -179,7 +179,7 @@ test("A5b: include matches equal Date keys by value", async () => {
   expect(child.parent).not.toBeNull();
 });
 
-test("A6: addRange supports multiple rows with only a generated key", async () => {
+test("addRange supports multiple rows with only a generated key", async () => {
   let next = 1;
   const { provider } = recording(() => [{ id: next++ }]);
   const context = ctx(provider, [Identity]); const items = [new Identity(), new Identity()];
@@ -198,7 +198,7 @@ class Dotted {
   @Key({ generated: false }) id = 1;
   @Column({ name: "external.name", type: "text" }) externalName = "x";
 }
-test("A7: query quotes the same literal column identifier as ensureCreated", async () => {
+test("query quotes the same literal column identifier as ensureCreated", async () => {
   const { provider, statements } = recording(); const context = ctx(provider, [Dotted]);
   const expected = compileExpectedSchema(new OrmModel([Dotted]));
   const ddl = renderSafeAdditivePostgres({ kind: "createTable", table: expected.tables[0]! });
@@ -207,7 +207,7 @@ test("A7: query quotes the same literal column identifier as ensureCreated", asy
   expect(statements[0]!.sql).toContain('"external.name"');
 });
 
-test("A8: retry must not replay an INSERT after COMMIT acknowledgement is lost", async () => {
+test("retry must not replay an INSERT after COMMIT acknowledgement is lost", async () => {
   const provider = new PostgresProvider({ options: {} });
   const committedIds: number[] = [];
   const statements: string[] = [];
@@ -244,7 +244,7 @@ test("A8: retry must not replay an INSERT after COMMIT acknowledgement is lost",
   expect(committedIds).toHaveLength(1);
 });
 
-test("A1: a failed joined save poisons only its containing savepoint and never retries there", async () => {
+test("a failed joined save poisons only its containing savepoint and never retries there", async () => {
   const { provider, statements } = mockPostgres();
   const context = new Context(new DbContextOptions({ provider, entities: [Item, Broken], validateOnSave: false,
     executionStrategy: { maxRetries: 2, baseDelayMs: 0, isTransient: () => true } }));
@@ -293,7 +293,7 @@ class NavigationUuidChild {
   @ManyToOne(() => QualifiedUuidParent, { foreignKey: "parentId" }) parent?: QualifiedUuidParent;
 }
 
-test("A3/A7: exact and additive schema use UUID FK storage and literal qualified names", async () => {
+test("exact and additive schema use UUID FK storage and literal qualified names", async () => {
   const models = new OrmModel([QualifiedUuidParent, NavigationUuidChild]);
   const expected = compileExpectedSchema(models);
   expect(expected.tables.find(t => t.table === "uuid.children")!.columns[1]!.physicalType).toBe("uuid");
@@ -306,7 +306,7 @@ test("A3/A7: exact and additive schema use UUID FK storage and literal qualified
   expect(statements.some(s => s.sql === 'CREATE SCHEMA IF NOT EXISTS "schema.with""quote"')).toBe(true);
 });
 
-test("A3: dynamic models propagate UUID through a primary-key/foreign-key chain", () => {
+test("dynamic models propagate UUID through a primary-key/foreign-key chain", () => {
   const graph = compileDynamicModelGraph([
     { name: "ChainLeaf", tableName: "chain_leaf", fields: [{ name: "id", type: "int", isKey: true }, { name: "rootId", type: "string" }, { name: "part", type: "int" }], foreignKeys: [{ properties: ["rootId", "part"], target: "ChainMiddle" }] },
     { name: "ChainMiddle", tableName: "chain_middle", fields: [{ name: "id", type: "string" }, { name: "part", type: "int" }], primaryKey: { properties: ["id", "part"] }, foreignKeys: [{ properties: ["id"], target: "ChainRoot" }] },
@@ -318,7 +318,7 @@ test("A3: dynamic models propagate UUID through a primary-key/foreign-key chain"
   expect(expected.tables.find(t => t.table === "chain_leaf")!.columns.map(c => c.physicalType)).toEqual(["integer", "uuid", "integer"]);
 });
 
-test("A3: additive new FK columns retain native UUID storage without inventing a backfill value", async () => {
+test("additive new FK columns retain native UUID storage without inventing a backfill value", async () => {
   const { provider, statements } = recording();
   provider.introspect = async () => ({ tables: new Map([
     ["uuid.children", { name: "uuid.children", columns: new Map([["id", { name: "id", type: "integer", notNull: true, isPrimaryKey: true }]]), indexes: [] }],
@@ -364,7 +364,7 @@ class BinaryMember {
   @Column({ type: "text" }) @HasConversion(bytesConversion) groupId = new Uint8Array([1, 2]);
   @ManyToOne(() => BinaryGroup, { foreignKey: "groupId" }) group?: BinaryGroup;
 }
-test("A5: reference and collection use the identity map's binary key semantics", async () => {
+test("reference and collection use the identity map's binary key semantics", async () => {
   const { provider } = recording(sql => sql.includes('FROM "audit_binary_groups"') ? [{ id: "1,2" }] : [{ id: 1, groupId: "1,2" }]);
   const context = ctx(provider, [BinaryGroup, BinaryMember]);
   const member = await context.setOf(BinaryMember).include(x => x.group).first();
@@ -374,7 +374,7 @@ test("A5: reference and collection use the identity map's binary key semantics",
   expect(group.members![0]).toBe(member);
 });
 
-test("A6: failure of a later DEFAULT VALUES row restores every generated key", async () => {
+test("failure of a later DEFAULT VALUES row restores every generated key", async () => {
   let insert = 0;
   const { provider, statements } = mockPostgres(sql => {
     if (sql.startsWith("INSERT")) { if (++insert === 2) throw new Error("second insert failed"); return [{ id: 42 }]; }
@@ -388,7 +388,7 @@ test("A6: failure of a later DEFAULT VALUES row restores every generated key", a
   expect(statements).toContain("ROLLBACK"); expect(statements).not.toContain("COMMIT");
 });
 
-test("A7: dotted columns stay literal in filters, ordering, INSERT, UPDATE and DELETE", async () => {
+test("dotted columns stay literal in filters, ordering, INSERT, UPDATE and DELETE", async () => {
   const { provider, statements } = recording(() => [{ id: 1, "external.name": "x" }]);
   const context = ctx(provider, [Dotted]); const set = context.setOf(Dotted);
   const entity = await set.where(x => x.externalName.eq("x")).orderBy(x => x.externalName).first();
@@ -463,7 +463,7 @@ for (const errno of ["40001", "40P01", "23505"]) {
   });
 }
 
-test("A8: custom retry classifiers cannot replay an unknown outcome hidden by cleanup aggregation", async () => {
+test("custom retry classifiers cannot replay an unknown outcome hidden by cleanup aggregation", async () => {
   let attempts = 0;
   const strategy = new ExecutionStrategy({ maxRetries: 3, baseDelayMs: 0, isTransient: () => true });
   await expect(strategy.execute(async () => {
@@ -485,7 +485,7 @@ class BigMember {
   @Column({ type: "text" }) tenant = "a";
   @Column({ type: "integer" }) groupId: bigint | null = 9223372036854775806n;
 }
-test("A5: composite bigint collection keys support chunking and ignore incomplete foreign keys", async () => {
+test("composite bigint collection keys support chunking and ignore incomplete foreign keys", async () => {
   const { provider, statements } = recording((sql, params) => sql.includes('FROM "audit_big_groups"')
     ? [{ tenant: "a", id: 9223372036854775806n }, { tenant: "b", id: 9223372036854775806n }]
     : params[0] === "a" ? [{ id: 1, tenant: "a", groupId: 9223372036854775806n }, { id: 2, tenant: "a", groupId: null }] : []);
@@ -496,7 +496,7 @@ test("A5: composite bigint collection keys support chunking and ignore incomplet
   expect(statements).toHaveLength(3);
 });
 
-test("A7: dynamic schema and table names containing dots retain separate physical identities", () => {
+test("dynamic schema and table names containing dots retain separate physical identities", () => {
   const model = buildDynamicModel({ name: "LiteralDynamic", schema: 'schema.with"quote', tableName: "table.with.dot", fields: [{ name: "id", type: "int", isKey: true }] });
   const models = new OrmModel([]); models.registerModel(model);
   const table = compileExpectedSchema(models).tables[0]!;
@@ -521,7 +521,7 @@ for (const errno of ["08006", "08007", "40003"]) {
   });
 }
 
-test("A8: a known owner commit takes precedence over an uncertain transaction in an afterCommit callback", async () => {
+test("a known owner commit takes precedence over an uncertain transaction in an afterCommit callback", async () => {
   const { provider, statements } = mockPostgres(sql => sql.startsWith("INSERT") ? [{ id: 7 }] : []);
   const transaction = provider.transaction.bind(provider);
   provider.transaction = work => transaction(async tx => {
@@ -535,7 +535,7 @@ test("A8: a known owner commit takes precedence over an uncertain transaction in
   expect(statements.filter(sql => sql.startsWith("INSERT"))).toHaveLength(1);
 });
 
-test("A8: an uncertain external transaction does not suppress the owner's confirmed rollback hooks", async () => {
+test("an uncertain external transaction does not suppress the owner's confirmed rollback hooks", async () => {
   const { provider, statements } = mockPostgres(sql => sql.startsWith("INSERT") ? [{ id: 7 }] : []);
   const context = ctx(provider, [Identity]); const entity = new Identity(); context.add(entity);
   let rolledBack = 0;
@@ -560,7 +560,7 @@ class ConflictingForeignKeys {
   @Key({ generated: false }) id = 1;
   @Column({ type: "text" }) parentId = "";
 }
-test("A3: incompatible physical FK types fail before any additive schema DDL", async () => {
+test("incompatible physical FK types fail before any additive schema DDL", async () => {
   const models = [UuidParent, TextParent, ConflictingForeignKeys];
   expect(() => compileExpectedSchema(new OrmModel(models))).toThrow("ORM_SCHEMA_FOREIGN_KEY_TYPE_MISMATCH");
   const { provider, statements } = recording();

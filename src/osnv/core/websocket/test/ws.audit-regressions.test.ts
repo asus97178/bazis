@@ -12,7 +12,7 @@ import type { AckCallback, OsnvSocket, ServerPacket } from "../types";
 const binaryCodec = new BinaryPacketCodec();
 const codecs = [jsonPacketCodec, binaryCodec];
 
-describe("WebSocket audit: codec and acknowledgements", () => {
+describe("WebSocket: codec and acknowledgements", () => {
   for (const codec of codecs) {
     test(`${codec.name}: return, callback and error use the selected wire codec`, async () => {
       const ns = namespace({ handlers: new Map([
@@ -119,7 +119,7 @@ describe("WebSocket audit: codec and acknowledgements", () => {
   });
 });
 
-describe("WebSocket audit: replay acceptance", () => {
+describe("WebSocket: replay acceptance", () => {
   for (const codec of codecs) {
     for (const maxPayloadBytes of [512, 65_536]) {
       test(`${codec.name}: replay fits the real ${maxPayloadBytes}-byte envelope`, async () => {
@@ -218,7 +218,7 @@ describe("WebSocket audit: replay acceptance", () => {
   });
 });
 
-describe("WebSocket audit: complete admission deadline and open ordering", () => {
+describe("WebSocket: complete admission deadline and open ordering", () => {
   test("a timed-out load retains admission until settlement and cannot add a late session or upgrade", async () => {
     const gate = deferred<SessionState | null>();
     class Adapter extends InMemoryWebSocketAdapter {
@@ -340,7 +340,7 @@ describe("WebSocket audit: complete admission deadline and open ordering", () =>
   });
 });
 
-describe("WebSocket audit: bounded deletion history", () => {
+describe("WebSocket: bounded deletion history", () => {
   test("tombstones do not occupy live capacity and stale saves stay rejected after expiration", async () => {
     let now = Date.now();
     const clock = spyOn(Date, "now").mockImplementation(() => now);

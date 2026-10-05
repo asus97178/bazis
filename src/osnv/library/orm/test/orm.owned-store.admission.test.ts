@@ -380,7 +380,7 @@ async function admissionError(work: () => Promise<unknown>, code: OrmOwnedStoreA
   if (!(caught instanceof OrmOwnedStoreAdmissionError)) throw new Error("expected owned-store admission error");
   expect(Object.getPrototypeOf(caught)).toBe(OrmOwnedStoreAdmissionError.prototype); expect(caught.name).toBe("OrmOwnedStoreAdmissionError"); expect(caught.code).toBe(code); expect(caught.message).toBe(code); expect(Object.hasOwn(caught, "cause")).toBe(false); expect(providerEffects).toBe(0);
 }
-test("B3 server context validates a returned value before Registry access", async () => {
+test("server context validates a returned value before Registry access", async () => {
   for (const [value, code] of [["63", "ORM_OWNED_STORE_DRIFT"], [62n, "ORM_OWNED_STORE_PROVIDER_UNSUPPORTED"]] as const) {
     let calls = 0;
     registerPostgresOwnedStoreCapability(provider, { async withOwnedStoreAdmission(_signal, work) { calls++; return work(contextSession(value)); } });
@@ -388,7 +388,7 @@ test("B3 server context validates a returned value before Registry access", asyn
     expect(calls).toBe(1);
   }
 });
-test("B3 server-context getter failures are operationally redacted", async () => {
+test("server-context getter failures are operationally redacted", async () => {
   let reads = 0, registryReads = 0;
   const session: RegistryLockedOwnedStoreSessionV1 = Object.freeze({
     get maxIdentifierLength(): bigint { reads++; throw failure("ORM_OWNED_STORE_DRIFT"); },
@@ -399,7 +399,7 @@ test("B3 server-context getter failures are operationally redacted", async () =>
   await admissionError(() => admitOwnedStoresV1(provider, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE");
   expect(reads).toBe(1); expect(registryReads).toBe(0);
 });
-test("B3 preserves an exact safe capability rejection before callback entry", async () => {
+test("preserves an exact safe capability rejection before callback entry", async () => {
   let callback = 0;
   registerPostgresOwnedStoreCapability(provider, { async withOwnedStoreAdmission() { callback++; throw failure("ORM_OWNED_STORE_DRIFT"); } });
   await admissionError(() => admitOwnedStoresV1(provider, request()), "ORM_OWNED_STORE_DRIFT");
@@ -419,7 +419,7 @@ function recordingPrimaryKey(): OwnedCatalogConstraintV1 { return {
   oid: "16", relationOid: "10", referencedRelationOid: null, name: "pk_jobs", kind: "primaryKey", columns: ["id"], referencedColumns: [], backingIndexOid: "12", onDelete: null, onUpdate: null, match: null,
   deferrable: false, initiallyDeferred: false, validated: true, parentConstraintOid: null, inheritanceCount: "0", noInherit: true, deleteSetColumns: [], primaryForeignEqualityOperatorOids: [], primaryPrimaryEqualityOperatorOids: [], foreignForeignEqualityOperatorOids: [], defaultEqualityOperatorOids: [], checkExpression: null,
 }; }
-test("B1 recording facts parse a non-default integer primary-key physical contract", () => {
+test("recorded catalog facts parse a non-default integer primary-key physical contract", () => {
   const context = Object.freeze({ maxIdentifierLength: 63n });
   expect(parseOwnedCatalogColumnV1(recordingColumn()).default.kind).toBe("none");
   expect(parseOwnedCatalogIndexV1(recordingIndex()).name).toBe("pk_jobs");
@@ -442,7 +442,7 @@ function recordingCatalogSnapshot(): OwnedStoreCatalogSnapshotV1 { return {
     { dependentClassOid: "1", dependentOid: "12", dependentSubId: "0", referencedClassOid: "3", referencedOid: "16", referencedSubId: "0", kind: "internal" },
   ],
 }; }
-test("B1 recording Catalogue snapshot parses and verifies the current admitted store", () => {
+test("recorded Catalogue snapshot parses and verifies the current admitted store", () => {
   const context = Object.freeze({ maxIdentifierLength: 63n });
   const snapshot = parseOwnedStoreCatalogSnapshotV1(recordingCatalogSnapshot(), context);
   expect(snapshot.relations[0]!.name).toBe("osnv_td_jobs"); expect(snapshot.requestedScopes).toEqual([{ schema: "public", tablePrefix: "osnv_td_" }]);
@@ -462,7 +462,7 @@ function recordingRegistrySnapshot() {
     dependencies: [{ dependentClassOid: "1", dependentOid: rootOid, dependentSubId: "0", referencedClassOid: "5", referencedOid: "12000", referencedSubId: "0", kind: "normal" }, { dependentClassOid: "2", dependentOid: rowOid, dependentSubId: "0", referencedClassOid: "1", referencedOid: rootOid, referencedSubId: "0", kind: "internal" }, { dependentClassOid: "2", dependentOid: arrayOid, dependentSubId: "0", referencedClassOid: "2", referencedOid: rowOid, referencedSubId: "0", kind: "internal" }, { dependentClassOid: "3", dependentOid: constraintOid, dependentSubId: "0", referencedClassOid: "1", referencedOid: rootOid, referencedSubId: "1", kind: "automatic" }, { dependentClassOid: "1", dependentOid: indexOid, dependentSubId: "0", referencedClassOid: "3", referencedOid: constraintOid, referencedSubId: "0", kind: "internal" }],
   } } };
 }
-test("B1 recording Registry snapshot and current Catalogue classify as exact reopen", () => {
+test("recorded Registry snapshot and current Catalogue classify as exact reopen", () => {
   const context = Object.freeze({ maxIdentifierLength: 63n }); const scopes = [{ schema: "public", tablePrefix: "osnv_td_" }];
   const registry = parseOwnedStoreRegistrySnapshotV1(recordingRegistrySnapshot(), [definition], context); const catalogue = parseOwnedStoreCatalogSnapshotV1(recordingCatalogSnapshot(), context);
   expect(inspectOwnedStoreCatalogPreCreateV1(catalogue, registry, { stores: [{ definition, expectedSchema: expected }], requestedScopes: scopes })).toEqual({ kind: "ready", emptyMissingIdentityStoreKeys: [] });
@@ -481,42 +481,42 @@ function recordingCapability(mode: "reopen" | "create", serverContext: unknown =
   const locked: RegistryLockedOwnedStoreSessionV1 = Object.freeze({ get maxIdentifierLength(): bigint { contextReads++; return typeof serverContext === "function" ? (serverContext as () => unknown)() as bigint : serverContext as bigint; }, async inspectRegistry() { events.push("registry"); if (initialRegistryFailure !== undefined) throw initialRegistryFailure; return initialRegistryRaw === undefined ? mode === "create" ? emptyRegistry : registry : initialRegistryRaw as ReturnType<typeof parseOwnedStoreRegistrySnapshotV1>; }, async lockSecondary(plan: OwnedStoreSecondaryLockPlanV1) { events.push("lock"); plans.push(plan); if (lockFailure !== undefined) throw lockFailure; return secondary; } });
   return { events, scopes, plans, created, inserted, get contextReads() { return contextReads; }, capability: { async withOwnedStoreAdmission<T>(_signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { events.push("callback"); return work(locked); } } };
 }
-test("B3 recording capability reopens one store then publishes one idempotently revocable lease", async () => {
+test("recording capability reopens one store then publishes one idempotently revocable lease", async () => {
   const local = recordingProvider(), record = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, record.capability);
   const receipt = await admitOwnedStoresV1(local, request()); expect(Object.isFrozen(receipt)).toBe(true);
   expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(record.created).toEqual([]); expect(record.inserted).toEqual([]);
   const leases = publishOwnedStoreAdmissionV1(local, receipt); expect(leases).toHaveLength(1); const lease = leases[0]; if (!lease) throw new Error("missing lease"); expect(Object.isFrozen(lease)).toBe(true); expect(lease.active).toBe(true); lease.revoke(); lease.revoke(); expect(lease.active).toBe(false);
 });
-test("B3 rejectIfPresent requests its scope while reopening and rejects an existing reject root", async () => {
+test("rejectIfPresent requests its scope while reopening and rejects an existing reject root", async () => {
   const rejecting = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "fixtures", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_td_" }, rejectIfPresent: [{ schema: "public", tablePrefix: "osnv_b_" }] }); const requestedScopes = [{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }]; const input = typedRequest(expected, rejecting);
   const onlyA = { ...recordingCatalogSnapshot(), requestedScopes }; const local = recordingProvider(), reopen = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, undefined, undefined, onlyA); registerPostgresOwnedStoreCapability(local, reopen.capability); const receipt = await admitOwnedStoresV1(local, input); expect(reopen.scopes).toEqual([requestedScopes]); expect(reopen.created).toEqual([]); expect(reopen.inserted).toEqual([]); const lease = publishOwnedStoreAdmissionV1(local, receipt)[0]; if (!lease) throw new Error("missing reject reopen lease"); lease.revoke();
   const full = recordingTwoStores().catalogue, rejected = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, undefined, undefined, full); const blocked = recordingProvider(); registerPostgresOwnedStoreCapability(blocked, rejected.capability); await admissionError(() => admitOwnedStoresV1(blocked, input), "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"); expect(rejected.events).toEqual(["callback", "registry", "lock", "catalogue"]); expect(rejected.scopes).toEqual([requestedScopes]); expect(rejected.created).toEqual([]); expect(rejected.inserted).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 post-create rejectIfPresent root blocks identity insert", async () => {
+test("post-create rejectIfPresent root blocks identity insert", async () => {
   const rejecting = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "fixtures", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_td_" }, rejectIfPresent: [{ schema: "public", tablePrefix: "osnv_b_" }] }); const scopes = [{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }]; const empty = { ...recordingCatalogSnapshot(), requestedScopes: scopes, relations: [], rowTypes: [], arrayTypes: [], columns: [], indexes: [], constraints: [], dependencies: [] }; const full = recordingTwoStores().catalogue; const registry = recordingRegistrySnapshot(); const emptyRegistry = { ...registry, state: { ...registry.state, rows: [] } }; const local = recordingProvider(), record = recordingCapability("create", 63n, undefined, undefined, undefined, undefined, emptyRegistry, undefined, empty, full); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, typedRequest(expected, rejecting)), "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue"]); expect(record.scopes).toEqual([scopes, scopes]); expect(record.created).toEqual([[{ kind: "createTable", table: expected.tables[0]! }]]); expect(record.inserted).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 raw Catalogue parse failure maps by initial versus post-create phase", async () => {
+test("raw Catalogue parse failure maps by initial versus post-create phase", async () => {
   const raw = recordingCatalogSnapshot(), malformed = { ...raw, columns: raw.columns.map(column => ({ ...column, attnum: "01" })) };
   const reopenProvider = recordingProvider(), reopen = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, undefined, undefined, malformed); registerPostgresOwnedStoreCapability(reopenProvider, reopen.capability); await admissionError(() => admitOwnedStoresV1(reopenProvider, request()), "ORM_OWNED_STORE_DRIFT"); expect(reopen.events).toEqual(["callback", "registry", "lock", "catalogue"]); expect(reopen.created).toEqual([]); expect(reopen.inserted).toEqual([]); expect(providerEffects).toBe(0);
   const createProvider = recordingProvider(), create = recordingCapability("create", 63n, undefined, undefined, undefined, undefined, undefined, undefined, undefined, malformed); registerPostgresOwnedStoreCapability(createProvider, create.capability); await admissionError(() => admitOwnedStoresV1(createProvider, request()), "ORM_OWNED_STORE_CREATE_FAILED"); expect(create.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue"]); expect(create.created).toHaveLength(1); expect(create.inserted).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 lock and Catalogue operational failures preserve reached phase and redact raw/proxy errors", async () => {
+test("lock and Catalogue operational failures preserve reached phase and redact raw/proxy errors", async () => {
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("operational proxy"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } });
   for (const [phase, failureValue] of [["lock", new Error("lock raw")], ["lock", proxy], ["catalogue", new Error("catalogue raw")], ["catalogue", proxy]] as const) { const local = recordingProvider(), record = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, phase === "lock" ? failureValue : undefined, phase === "catalogue" ? failureValue : undefined); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(record.events).toEqual(phase === "lock" ? ["callback", "registry", "lock"] : ["callback", "registry", "lock", "catalogue"]); expect(record.created).toEqual([]); expect(record.inserted).toEqual([]); expect(providerEffects).toBe(0); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
-test("B3 native already-aborted signal rejects before capability entry", async () => {
+test("native already-aborted signal rejects before capability entry", async () => {
   const controller = new AbortController(); controller.abort(); const local = recordingProvider(), record = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, { ...request(), signal: controller.signal }), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(record.events).toEqual([]); expect(record.contextReads).toBe(0); expect(record.created).toEqual([]); expect(record.inserted).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 native abort after completed callback prevents receipt after capability release", async () => {
+test("native abort after completed callback prevents receipt after capability release", async () => {
   const controller = new AbortController(), local = recordingProvider(), recorded = recordingCapability("reopen"); let release: (() => void) | undefined; const gate = new Promise<void>(resolve => { release = resolve; }); let readyResolve: (() => void) | undefined; const ready = new Promise<void>(resolve => { readyResolve = resolve; }); registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { const value = await recorded.capability.withOwnedStoreAdmission(signal, work); if (!readyResolve) throw new Error("missing abort ready resolver"); readyResolve(); await gate; return value; } });
   let settled = false; const pending = admitOwnedStoresV1(local, { ...request(), signal: controller.signal }).then(value => { settled = true; return value; }, error => { settled = true; throw error; }); try { const state = await Promise.race([ready.then(() => "ready" as const), pending.then(() => "settled" as const)]); if (state !== "ready") throw new Error("admission settled before abort"); expect(settled).toBe(false); controller.abort(); } finally { if (!release) throw new Error("missing abort release"); release(); }
   await admissionError(() => pending, "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 successful native signal admission does not attach post-publication listeners", async () => {
+test("successful native signal admission does not attach post-publication listeners", async () => {
   const controller = new AbortController(), signal = controller.signal; let added = 0, removed = 0; const add = signal.addEventListener.bind(signal), remove = signal.removeEventListener.bind(signal); Object.defineProperties(signal, { addEventListener: { value(...args: Parameters<AbortSignal["addEventListener"]>) { added++; return add(...args); } }, removeEventListener: { value(...args: Parameters<AbortSignal["removeEventListener"]>) { removed++; return remove(...args); } } }); const local = recordingProvider(), record = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, record.capability); const receipt = await admitOwnedStoresV1(local, { ...request(), signal }); const lease = publishOwnedStoreAdmissionV1(local, receipt)[0]; if (!lease) throw new Error("missing native-signal lease"); expect(Object.isFrozen(lease)).toBe(true); expect(lease.active).toBe(true); controller.abort(); expect(lease.active).toBe(true); lease.revoke(); lease.revoke(); expect(lease.active).toBe(false); expect(added).toBe(0); expect(removed).toBe(0); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(record.created).toEqual([]); expect(record.inserted).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 recording capability creates the missing store, rechecks, inserts sorted identity, then publishes", async () => {
+test("recording capability creates the missing store, rechecks, inserts sorted identity, then publishes", async () => {
   const local = recordingProvider(), record = recordingCapability("create"); registerPostgresOwnedStoreCapability(local, record.capability);
   const receipt = await admitOwnedStoresV1(local, request()); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert", "finalRegistry"]);
   expect(record.contextReads).toBe(1);
@@ -524,7 +524,7 @@ test("B3 recording capability creates the missing store, rechecks, inserts sorte
   expect(record.inserted).toHaveLength(1); expect(record.inserted[0]![0]).toMatchObject({ storeKey: "fixtures", ownedSchema: "public", tablePrefix: "osnv_td_", ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition), modelHash: canonicalOwnedStoreModelHashV1(definition, expected) });
   const leases = publishOwnedStoreAdmissionV1(local, receipt); expect(leases).toHaveLength(1); const lease = leases[0]; if (!lease) throw new Error("missing lease"); expect(lease.active).toBe(true);
 });
-test("B3 applyCreateOperations rejection maps every safe, raw, and proxy error to CREATE_FAILED", async () => {
+test("applyCreateOperations rejection maps every safe, raw, and proxy error to CREATE_FAILED", async () => {
   let proxyHooks = 0; const proxy = new Proxy(new Error("proxy mutation marker"), { get() { proxyHooks++; throw new Error("hook"); }, getPrototypeOf() { proxyHooks++; throw new Error("hook"); }, getOwnPropertyDescriptor() { proxyHooks++; throw new Error("hook"); }, ownKeys() { proxyHooks++; throw new Error("hook"); } });
   for (const thrown of [...safeAdmissionCodes.map(code => failure(code)), new Error("raw mutation marker"), proxy]) {
     const local = recordingProvider(), record = recordingCapability("create", 63n, thrown); registerPostgresOwnedStoreCapability(local, record.capability);
@@ -532,12 +532,12 @@ test("B3 applyCreateOperations rejection maps every safe, raw, and proxy error t
   }
   expect(proxyHooks).toBe(0);
 });
-test("B3 insertIdentities rejection maps every safe, raw, and proxy error after a verified create", async () => {
+test("insertIdentities rejection maps every safe, raw, and proxy error after a verified create", async () => {
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("proxy insert marker"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } });
   for (const thrown of [...safeAdmissionCodes.map(code => failure(code)), new Error("raw insert marker"), proxy]) { const local = recordingProvider(), record = recordingCapability("create", 63n, undefined, thrown); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_CREATE_FAILED"); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert"]); expect(record.created).toHaveLength(1); expect(record.inserted).toHaveLength(1); expect(record.inserted[0]![0]!.storeKey).toBe("fixtures"); expect(providerEffects).toBe(0); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
-test("B3 reopen final Registry semantic and read failures stop without mutation", async () => {
+test("reopen final Registry semantic and read failures stop without mutation", async () => {
   const base = recordingRegistrySnapshot(); const malformedCreatedAt = { ...base, state: { ...base.state, rows: [{ ...base.state.rows[0]!, createdAtEpochMicroseconds: "01" }] } }; const malformedShape = { ...base, state: { ...base.state, shape: { ...base.state.shape, columns: [] } } }; const missingCurrent = { ...base, state: { ...base.state, rows: [] } }; const modelMismatch = { ...base, state: { ...base.state, rows: [{ ...base.state.rows[0]!, modelHash: "sha256:" + "1".repeat(64) }] } };
   const cases: readonly [unknown, OrmOwnedStoreAdmissionError["code"]][] = [[{ contract: "osnv.orm-owned-store-registry-snapshot/v1", publicSchemaExists: true, state: { kind: "absent" } }, "ORM_OWNED_STORE_DRIFT"], [missingCurrent, "ORM_OWNED_STORE_DRIFT"], [malformedCreatedAt, "ORM_OWNED_STORE_DRIFT"], [malformedShape, "ORM_OWNED_STORE_DRIFT"], [{ ...base, publicSchemaExists: false }, "ORM_OWNED_STORE_DRIFT"], [modelMismatch, "ORM_OWNED_STORE_IDENTITY_MISMATCH"]];
   for (const [raw, code] of cases) { const local = recordingProvider(), recorded = recordingCapability("reopen", 63n, undefined, undefined, raw); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), code); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); expect(providerEffects).toBe(0); }
@@ -545,40 +545,40 @@ test("B3 reopen final Registry semantic and read failures stop without mutation"
   for (const failureValue of [new Error("final read raw"), proxy]) { const local = recordingProvider(), recorded = recordingCapability("reopen", 63n, undefined, undefined, undefined, failureValue); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
-test("B3 post-mutation final Registry semantic failures map to CREATE_FAILED after insert", async () => {
+test("post-mutation final Registry semantic failures map to CREATE_FAILED after insert", async () => {
   const base = recordingRegistrySnapshot(); const malformedCreatedAt = { ...base, state: { ...base.state, rows: [{ ...base.state.rows[0]!, createdAtEpochMicroseconds: "01" }] } }; const malformedShape = { ...base, state: { ...base.state, shape: { ...base.state.shape, columns: [] } } }; const missingCurrent = { ...base, state: { ...base.state, rows: [] } }; const modelMismatch = { ...base, state: { ...base.state, rows: [{ ...base.state.rows[0]!, modelHash: "sha256:" + "1".repeat(64) }] } };
   for (const raw of [{ contract: "osnv.orm-owned-store-registry-snapshot/v1", publicSchemaExists: true, state: { kind: "absent" } }, missingCurrent, malformedCreatedAt, malformedShape, { ...base, publicSchemaExists: false }, modelMismatch]) { const local = recordingProvider(), record = recordingCapability("create", 63n, undefined, undefined, raw); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_CREATE_FAILED"); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert", "finalRegistry"]); expect(record.created).toHaveLength(1); expect(record.inserted).toHaveLength(1); expect(providerEffects).toBe(0); }
 });
-test("B3 post-mutation final Registry read failures are operational LOCK failures", async () => {
+test("post-mutation final Registry read failures are operational LOCK failures", async () => {
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("proxy final marker"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } });
   for (const failureValue of [new Error("raw final marker"), proxy]) { const local = recordingProvider(), record = recordingCapability("create", 63n, undefined, undefined, undefined, failureValue); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert", "finalRegistry"]); expect(record.created).toHaveLength(1); expect(record.inserted).toHaveLength(1); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
-test("B3 final Registry overlapping offgraph ownership wins before public-schema status", async () => {
+test("final Registry overlapping offgraph ownership wins before public-schema status", async () => {
   const archive = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "archive", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_td_jobs_" } }); const base = recordingRegistrySnapshot();
   for (const [mode, publicSchemaExists, events] of [["reopen", true, ["callback", "registry", "lock", "catalogue", "finalRegistry"]], ["reopen", false, ["callback", "registry", "lock", "catalogue", "finalRegistry"]], ["create", true, ["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert", "finalRegistry"]], ["create", false, ["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert", "finalRegistry"]]] as const) {
     const finalRaw = { ...base, publicSchemaExists, state: { ...base.state, rows: [...base.state.rows, { storeKey: archive.storeKey, contract: archive.contract, formatVersion: "1", ownedSchema: archive.ownedScope.schema, tablePrefix: archive.ownedScope.tablePrefix, ownedScopeHash: canonicalOwnedStoreScopeHashV1(archive), modelHash: "sha256:" + "1".repeat(64), createdAtEpochMicroseconds: "0" }] } }; const local = recordingProvider(), record = recordingCapability(mode, 63n, undefined, undefined, finalRaw); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"); expect(record.events).toEqual([...events]); expect(providerEffects).toBe(0); if (mode === "reopen") { expect(record.created).toEqual([]); expect(record.inserted).toEqual([]); } else { expect(record.created).toHaveLength(1); expect(record.inserted).toHaveLength(1); }
   }
 });
-test("B3 initial Registry fences reject raw malformed, identity, ownership, and absent-public states before locking", async () => {
+test("initial Registry fences reject raw malformed, identity, ownership, and absent-public states before locking", async () => {
   const base = recordingRegistrySnapshot(), current = base.state.rows[0]!; const archive = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "archive", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_td_jobs_" } }); const disjointArchive = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "archive-disjoint", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_a_" } }); const off = { storeKey: archive.storeKey, contract: archive.contract, formatVersion: "1", ownedSchema: "public", tablePrefix: "osnv_td_jobs_", ownedScopeHash: canonicalOwnedStoreScopeHashV1(archive), modelHash: "sha256:" + "1".repeat(64), createdAtEpochMicroseconds: "0" }; const disjointOff = { ...off, storeKey: disjointArchive.storeKey, ownedSchema: disjointArchive.ownedScope.schema, tablePrefix: disjointArchive.ownedScope.tablePrefix, ownedScopeHash: canonicalOwnedStoreScopeHashV1(disjointArchive) };
   const cases: readonly [unknown, OrmOwnedStoreAdmissionError["code"]][] = [[{ ...base, state: { ...base.state, shape: { ...base.state.shape, columns: [] } } }, "ORM_OWNED_STORE_DRIFT"], [{ ...base, state: { ...base.state, rows: [{ ...current, createdAtEpochMicroseconds: "01" }] } }, "ORM_OWNED_STORE_DRIFT"], [{ ...base, state: { ...base.state, rows: [current, { ...disjointOff, createdAtEpochMicroseconds: "01" }] } }, "ORM_OWNED_STORE_DRIFT"], [{ ...base, state: { ...base.state, rows: [{ ...current, ownedScopeHash: "sha256:" + "1".repeat(64) }] } }, "ORM_OWNED_STORE_DRIFT"], [{ ...base, state: { ...base.state, rows: [{ ...current, modelHash: "sha256:" + "1".repeat(64) }] } }, "ORM_OWNED_STORE_IDENTITY_MISMATCH"], [{ ...base, state: { ...base.state, rows: [current, current] } }, "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"], [{ ...base, state: { ...base.state, rows: [current, off] } }, "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"], [{ contract: "osnv.orm-owned-store-registry-snapshot/v1", publicSchemaExists: false, state: { kind: "absent" } }, "ORM_OWNED_STORE_CREATE_FAILED"]];
   for (const [raw, code] of cases) { const local = recordingProvider(), record = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, raw); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), code); expect(record.events).toEqual(["callback", "registry"]); expect(record.created).toEqual([]); expect(record.inserted).toEqual([]); expect(providerEffects).toBe(0); }
 });
-test("B3 initial Registry read errors and recomputed current identity changes stop before locking", async () => {
+test("initial Registry read errors and recomputed current identity changes stop before locking", async () => {
   const changedScope = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "fixtures", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_wx_" } }); const changedFormat = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "fixtures", formatVersion: 2, ownedScope: { schema: "public", tablePrefix: "osnv_td_" } }); const base = recordingRegistrySnapshot(), current = base.state.rows[0]!;
   for (const row of [{ ...current, ownedSchema: changedScope.ownedScope.schema, tablePrefix: changedScope.ownedScope.tablePrefix, ownedScopeHash: canonicalOwnedStoreScopeHashV1(changedScope) }, { ...current, formatVersion: "2", ownedScopeHash: canonicalOwnedStoreScopeHashV1(changedFormat) }]) { const local = recordingProvider(), record = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, { ...base, state: { ...base.state, rows: [row] } }); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_IDENTITY_MISMATCH"); expect(record.events).toEqual(["callback", "registry"]); }
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("initial proxy"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } }); for (const error of [new Error("initial raw"), proxy]) { const local = recordingProvider(), record = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, undefined, error); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(record.events).toEqual(["callback", "registry"]); } expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
-test("B3 Catalogue phase classifies public status, inbound ownership, and missing identity before mutation", async () => {
+test("Catalogue phase classifies public status, inbound ownership, and missing identity before mutation", async () => {
   const registry = recordingRegistrySnapshot(), emptyRegistry = { ...registry, state: { ...registry.state, rows: [] } }, catalogue = recordingCatalogSnapshot(); const inbound = { ...catalogue, constraints: [...catalogue.constraints, { ...recordingPrimaryKey(), oid: "90", relationOid: "91", referencedRelationOid: "10", name: "inbound", kind: "foreignKey" as const, columns: ["id"], referencedColumns: ["id"], backingIndexOid: "12", onDelete: "noAction", onUpdate: "noAction", match: "simple" }] };
   const cases: readonly [unknown, unknown, OrmOwnedStoreAdmissionError["code"]][] = [[{ ...registry, publicSchemaExists: false }, catalogue, "ORM_OWNED_STORE_DRIFT"], [{ ...registry, publicSchemaExists: false }, inbound, "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"], [emptyRegistry, catalogue, "ORM_OWNED_STORE_IDENTITY_MISSING"]];
   for (const [initial, currentCatalogue, code] of cases) { const local = recordingProvider(), record = recordingCapability("reopen", 63n, undefined, undefined, undefined, undefined, initial, undefined, currentCatalogue); registerPostgresOwnedStoreCapability(local, record.capability); await admissionError(() => admitOwnedStoresV1(local, request()), code); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue"]); expect(record.created).toEqual([]); expect(record.inserted).toEqual([]); expect(providerEffects).toBe(0); }
 });
-test("B3 snapshots mutable caller request data before capability work", async () => {
+test("snapshots mutable caller request data before capability work", async () => {
   const mutableTable = { ...expected.tables[0]!, columns: [...expected.tables[0]!.columns], primaryKey: { ...expected.tables[0]!.primaryKey, columns: [...expected.tables[0]!.primaryKey.columns] }, indexes: [], foreignKeys: [], checks: [] }; const mutableExpected = { tables: [mutableTable] }; const mutableDefinition = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "fixtures", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_td_" } }); const held = { definition, expected: mutableExpected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, mutableExpected) as `sha256:${string}` }; const heldStores = [held]; const mutableRequest: { stores: typeof held[] } = { stores: heldStores }; const local = recordingProvider(), record = recordingCapability("create"); registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { heldStores.splice(0); mutableRequest.stores = []; held.definition = mutableDefinition; held.ownedScopeHash = "sha256:" + "1".repeat(64) as `sha256:${string}`; held.modelHash = "sha256:" + "2".repeat(64) as `sha256:${string}`; mutableExpected.tables.splice(0); mutableTable.table = "osnv_td_mutated"; mutableTable.columns.splice(0); mutableTable.columns = []; return record.capability.withOwnedStoreAdmission(signal, work); } }); const receipt = await admitOwnedStoresV1(local, mutableRequest); expect(record.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue", "insert", "finalRegistry"]); expect(record.created).toEqual([[{ kind: "createTable", table: expected.tables[0]! }]]); expect(record.inserted).toEqual([[{ storeKey: definition.storeKey, contract: definition.contract, formatVersion: definition.formatVersion, ownedSchema: definition.ownedScope.schema, tablePrefix: definition.ownedScope.tablePrefix, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` }]]); const operation = record.created[0]![0]; if (!operation || operation.kind !== "createTable") throw new Error("missing snapshot table create"); expect(operation.table).not.toBe(mutableTable); const storePreimage = canonicalOwnedStoreStoreLockPreimageV1(definition), scopePreimage = canonicalOwnedStoreScopeLockPreimageV1(definition.ownedScope); expect(record.plans[0]!.stores.map(entry => ({ kind: entry.kind, preimage: Buffer.from(entry.preimage).toString("hex"), key: entry.key }))).toEqual([{ kind: "store", preimage: storePreimage.toString("hex"), key: ownedStoreAdvisoryLockV1(storePreimage) }]); expect(record.plans[0]!.scopes.map(entry => ({ kind: entry.kind, preimage: Buffer.from(entry.preimage).toString("hex"), key: entry.key }))).toEqual([{ kind: "scope", preimage: scopePreimage.toString("hex"), key: ownedStoreAdvisoryLockV1(scopePreimage) }]); const leases = publishOwnedStoreAdmissionV1(local, receipt); expect(leases).toHaveLength(1); leases[0]!.revoke(); expect(mutableDefinition).not.toBe(definition); expect(providerEffects).toBe(0);
 });
-test("B3 hostile request envelopes reject before fresh capability entry without invoking hooks", async () => {
+test("hostile request envelopes reject before fresh capability entry without invoking hooks", async () => {
   const valid = request(), original = valid.stores[0]!;
   const cases: { readonly name: string; readonly input: unknown; readonly hooks: () => readonly number[]; }[] = [];
   const trapped = (value: object) => { const hooks: [number, number, number, number] = [0, 0, 0, 0]; return { proxy: new Proxy(value, { get() { hooks[0]++; throw new Error("hook"); }, getPrototypeOf() { hooks[1]++; throw new Error("hook"); }, getOwnPropertyDescriptor() { hooks[2]++; throw new Error("hook"); }, ownKeys() { hooks[3]++; throw new Error("hook"); } }), hooks: () => hooks }; };
@@ -606,7 +606,7 @@ test("B3 hostile request envelopes reject before fresh capability entry without 
   { let coercions = 0; const hash = new String(original.modelHash); Object.defineProperties(hash, { valueOf: { value() { coercions++; return original.modelHash; } }, toString: { value() { coercions++; return original.modelHash; } } }); cases.push({ name: "hash boxed String", input: { stores: [{ ...original, modelHash: hash }] }, hooks: () => [coercions] }); }
   for (const item of cases) { const local = recordingProvider(); let entries = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { entries++; throw new Error("unexpected"); } }); await admissionError(() => admitOwnedStoresV1(local, item.input as OwnedStoreAdmissionRequestV1), "ORM_OWNED_STORE_IDENTITY_MISMATCH"); expect(entries, item.name).toBe(0); const hooks = item.hooks(); expect(hooks, item.name).toEqual(hooks.map(() => 0)); }
 });
-test("B3 repeats the exact UTF-8 semantic secondary lock plan before an operational Catalogue failure", async () => {
+test("repeats the exact UTF-8 semantic secondary lock plan before an operational Catalogue failure", async () => {
   const reject = { schema: "public", tablePrefix: "legacy_" } as const;
   const bmp = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "bmp", formatVersion: 1, ownedScope: { schema: "a", tablePrefix: "\uE000_long_" }, rejectIfPresent: [reject] });
   const astral = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "astral", formatVersion: 1, ownedScope: { schema: "a", tablePrefix: "\u{10000}_" }, rejectIfPresent: [reject] });
@@ -648,7 +648,7 @@ function recordingTwoStores() {
   const registry = { ...base, state: { ...base.state, rows: [{ storeKey: other.storeKey, contract: other.contract, formatVersion: "1", ownedSchema: "public", tablePrefix: "osnv_b_", ownedScopeHash: canonicalOwnedStoreScopeHashV1(other), modelHash: canonicalOwnedStoreModelHashV1(other, otherExpected), createdAtEpochMicroseconds: "0" }, ...(base.state.rows as readonly unknown[])] } };
   return { other, otherExpected, catalogue, registry, scopes };
 }
-test("B1/B2 recording two-store graph preflights as one shared-schema current Registry", () => {
+test("recorded two-store graph preflights as one shared-schema current Registry", () => {
   const fixture = recordingTwoStores(), context = Object.freeze({ maxIdentifierLength: 63n });
   const registry = parseOwnedStoreRegistrySnapshotV1(fixture.registry, [definition, fixture.other], context); const catalogue = parseOwnedStoreCatalogSnapshotV1(fixture.catalogue, context);
   const semantic = { stores: [{ definition, expectedSchema: expected }, { definition: fixture.other, expectedSchema: fixture.otherExpected }], requestedScopes: fixture.scopes };
@@ -666,7 +666,7 @@ function recordingTwoStoreCapability(mode: "reopen" | "mixed" | "allMissing" = "
   const locked: RegistryLockedOwnedStoreSessionV1 = Object.freeze({ maxIdentifierLength: 63n, async inspectRegistry() { events.push("registry"); return mode === "mixed" ? existingRegistry : mode === "allMissing" ? emptyRegistry : registry; }, async lockSecondary(plan: OwnedStoreSecondaryLockPlanV1) { events.push("lock"); plans.push(plan); return secondary; } });
   return { fixture, offDefinition, events, plans, scopes, creates, inserts, capability: { async withOwnedStoreAdmission<T>(_signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { events.push("callback"); return work(locked); } } };
 }
-test("B3 two-store reopen holds one union lock and publishes graph-isolated leases", async () => {
+test("two-store reopen holds one union lock and publishes graph-isolated leases", async () => {
   const local = recordingProvider(), one = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, one.capability); const oneReceipt = await admitOwnedStoresV1(local, request());
   const two = recordingTwoStoreCapability(); registerPostgresOwnedStoreCapability(local, two.capability);
   const input: OwnedStoreAdmissionRequestV1 = { stores: [
@@ -677,7 +677,7 @@ test("B3 two-store reopen holds one union lock and publishes graph-isolated leas
   const firstLeases = publishOwnedStoreAdmissionV1(local, oneReceipt); const secondLeases = publishOwnedStoreAdmissionV1(local, twoReceipt); expect(firstLeases).toHaveLength(1); expect(secondLeases).toHaveLength(2); const first = firstLeases[0], second = secondLeases[0], third = secondLeases[1]; if (!first || !second || !third) throw new Error("missing lease"); expect(Object.isFrozen(first)).toBe(true); expect(Object.isFrozen(second)).toBe(true); expect(Object.isFrozen(third)).toBe(true); expect(first.active).toBe(true); expect(second.active).toBe(true); expect(third.active).toBe(true); first.revoke(); expect(first.active).toBe(false); expect(second.active).toBe(true); expect(third.active).toBe(true);
 });
 
-test("B3 two-store reopen locks a valid unrelated Registry row without cataloguing its scope", async () => {
+test("two-store reopen locks a valid unrelated Registry row without cataloguing its scope", async () => {
   const local = recordingProvider(), recorded = recordingTwoStoreCapability("reopen", true); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const input: OwnedStoreAdmissionRequestV1 = { stores: [
     { definition, expected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` },
@@ -694,7 +694,7 @@ test("B3 two-store reopen locks a valid unrelated Registry row without catalogui
   const leases = publishOwnedStoreAdmissionV1(local, receipt); expect(leases).toHaveLength(2); for (const lease of leases) lease.revoke(); expect(leases.every(lease => !lease.active)).toBe(true);
 });
 
-test("B3 two-store mixed create mutates only the absent store and records its identity", async () => {
+test("two-store mixed create mutates only the absent store and records its identity", async () => {
   const local = recordingProvider(), recorded = recordingTwoStoreCapability("mixed"); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const input: OwnedStoreAdmissionRequestV1 = { stores: [
     { definition, expected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` },
@@ -705,23 +705,23 @@ test("B3 two-store mixed create mutates only the absent store and records its id
   expect(recorded.inserts).toEqual([[{ storeKey: recorded.fixture.other.storeKey, contract: "osnv.orm-owned-store/v1", formatVersion: 1, ownedSchema: "public", tablePrefix: "osnv_b_", ownedScopeHash: canonicalOwnedStoreScopeHashV1(recorded.fixture.other) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(recorded.fixture.other, recorded.fixture.otherExpected) as `sha256:${string}` }]]);
   const leases = publishOwnedStoreAdmissionV1(local, receipt); expect(leases).toHaveLength(2); for (const lease of leases) lease.revoke(); expect(leases.every(lease => !lease.active)).toBe(true);
 });
-test("B3 mixed two-store pre-create rejects existing A drift before creating missing B", async () => {
+test("mixed two-store pre-create rejects existing A drift before creating missing B", async () => {
   const raw = recordingCatalogSnapshot(); const damaged = { ...raw, requestedScopes: [{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }], columns: raw.columns.map(column => ({ ...column, notNull: false })) }; const local = recordingProvider(), recorded = recordingTwoStoreCapability("mixed", false, damaged); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const input: OwnedStoreAdmissionRequestV1 = { stores: [{ definition, expected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` }, { definition: recorded.fixture.other, expected: recorded.fixture.otherExpected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(recorded.fixture.other) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(recorded.fixture.other, recorded.fixture.otherExpected) as `sha256:${string}` }] };
   await admissionError(() => admitOwnedStoresV1(local, input), "ORM_OWNED_STORE_DRIFT"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue"]); expect(recorded.creates).toEqual([]); expect(recorded.inserts).toEqual([]); expect(recorded.scopes).toEqual([[{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }]]); expect(recorded.plans[0]!.stores).toHaveLength(2); expect(providerEffects).toBe(0);
 });
-test("B3 mixed two-store rechecks pre-existing A after creating B", async () => {
+test("mixed two-store rechecks pre-existing A after creating B", async () => {
   const fixture = recordingTwoStores(), damagedPost = { ...fixture.catalogue, columns: fixture.catalogue.columns.map(column => column.relationOid === "10" ? { ...column, notNull: false } : column) }; const local = recordingProvider(), recorded = recordingTwoStoreCapability("mixed", false, undefined, damagedPost); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const input: OwnedStoreAdmissionRequestV1 = { stores: [{ definition, expected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` }, { definition: recorded.fixture.other, expected: recorded.fixture.otherExpected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(recorded.fixture.other) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(recorded.fixture.other, recorded.fixture.otherExpected) as `sha256:${string}` }] };
   await admissionError(() => admitOwnedStoresV1(local, input), "ORM_OWNED_STORE_CREATE_FAILED"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue"]); expect(recorded.scopes).toEqual([[{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }], [{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }]]); expect(recorded.creates).toEqual([[{ kind: "createTable", table: recorded.fixture.otherExpected.tables[0]! }]]); expect(recorded.inserts).toEqual([]); expect(providerEffects).toBe(0);
 });
-test("B3 mixed post-Catalogue inbound and read failures stop after B-only create", async () => {
+test("mixed post-Catalogue inbound and read failures stop after B-only create", async () => {
   const fixture = recordingTwoStores(), inbound = { ...fixture.catalogue, constraints: [...fixture.catalogue.constraints, { ...recordingPrimaryKey(), oid: "90", relationOid: "91", referencedRelationOid: "10", name: "inbound", kind: "foreignKey" as const, columns: ["id"], referencedColumns: ["id"], backingIndexOid: "12", onDelete: "noAction", onUpdate: "noAction", match: "simple" }] }; let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("post proxy"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } });
   for (const [postRaw, postFailure, code] of [[inbound, undefined, "ORM_OWNED_STORE_OWNERSHIP_CONFLICT"], [undefined, new Error("post raw"), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"], [undefined, proxy, "ORM_OWNED_STORE_LOCK_UNAVAILABLE"]] as const) { const local = recordingProvider(), recorded = recordingTwoStoreCapability("mixed", false, undefined, postRaw, postFailure); registerPostgresOwnedStoreCapability(local, recorded.capability); const input: OwnedStoreAdmissionRequestV1 = { stores: [{ definition, expected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` }, { definition: recorded.fixture.other, expected: recorded.fixture.otherExpected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(recorded.fixture.other) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(recorded.fixture.other, recorded.fixture.otherExpected) as `sha256:${string}` }] }; await admissionError(() => admitOwnedStoresV1(local, input), code); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "create", "catalogue"]); expect(recorded.scopes).toEqual([[{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }], [{ schema: "public", tablePrefix: "osnv_b_" }, { schema: "public", tablePrefix: "osnv_td_" }]]); expect(recorded.creates).toEqual([[{ kind: "createTable", table: recorded.fixture.otherExpected.tables[0]! }]]); expect(recorded.inserts).toEqual([]); expect(providerEffects).toBe(0); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
 
-test("B3 two-store all-missing create sorts tables and identity rows independently", async () => {
+test("two-store all-missing create sorts tables and identity rows independently", async () => {
   const local = recordingProvider(), recorded = recordingTwoStoreCapability("allMissing"); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const input: OwnedStoreAdmissionRequestV1 = { stores: [
     { definition, expected, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` },
@@ -745,7 +745,7 @@ function recordingAbsentRegistryCapability(createRegistryFailure?: unknown, regi
   return { events, created, inserted, capability: { async withOwnedStoreAdmission<T>(_signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { events.push("callback"); return work(locked); } } };
 }
 
-test("B3 Registry-absent create records the empty Registry reread before the missing-store create", async () => {
+test("Registry-absent create records the empty Registry reread before the missing-store create", async () => {
   const local = recordingProvider(), recorded = recordingAbsentRegistryCapability(); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const receipt = await admitOwnedStoresV1(local, request());
   expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "createRegistry", "registryReread", "create", "catalogue", "insert", "finalRegistry"]);
@@ -753,16 +753,16 @@ test("B3 Registry-absent create records the empty Registry reread before the mis
   expect(recorded.inserted).toEqual([[{ storeKey: definition.storeKey, contract: definition.contract, formatVersion: definition.formatVersion, ownedSchema: definition.ownedScope.schema, tablePrefix: definition.ownedScope.tablePrefix, ownedScopeHash: canonicalOwnedStoreScopeHashV1(definition) as `sha256:${string}`, modelHash: canonicalOwnedStoreModelHashV1(definition, expected) as `sha256:${string}` }]]);
   const leases = publishOwnedStoreAdmissionV1(local, receipt); expect(leases).toHaveLength(1); const lease = leases[0]; if (!lease) throw new Error("missing absent-Registry lease"); lease.revoke(); expect(lease.active).toBe(false);
 });
-test("B3 created Registry reread must be exact present-empty before store creation", async () => {
+test("created Registry reread must be exact present-empty before store creation", async () => {
   const base = recordingRegistrySnapshot(); const cases: readonly unknown[] = [{ contract: "osnv.orm-owned-store-registry-snapshot/v1", publicSchemaExists: true, state: { kind: "absent" } }, base, { ...base, state: { ...base.state, rows: [], shape: { ...base.state.shape, columns: [] } } }];
   for (const reread of cases) { const local = recordingProvider(), recorded = recordingAbsentRegistryCapability(undefined, reread); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_CREATE_FAILED"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "createRegistry", "registryReread"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); expect(providerEffects).toBe(0); }
 });
-test("B3 created Registry reread raw and proxy failures are operational lock failures", async () => {
+test("created Registry reread raw and proxy failures are operational lock failures", async () => {
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("reread proxy"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } });
   for (const failureValue of [new Error("reread raw"), proxy]) { const local = recordingProvider(), recorded = recordingAbsentRegistryCapability(undefined, undefined, failureValue); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "createRegistry", "registryReread"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); expect(providerEffects).toBe(0); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
-test("B3 createRegistryV1 rejection maps safe, raw, and proxy errors to CREATE_FAILED before reread", async () => {
+test("createRegistryV1 rejection maps safe, raw, and proxy errors to CREATE_FAILED before reread", async () => {
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(new Error("proxy registry marker"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } });
   for (const thrown of [...safeAdmissionCodes.map(code => failure(code)), new Error("raw registry marker"), proxy]) { const local = recordingProvider(), recorded = recordingAbsentRegistryCapability(thrown); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_CREATE_FAILED"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "createRegistry"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); expect(providerEffects).toBe(0); }
   expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
@@ -778,7 +778,7 @@ function globalCreatePlanFixture(alphaExists = true) {
   return { alpha, beta, alphaExpected, betaExpected, emptyRegistry, emptyCatalogue };
 }
 
-test("B3 create-plan observation/rejection preserves global schema-table-FK-index stages", async () => {
+test("create-plan observation/rejection preserves global schema-table-FK-index stages", async () => {
   for (const [alphaExists, schemas] of [[true, ["beta"]], [false, ["alpha", "beta"]]] as const) {
     const local = recordingProvider(), fixture = globalCreatePlanFixture(alphaExists), events: string[] = [], plans: OwnedStoreCreateOperationV1[][] = [], inserts: OwnedStoreIdentityInsertV1[][] = [];
     const secondary: SecondaryLockedOwnedStoreSessionV1 = Object.freeze({ async inspectCatalog() { events.push("catalogue"); return fixture.emptyCatalogue; }, async createRegistryV1() { events.push("createRegistry"); }, async applyCreateOperations(operations: readonly OwnedStoreCreateOperationV1[]) { events.push("create"); plans.push([...operations]); throw failure("ORM_OWNED_STORE_CREATE_FAILED"); }, async insertIdentities(rows: readonly OwnedStoreIdentityInsertV1[]) { events.push("insert"); inserts.push([...rows]); }, async inspectRegistry() { events.push("finalRegistry"); return fixture.emptyRegistry; } });
@@ -810,7 +810,7 @@ function adversarialCallbackCapability(run: (signal: AbortSignal | undefined, wo
   } }, get workCalls() { return state.workCalls; } };
 }
 
-test("B3 callback authenticity rejects malformed capability completion patterns", async () => {
+test("callback authenticity rejects malformed capability completion patterns", async () => {
   const forged = Object.freeze({});
   const cases: readonly { readonly name: string; readonly run: (signal: AbortSignal | undefined, work: CallbackWork, valid: CallbackCapability) => Promise<unknown>; readonly events: readonly string[]; readonly workCalls: number; }[] = [
     { name: "zero callback", async run() { return forged; }, events: [], workCalls: 0 },
@@ -826,7 +826,7 @@ test("B3 callback authenticity rejects malformed capability completion patterns"
   }
 });
 
-test("B3 callback authenticity rejects cached markers from another admission attempt", async () => {
+test("callback authenticity rejects cached markers from another admission attempt", async () => {
   for (const currentCallback of [false, true]) {
     const local = recordingProvider(), recorded = recordingCapability("reopen"); let cached: unknown; let attempts = 0, workCalls = 0;
     const capability = { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> {
@@ -842,7 +842,7 @@ test("B3 callback authenticity rejects cached markers from another admission att
   }
 });
 
-test("B3 authentic callback completion waits for capability resolution and does not publish its marker", async () => {
+test("authentic callback completion waits for capability resolution and does not publish its marker", async () => {
   const local = recordingProvider(), recorded = recordingCapability("reopen"); let marker: unknown; let release: (() => void) | undefined; const barrier = new Promise<void>(resolve => { release = resolve; }); let callbackReadyResolve: (() => void) | undefined; let callbackReadyReject: ((error: unknown) => void) | undefined; const callbackReady = new Promise<void>((resolve, reject) => { callbackReadyResolve = resolve; callbackReadyReject = reject; });
   registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { try { const value = await recorded.capability.withOwnedStoreAdmission(signal, work); marker = value; if (!callbackReadyResolve) throw new Error("missing callback-ready resolver"); callbackReadyResolve(); await barrier; return value; } catch (error) { callbackReadyReject?.(error); throw error; } } });
   let settled = false; const pending = admitOwnedStoresV1(local, request()).then(value => { settled = true; return value; }, error => { settled = true; throw error; });
@@ -850,7 +850,7 @@ test("B3 authentic callback completion waits for capability resolution and does 
   const receipt = await pending; expect(Object.isFrozen(receipt)).toBe(true); const lease = publishOwnedStoreAdmissionV1(local, receipt)[0]; if (!lease) throw new Error("missing resolved lease"); lease.revoke(); expect(lease.active).toBe(false); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]);
 });
 
-test("B3 opaque receipts preserve base priority, single consumption, and nominal authenticity", async () => {
+test("opaque receipts preserve base priority, single consumption, and nominal authenticity", async () => {
   const local = recordingProvider(), wrongBase = recordingProvider(), recorded = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, recorded.capability);
   const available = await admitOwnedStoresV1(local, request()); expect(Object.isFrozen(available)).toBe(true);
   await admissionError(() => Promise.resolve().then(() => publishOwnedStoreAdmissionV1(wrongBase, available)), "ORM_OWNED_STORE_PROVIDER_UNSUPPORTED");
@@ -863,14 +863,14 @@ test("B3 opaque receipts preserve base priority, single consumption, and nominal
   discardOwnedStoreAdmissionV1(untrusted); publishedLease.revoke(); publishedLease.revoke(); expect(publishedLease.active).toBe(false); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]);
 });
 
-test("B3 leases isolate by provider and by distinct nominally equal definition identity", async () => {
+test("leases isolate by provider and by distinct nominally equal definition identity", async () => {
   const firstProvider = recordingProvider(), secondProvider = recordingProvider(), firstRecord = recordingCapability("reopen"), secondRecord = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(firstProvider, firstRecord.capability); registerPostgresOwnedStoreCapability(secondProvider, secondRecord.capability);
   const firstReceipt = await admitOwnedStoresV1(firstProvider, request()), secondReceipt = await admitOwnedStoresV1(secondProvider, request()); const firstLease = publishOwnedStoreAdmissionV1(firstProvider, firstReceipt)[0], secondLease = publishOwnedStoreAdmissionV1(secondProvider, secondReceipt)[0]; if (!firstLease || !secondLease) throw new Error("missing separate-provider lease"); firstLease.revoke(); firstLease.revoke(); expect(firstLease.active).toBe(false); expect(secondLease.active).toBe(true);
   const twinDefinition = defineOrmOwnedStoreV1({ contract: "osnv.orm-owned-store/v1", storeKey: "fixtures", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "osnv_td_" } }); expect(twinDefinition).toEqual(definition); expect(twinDefinition).not.toBe(definition);
   const local = recordingProvider(), recorded = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, recorded.capability); const originalReceipt = await admitOwnedStoresV1(local, request()), twinReceipt = await admitOwnedStoresV1(local, typedRequest(expected, twinDefinition)); const originalLease = publishOwnedStoreAdmissionV1(local, originalReceipt)[0], twinLease = publishOwnedStoreAdmissionV1(local, twinReceipt)[0]; if (!originalLease || !twinLease) throw new Error("missing distinct-definition lease"); expect(Object.isFrozen(originalLease)).toBe(true); expect(Object.isFrozen(twinLease)).toBe(true); originalLease.revoke(); originalLease.revoke(); expect(originalLease.active).toBe(false); expect(twinLease.active).toBe(true); twinLease.revoke(); secondLease.revoke(); expect(twinLease.active).toBe(false); expect(secondLease.active).toBe(false); expect(firstRecord.created).toEqual([]); expect(secondRecord.inserted).toEqual([]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]);
 });
 
-test("B3 retry wrappers unwrap only through the registered acyclic depth budget", async () => {
+test("retry wrappers unwrap only through the registered acyclic depth budget", async () => {
   for (const depth of [0, 1, 15]) {
     const base = recordingProvider(), recorded = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(base, recorded.capability); let wrapped: DatabaseProvider = base; for (let edge = 0; edge < depth; edge++) wrapped = withRetry(wrapped, { maxRetries: 0 });
     const receipt = await admitOwnedStoresV1(wrapped, request()); const lease = publishOwnedStoreAdmissionV1(wrapped, receipt)[0]; if (!lease) throw new Error("missing wrapped lease"); lease.revoke();
@@ -891,7 +891,7 @@ function countBoundaryRequest(stores: number, tables: number): OwnedStoreAdmissi
   return { stores: prepared };
 }
 
-test("B3 request cardinality accepts exact store/table limits and rejects the next values before callback", async () => {
+test("request cardinality accepts exact store/table limits and rejects the next values before callback", async () => {
   for (const [stores, tables] of [[1, 1], [2, 1], [128, 1], [1, 512]] as const) {
     const local = recordingProvider(); let callbacks = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { callbacks++; throw failure("ORM_OWNED_STORE_LOCK_UNAVAILABLE"); } }); await admissionError(() => admitOwnedStoresV1(local, countBoundaryRequest(stores, tables)), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(callbacks).toBe(1);
   }
@@ -901,25 +901,25 @@ test("B3 request cardinality accepts exact store/table limits and rejects the ne
 });
 
 const safeAdmissionCodes = ["ORM_OWNED_STORE_PROVIDER_UNSUPPORTED", "ORM_OWNED_STORE_LOCK_UNAVAILABLE", "ORM_OWNED_STORE_IDENTITY_MISSING", "ORM_OWNED_STORE_IDENTITY_MISMATCH", "ORM_OWNED_STORE_OWNERSHIP_CONFLICT", "ORM_OWNED_STORE_DRIFT", "ORM_OWNED_STORE_CREATE_FAILED"] as const satisfies readonly OrmOwnedStoreAdmissionError["code"][];
-test("B3 server context reads once and distinguishes valid bounds from malformed values", async () => {
+test("server context reads once and distinguishes valid bounds from malformed values", async () => {
   for (const maximum of [63n, 64n]) { const local = recordingProvider(), recorded = recordingCapability("reopen", maximum); registerPostgresOwnedStoreCapability(local, recorded.capability); const receipt = await admitOwnedStoresV1(local, request()); expect(recorded.contextReads).toBe(1); const lease = publishOwnedStoreAdmissionV1(local, receipt)[0]; if (!lease) throw new Error("missing context lease"); lease.revoke(); }
   for (const [maximum, code] of [["63", "ORM_OWNED_STORE_DRIFT"], [null, "ORM_OWNED_STORE_DRIFT"], [62n, "ORM_OWNED_STORE_PROVIDER_UNSUPPORTED"], [-1n, "ORM_OWNED_STORE_PROVIDER_UNSUPPORTED"]] as const) { const local = recordingProvider(), recorded = recordingCapability("reopen", maximum); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), code); expect(recorded.contextReads).toBe(1); expect(recorded.events).toEqual(["callback"]); expect(recorded.created).toEqual([]); }
 });
 
-test("B3 operational error safe-codes preserve only at the pre-callback boundary", async () => {
+test("operational error safe-codes preserve only at the pre-callback boundary", async () => {
   for (const code of safeAdmissionCodes) {
     const local = recordingProvider(); let callbacks = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { callbacks++; throw failure(code); } }); await admissionError(() => admitOwnedStoresV1(local, request()), code); expect(callbacks).toBe(1);
     const afterLocal = recordingProvider(), recorded = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(afterLocal, { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { await recorded.capability.withOwnedStoreAdmission(signal, work); throw failure(code); } }); await admissionError(() => admitOwnedStoresV1(afterLocal, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]);
   }
 });
 
-test("B3 server getter and unsafe lookalikes redact to LOCK_UNAVAILABLE without hooks", async () => {
+test("server getter and unsafe lookalikes redact to LOCK_UNAVAILABLE without hooks", async () => {
   for (const value of [...safeAdmissionCodes.map(code => () => { throw failure(code); }), () => { throw new Error("raw marker"); }, () => { throw new Proxy(failure("ORM_OWNED_STORE_DRIFT"), {}); }]) { const local = recordingProvider(), recorded = recordingCapability("reopen", value); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback"]); }
   const unsafe = [Object.assign(new Error("raw marker"), { code: "ORM_OWNED_STORE_DRIFT" }), Object.create(OrmOwnedStoreAdmissionError.prototype, { code: { get() { throw new Error("hook"); } }, message: { value: "ORM_OWNED_STORE_DRIFT" } }), new (class extends OrmOwnedStoreAdmissionError {})("ORM_OWNED_STORE_DRIFT", "ORM_OWNED_STORE_DRIFT")];
   for (const error of unsafe) { const local = recordingProvider(); let callbacks = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { callbacks++; throw error; } }); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(callbacks).toBe(1); }
 });
 
-test("B3 hostile context and error descriptors are never invoked while redacting", async () => {
+test("hostile context and error descriptors are never invoked while redacting", async () => {
   for (const code of safeAdmissionCodes) {
     let hooks = 0; const error = Object.create(OrmOwnedStoreAdmissionError.prototype, { code: { enumerable: true, get() { hooks++; return code; } }, message: { enumerable: true, get() { hooks++; return code; } } }); const local = recordingProvider(); let callbacks = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { callbacks++; throw error; } }); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(callbacks).toBe(1); expect(hooks).toBe(0);
   }
@@ -927,22 +927,22 @@ test("B3 hostile context and error descriptors are never invoked while redacting
   let contextHooks = 0; const hostileContext = new Proxy({}, { get() { contextHooks++; throw new Error("hook"); }, getPrototypeOf() { contextHooks++; throw new Error("hook"); }, getOwnPropertyDescriptor() { contextHooks++; throw new Error("hook"); }, ownKeys() { contextHooks++; throw new Error("hook"); } }); const contextLocal = recordingProvider(), contextRecord = recordingCapability("reopen", hostileContext); registerPostgresOwnedStoreCapability(contextLocal, contextRecord.capability); await admissionError(() => admitOwnedStoresV1(contextLocal, request()), "ORM_OWNED_STORE_DRIFT"); expect(contextRecord.contextReads).toBe(1); expect(contextHooks).toBe(0); expect(contextRecord.events).toEqual(["callback"]); expect(contextRecord.created).toEqual([]); expect(contextRecord.inserted).toEqual([]);
 });
 
-test("B3 context malformed values and post-callback unsafe rejections remain phase-safe", async () => {
+test("context malformed values and post-callback unsafe rejections remain phase-safe", async () => {
   for (const value of [63, () => undefined, Object(63n), {}]) { const local = recordingProvider(), recorded = recordingCapability("reopen", value); registerPostgresOwnedStoreCapability(local, recorded.capability); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_DRIFT"); expect(recorded.contextReads).toBe(1); expect(recorded.events).toEqual(["callback"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); }
   const unsafe = [Object.assign(new Error("raw marker"), { code: "ORM_OWNED_STORE_NOT_A_CODE" }), Object.assign(new Error("raw marker"), { code: "ORM_OWNED_STORE_DRIFT" }), new Proxy(new Error("raw marker"), {})];
   for (const error of unsafe) { const local = recordingProvider(), recorded = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { await recorded.capability.withOwnedStoreAdmission(signal, work); throw error; } }); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect(recorded.created).toEqual([]); expect(recorded.inserted).toEqual([]); }
 });
 
-test("B3 unsafe exact-prototype own-data error pairs are redacted before callback", async () => {
+test("unsafe exact-prototype own-data error pairs are redacted before callback", async () => {
   for (const [code, message] of [["ORM_OWNED_STORE_UNKNOWN", "ORM_OWNED_STORE_UNKNOWN"], ["ORM_OWNED_STORE_DRIFT", "different message"]] as const) {
     const error = Object.create(OrmOwnedStoreAdmissionError.prototype, { code: { value: code, enumerable: true }, message: { value: message, enumerable: true } }); const local = recordingProvider(); let workCalls = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { workCalls++; throw error; } }); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(workCalls).toBe(1);
   }
 });
 
-test("B3 unsafe exact-prototype message accessor is redacted without invoking it", async () => {
+test("unsafe exact-prototype message accessor is redacted without invoking it", async () => {
   let hooks = 0; const error = Object.create(OrmOwnedStoreAdmissionError.prototype, { code: { value: "ORM_OWNED_STORE_DRIFT", enumerable: true }, message: { enumerable: true, get() { hooks++; return "ORM_OWNED_STORE_DRIFT"; } } }); const local = recordingProvider(); let workCalls = 0; registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission() { workCalls++; throw error; } }); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(workCalls).toBe(1); expect(hooks).toBe(0);
 });
 
-test("B3 post-callback proxy error is redacted without invoking proxy traps", async () => {
+test("post-callback proxy error is redacted without invoking proxy traps", async () => {
   let get = 0, prototype = 0, descriptor = 0, keys = 0; const proxy = new Proxy(failure("ORM_OWNED_STORE_DRIFT"), { get() { get++; throw new Error("hook"); }, getPrototypeOf() { prototype++; throw new Error("hook"); }, getOwnPropertyDescriptor() { descriptor++; throw new Error("hook"); }, ownKeys() { keys++; throw new Error("hook"); } }); const local = recordingProvider(), recorded = recordingCapability("reopen"); registerPostgresOwnedStoreCapability(local, { async withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T> { await recorded.capability.withOwnedStoreAdmission(signal, work); throw proxy; } }); await admissionError(() => admitOwnedStoresV1(local, request()), "ORM_OWNED_STORE_LOCK_UNAVAILABLE"); expect(recorded.events).toEqual(["callback", "registry", "lock", "catalogue", "finalRegistry"]); expect({ get, prototype, descriptor, keys }).toEqual({ get: 0, prototype: 0, descriptor: 0, keys: 0 });
 });
