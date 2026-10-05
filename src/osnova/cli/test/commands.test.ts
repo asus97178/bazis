@@ -6,6 +6,7 @@ import { runCli, type CliRuntime } from "../main";
 import { generateModule, generateModulePack } from "../generateModule";
 import { resolveGenerator, runCodegen } from "../codegen";
 import { parseModuleName } from "../naming";
+import { devEnvironment } from "../build";
 
 const roots: string[] = [];
 async function fixture() {
@@ -180,4 +181,10 @@ test.each([
 ])("normalizes common module names: %s", (input, entity, route) => {
   expect(parseModuleName(input).entity).toBe(entity);
   expect(parseModuleName(input).route).toBe(route);
+});
+
+test("osnv dev runs as development unless OSNV_ENV is set in the shell", () => {
+  expect(devEnvironment({ PATH: "/bin" })).toEqual({ PATH: "/bin", OSNV_ENV: "development" });
+  expect(devEnvironment({ OSNV_ENV: "" }).OSNV_ENV).toBe("development");
+  expect(devEnvironment({ OSNV_ENV: "staging" }).OSNV_ENV).toBe("staging");
 });
