@@ -764,16 +764,6 @@ export function parseOwnedStoreCatalogSnapshotV1(v: unknown, context: OwnedStore
   unique(out.sequences, x => x.relationOid);
   return Object.freeze(out);
 }
-/** Verifies the authoritative admission scope; expected table names cannot prove a prefix. */
-export function verifyOwnedStoreCatalogScopesV1(snapshot: OwnedStoreCatalogSnapshotV1, requestedScopes: readonly OrmCatalogScopeV1[]): void {
-  if (snapshot.requestedScopes.length !== requestedScopes.length)
-    bad();
-  for (let index = 0; index < requestedScopes.length; index++) {
-    const actual = snapshot.requestedScopes[index]!, requested = requestedScopes[index]!;
-    if (actual.schema !== requested.schema || actual.tablePrefix !== requested.tablePrefix)
-      bad();
-  }
-}
 export interface OwnedStoreCatalogStoreExpectationV1 {
   readonly definition: Readonly<OrmOwnedStoreDefinitionV1>;
   readonly expectedSchema: OrmExpectedSchema;

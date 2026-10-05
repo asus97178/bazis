@@ -1,6 +1,5 @@
 import type { ClientPacket, ServerPacket } from "./types";
 
-const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export function encodeServerPacket(packet: Omit<ServerPacket, "v"> & { v?: 1 }): string {
@@ -36,23 +35,11 @@ export function decodeClientPacket(raw: string | Buffer): ClientPacket {
   return packet as ClientPacket;
 }
 
-export function encodeServerPacketBytes(packet: Omit<ServerPacket, "v"> & { v?: 1 }): Uint8Array {
-  return encoder.encode(encodeServerPacket(packet));
-}
-
 export class PacketCodecError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "PacketCodecError";
   }
-}
-
-export function createErrorPacket(message: string, id?: string): string {
-  return encodeServerPacket({
-    type: "error",
-    data: { message },
-    id,
-  });
 }
 
 export function createAckPacket(id: string, data?: unknown): string {
@@ -72,10 +59,6 @@ export function createConnectedPacket(sid: string, namespace: string, data?: unk
   });
 }
 
-export function createPongPacket(): string {
-  return encodeServerPacket({ type: "pong" });
-}
-
 export function createReconnectedPacket(
   sid: string,
   namespace: string,
@@ -88,20 +71,5 @@ export function createReconnectedPacket(
     namespace,
     missed,
     data,
-  });
-}
-
-export function createEventPacket(
-  namespace: string,
-  event: string,
-  data?: unknown,
-  id?: string,
-): string {
-  return encodeServerPacket({
-    type: "event",
-    namespace,
-    event,
-    data,
-    id,
   });
 }

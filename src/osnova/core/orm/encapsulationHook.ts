@@ -17,8 +17,3 @@ export function registerRepositoryEncapsulationHook(): void {
     return undefined;
   });
 }
-
-/** @internal Test helper. */
-export function resetRepositoryEncapsulationHookForTests(): void {
-  registered = false;
-}

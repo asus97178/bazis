@@ -97,7 +97,7 @@ export class UiSurfaceDocumentProvider {
 
   public constructor(
     private readonly options: UiSurfaceHostingOptions,
-    private readonly profiles: UiProfileV1Registry,
+    profiles: UiProfileV1Registry,
     private readonly openApiDocument: OpenApiSchema,
   ) {
     const seen = new Set<string>();
