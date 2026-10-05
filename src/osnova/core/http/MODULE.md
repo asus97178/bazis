@@ -80,6 +80,16 @@
 полей и существующий валидатор. Эти options не добавлены в HTTP barrel exports.
 Проверки: [исправления Agent/Tool](../../../../docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
 
+## Проверка примитивных типов (0.96.1)
+
+Codegen добавляет в shape поля `{ primitive: "string" | "number" | "boolean" }`
+для полей, объявленных ровно этими типами (с `null`/`?`/массивом). Binder
+проверяет `typeof` только при `primitiveTypes: true`; эту опцию передаёт
+`ParameterBinder` для JSON-тела. gRPC (int64 как string/bigint) и Agent её не
+включают. DTO, который не является именованным top-level export, остаётся без
+проверки и не получает новой ошибки codegen. Проверки:
+`test/modelBinder.primitives.test.ts`, `core/scripts/test/request-model-codegen.test.ts`.
+
 ## Повторное использование привязки DTO в gRPC
 
 Дополнение 2026-09-26: тот же binder используется gRPC с внутренней опцией

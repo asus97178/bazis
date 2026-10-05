@@ -1717,7 +1717,7 @@ function renderRequestModels(
     const alias = aliases.get(declaration);
     const shape = hydration.fields.get(declaration);
     if (alias !== undefined && shape !== undefined) {
-      const fields = shape.map((field) => `${JSON.stringify(field.property)}: { model: ${aliases.get(field.model)},${field.array ? " array: true," : ""}${field.nullable ? " nullable: true," : ""}${field.elementNullable ? " elementNullable: true," : ""} }`).join(", ");
+      const fields = shape.map((field) => `${JSON.stringify(field.property)}: { ${field.primitive === undefined ? `model: ${aliases.get(field.model!)}` : `primitive: ${JSON.stringify(field.primitive)} as const`},${field.array ? " array: true," : ""}${field.nullable ? " nullable: true," : ""}${field.elementNullable ? " elementNullable: true," : ""} }`).join(", ");
       lines.push(`  [${alias}, Object.freeze({ ${fields} })] as const,`);
     }
   }

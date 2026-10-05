@@ -15,7 +15,6 @@ export class UpdateTaskRequest {
   @Validator({ minLength: 1, maxLength: 200 })
   title?: string;
 
-  // Validation is opt-in: without a rule the field would accept any JSON value.
-  @Validator({ type: "boolean" })
+  // No rule needed for the type: HTTP rejects a non-boolean JSON value (400).
   done?: boolean;
 }

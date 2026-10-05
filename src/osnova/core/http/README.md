@@ -96,6 +96,14 @@ export class CreateUserRequest {
 union из двух классов) останавливает codegen; plain object при отсутствующей
 или устаревшей generated-метадате стандартный validator отклоняет fail-closed.
 
+Поле тела запроса, объявленное ровно как `string`, `number` или `boolean`
+(также `| null`, необязательное или массив таких значений), проверяется по
+типу JSON без `@Validator`: `{"done":"yes"}` для `done?: boolean` даёт 400
+с кодом `type`. Тип берёт codegen из исходников; литеральные union-типы, enum,
+`Date` и смешанные union не проверяются — для них нужен `@Validator`.
+Обязательность по-прежнему задаёт `required: true`. Проверка действует только
+на HTTP-границе: gRPC и Agent используют тот же binder без неё.
+
 Открытые JSON-поля (`Record<string, unknown>`, `{}`, `unknown[]`) сохраняют
 обычные пользовательские ключи, но binder рекурсивно клонирует их и удаляет
 `__proto__`, `constructor`, `prototype` на любой глубине. Циклы, глубина более

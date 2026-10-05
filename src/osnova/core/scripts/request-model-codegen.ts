@@ -1,8 +1,12 @@
 import ts from "typescript";
 
+export type RequestModelPrimitive = "string" | "number" | "boolean";
+
+/** Exactly one of `model` (nested DTO) or `primitive` is set. */
 export interface RequestModelHydrationField {
   readonly property: string;
-  readonly model: ts.ClassDeclaration;
+  readonly model?: ts.ClassDeclaration;
+  readonly primitive?: RequestModelPrimitive;
   readonly array: boolean;
   readonly nullable: boolean;
   readonly elementNullable: boolean;
@@ -69,6 +73,16 @@ export function analyzeRequestModelHydration(
       }
       const nested = modelTypeForProperty(checker, member);
       const explicitNested = hasExplicitNestedValidator(member);
+      const primitive = nested.model === undefined && !explicitNested ? primitiveTypeForProperty(checker, member) : undefined;
+      if (primitive !== undefined) {
+        // Primitive checks are an addition: a DTO that cannot be imported by
+        // generated code keeps its previous (unchecked) binding instead of failing.
+        if (options.isNamedExportedTopLevelClass(owner)) {
+          ownerFields.push({ property: member.name.text, ...primitive });
+          requiredDeclarations.add(owner);
+        }
+        continue;
+      }
       if (nested.model === undefined) {
         if (explicitNested && nested.ambiguous) {
           errors.push(
@@ -153,11 +167,11 @@ export function renderRequestModelShapeRegistrations(
     }
     lines.push(`registerRequestModelShape(${ownerAlias}, {`);
     for (const field of ownerFields) {
-      const modelAlias = aliasFor(field.model);
-      if (modelAlias === undefined) {
+      const modelAlias = field.model === undefined ? undefined : aliasFor(field.model);
+      if (field.primitive === undefined && modelAlias === undefined) {
         continue;
       }
-      const values: string[] = [`model: ${modelAlias}`];
+      const values: string[] = [field.primitive === undefined ? `model: ${modelAlias}` : `primitive: ${JSON.stringify(field.primitive)}`];
       if (field.array) {
         values.push("array: true");
       }
@@ -202,6 +216,44 @@ function modelTypeForProperty(checker: ts.TypeChecker, member: ts.PropertyDeclar
     elementNullable: false,
     ambiguous: model === undefined,
   };
+}
+
+/**
+ * `string`, `number` or `boolean` exactly (literal unions, enums and other
+ * types are left unchecked), optionally `| null`, optional, or as array elements.
+ */
+function primitiveTypeForProperty(
+  checker: ts.TypeChecker,
+  member: ts.PropertyDeclaration,
+): Pick<RequestModelHydrationField, "primitive" | "array" | "nullable" | "elementNullable"> | undefined {
+  const outer = splitNullable(checker.getTypeAtLocation(member));
+  const single = outer.types.length === 1 ? outer.types[0] : undefined;
+  if (single !== undefined && isArrayModelType(checker, single)) {
+    const elementType = checker.getIndexTypeOfType(single, ts.IndexKind.Number);
+    if (elementType === undefined || checker.isTupleType(single)) {
+      return undefined;
+    }
+    const element = splitNullable(elementType);
+    const primitive = primitiveOf(element.types);
+    return primitive === undefined ? undefined : { primitive, array: true, nullable: outer.nullable, elementNullable: element.nullable };
+  }
+  const primitive = primitiveOf(outer.types);
+  return primitive === undefined ? undefined : { primitive, array: false, nullable: outer.nullable, elementNullable: false };
+}
+
+function splitNullable(input: ts.Type): { readonly types: readonly ts.Type[]; readonly nullable: boolean } {
+  const candidates = input.isUnion() ? input.types : [input];
+  const types = candidates.filter((candidate) => (candidate.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void)) === 0);
+  return { types, nullable: candidates.some((candidate) => (candidate.flags & ts.TypeFlags.Null) !== 0) };
+}
+
+/** `boolean` arrives as the union `true | false`. */
+function primitiveOf(types: readonly ts.Type[]): RequestModelPrimitive | undefined {
+  if (types.length === 1 && types[0]!.flags === ts.TypeFlags.String) return "string";
+  if (types.length === 1 && types[0]!.flags === ts.TypeFlags.Number) return "number";
+  if (types.length === 1 && types[0]!.flags === ts.TypeFlags.Boolean) return "boolean";
+  if (types.length === 2 && types.every((type) => (type.flags & ts.TypeFlags.BooleanLiteral) !== 0)) return "boolean";
+  return undefined;
 }
 
 function unwrapNullableType(input: ts.Type): { readonly type?: ts.Type; readonly nullable: boolean } {
