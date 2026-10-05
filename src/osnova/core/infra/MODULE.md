@@ -329,9 +329,9 @@ Callback отменяется по lifetime signal; ожидание огран�
 Agents передаёт callback в штатный AgentToolExecutor, где действуют DTO, допуск,
 scope, timeout и hooks. Добавление операций записи требует отдельной политики допуска.
 
-Проверки: [codex.test.ts](test/codex.test.ts), [физический runner](../../../../ops/codex/verify.py).
-Изоляция навыков: [проверка настоящего CLI без аккаунта](../../../../ops/codex/check-skills.ts)
-и [результаты от 2026-09-21](../../../../docs/audits/codex-skills-2026-09-21.md).
+Проверки: [codex.test.ts](test/codex.test.ts), физический прогон — [отчёт](../../../../docs/audits/codex-chatgpt-2026-09-20.md) (скрипты пробы удалены в 0.96.1, остались в истории git).
+Изоляция навыков: проверка настоящего CLI без аккаунта
+— [результаты от 2026-09-21](../../../../docs/audits/codex-skills-2026-09-21.md).
 PASS: реальный CLI handshake/policy/account-read без входа; mock subprocess
 streaming, отмена/смерть/ошибки/изоляция; собранный binary + отдельная PostgreSQL БД
 и реальные WebSocket. Реальная генерация ChatGPT требует входа владельца и до

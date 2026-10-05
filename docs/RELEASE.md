@@ -18,8 +18,7 @@
 ## Версии и зависимости
 
 Согласовать `package.json` и `src/osnova/package.json`, затем активные metadata
-приложения в `src/index.ts`, `src/admin-ui-dev.ts` и Codex `clientInfo.version`.
-Диагностический `ops/codex/check-skills.ts` использует тот же номер клиента.
+приложения в `src/index.ts` и Codex `clientInfo.version`.
 Пакеты admin-ui/client-ui имеют независимую версию `0.1.0`.
 API/schema versions, исторические отчёты и версии примеров автоматически не менять.
 

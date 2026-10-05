@@ -238,8 +238,6 @@ function shouldSkipRuntimeGraphFile(file: string): boolean {
     normalized.includes("/src/osnova/core/scripts/") ||
     normalized.includes("/src/osnova/cli/") ||
     normalized.includes("/test/") ||
-    normalized.includes("/src/osnova/core/generated/") ||
-    normalized.includes("/src/osnova/core/http/generated/") ||
     normalized.endsWith("/src/osnova/library/openapi/codegen.ts")
   );
 }
