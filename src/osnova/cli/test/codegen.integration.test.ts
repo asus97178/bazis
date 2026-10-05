@@ -20,9 +20,9 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
     await cp(path.join(project, "tsconfig.json"), path.join(root, "tsconfig.json"));
     const modules = path.join(root, "src/app/modules");
     await mkdir(path.join(modules, "auth"), { recursive: true });
-    for (const helper of ["jwtAuth.ts", "tokenKinds.ts", "accessTokenValidation.ts"]) {
-      await cp(path.join(project, "src/app/modules/auth", helper), path.join(modules, "auth", helper));
-    }
+    // Minimal host auth helpers: the --full template imports exactly these two names.
+    await Bun.write(path.join(modules, "auth", "tokenKinds.ts"), 'export const TokenKind = { Admin: "admin", Client: "client" } as const;\nexport type TokenKind = typeof TokenKind[keyof typeof TokenKind];\n');
+    await Bun.write(path.join(modules, "auth", "jwtAuth.ts"), 'import type { AuthorizeCheck } from "@osnova/core/http";\nimport type { TokenKind } from "./tokenKinds";\nexport function requireTokenKind(...kinds: readonly TokenKind[]): AuthorizeCheck {\n  return () => kinds.length > 0;\n}\n');
     await Bun.write(path.join(modules, "App.module.ts"), 'import { Module } from "@osnova/core/di";\n@Module({imports: [], exports: []})\nexport class AppModule {}\n');
     await Bun.write(path.join(root, "src/index.ts"), 'export { AppModule } from "./app/modules/App.module";\n');
     await Bun.write(path.join(root, "osnv.config.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));

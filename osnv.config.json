@@ -4,7 +4,7 @@
   "targets": {
     "production": {
       "entrypoints": [
-        "src/index.ts"
+        "src/osnova/index.ts"
       ]
     },
     "test": {

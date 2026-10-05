@@ -1,8 +1,6 @@
-# Runs scripts/ci.ts on every qualified host in toolchain/bun.json:
-# - macos: the self-hosted Mac (exact macOS build); its runner `.env` supplies
-#   OSNV_BUN_BIN, nothing machine-specific lives in the repo;
-# - linux: a GitHub-hosted ubuntu-latest (glibc x64) with the official Bun
-#   release; scripts/osnova-bun refuses it unless its hash matches bun.json.
+# Runs scripts/ci.ts on a GitHub-hosted ubuntu-latest (glibc x64) with the
+# official Bun release; scripts/osnova-bun refuses it unless its hash matches
+# toolchain/bun.json. A cloud runner is also what npm --provenance requires.
 name: CI
 
 on:
@@ -25,24 +23,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  macos:
-    # Never run code from forks on the self-hosted machine.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, macOS, ARM64, osnova-qualified]
+  linux:
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Qualified Bun is configured
+      - name: Qualified Bun (hash-pinned in toolchain/bun.json)
         run: |
-          test -n "$OSNV_BUN_BIN" || { echo "OSNV_BUN_BIN is not set in the runner .env"; exit 1; }
-          ./scripts/osnova-bun --no-env-file run toolchain:check
+          curl -fsSL -o "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip
+          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
+          echo "OSNV_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
+
+      - name: Toolchain check
+        run: ./scripts/osnova-bun --no-env-file run toolchain:check
 
       - name: Install dependencies
-        run: |
-          ./scripts/osnova-bun --no-env-file install --frozen-lockfile
-          (cd admin-ui && ../scripts/osnova-bun --no-env-file install --frozen-lockfile)
-          (cd client-ui && ../scripts/osnova-bun --no-env-file install --frozen-lockfile)
+        run: ./scripts/osnova-bun --no-env-file install --frozen-lockfile
 
       - name: Pipeline
         if: ${{ !inputs.live }}
@@ -59,33 +56,3 @@ jobs:
           name: live-postgres-${{ github.run_id }}
           path: ${{ runner.temp }}/live-postgres-${{ github.run_id }}
           if-no-files-found: ignore
-
-  linux:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-
-      # Admin/Client UI type checks need real Node >= 22.12.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Qualified Bun (hash-pinned in toolchain/bun.json)
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip
-          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
-          echo "OSNV_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
-
-      - name: Toolchain check
-        run: ./scripts/osnova-bun --no-env-file run toolchain:check
-
-      - name: Install dependencies
-        run: |
-          ./scripts/osnova-bun --no-env-file install --frozen-lockfile
-          (cd admin-ui && ../scripts/osnova-bun --no-env-file install --frozen-lockfile)
-          (cd client-ui && ../scripts/osnova-bun --no-env-file install --frozen-lockfile)
-
-      - name: Pipeline
-        run: ./scripts/osnova-bun --no-env-file run ci

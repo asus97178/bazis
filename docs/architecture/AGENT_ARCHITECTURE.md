@@ -6,7 +6,7 @@
 Agent Runtime и Tools, отделить агентов от модулей, затем развивать эту основу.
 
 Документ дополняет [MOD-ARCH-001](MODULE_ARCHITECTURE.md). По следующему поручению
-пользователя создан атомарный [AgentsModule](../../src/app/modules/agents/MODULE.md)
+пользователя создан атомарный [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md)
 для управления определениями из админки. Далее добавлен путь запуска определения
 как данных и отдельный пользовательский Vue-чат. Полный перенос прежних объявлений
 не выполняется.
@@ -95,13 +95,13 @@ DI scope не является изоляцией процессов, файло
 
 | Участок | Что существует | Что предстоит изменить |
 | --- | --- | --- |
-| [AgentsModule](../../src/app/modules/agents/MODULE.md) | Определения в PostgreSQL, защищённый Admin CRUD, версии, Main, RunService и agents.getAll | Создание Main других агентов через Tool с отдельной проверкой полномочий |
+| [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md) | Определения в PostgreSQL, защищённый Admin CRUD, версии, Main, RunService и agents.getAll | Создание Main других агентов через Tool с отдельной проверкой полномочий |
 | [Module AI metadata](../../src/osnova/core/agent/index.ts) | `agents/tools/prompts/agentToolHooks` расширяют метаданные модуля | Убрать зависимость исполнения агента от модульного объявления; действующий путь сохранить на время миграции |
 | [AgentRegistry](../../src/osnova/core/agent/AgentRegistry.ts) | fromDefinition разрешает toolNames из явного списка хоста; immutable snapshot без класса агента | Сохранение версионированного снимка вместе с длительной сессией |
 | [Agent metadata](../../src/osnova/core/agent/metadata.ts) | Динамические определения — данные; классы/decorators остаются для Tools/DTO и совместимости | Согласовать старые примеры и генерацию, не меняя старый API без миграции |
 | [CLI full template](../../src/osnova/cli/templates/module.ts) | Создаёт AnalystAgent внутри модуля и записывает `agents` в `@Module` | Разделить генерацию модуля и агента, согласовать codegen и проверки |
 | [Agent Runtime](../../src/osnova/core/agent/MODULE.md) | Рабочий цикл Agent → model → Tool и проверенные границы локальных исправлений | Упорядочить текущие контракты и регистрацию до добавления новых возможностей |
-| [Chat](../../src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/osnova/cli/MODULE.md) | Общий RunService, сохранение ответов, отмена, текст и прогресс инструментов в Vue; CLI получает итоговый ответ | CLI streaming/resume и транспортно-независимая сессия |
+| [Chat](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/osnova/cli/MODULE.md) | Общий RunService, сохранение ответов, отмена, текст и прогресс инструментов в Vue; CLI получает итоговый ответ | CLI streaming/resume и транспортно-независимая сессия |
 | [Session contracts](../../src/osnova/core/agent/session/contracts.ts) | Контракты сессий; рядом есть сущности, codec и защита checkpoints | Довести исполняющий сервис отдельно; наличие контрактов не доказывает готовое восстановление |
 
 Текущий код с `@Module.agents` — совместимость на время перехода, а не образец

@@ -30,7 +30,9 @@ registerRepositoryEncapsulationHook();
  * class UsersModule {}
  * ```
  */
-declare module "../di" {
+// Augment the declaring file, not the "../di" re-export: re-export targets
+// depend on program file order and silently stop merging in some projects.
+declare module "../di/module/types/OsnovaModule" {
   interface OsnovaModuleMetadata {
     readonly ormOsnova?: OrmModuleConfig<DbContext> | readonly OrmModuleConfig<DbContext>[];
   }

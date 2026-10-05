@@ -442,7 +442,7 @@ export class TaskLookupTool {
 
 ### 3.1. Корень пакета
 
-Источник: [DataManager.module.ts](../../src/app/modules/datamanager_modules/DataManager.module.ts).
+Источник: [DataManager.module.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/datamanager_modules/DataManager.module.ts).
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
@@ -468,7 +468,7 @@ export class DataManagerModule {}
 
 ### 3.2. Records владеет реализацией
 
-Источник: [DataManagerRecords.module.ts](../../src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts).
+Источник: [DataManagerRecords.module.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts).
 
 ```ts
 // file: src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts
@@ -492,7 +492,7 @@ Records получает каталог/валидацию через imports, �
 контроллер и сервисы. `exports: []` делает его DI-провайдеры приватными;
 контроллер по-прежнему входит в HTTP-композицию пакета.
 Остальные части и конкретные входные поля описаны в
-[разборе DataManager](EXISTING_MODULES.md).
+[разборе DataManager](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/docs/architecture/EXISTING_MODULES.md).
 
 ## 4. Подключение атомарного и составного модулей в приложении
 
