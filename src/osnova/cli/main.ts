@@ -9,8 +9,9 @@ export const USAGE = `Usage:
   osnv new <Name> [options]                  Create a new application project
   osnv g module <Name> [options]             Atomic module (alias: m)
   osnv g pack <Name> --parts <a,b> [options] Composite module (aliases: p, module-pack)
-  osnv codegen [--target <name|all>]         Run the project's di:generate script
-  osnv dev [--watch]                         Codegen, then run the app from source;
+  osnv codegen [--target <name|all>]         Generate DI wiring into src/generated/osnv
+  osnv dev [--watch]                         Codegen, then run the app from source with
+                                             OSNV_ENV=development (unless set);
                                              --watch reruns both when src/ changes
   osnv test [<bun test args>]                Codegen, then bun test
   osnv build                                 Codegen and typecheck

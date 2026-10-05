@@ -9,7 +9,7 @@ CLI выполняется отдельным процессом и не рег�
 ## Запуск и сборка
 
 ```sh
-bunx osnv dev                         # codegen, затем src/index.ts из исходников
+bunx osnv dev                         # codegen, затем src/index.ts из исходников (OSNV_ENV=development, если не задан)
 bunx osnv dev --watch                 # то же; изменение в src/ перезапускает codegen и приложение
 bunx osnv test [<аргументы bun test>]  # codegen, затем bun test
 bunx osnv build                       # codegen и проверка типов (tsc --noEmit)

@@ -16,14 +16,21 @@ export interface BuildOptions {
  * `osnv dev`: codegen, then run the default target's entrypoint from source.
  * With `watch`, a change under src/ (except src/generated) stops the app,
  * reruns codegen and starts it again; a failed codegen waits for the next change.
+ * The app runs as `development` unless OSNV_ENV is set in the shell.
  */
+/** `osnv dev` means development; an OSNV_ENV from the shell still wins. */
+export function devEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return { ...env, OSNV_ENV: env.OSNV_ENV || "development" };
+}
+
 export async function runDev(cwd: string, codegen: Codegen, log: (message: string) => void, options: { readonly watch?: boolean } = {}): Promise<number> {
   const bun = await resolveBun(cwd);
   const entry = await projectEntry(cwd);
+  const env = devEnvironment(process.env);
   if (!options.watch) {
     const generated = await codegen(cwd);
     if (generated !== 0) return generated;
-    const child = Bun.spawn([bun, "run", entry], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    const child = Bun.spawn([bun, "run", entry], { cwd, env, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
     // The app owns graceful shutdown; forward the signal instead of dying first.
     const forward = (signal: NodeJS.Signals) => () => child.kill(signal);
     const onInterrupt = forward("SIGINT"), onTerminate = forward("SIGTERM");
@@ -49,7 +56,7 @@ export async function runDev(cwd: string, codegen: Codegen, log: (message: strin
   };
   const start = async () => {
     if (await codegen(cwd) !== 0) { log("[osnv] codegen failed; waiting for changes..."); return; }
-    child = Bun.spawn([bun, "run", entry], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+    child = Bun.spawn([bun, "run", entry], { cwd, env, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
   };
   const watcher = watch(path.join(cwd, "src"), { recursive: true }, (_event, file) => {
     // codegen writes src/generated: watching it would restart forever.
