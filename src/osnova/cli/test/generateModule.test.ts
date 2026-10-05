@@ -137,7 +137,7 @@ export class AppModule {}
     expect(controller).toContain("@Authorize");
     expect(controller).toContain("@OutputCache");
 
-    const agent = await readFile(path.join(moduleDir, "ai/agents/Catalog.agent.ts"), "utf8");
+    const agent = await readFile(path.join(moduleDir, "ai/agents/CatalogAnalyst.agent.ts"), "utf8");
     expect(agent).toContain("@Agent");
     expect(agent).toContain("@Task");
     expect(agent).toContain('role: "catalogs analyst"');

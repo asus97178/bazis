@@ -1,6 +1,6 @@
 import { BadRequest, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "osnv/core/http";
 import { buildListDocument } from "osnv/library/jsonapi";
-import { TaskListQuery } from "./contracts/Task.query";
+import { TaskListQuery } from "./contracts/TaskList.query";
 import { CreateTaskRequest, UpdateTaskRequest } from "./contracts/Task.requests";
 import type { ITaskService } from "../services/ITask.service";
 

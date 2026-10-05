@@ -55,10 +55,10 @@ adapters that access it.
 | ${m}Controller | [http/${m}.controller.ts](http/${m}.controller.ts) | I${m}Service, HTTP request | HTTP operations below |
 | Create${e}Request / Update${e}Request | [requests](http/contracts/${m}.requests.ts) | JSON body | RequestModel + Validator |
 | ${e}Response / ${m}Summary / to${e}Response | [responses](http/contracts/${m}.responses.ts) | ORM entity | Public data projection |
-| ${m}ListQuery | [list](http/contracts/${m}.query.ts) | Query string | ListQuery, filters/sorting/pages |
+| ${m}ListQuery | [list](http/contracts/${m}List.query.ts) | Query string | ListQuery, filters/sorting/pages |
 ${profile === "full" ? `| ${m}Reporter | [background](background/${m}.reporter.ts) | ServiceProvider, Logger, AbortSignal | Runs count and logs it |
-| ${m}SummaryTool | [tool](ai/tools/${m}.tool.ts) | I${m}Service, input, context | Summary for the agent |
-| ${m}AnalystAgent | [agent](ai/agents/${m}.agent.ts) | Prepare${m}BriefRequest | ${m}BriefDocument via AgentRuntime |
+| ${m}SummaryTool | [tool](ai/tools/${m}Summary.tool.ts) | I${m}Service, input, context | Summary for the agent |
+| ${m}AnalystAgent | [agent](ai/agents/${m}Analyst.agent.ts) | Prepare${m}BriefRequest | ${m}BriefDocument via AgentRuntime |
 | AI DTO | [contracts](ai/contracts/${m}.brief.ts) | topic, audience | title, bullets |
 ` : ""}
 
