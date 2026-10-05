@@ -1,10 +1,10 @@
 import { paginate, type PageResult } from "osnv/core/orm";
 import type { ListQuery } from "osnv/library/jsonapi";
 import type { IProjectService } from "../../project/services/IProject.service";
-import type { CreateTaskRequest, UpdateTaskRequest } from "../http/contracts/TaskRequests";
-import { toTaskResponse, type TaskResponse } from "../http/contracts/TaskResponses";
+import type { CreateTaskRequest, UpdateTaskRequest } from "../http/contracts/Task.requests";
+import { toTaskResponse, type TaskResponse } from "../http/contracts/Task.responses";
 import { Task } from "../model/Task.model";
-import { TaskDbContext } from "../model/TaskDbContext";
+import { TaskDbContext } from "../model/Task.dbContext";
 import type { ITaskService } from "./ITask.service";
 
 export class TaskService implements ITaskService {

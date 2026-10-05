@@ -52,7 +52,7 @@ export async function generateModule(options: GenerateModuleOptions): Promise<Ge
     const authDir = path.resolve("src/app/modules/auth");
     const helpers = await Promise.all(["tokenKinds.ts", "jwtAuth.ts"].map(async (helper) => (await fileInfo(path.join(authDir, helper)))?.isFile() === true));
     authImportPath = helpers.every(Boolean)
-      ? moduleImportPath(path.join(modulesRoot, naming.folder, "http", `${naming.entity}Controller.ts`), await canonicalDirectory(authDir))
+      ? moduleImportPath(path.join(modulesRoot, naming.folder, "http", `${naming.module}.controller.ts`), await canonicalDirectory(authDir))
       : null;
   }
   const result = await generateFiles(options, naming, naming.folder, buildModuleTemplates(naming, profile, authImportPath));

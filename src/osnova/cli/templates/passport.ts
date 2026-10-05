@@ -37,6 +37,7 @@ works; check the contents, run codegen and the relevant tests.
 `;
 
   const e = n.entity;
+  const m = n.module;
   return `${header}
 ## Responsibility and components
 
@@ -48,34 +49,34 @@ adapters that access it.
 | Component | File | Input / dependency | Output / effect |
 | --- | --- | --- | --- |
 | ${n.moduleClass} | [${n.module}.module.ts](${n.module}.module.ts) | host imports | ORM, DI, HTTP${profile === "full" ? ", background, AI" : ""} |
-| ${e} | [model/${e}.model.ts](model/${e}.model.ts) | Fields below | Table ${n.route} |
-| ${e}DbContext | [model/${e}DbContext.ts](model/${e}DbContext.ts) | Shared host ORM provider | DbSet ${n.collection} |
-| I${e}Service / ${e}Service | [services/${e}.service.ts](services/${e}.service.ts), [token](services/I${e}.service.ts) | ${e}DbContext${profile === "full" ? ", ICache" : ""} | CRUD, count, summary |
-| ${e}Controller | [http/${e}Controller.ts](http/${e}Controller.ts) | I${e}Service, HTTP request | HTTP operations below |
-| Create${e}Request / Update${e}Request | [requests](http/contracts/${e}Requests.ts) | JSON body | RequestModel + Validator |
-| ${e}Response / ${e}Summary / to${e}Response | [responses](http/contracts/${e}Responses.ts) | ORM entity | Public data projection |
-| ${e}ListQuery | [list](http/contracts/${e}ListQuery.ts) | Query string | ListQuery, filters/sorting/pages |
-${profile === "full" ? `| ${e}StatsReporter | [background](background/${e}StatsReporter.ts) | ServiceProvider, Logger, AbortSignal | Runs count and logs it |
-| ${e}SummaryTool | [tool](ai/tools/${e}SummaryTool.ts) | I${e}Service, input, context | Summary for the agent |
-| ${e}AnalystAgent | [agent](ai/agents/${e}AnalystAgent.ts) | Prepare${e}BriefRequest | ${e}BriefDocument via AgentRuntime |
-| AI DTO | [contracts](ai/contracts/${e}Brief.ts) | topic, audience | title, bullets |
+| ${e} | [model/${m}.model.ts](model/${m}.model.ts) | Fields below | Table ${n.route} |
+| ${m}DbContext | [model/${m}.dbContext.ts](model/${m}.dbContext.ts) | Shared host ORM provider | DbSet ${n.collection} |
+| I${m}Service / ${m}Service | [services/${m}.service.ts](services/${m}.service.ts), [token](services/I${m}.service.ts) | ${m}DbContext${profile === "full" ? ", ICache" : ""} | CRUD, count, summary |
+| ${m}Controller | [http/${m}.controller.ts](http/${m}.controller.ts) | I${m}Service, HTTP request | HTTP operations below |
+| Create${e}Request / Update${e}Request | [requests](http/contracts/${m}.requests.ts) | JSON body | RequestModel + Validator |
+| ${e}Response / ${m}Summary / to${e}Response | [responses](http/contracts/${m}.responses.ts) | ORM entity | Public data projection |
+| ${m}ListQuery | [list](http/contracts/${m}.query.ts) | Query string | ListQuery, filters/sorting/pages |
+${profile === "full" ? `| ${m}Reporter | [background](background/${m}.reporter.ts) | ServiceProvider, Logger, AbortSignal | Runs count and logs it |
+| ${m}SummaryTool | [tool](ai/tools/${m}.tool.ts) | I${m}Service, input, context | Summary for the agent |
+| ${m}AnalystAgent | [agent](ai/agents/${m}.agent.ts) | Prepare${m}BriefRequest | ${m}BriefDocument via AgentRuntime |
+| AI DTO | [contracts](ai/contracts/${m}.brief.ts) | topic, audience | title, bullets |
 ` : ""}
 
 ## Wiring, DI and data
 
 No imports: the host provides the scaffold's functional dependencies.
-exports: [I${e}Service]. TypeScript contract: services/I${e}.service.ts;
+exports: [I${m}Service]. TypeScript contract: services/I${e}.service.ts;
 HTTP access is defined by the controller and the host policy, separately from DI exports.
-I${e}Service → ${e}Service, scoped lifetime. The context and DbSet belong to the ORM.
-${profile === "full" ? `${e}SummaryTool is listed in tools: [${e}SummaryTool]; the framework registers it as scoped, the tool is not exported.
+I${m}Service → ${m}Service, scoped lifetime. The context and DbSet belong to the ORM.
+${profile === "full" ? `${m}SummaryTool is listed in tools: [${m}SummaryTool]; the framework registers it as scoped, the tool is not exported.
 The service uses cachedScoped; ICache comes from the host cacheModule.
 The background service gets its own scope per tick and disposes it in finally.
 The host also provides auth from src/app/modules/auth (TokenKind.Admin/Client),
 AgentRuntime and the reasoning modelProfile. The CLI does not create them.
-` : ""}Constructor dependencies, including ${e}DbContext, are wired by codegen.
+` : ""}Constructor dependencies, including ${m}DbContext, are wired by codegen.
 No manual deps arrays. UI, events and own configuration are not used.
 
-ORM: context ${e}DbContext, entities [${e}], shared host provider.
+ORM: context ${m}DbContext, entities [${e}], shared host provider.
 Table ${n.route}${profile === "full" ? `, schema ${n.dbSchema}` : ""}; the entity takes part in migrations.
 No startup flags create or update the schema. The host makes sure the schema
 exists before requests. The CLI and codegen do not create the database.
@@ -100,7 +101,7 @@ ${profile === "full" ? "Read: Admin or Client. Write: Admin. Checked by HTTP Aut
 | PUT /${n.route}/:id, update(id, body) | id, Update${e}Request | ${e}Response or null; HTTP 200 / 404; only the fields sent are changed |
 | DELETE /${n.route}/:id, delete(id) | id | boolean; HTTP 204 / 404; physical delete |
 | count() | None | Promise<number>; SELECT count |
-| summary() | None | Promise<${e}Summary>: count — total; names — up to 20 names ordered by id; SELECT count and a bounded projection |
+| summary() | None | Promise<${m}Summary>: count — total; names — up to 20 names ordered by id; SELECT count and a bounded projection |
 
 | Field | Type / source | Required | null | Default | Validation | Example |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -125,7 +126,7 @@ malformed UUID does not match the route; a missing record is 404. A duplicate
 email makes saveChanges() reject with UniqueViolationError (osnv/core/orm); the
 scaffold does not catch it, so it reaches the shared error handler as 500 —
 catch it to answer 409.
-${e}DbContext.saveChanges() saves every change collected in the context, not
+${m}DbContext.saveChanges() saves every change collected in the context, not
 only the current entity. IRepository.saveChanges() saves the same scope and
 stays a compatible API. The CRUD has no outer transaction, retries or separate
 cancellation protocol. Data changes and later effects are not in one
@@ -163,8 +164,8 @@ for the runtime. Calling prepareBrief directly does not run the LLM.
 
 | AI input field | Type / source | Required | null | Default | Check | Example |
 | --- | --- | --- | --- | --- | --- | --- |
-| topic | string / tool input or Prepare${n.entity}BriefRequest | Yes | no | none | Validator required, minLength 3 | Daily summary |
-| audience | string / Prepare${n.entity}BriefRequest | Yes by Validator | no | operators when the DTO is created | Validator required, minLength 3 | operators |
+| topic | string / tool input or Prepare${n.module}BriefRequest | Yes | no | none | Validator required, minLength 3 | Daily summary |
+| audience | string / Prepare${n.module}BriefRequest | Yes by Validator | no | operators when the DTO is created | Validator required, minLength 3 | operators |
 | context | AgentToolExecutionContext / runtime | For the tool | no | runtime | agentName comes from the server context | agentName: ${n.route}-analyst |
 
 Tool output: topic string, count number, names string[], agentName string

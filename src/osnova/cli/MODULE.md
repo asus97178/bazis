@@ -205,12 +205,19 @@ count и максимум 20 имён в порядке id. Сервис пол�
 (`path`, `action: create | update`) и `warnings`. Пути файлов в отчёте относительны cwd.
 В dry-run `registered` отражает план; в обычном запуске — итоговую регистрацию.
 Папка пакета: `{kebab-name}_modules`, часть: `{kebab-part}_module`.
-Модуль и часть пакета называются так, как их ввели: `g module Stats` создаёт
-`stats/Stats.module.ts` с классом `StatsModule` (до 0.96.1 — `Stat.module.ts`,
-`StatModule`). Единственное число получает только CRUD-сущность профилей
-`--minimal`/`--full`: `Stat.model.ts`, `StatService`, `StatController`, маршрут
-`/stats`. Части пакета, совпадающие в единственном числе (`records,record`),
-отклоняются. Это ограниченные правила английских имён, не универсальный словарь.
+Имена по модулю, как его ввели (`g module Stats`). Файлы — `<Модуль>.<роль>.ts`:
+`Stats.module.ts`, `model/Stats.model.ts`, `model/Stats.dbContext.ts`,
+`services/IStats.service.ts`, `services/Stats.service.ts`, `http/Stats.controller.ts`,
+`http/contracts/Stats.requests.ts|responses.ts|query.ts`; в `--full` ещё
+`background/Stats.reporter.ts`, `ai/agents/Stats.agent.ts`, `ai/tools/Stats.tool.ts`,
+`ai/contracts/Stats.brief.ts`. Классы ролей тоже по модулю: `StatsModule`,
+`StatsController`, `IStatsService`/`StatsService`, `StatsDbContext`, `StatsListQuery`,
+`StatsReporter`, `StatsSummaryTool`, `StatsAnalystAgent`. Единственное число
+остаётся у записи и её DTO: `class Stat`, `CreateStatRequest`, `StatResponse`;
+маршрут `/stats`. До 0.96.1 имена файлов и классов строились от сущности
+(`StatController.ts`, `StatService`). Части пакета, совпадающие в единственном
+числе (`records,record`), отклоняются. Это ограниченные правила английских имён,
+не универсальный словарь.
 
 Существующая папка без `--force` — ошибка. Host проверяется до записи файлов.
 Регистрация поддерживает объект `@Module` с литеральным массивом `imports`

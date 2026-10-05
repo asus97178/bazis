@@ -1,9 +1,9 @@
 import { paginate, UniqueViolationError, type PageResult } from "osnv/core/orm";
 import type { ListQuery } from "osnv/library/jsonapi";
-import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/ProjectRequests";
-import { toProjectResponse, type ProjectResponse } from "../http/contracts/ProjectResponses";
+import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/Project.requests";
+import { toProjectResponse, type ProjectResponse } from "../http/contracts/Project.responses";
 import { Project } from "../model/Project.model";
-import { ProjectDbContext } from "../model/ProjectDbContext";
+import { ProjectDbContext } from "../model/Project.dbContext";
 import type { IProjectService } from "./IProject.service";
 
 export class ProjectService implements IProjectService {

@@ -87,7 +87,7 @@ test("full service evicts list and item caches after successful mutations, prese
 });
 
 test("generated controllers derive Location and list basePath from the active HTTP prefix", async () => {
-  const { CliGuestController } = await import(path.join(guestDir, "http/CliGuestController.ts"));
+  const { CliGuestController } = await import(path.join(guestDir, "http/CliGuest.controller.ts"));
   const item = { id: "123e4567-e89b-42d3-a456-426614174000", name: "Guest", email: "guest@example.com" };
   const service = { create: async () => item };
   const controller = new CliGuestController(service);
@@ -99,7 +99,7 @@ test("generated controllers derive Location and list basePath from the active HT
   expect(result.status).toBe(201);
   expect(new Headers(result.headers).get("Location")).toBe(`/custom/v2/cli-guests/${item.id}`);
 
-  const { CliCatalogController } = await import(path.join(catalogDir, "http/CliCatalogController.ts"));
+  const { CliCatalogController } = await import(path.join(catalogDir, "http/CliCatalog.controller.ts"));
   const calls: unknown[][] = [];
   const catalogController = new CliCatalogController({ getAll: async (...args: unknown[]) => { calls.push(args); return { items: [item], total: 42 }; } });
   const query = parseListQuery(new URLSearchParams());
@@ -115,9 +115,9 @@ test("generated controllers derive Location and list basePath from the active HT
 test("minimal and full lists bound SQL and return data; summary counts all rows and selects at most 20 names", async () => {
   for (const [directory, entityName] of [[guestDir, "CliGuest"], [catalogDir, "CliCatalog"]]) {
     const { [entityName!]: Entity } = await import(path.join(directory!, `model/${entityName}.model.ts`));
-    const { [`${entityName}DbContext`]: Context } = await import(path.join(directory!, `model/${entityName}DbContext.ts`));
+    const { [`${entityName}DbContext`]: Context } = await import(path.join(directory!, `model/${entityName}.dbContext.ts`));
     const { [`${entityName}Service`]: Service } = await import(path.join(directory!, `services/${entityName}.service.ts`));
-    const { [`${entityName}ListQuery`]: Query } = await import(path.join(directory!, `http/contracts/${entityName}ListQuery.ts`));
+    const { [`${entityName}ListQuery`]: Query } = await import(path.join(directory!, `http/contracts/${entityName}.query.ts`));
     const statements: { sql: string; params: readonly SqlParam[] }[] = [];
     const provider: DatabaseProvider = {
       name: "postgres", dialect: new PostgresDialect(), limits: { maxParametersPerCommand: 32767 },

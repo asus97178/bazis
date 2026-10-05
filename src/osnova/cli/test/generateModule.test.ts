@@ -100,7 +100,7 @@ export class AppModule {}
     expect(appModule).toContain('import { ProductModule } from "./product/Product.module";');
     expect(appModule).toContain("imports: [ProductModule]");
 
-    const controller = await readFile(path.join(moduleDir, "http/ProductController.ts"), "utf8");
+    const controller = await readFile(path.join(moduleDir, "http/Product.controller.ts"), "utf8");
     expect(controller).not.toContain("@Authorize");
     expect(controller).not.toContain("@OutputCache");
     const module = await readFile(path.join(moduleDir, "Product.module.ts"), "utf8");
@@ -133,11 +133,11 @@ export class AppModule {}
       expect(await Bun.file(file).exists()).toBe(true);
     }
 
-    const controller = await readFile(path.join(moduleDir, "http/CatalogController.ts"), "utf8");
+    const controller = await readFile(path.join(moduleDir, "http/Catalog.controller.ts"), "utf8");
     expect(controller).toContain("@Authorize");
     expect(controller).toContain("@OutputCache");
 
-    const agent = await readFile(path.join(moduleDir, "ai/agents/CatalogAnalystAgent.ts"), "utf8");
+    const agent = await readFile(path.join(moduleDir, "ai/agents/Catalog.agent.ts"), "utf8");
     expect(agent).toContain("@Agent");
     expect(agent).toContain("@Task");
     expect(agent).toContain('role: "catalogs analyst"');
@@ -163,7 +163,7 @@ export class AppModule {}
       const result = await generateModule({ name: "Ledger", modulesRoot: root, register: false, profile: "full" });
       expect(result.files).toHaveLength(14);
       expect(result.warnings.some((warning) => warning.includes("no @Authorize"))).toBe(true);
-      const controller = await readFile(path.join(root, "ledger/http/LedgerController.ts"), "utf8");
+      const controller = await readFile(path.join(root, "ledger/http/Ledger.controller.ts"), "utf8");
       expect(controller).not.toMatch(/^\s*@Authorize\(/m);
       expect(controller).not.toContain("tokenKinds");
       expect(controller).toContain("@OutputCache");

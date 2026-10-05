@@ -189,14 +189,29 @@ test("osnv dev runs as development unless OSNV_ENV is set in the shell", () => {
   expect(devEnvironment({ OSNV_ENV: "staging" }).OSNV_ENV).toBe("staging");
 });
 
-test("a module keeps its name as given; only the CRUD entity is singular", async () => {
+test("files and role classes are named by the module; the record and its DTOs stay singular", async () => {
   expect(parseModuleName("Stats")).toMatchObject({ folder: "stats", module: "Stats", moduleClass: "StatsModule", entity: "Stat" });
   expect(parseModuleName("order-items")).toMatchObject({ folder: "order-items", module: "OrderItems", moduleClass: "OrderItemsModule", entity: "OrderItem", route: "order-items" });
   expect(parseModuleName("Task")).toMatchObject({ module: "Task", moduleClass: "TaskModule", entity: "Task" });
 
   const f = await fixture();
-  const result = await generateModule({ ...f, name: "Stats", profile: "minimal" });
-  expect(result.files.map((file) => path.relative(result.moduleDir, file))).toEqual(expect.arrayContaining(["Stats.module.ts", "model/Stat.model.ts"]));
-  expect(await readFile(path.join(result.moduleDir, "Stats.module.ts"), "utf8")).toContain("export class StatsModule {}");
+  const result = await generateModule({ ...f, name: "Stats", profile: "full" });
+  const files = result.files.map((file) => path.relative(result.moduleDir, file)).sort();
+  expect(files).toEqual([
+    "MODULE.md", "Stats.module.ts",
+    "ai/agents/Stats.agent.ts", "ai/contracts/Stats.brief.ts", "ai/tools/Stats.tool.ts",
+    "background/Stats.reporter.ts",
+    "http/Stats.controller.ts", "http/contracts/Stats.query.ts", "http/contracts/Stats.requests.ts", "http/contracts/Stats.responses.ts",
+    "model/Stats.dbContext.ts", "model/Stats.model.ts",
+    "services/IStats.service.ts", "services/Stats.service.ts",
+  ]);
+  const source = async (file: string) => readFile(path.join(result.moduleDir, file), "utf8");
+  expect(await source("Stats.module.ts")).toContain("export class StatsModule {}");
+  expect(await source("http/Stats.controller.ts")).toContain("export class StatsController {");
+  expect(await source("services/Stats.service.ts")).toContain("export class StatsService implements IStatsService {");
+  expect(await source("model/Stats.dbContext.ts")).toContain("export class StatsDbContext extends DbContext {");
+  expect(await source("model/Stats.model.ts")).toContain("export class Stat {");
+  expect(await source("http/contracts/Stats.requests.ts")).toContain("export class CreateStatRequest {");
+  expect(await source("background/Stats.reporter.ts")).toContain("export class StatsReporter ");
   expect(await readFile(f.appModulePath, "utf8")).toContain("import { StatsModule } from \"../features/stats/Stats.module\";");
 });
