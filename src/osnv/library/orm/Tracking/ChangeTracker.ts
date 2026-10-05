@@ -1,4 +1,4 @@
-import type { EntityModel, PropertyModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import { DbUpdateError, OrmError } from "../errors";
 import { KeyTuple } from "../Metadata/KeyTuple";
 import { EntityState } from "./EntityState";
@@ -384,6 +384,8 @@ export function assertUniqueTrackedKeys(tracker: ChangeTracker, generated: reado
   }
   for (const entry of trackerEntries.get(tracker)?.values() ?? []) {
     if (entry.state === EntityState.Added && hasGeneratedKey(entry.model) && !returned.has(entry)) continue;
+    // The ORM assigns an unset UUID v7 key during save; the preflight after that checks the real value.
+    if (entry.state === EntityState.Added && hasUnassignedUuidV7Key(entry)) continue;
     const key = KeyTuple.fromEntity(entry.model, entry.entity as Record<string, unknown>)?.toString();
     if (key === undefined) continue;
     let modelKeys = identities.get(entry.model);
@@ -395,7 +397,14 @@ export function assertUniqueTrackedKeys(tracker: ChangeTracker, generated: reado
 }
 
 function hasGeneratedKey(model: EntityModel): boolean {
-  return model.key.length === 1 && model.key[0].generation !== "none";
+  return model.key.length === 1 && isDatabaseGenerated(model.key[0].generation);
+}
+
+function hasUnassignedUuidV7Key(entry: TrackedEntry): boolean {
+  const key = entry.model.key;
+  if (key.length !== 1 || key[0].generation !== "uuidV7") return false;
+  const value = (entry.entity as Record<string, unknown>)[key[0].propertyName];
+  return value === undefined || value === null || value === "";
 }
 
 function duplicateIdentity(model: EntityModel): DbUpdateError {

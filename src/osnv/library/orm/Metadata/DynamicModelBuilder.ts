@@ -365,7 +365,9 @@ function buildProperty(tableName: string, field: DynamicFieldDefinition): Proper
 
   // An integer key is auto-increment (identity) by default.
   const generation: KeyGeneration =
-    isKey && storageType === "integer" ? "identity" : isKey && field.type === "uuid" ? "uuid" : "none";
+    isKey && storageType === "integer" ? "identity"
+      : isKey && field.type === "uuid" ? (field.uuidVersion === "v7" ? "uuidV7" : "uuid")
+      : "none";
   const convention: PropertyConvention | undefined =
     field.convention ?? (field.type === "uuid" && !isKey ? "uuid" : undefined);
   const required = isKey || field.required === true || convention === "createdAt" || convention === "updatedAt";

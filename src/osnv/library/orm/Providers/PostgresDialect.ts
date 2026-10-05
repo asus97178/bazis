@@ -132,6 +132,10 @@ export class PostgresDialect implements SqlDialect {
       if (model.key.length === 1 && property.isKey && property.generation === "uuid") {
         return `${this.quoteId(property.columnName)} uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY`;
       }
+      if (model.key.length === 1 && property.isKey && property.generation === "uuidV7") {
+        // The ORM assigns the v7 value before INSERT, so the column has no default.
+        return `${this.quoteId(property.columnName)} uuid NOT NULL PRIMARY KEY`;
+      }
       const foreignKey = foreignKeys.find((candidate) => (candidate.columns ?? [candidate.column]).includes(property.columnName));
       const parts = [this.quoteId(property.columnName), this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property))];
       if (property.required) {
@@ -139,7 +143,7 @@ export class PostgresDialect implements SqlDialect {
       }
       return parts.join(" ");
     });
-    if (model.key.length > 1 || (model.key[0].generation !== "identity" && model.key[0].generation !== "uuid")) {
+    if (model.key.length > 1 || model.key[0].generation === "none") {
       columns.push(`PRIMARY KEY (${model.key.map((key) => this.quoteId(key.columnName)).join(", ")})`);
     }
     for (const check of model.checks) columns.push(`CONSTRAINT ${this.quoteId(check.name)} CHECK (${renderCheck(projectCheckAstIdentifiers(check.expression, (name) => model.propertyByName(name)!.columnName), (name) => this.quoteId(name))})`);

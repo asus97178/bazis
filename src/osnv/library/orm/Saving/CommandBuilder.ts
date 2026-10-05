@@ -1,4 +1,4 @@
-import type { EntityModel, PropertyModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import type { SqlDialect, SqlParam } from "../Providers/types";
 import { encodeProperty } from "../Providers/propertyConversion";
 import { EntityState } from "../Tracking/EntityState";
@@ -49,7 +49,7 @@ export class CommandBuilder {
    */
   insertMany(entities: readonly Record<string, unknown>[], model: EntityModel): DbCommand {
     const scalarKey = model.key.length === 1 ? model.key[0] : undefined;
-    const dbGeneratedKey = scalarKey?.generation === "identity" || scalarKey?.generation === "uuid";
+    const dbGeneratedKey = scalarKey !== undefined && isDatabaseGenerated(scalarKey.generation);
     const columns = model.properties.filter((property) => !isDatabaseGenerated(property.generation));
     const columnList = columns.map((property) => this.dialect.quoteId(property.columnName)).join(", ");
     const params: SqlParam[] = [];
@@ -136,8 +136,4 @@ export class CommandBuilder {
       return `${this.dialect.quoteId(key.columnName)} = ${placeholder}`;
     }).join(" AND ");
   }
-}
-
-function isDatabaseGenerated(generation: "identity" | "uuid" | "none"): boolean {
-  return generation === "identity" || generation === "uuid";
 }
