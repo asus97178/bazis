@@ -24,10 +24,10 @@ imports: none. exports: `IProjectService` (DI token + interface,
 | `PUT /projects/:id` | `UpdateProjectRequest.name`: optional, 2–100 chars | `ProjectResponse` | 400, 404, 409 |
 | `DELETE /projects/:id` | `id` uuid | 204 | 404 |
 
-`IProjectService.create/update` return `"conflict"` for a taken name. The
-check is not atomic: two concurrent requests can both pass it, then the unique
-index rejects the second with a database error (500). Deleting a project does
-not touch its tasks.
+`IProjectService.create/update` return `"conflict"` for a taken name: the
+unique index rejects the save with `UniqueViolationError` from `osnv/core/orm`,
+so concurrent requests cannot both succeed. Deleting a project does not touch
+its tasks.
 
 ## Checks
 

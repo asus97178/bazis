@@ -148,6 +148,7 @@ export {
   ModelBuildError,
   OrmError,
   OrmValidationError,
+  UniqueViolationError,
   PostCommitError,
   isCommittedOutcome,
   OrmTransactionScopeError,

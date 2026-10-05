@@ -1,4 +1,4 @@
-import { paginate, type PageResult } from "osnv/core/orm";
+import { paginate, UniqueViolationError, type PageResult } from "osnv/core/orm";
 import type { ListQuery } from "osnv/library/jsonapi";
 import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/ProjectRequests";
 import { toProjectResponse, type ProjectResponse } from "../http/contracts/ProjectResponses";
@@ -24,13 +24,9 @@ export class ProjectService implements IProjectService {
   }
 
   async create(body: CreateProjectRequest): Promise<ProjectResponse | "conflict"> {
-    if (await this.nameTaken(body.name)) {
-      return "conflict";
-    }
     const item = Object.assign(new Project(), { name: body.name });
     this.db.projects.add(item);
-    await this.db.saveChanges();
-    return toProjectResponse(item);
+    return await this.save() ? toProjectResponse(item) : "conflict";
   }
 
   async update(id: string, body: UpdateProjectRequest): Promise<ProjectResponse | "conflict" | null> {
@@ -38,14 +34,10 @@ export class ProjectService implements IProjectService {
     if (!item) {
       return null;
     }
-    if (body.name !== undefined && body.name !== item.name) {
-      if (await this.nameTaken(body.name)) {
-        return "conflict";
-      }
+    if (body.name !== undefined) {
       item.name = body.name;
     }
-    await this.db.saveChanges();
-    return toProjectResponse(item);
+    return await this.save() ? toProjectResponse(item) : "conflict";
   }
 
   async delete(id: string): Promise<boolean> {
@@ -59,10 +51,18 @@ export class ProjectService implements IProjectService {
   }
 
   /**
-   * Friendly 409 for the common case. Two concurrent requests can still both
-   * pass this check; the unique index then rejects the second one.
+   * The unique index on `name` decides, so two concurrent requests cannot
+   * both win. False when it rejected the change.
    */
-  private async nameTaken(name: string): Promise<boolean> {
-    return await this.db.projects.where(item => item.name.eq(name)).count() > 0;
+  private async save(): Promise<boolean> {
+    try {
+      await this.db.saveChanges();
+      return true;
+    } catch (error) {
+      if (error instanceof UniqueViolationError) {
+        return false;
+      }
+      throw error;
+    }
   }
 }

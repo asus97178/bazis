@@ -4,8 +4,8 @@ import { formatSchemaDifferences } from "./Schema/formatSchemaDifferences";
 
 /** Базовая ошибка ORM. */
 export class OrmError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = new.target.name;
   }
 }
@@ -143,6 +143,40 @@ export class OrmUnsafeImmediateMutationError extends OrmError {
 /** INSERT ON CONFLICT may name only an exactly declared unique target. */
 export class OrmUndeclaredConflictTargetError extends OrmError {
   constructor() { super("Immediate ORM mutation conflict target is not a declared unique key."); }
+}
+
+/**
+ * SaveChanges hit a unique constraint (PostgreSQL SQLSTATE 23505); its changes
+ * were rolled back. `constraint` and `table` come from the server when it
+ * reports them. The original driver error is `cause`; its own `errno`/`code`
+ * are copied so transaction-outcome classification sees the same server
+ * rejection as before.
+ */
+export class UniqueViolationError extends DbUpdateError {
+  readonly constraint: string | undefined;
+  readonly table: string | undefined;
+
+  constructor(cause: object) {
+    const field = (name: string): string | undefined => {
+      const value = (cause as Record<string, unknown>)[name];
+      return typeof value === "string" && value !== "" ? value : undefined;
+    };
+    const constraint = field("constraint");
+    super(constraint === undefined ? "Unique constraint violated." : `Unique constraint "${constraint}" violated.`, { cause });
+    this.constraint = constraint;
+    this.table = field("table");
+    for (const name of ["errno", "code"]) {
+      const descriptor = Object.getOwnPropertyDescriptor(cause, name);
+      if (descriptor && "value" in descriptor) Object.defineProperty(this, name, { value: descriptor.value, enumerable: true });
+    }
+  }
+
+  /** The driver error as UniqueViolationError when it is SQLSTATE 23505, else unchanged. */
+  static from(error: unknown): unknown {
+    if (error === null || typeof error !== "object" || error instanceof OrmError) return error;
+    const errno = Object.getOwnPropertyDescriptor(error, "errno");
+    return errno && "value" in errno && errno.value === "23505" ? new UniqueViolationError(error) : error;
+  }
 }
 
 /** Сущность не прошла валидацию перед сохранением. */
