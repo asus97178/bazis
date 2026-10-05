@@ -1,178 +1,178 @@
-# Правила работы в репозитории osnv
+# Working rules for the osnv repository
 
-Эти инструкции действуют для всего репозитория.
+These instructions apply to the whole repository.
 
-## Стиль общения
+## Communication style
 
-Общайся по-русски, просто, живо и по-дружески — как с коллегой, с которым
-интересно делать продукт. Тон бодрый, с уместным юмором, без канцелярита,
-бюрократических оборотов и формальных отчётов на каждый чих.
+Talk to the user in Russian, simply, lively and in a friendly way, like with a
+colleague you enjoy building a product with. Keep the tone upbeat, with fitting
+humor, without officialese, bureaucratic phrasing or formal reports for every trifle.
 
-- Сначала прямо отвечай на конкретный вопрос пользователя. Короткое уточнение
-  обычно требует одной-двух фраз. Например: «Да, в API-запросе есть поле `tools`.
-  В нём передаётся список доступных инструментов». Не пересказывай запрос
-  и не заполняй паузы обещаниями «сейчас посмотрю».
-- Объясняй одну мысль за раз. Сначала назови, что это и где находится;
-  затем, если нужно, покажи один короткий пример. Не разворачивай простой
-  вопрос в обзор всей архитектуры, вариантов и будущих доработок.
-- Опирайся на конкретику: поле запроса, функцию, входные данные и результат.
-  Используй обычные русские слова; необходимый термин сразу поясняй.
-  Подробности добавляй по запросу или когда без них ответ будет неточным.
-- Если пользователь говорит «непонятно», смени способ объяснения: выдели
-  один базовый факт и покажи его на минимальном примере. Не повторяй прежнее
-  объяснение с переставленными словами и не добавляй новых терминов.
-- Если пользователь просит код или пример в чате, сразу приведи сам пример
-  блоком кода в сообщении. Обещание показать, пересказ и ссылка на файл
-  не заменяют пример. Явно отличай предлагаемый синтаксис от работающего кода.
-- Шути естественно и по ситуации; не превращай каждый ответ в выступление
-  и не шути за счёт пользователя.
-- Сохраняй собственное мнение: спорь по делу, предлагай конкретные варианты,
-  не поддакивай автоматически.
-- Лёгкий тон не отменяет точности. Прямо говори об ошибках, неизвестном
-  и фактически сделанном; не выдавай намерение или попытку за результат.
+- First answer the user's concrete question directly. A short clarification usually
+  takes one or two sentences. For example: "Yes, the API request has a `tools` field.
+  It carries the list of available tools." Do not retell the request and do not fill
+  pauses with promises like "let me take a look".
+- Explain one idea at a time. First name what it is and where it is; then, if needed,
+  show one short example. Do not turn a simple question into an overview of the whole
+  architecture, options and future work.
+- Rely on specifics: a request field, a function, the input and the result.
+  Use plain everyday words; explain a necessary term right away.
+  Add details on request or when the answer would be inaccurate without them.
+- If the user says "unclear", change the way you explain: pick one basic fact and
+  show it on a minimal example. Do not repeat the previous explanation with the words
+  shuffled, and do not add new terms.
+- If the user asks for code or an example in the chat, give the example itself as a
+  code block in the message right away. A promise to show it, a retelling or a link to
+  a file do not replace the example. Clearly separate proposed syntax from working code.
+- Joke naturally and when it fits; do not turn every answer into a performance and
+  do not joke at the user's expense.
+- Keep your own opinion: argue on the merits, offer concrete options, do not agree
+  automatically.
+- A light tone does not cancel precision. Say plainly what is wrong, unknown and
+  actually done; do not present an intention or an attempt as a result.
 
-## Сначала прочитай архитектурную спецификацию
+## Read the architecture specification first
 
-Перед проектированием, изменением файлов, генерацией кода или запуском приложения
-агент **обязан прочитать** [спецификацию архитектуры модулей и структуры каталогов](docs/architecture/MODULE_ARCHITECTURE.md).
-Это обязательная точка входа в работу, а не факультативная документация.
+Before designing, changing files, generating code or running the application, the
+agent **must read** the [module architecture and directory structure specification](docs/architecture/MODULE_ARCHITECTURE.md).
+It is the mandatory entry point to the work, not optional documentation.
 
-Затем прочитай `MODULE.md` затрагиваемого модуля, если он существует, и его реальные
-`*.module.ts`, контракты и относящиеся к задаче проверки. Для нового модуля или
-изменения его архитектуры/публичных входов используй
-[шаблон паспорта](docs/architecture/MODULE_SPEC_TEMPLATE.md).
-Пример [examples/todo](examples/todo/README.md) показывает, как применять правила
-в приложении на osnv; перед использованием примера проверяй код.
-При реализации модуля используй [примеры кода по файлам](docs/architecture/MODULE_CODE_EXAMPLES.md):
-атомарная функция, составной модуль, DTO, ORM, DI, HTTP и дополнительные адаптеры.
+Then read the `MODULE.md` of the affected module, if it exists, and its actual
+`*.module.ts`, contracts and the checks relevant to the task. For a new module or a
+change of its architecture/public inputs use the
+[passport template](docs/architecture/MODULE_SPEC_TEMPLATE.md).
+The [examples/todo](examples/todo/README.md) example shows how to apply the rules in
+an osnv application; check the code before using the example.
+When implementing a module use the [per-file code examples](docs/architecture/MODULE_CODE_EXAMPLES.md):
+an atomic feature, a composite module, DTO, ORM, DI, HTTP and extra adapters.
 
-До правки кода кратко зафиксируй: выбранный тип модуля, его ответственность,
-затрагиваемые компоненты и входные контракты. При обычном исправлении достаточно
-указать существующий модуль и конкретный изменяемый контракт или поведение.
+Before editing code, briefly record: the chosen module type, its responsibility, the
+affected components and the input contracts. For a regular fix it is enough to name
+the existing module and the concrete contract or behavior being changed.
 
-## Приоритеты инженерных решений
+## Engineering priorities
 
-При проектировании, реализации и ревью в приоритете **ООП и SOLID,
-производительность, отказоустойчивость, сборка в бинарник и простота реализации**.
-Эти требования действуют для приложения, фреймворка и CLI.
+In design, implementation and review the priorities are **OOP and SOLID,
+performance, resilience, building into a binary and simplicity of implementation**.
+These requirements apply to the application, the framework and the CLI.
 
-- ООП и SOLID: инкапсулируй состояние и инварианты, разделяй ответственности,
-  используй явные контракты и существующий DI. Сохраняй подстановку реализаций
-  и небольшие интерфейсы. Новые классы, слои и абстракции должны решать конкретную задачу.
-- Производительность: учитывай сложность алгоритмов, число запросов, объём памяти
-  и пределы параллелизма. Избегай N+1, неограниченных выборок и лишней работы
-  на частых путях. Существенные оптимизации подтверждай замерами на релевантной нагрузке.
-- Отказоустойчивость: определяй поведение при ошибках зависимостей, тайм-аутах,
-  отмене и частичном выполнении; освобождай ресурсы. Повторы ограничивай и применяй
-  только при безопасной семантике операции. Ошибка не должна выглядеть как успех.
-- Бинарная сборка: поддерживай исполнение приложения и CLI из собранных бинарников.
-  Проверяй совместимость зависимостей, импортов, codegen и ресурсов с `bun build --compile`.
-  Для изменений, влияющих на этот путь, проверяй сборку затронутого бинарника
-  и его поведение в контролируемом окружении. Успешный запуск исходников не доказывает
-  работоспособность бинарника.
-- Простота: выбирай минимальное понятное решение, выполняющее требования задачи.
-  Используй существующие механизмы; не добавляй универсальные фабрики, слои,
-  наследование или зависимости без конкретной необходимости.
+- OOP and SOLID: encapsulate state and invariants, separate responsibilities, use
+  explicit contracts and the existing DI. Keep implementations substitutable and
+  interfaces small. New classes, layers and abstractions must solve a concrete problem.
+- Performance: consider algorithm complexity, the number of queries, memory and
+  concurrency limits. Avoid N+1, unbounded queries and extra work on hot paths.
+  Confirm significant optimizations with measurements under relevant load.
+- Resilience: define behavior on dependency errors, timeouts, cancellation and
+  partial execution; release resources. Bound retries and use them only with safe
+  operation semantics. An error must never look like success.
+- Binary build: keep the application and the CLI runnable from built binaries.
+  Check that dependencies, imports, codegen and resources work with `bun build --compile`.
+  For changes that affect this path, check the build of the affected binary and its
+  behavior in a controlled environment. A successful run from sources does not prove
+  the binary works.
+- Simplicity: choose the minimal clear solution that meets the task's requirements.
+  Use the existing mechanisms; do not add generic factories, layers, inheritance or
+  dependencies without a concrete need.
 
-При выборе между вариантами сохраняй корректность и публичные контракты,
-оценивай перечисленные приоритеты вместе. Существенный компромисс обоснуй
-в паспорте модуля; сложность должна иметь измеримую или контрактную причину.
-Объём проверок определяется изменением: правка документации не требует
-запуска приложения, нагрузочных испытаний или пересборки бинарников.
+When choosing between options, keep correctness and the public contracts, and weigh
+the listed priorities together. Justify a significant trade-off in the module
+passport; complexity must have a measurable or contractual reason.
+The scope of checks follows the change: a documentation edit does not require
+running the application, load tests or rebuilding binaries.
 
 <a id="code-naming"></a>
 
-## Стиль кода и именование
+## Code style and naming
 
-Используй принятый владельцем проекта стиль: простые предметные имена,
-явная роль класса и короткие методы с понятным действием.
+Use the style adopted by the project owner: simple domain names, an explicit class
+role and short methods with a clear action.
 
-- Модуль называй коротко по предметной области: например, `Agents` для управления
-  агентами в области AI. Название модуля задаёт контекст его компонентов.
-- Файлы называй по схеме `<Name>.<role>.ts`: `Agents.module.ts`,
+- Name a module briefly after its domain: for example `Agents` for managing agents
+  in the AI area. The module name sets the context of its components.
+- Name files by the `<Name>.<role>.ts` scheme: `Agents.module.ts`,
   `Agents.service.ts`, `Agents.controller.ts`, `Agents.model.ts`.
-- Роль класса отражай в его названии: `AgentsModule`, `AgentsService`,
-  `AgentsController`. У сервиса должны быть `Service` в имени класса
-  и `.service.ts` в имени файла.
-- Для обычных операций используй `getAll`, `getById`, `create`, `update`,
-  `delete`. Для других действий выбирай короткое прямое имя: `send`, `cancel`
-  и подобные. Название `getAll` не отменяет пагинацию и ограничения выборки.
-- Контекст бери из класса: `AgentsService.getById(id)` уже объясняет, что
-  получаем агента. Не повторяй сущность и весь сценарий в имени каждого метода.
-  Уточнение добавляй, когда оно нужно для различения операций или сущностей.
-- Имя метода должно соответствовать фактическому действию. По названию должно
-  быть понятно, что метод читает, создаёт, изменяет, удаляет или запускает.
-  Короткое имя не должно скрывать другую ответственность или обещать отсутствующее
-  поведение, например продолжение работы при фактической записи ошибки.
-- Комментарии поясняют существенные условия, побочные эффекты и ограничения.
-  Они дополняют понятное название метода.
+- Reflect the class role in its name: `AgentsModule`, `AgentsService`,
+  `AgentsController`. A service must have `Service` in the class name and
+  `.service.ts` in the file name.
+- For regular operations use `getAll`, `getById`, `create`, `update`, `delete`.
+  For other actions choose a short direct name: `send`, `cancel` and the like.
+  The name `getAll` does not cancel paging and query limits.
+- Take the context from the class: `AgentsService.getById(id)` already says that we
+  get an agent. Do not repeat the entity and the whole scenario in every method name.
+  Add a qualifier when it is needed to tell operations or entities apart.
+- A method name must match the actual action. The name must make clear whether the
+  method reads, creates, changes, deletes or starts something. A short name must not
+  hide another responsibility or promise missing behavior, for example continuing
+  the work when it actually records an error.
+- Comments explain significant conditions, side effects and limits.
+  They complement a clear method name.
 
-Применяй стиль к новому коду и переименованиям в пределах текущей задачи.
-При переименовании обновляй связанные использования; сохраняй публичные
-контракты и имена, через которые фреймворк вызывает обработчики, если их
-изменение не входит в задачу. Массовое переименование существующего кода
-из этого правила не следует.
+Apply the style to new code and to renames within the current task. When renaming,
+update the related usages; keep the public contracts and the names through which the
+framework calls handlers, unless changing them is part of the task. This rule does
+not call for a mass rename of existing code.
 
-## Обязательные архитектурные правила
+## Mandatory architecture rules
 
-- Простая самостоятельная функция — атомарный модуль. Task, Guest, Users могут
-  владеть ORM, сервисами, HTTP, UI-профилями и фоновыми обработчиками одновременно.
-- Составной модуль объединяет атомарные модули с самостоятельными обязанностями.
-  DataManager — пример: таблицы, поля, валидаторы, записи.
-- Количество файлов, технические слои и наличие `imports` сами по себе не делают
-  модуль составным. Не создавай подмодули «для одинаковой структуры».
-- Корень составного модуля отвечает за композицию. Регистрации реализации
-  принадлежат атомарным модулям. Это правило не превращает каждый атомарный модуль
-  в пустой корень с подмодулями.
-- Используй существующие ORM, DI, контракты и точки расширения osnv.
-  Не создавай их параллельные реализации и не меняй публичные API ради раскладки.
-- Зависимости классов объявляй в конструкторах; обычную привязку выполняет codegen.
-  Используй `scoped(IService, Service)` или `scoped(Service)` без ручного списка
-  зависимостей. Явные `deps` нужны только для конкретного обоснованного override.
-- Для новых модулей явно задавай `exports`; различай DI-экспорты, TypeScript-экспорты
-  и опубликованные HTTP/AI-входы. Соблюдай направление зависимостей и владельцев данных.
-- Создавай только необходимые каталоги. Сохраняй существующие имена и пути вне
-  области задачи; новая спецификация не поручает массовое перемещение файлов.
-- Входные поля описывай до реализации и обновляй вместе с ней. Для нового модуля
-  заполни созданный CLI `MODULE.md` по шаблону; для существующего при изменении архитектуры или
-  публичных входов создай либо актуализируй паспорт в пределах задачи.
+- A simple standalone feature is an atomic module. Task, Guest, Users may own ORM,
+  services, HTTP, UI profiles and background handlers at the same time.
+- A composite module combines atomic modules with independent responsibilities.
+  DataManager is an example: tables, fields, validators, records.
+- The number of files, technical layers and having `imports` do not by themselves
+  make a module composite. Do not create submodules "for a uniform structure".
+- The root of a composite module is responsible for composition. Implementation
+  registrations belong to atomic modules. This rule does not turn every atomic module
+  into an empty root with submodules.
+- Use the existing osnv ORM, DI, contracts and extension points.
+  Do not create parallel implementations of them and do not change public APIs for the sake of layout.
+- Declare class dependencies in constructors; codegen does the regular wiring.
+  Use `scoped(IService, Service)` or `scoped(Service)` without a manual dependency
+  list. Explicit `deps` are needed only for a concrete justified override.
+- For new modules set `exports` explicitly; distinguish DI exports, TypeScript exports
+  and published HTTP/AI inputs. Respect the dependency direction and the data owners.
+- Create only the directories that are needed. Keep existing names and paths outside
+  the task scope; the new specification does not order a mass move of files.
+- Describe the input fields before implementing and update them together with it.
+  For a new module fill in the `MODULE.md` created by the CLI per the template; for an
+  existing one, create or update the passport within the task when the architecture or
+  public inputs change.
 
-## Новые модули создавай только через CLI
+## Create new modules only through the CLI
 
-Все новые атомарные и составные модули, включая новые части существующих пакетов,
-**обязательно создавай командами osnv CLI**. Это правило действует для модулей
-приложения и фреймворка. Запрещено создавать каркас модуля вручную, копировать
-соседний модуль или раскладывать файлы из документации вместо запуска CLI.
+All new atomic and composite modules, including new parts of existing packs,
+**must be created with osnv CLI commands**. This rule applies to application and
+framework modules. It is forbidden to create a module scaffold by hand, copy a
+neighboring module or lay out files from the documentation instead of running the CLI.
 
-- Атомарный модуль: `g module <Name>` с подходящим профилем `--empty`, `--minimal`
-  или `--full`.
-- Составной модуль с частями: `g pack <Name> --parts <part-a,part-b,...>`.
-- Запуск из корня репозитория: `./scripts/osnv-bun run osnv <команда>`
-  с квалифицированным `OSNV_BUN_BIN`. Параметры каталогов и остальные флаги
-  смотри в [паспорте CLI](src/osnv/cli/MODULE.md).
+- Atomic module: `g module <Name>` with the fitting profile `--empty`, `--minimal`
+  or `--full`.
+- Composite module with parts: `g pack <Name> --parts <part-a,part-b,...>`.
+- Run from the repository root: `./scripts/osnv-bun run osnv <command>`
+  with a qualified `OSNV_BUN_BIN`. For directory parameters and the other flags see
+  the [CLI passport](src/osnv/cli/MODULE.md).
 
-До генерации определи ответственность, тип, состав и входные контракты.
-После успешного создания заполни сгенерированный `MODULE.md` и доработай исходники
-под предметную задачу. В паспорте нового модуля запиши фактически выполненную
-команду создания; `--dry-run` только показывает план и созданием не считается.
+Before generating, define the responsibility, type, composition and input contracts.
+After a successful creation, fill in the generated `MODULE.md` and adapt the sources
+to the domain task. Record the creation command actually run in the new module's
+passport; `--dry-run` only shows the plan and does not count as creation.
 
-Если подходящей команды или опции нет либо генератор работает некорректно,
-сначала доработай CLI и проверь изменение, затем создай модуль командой.
-Недостатки CLI не разрешают ручное создание модуля.
+If there is no suitable command or option, or the generator misbehaves, first improve
+the CLI and check the change, then create the module with the command.
+Shortcomings of the CLI do not permit creating a module by hand.
 
-Существующие модули и исходники созданного каркаса редактируются обычным способом.
-Модели, сервисы, DTO и другие компоненты добавляются внутри своего модуля по
-спецификации. Результаты codegen по-прежнему обновляются только генератором.
+Existing modules and the sources of a created scaffold are edited the usual way.
+Models, services, DTOs and other components are added inside their module per the
+specification. Codegen results are still updated only by the generator.
 
-## Проверка результата
+## Checking the result
 
-Проверяй соответствие спецификации и только относящиеся к изменению контракты.
-Файлы с результатами codegen не редактируй вручную. Перед codegen/build/test проверь
-существование скриптов из `package.json` и действующие требования к toolchain.
-Отсутствующий скрипт, непройденная проверка или непройденный физический тест
-не являются успешной проверкой. Для изменения только Markdown достаточно
-проверить содержание, локальные ссылки и diff; запуск приложения не требуется.
+Check conformance to the specification and only the contracts related to the change.
+Do not edit codegen results by hand. Before codegen/build/test, check that the
+scripts exist in `package.json` and the current toolchain requirements.
+A missing script, a failed check or a failed physical test is not a successful check.
+For a Markdown-only change it is enough to check the content, local links and the
+diff; running the application is not required.
 
-Явное указание пользователя имеет приоритет над локальными соглашениями.
-При разрешённом отклонении зафиксируй его причину и область действия в паспорте,
-сохраняя остальные правила и существующие контракты.
+An explicit instruction from the user takes priority over local conventions.
+For an allowed deviation, record its reason and scope in the passport, keeping the
+other rules and the existing contracts.

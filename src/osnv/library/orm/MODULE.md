@@ -1,105 +1,105 @@
-# ORM: сроки операций и отмена transactionScope
+# ORM: operation timeouts and transactionScope cancellation
 
-Версия паспорта: 9. Дата сверки: 2026-10-05.
-Статус: серверная отмена интегрирована; результаты TCP/TLS и бинарной квалификации приведены в разделе 6. Production-топологии и остальные платформы не квалифицированы.
-Тип: существующая атомарная библиотечная функция управления ORM-транзакцией.
-Путь: `src/osnv/library/orm`.
-Точка подключения: `DbContext`; интеграция с DI — `core/orm/ormModule.ts`.
-Область паспорта: `DbContext.transactionScope(work, options?)`, сроки обычных
-PostgresProvider query/execute/ping/close и эксплуатационные options.
-Дополнение версии 5 описывает внутреннюю границу reader/provider для owned-store.
-Весь lifecycle schema admission, owned-store и миграций здесь не паспортизован.
-Reader создаётся на одно чтение и не экспортируется через публичный barrel.
-Provider по-прежнему владеет phase/generation, блокировками, сроками, отменой,
-quarantine и release/close. Протокол, SQL-порядок, лимиты и публичные DTO сохранены.
+Passport version: 9. Check date: 2026-10-05.
+Status: server cancellation is integrated; TCP/TLS and binary qualification results are in section 6. Production topologies and other platforms are not qualified.
+Type: an existing atomic library feature that manages ORM transactions.
+Path: `src/osnv/library/orm`.
+Connection point: `DbContext`; the DI integration is `core/orm/ormModule.ts`.
+Passport scope: `DbContext.transactionScope(work, options?)`, the timeouts of the regular
+PostgresProvider query/execute/ping/close and the operational options.
+The version 5 addendum describes the internal reader/provider boundary for owned-store.
+The whole lifecycle of schema admission, owned-store and migrations is not covered here.
+A reader is created per read and is not exported through the public barrel.
+The provider still owns phase/generation, locks, timeouts, cancellation,
+quarantine and release/close. The protocol, SQL order, limits and public DTOs are kept.
 
-## 1. Ответственность и структура
+## 1. Responsibility and structure
 
-Координатор владеет логической областью транзакции, её операциями, контекстами
-и запретом позднего SQL. `PostgresProvider` владеет физическим соединением и
-исходными native операциями, отдельным управляющим подключением и доказательством отката. Новые подмодули не требуются.
-Исполнение произвольного пользовательского JavaScript и драйвер Bun находятся
-за этой границей; отмена не останавливает произвольный JS-код.
+The coordinator owns the logical transaction scope, its operations, contexts and the
+ban on late SQL. `PostgresProvider` owns the physical connection and the original
+native operations, a separate control connection and the rollback proof. No new submodules are needed.
+Running arbitrary user JavaScript and the Bun driver are outside this boundary;
+cancellation does not stop arbitrary JS code.
 
-## 2. Компоненты
+## 2. Components
 
-| Компонент | Файл | Изменение |
+| Component | File | Change |
 | --- | --- | --- |
-| Публичный вход | `DbContext.ts`, `Transactions/OrmTransaction.ts`, `index.ts` | Необязательные options с AbortSignal |
-| Координатор | `Transactions/TransactionScopeCoordinator.ts` | Сигнал отмены, закрытие и запрет поздних операций |
-| Физический владелец | `Providers/PostgresProvider.ts` | Fencing reservation, серверная отмена, native settlement и подтверждённый ROLLBACK |
-| Чтение owned-store | `Providers/OwnedStoreCatalog.reader.ts` | Registry/catalog SQL, строгий wire decode, бюджеты и замороженные снимки. Только query/assertActive/unavailable/drift; соединение и attempt недоступны |
-| Декодирование схемы | `Providers/PostgresSchema.decoder.ts` | Общие чистые правила типов/default/check для обычной introspection и owned-store |
-| Приватная связь | `Providers/ormTransactionRuntime.ts` | Координатор передаёт завершение отмены физическому владельцу |
-| Сроки | `Providers/operationDeadline.ts` | Таймер, AbortSignal и удаление listeners; bounded wait не доказывает остановку native работы |
-| Неизвестный исход | `Providers/transactionOutcome.ts` | phase=commit/cancellation, внутренние hooks tracking без фиктивных пользовательских callbacks |
-| Интеграция | `core/orm/databaseConnector.ts` | Пул, TLS, сроки и signal lifecycle через прежний DATABASE_PROVIDER |
-| Проверки | `test/orm.server-cancellation.test.ts`, `test/orm.server-cancellation.postgres.live.test.ts`, прежние scope/cancellation-наборы | Сигнал, native settlement, очередь, потеря ответа, TLS, rollback, tracking, borrowed locks и изоляция пула |
+| Public entry | `DbContext.ts`, `Transactions/OrmTransaction.ts`, `index.ts` | Optional options with an AbortSignal |
+| Coordinator | `Transactions/TransactionScopeCoordinator.ts` | The cancellation signal, closing and the ban on late operations |
+| Physical owner | `Providers/PostgresProvider.ts` | Fencing the reservation, server cancellation, native settlement and a confirmed ROLLBACK |
+| Owned-store reading | `Providers/OwnedStoreCatalog.reader.ts` | Registry/catalog SQL, strict wire decoding, budgets and frozen snapshots. Only query/assertActive/unavailable/drift; the connection and the attempt are not accessible |
+| Schema decoding | `Providers/PostgresSchema.decoder.ts` | Shared pure type/default/check rules for regular introspection and owned-store |
+| Private link | `Providers/ormTransactionRuntime.ts` | The coordinator passes cancellation completion to the physical owner |
+| Timeouts | `Providers/operationDeadline.ts` | The timer, the AbortSignal and listener removal; a bounded wait does not prove native work stopped |
+| Unknown outcome | `Providers/transactionOutcome.ts` | phase=commit/cancellation, internal tracking hooks without fake user callbacks |
+| Integration | `core/orm/databaseConnector.ts` | Pool, TLS, timeouts and signal lifecycle through the existing DATABASE_PROVIDER |
+| Checks | `test/orm.server-cancellation.test.ts`, `test/orm.server-cancellation.postgres.live.test.ts`, the existing scope/cancellation suites | Signal, native settlement, queue, lost response, TLS, rollback, tracking, borrowed locks and pool isolation |
 
-HTTP, UI, AI, фоновые обработчики, events и новые сущности не используются.
+HTTP, UI, AI, background handlers, events and new entities are not used.
 
-## 3. Подключение и DI
+## 3. Connection and DI
 
-Новых регистраций, imports и DI-экспортов нет. Существующий `ormModule` передаёт
-общий `DATABASE_PROVIDER` контекстам; lifetime провайдера и контекстов сохраняется.
-TypeScript-публичный вход — `library/orm/index.ts`, реэкспорт в `core/orm/index.ts`.
-Для прикладной сверки исхода публично доступны `TransactionOutcomeUnknownError`
-и `isUnknownTransactionOutcome(error: unknown): boolean`. Классификатор проверяет
-код, cause и AggregateError без вызова getters; чрезмерно глубокое обёртывание
-консервативно считает небезопасным для повтора. Результат `true` не доказывает
-ни COMMIT, ни ROLLBACK и не разрешает повтор бизнес-операции без её собственного ключа.
-`OrmTransactionScopeOptions` дополнен timeoutMs; новые типы `PostgresServerTimeouts`
-и `PostgresOperationEvent` описывают конфигурацию и событие. Приватная политика отмены
-не экспортируется через barrel. Фабрика `ormModule` не меняется.
+There are no new registrations, imports or DI exports. The existing `ormModule` passes
+the shared `DATABASE_PROVIDER` to contexts; the lifetime of the provider and the contexts
+is kept. The TypeScript public entry is `library/orm/index.ts`, re-exported in
+`core/orm/index.ts`. For application reconciliation of an outcome,
+`TransactionOutcomeUnknownError` and `isUnknownTransactionOutcome(error: unknown): boolean`
+are public. The classifier checks the code, cause and AggregateError without calling
+getters; overly deep wrapping is conservatively treated as unsafe to retry. A `true`
+result proves neither COMMIT nor ROLLBACK and does not allow retrying the business
+operation without its own key.
+`OrmTransactionScopeOptions` got timeoutMs; the new types `PostgresServerTimeouts` and
+`PostgresOperationEvent` describe the configuration and the event. The private
+cancellation policy is not exported through the barrel. The `ormModule` factory does not change.
 
-## 4. Данные, конфигурация и lifecycle
+## 4. Data, configuration and lifecycle
 
-Новых таблиц, миграций и портов нет. Необязательные поля конфигурации перечислены
-ниже; настройки приложения автоматически не меняются. Callback работает на
-существующем физическом владельце, вложенный scope использует savepoint.
-При отмене reservation немедленно запрещает новый SQL и release. В режиме server
-отдельный ленивый Bun.SQL-пул max=1 отправляет pg_cancel_backend для активного SQL
-этого владельца. Проверяются backend PID/start, datid, postmaster start, адрес/порт,
-роль и query_start. Полный текст SQL не используется. Повторная отмена разделяет
-один Promise; завершённый dispatch и старый владелец не отменяют будущего заёмщика.
-После ответа управляющего SQL ожидаются **исходные native Promise**, затем ответ
-ROLLBACK и readback прежней backend identity. Только после этого публикуются
-rollback callbacks и разрешён reuse соединения. Нулевое число pending операций
-позволяет сразу откатить удержанную транзакцию без запроса отмены.
+There are no new tables, migrations or ports. The optional configuration fields are
+listed below; application settings do not change automatically. The callback runs on the
+existing physical owner, and a nested scope uses a savepoint.
+On cancellation the reservation immediately forbids new SQL and release. In server mode a
+separate lazy Bun.SQL pool max=1 sends pg_cancel_backend for the active SQL of this owner.
+The backend PID/start, datid, postmaster start, address/port, role and query_start are
+checked. The full SQL text is not used. A repeated cancellation shares one Promise; a
+finished dispatch and an old owner do not cancel a future borrower.
+After the control SQL responds, the **original native Promises** are awaited, then the
+ROLLBACK response and a readback of the same backend identity. Only after that are
+rollback callbacks published and the connection allowed to be reused. With zero pending
+operations the held transaction can be rolled back at once without a cancel request.
 
-Серверная отмена вложенного scope сохраняет прежнюю семантику: откатывается вся
-физическая транзакция. Родитель становится rollback-only. Borrowed migration/schema
-owner остаётся запрещённым для пользовательской работы до внешнего release;
-перед release явно снимаются его session-level advisory locks. При ошибке unlock
-соединение закрывается, прежде чем его разрешено вернуть в пул.
+Server cancellation of a nested scope keeps the former semantics: the whole physical
+transaction is rolled back. The parent becomes rollback-only. A borrowed migration/schema
+owner stays forbidden for user work until the external release; its session-level
+advisory locks are released explicitly before release. If unlock fails, the connection
+is closed before it may return to the pool.
 
-При недоступности служебного подключения, потере ответа, незавершившемся исходном
-SQL/ROLLBACK или смене backend readback ожидание ограничено cancellationTimeoutMs.
-Результат — ORM_TRANSACTION_OUTCOME_UNKNOWN с phase=cancellation; пользовательские
-callbacks не публикуются, затронутые контексты запрещают SQL и сохранения. Рабочая
-и незавершённая управляющая reservation закрываются. Поздняя выдача служебного
-слота закрывается без SQL. Незавершившиеся native операции удерживают ёмкость
-maxPendingOperations; число одновременно ожидающих отмен также ограничено этим
-лимитом. Control pool не получает слот из рабочего пула. При close провайдера
-закрываются оба пула; новая отмена не открывает подключение после остановки.
-Фоновых бесконечных проверок нет: бизнес-результат после unknown сверяет приложение
-через новый контекст. Root pool сохраняет работоспособность, если доступна БД.
-Автоматический повтор отменённого callback отсутствует.
+When the service connection is unavailable, a response is lost, the original
+SQL/ROLLBACK does not finish or the backend readback changes, the wait is bounded by
+cancellationTimeoutMs. The result is ORM_TRANSACTION_OUTCOME_UNKNOWN with
+phase=cancellation; user callbacks are not published, and the affected contexts forbid
+SQL and saves. The working and the unfinished control reservations are closed. A late
+service slot is closed without SQL. Unfinished native operations hold
+maxPendingOperations capacity; the number of concurrently waiting cancellations is also
+bounded by this limit. The control pool gets no slot from the working pool. On provider
+close both pools are closed; a new cancellation does not open a connection after shutdown.
+There are no endless background checks: after unknown the application reconciles the
+business result through a new context. The root pool stays usable if the database is
+reachable. There is no automatic retry of a cancelled callback.
 
-После принудительного закрытия reservation её пул до конца жизни provider
-проверяет каждую новую reservation через внутренний read-only SELECT 1 до BEGIN
-и бизнес-SQL. Bun 1.4.0 может выдать закрываемый TLS-слот раньше завершения его
-внутренних обработчиков: первая проверка такого слота завершается connection timeout.
-Получение/проверка допуска повторяется максимум один раз только при native
-ERR_POSTGRES_CONNECTION_TIMEOUT и в пределах исходного operation deadline.
-Плохая reservation закрывается до повторной попытки. Это не повтор callback,
-бизнес-SQL или COMMIT. Цена после такого отказа — один дополнительный round trip
-на последующие выдачи данного пула. Здоровый server cancellation сохраняет
-reservation и не включает эту проверку. Это восстановление доступности клиента,
-а не доказательство прекращения неизвестного SQL на сервере.
+After a reservation is forcibly closed, its pool checks every new reservation for the
+rest of the provider's life with an internal read-only SELECT 1 before BEGIN and business
+SQL. Bun 1.4.0 may hand out a closing TLS slot before its internal handlers finish: the
+first check of such a slot ends with a connection timeout. Getting/checking admission is
+retried at most once, only on the native ERR_POSTGRES_CONNECTION_TIMEOUT and within the
+original operation deadline. A bad reservation is closed before the retry. This is not a
+retry of the callback, business SQL or COMMIT. The cost after such a failure is one extra
+round trip on later handouts of this pool. A healthy server cancellation keeps the
+reservation and does not enable this check. This restores client availability; it does
+not prove that unknown SQL stopped on the server.
 
 
-## 5. Публичный вход
+## 5. Public entry
 
 ```ts
 transactionScope<TResult>(
@@ -112,280 +112,271 @@ await db.transactionScope(async (tx) => {
 }, { signal: AbortSignal.timeout(1_000) });
 ```
 
-Потребитель — код приложения, уже имеющий DbContext; новых правил доступа нет.
+The consumer is application code that already has a DbContext; there are no new access rules.
 
-| Поле | Тип | Обязательно / null | Default | Валидация |
+| Field | Type | Required / null | Default | Validation |
 | --- | --- | --- | --- | --- |
-| work | Асинхронный callback с OrmTransaction | Да / нет | Нет | Существующий контракт callback |
-| options | OrmTransactionScopeOptions | Нет / нет | Без внешнего сигнала; срок 30 с или provider default | Используется координатором |
-| options.signal | AbortSignal | Нет / нет | Без внешней отмены | Нативный AbortSignal; неверный тип отклоняется до BEGIN |
-| options.timeoutMs | number | Нет / нет | operationTimeoutMs provider, иначе 30000 | Целое 1..2147483647; включает ожидание reservation, BEGIN, работу и COMMIT |
+| work | An async callback with OrmTransaction | Yes / no | None | The existing callback contract |
+| options | OrmTransactionScopeOptions | No / no | No external signal; a 30 s timeout or the provider default | Used by the coordinator |
+| options.signal | AbortSignal | No / no | No external cancellation | A native AbortSignal; a wrong type is rejected before BEGIN |
+| options.timeoutMs | number | No / no | The provider's operationTimeoutMs, otherwise 30000 | An integer 1..2147483647; includes waiting for the reservation, BEGIN, the work and COMMIT |
 
-Неизвестные поля options не используются; преобразований и сериализации нет.
-Результат — значение callback после успешного COMMIT; ошибки отклоняют Promise.
+Unknown options fields are not used; there are no conversions and no serialization.
+The result is the callback value after a successful COMMIT; errors reject the Promise.
 
-| Отказ | Условие | Поведение |
+| Failure | Condition | Behavior |
 | --- | --- | --- |
-| TypeError | Неверный signal | До обращения к провайдеру |
-| OrmTransactionScopeError | Сигнал уже отменён | Callback и BEGIN не выполняются |
-| OrmTransactionScopeError | Сигнал во время callback / закрытия операций | Запрет новых операций, откат; незавершённый SQL отменяется с подтверждённым откатом физического владельца |
-| ORM_TRANSACTION_OUTCOME_UNKNOWN | Нет доказательства отмены или подтверждения COMMIT в бюджет | DbUpdateError, phase=cancellation/commit; запрет повторов, фиктивных callbacks и SQL затронутых контекстов |
-| UniqueViolationError | SQLSTATE 23505 в saveChanges | DbUpdateError с constraint/table/cause; собственные errno/code драйвера сохранены для классификации исхода |
-| Существующие ошибки scope | Чужой provider, stale scope, конкурирующие дочерние scopes | Прежнее поведение |
+| TypeError | An invalid signal | Before calling the provider |
+| OrmTransactionScopeError | The signal is already aborted | The callback and BEGIN do not run |
+| OrmTransactionScopeError | A signal during the callback / while operations close | New operations are forbidden, rollback; unfinished SQL is cancelled with a confirmed rollback by the physical owner |
+| ORM_TRANSACTION_OUTCOME_UNKNOWN | No proof of cancellation or COMMIT confirmation within the budget | DbUpdateError, phase=cancellation/commit; retries, fake callbacks and SQL of the affected contexts are forbidden |
+| UniqueViolationError | SQLSTATE 23505 in saveChanges | DbUpdateError with constraint/table/cause; the driver's own errno/code are kept for outcome classification |
+| Existing scope errors | A foreign provider, a stale scope, competing child scopes | The former behavior |
 
-Сигнал передаётся в reserve({ signal }); поздняя выдача соединения после отмены
-закрывает его без BEGIN. Provider ограничивает BEGIN, SQL и COMMIT тем же сроком
-работы; подтверждение отмены получает отдельный конечный бюджет. Listener логической
-области снимается перед COMMIT, но физический владелец продолжает отслеживать свой
-срок. Потеря подтверждения COMMIT сохраняет phase=commit. После подтверждённого
-COMMIT внешняя отмена не меняет его исход и не отменяет afterCommit. Время
-пользовательских afterCommit/afterRollback не ограничено сроком работы. Освобождение
-reservation получает отдельный cancellationTimeoutMs; общий вызов может занять
-время работы, подтверждения отмены и cleanup, а затем время callback.
-Отмена во вложенном scope откатывает всю физическую транзакцию, включая server-режим с сохранением соединения.
+The signal is passed to reserve({ signal }); a connection handed out after cancellation
+is closed without BEGIN. The provider bounds BEGIN, SQL and COMMIT with the same work
+deadline; confirming a cancellation gets a separate finite budget. The listener of the
+logical scope is removed before COMMIT, but the physical owner keeps tracking its
+deadline. A lost COMMIT confirmation keeps phase=commit. After a confirmed COMMIT an
+external cancellation does not change its outcome and does not cancel afterCommit. The
+time of user afterCommit/afterRollback is not bounded by the work deadline. Releasing the
+reservation gets a separate cancellationTimeoutMs; the whole call may take the work time,
+the cancellation confirmation and cleanup, and then the callback time.
+Cancellation in a nested scope rolls back the whole physical transaction, including in server mode with the connection kept.
 
-### Настройки PostgreSQL provider и ORM-коннектора
+### PostgreSQL provider and ORM connector settings
 
-| Поле | Default | Валидация / ответственность |
+| Field | Default | Validation / responsibility |
 | --- | --- | --- |
-| operationTimeoutMs | 30000 | Положительное целое мс; root query/execute, физическая транзакция и ORM scope |
-| cancellationMode | server | Необязательное `server` или `close`; null и другие значения отклоняются до создания SQL. `close` явно включает прежнюю политику закрытия с доказательством исчезновения backend |
-| cancellationTimeoutMs | 5000 | Положительное целое мс; подтверждение отмены и освобождение ресурса имеют конечные бюджеты |
-| maxPendingOperations | 256 | Положительное целое; незавершившийся native Promise удерживает слот до реального settlement; cleanup имеет резерв до удвоенного лимита |
-| serverTimeouts.statementTimeoutMs / lockTimeoutMs / idleInTransactionTimeoutMs / transactionTimeoutMs | Не заданы | Положительные целые мс; SET LOCAL и readback при BEGIN; последнее поле требует PostgreSQL 17+ |
-| onOperation | Не задан | Callback с operation/outcome/durationMs/pendingNativeOperations; исключения callback не меняют SQL-результат |
-| statistics() | Снимок | pendingNativeOperations, activeCancellations, unconfirmedCancellations, closed; без SQL и секретов |
+| operationTimeoutMs | 30000 | A positive integer, ms; root query/execute, the physical transaction and the ORM scope |
+| cancellationMode | server | An optional `server` or `close`; null and other values are rejected before SQL is created. `close` explicitly enables the former close policy with proof that the backend is gone |
+| cancellationTimeoutMs | 5000 | A positive integer, ms; confirming a cancellation and releasing the resource have finite budgets |
+| maxPendingOperations | 256 | A positive integer; an unfinished native Promise holds a slot until its real settlement; cleanup has a reserve of up to twice the limit |
+| serverTimeouts.statementTimeoutMs / lockTimeoutMs / idleInTransactionTimeoutMs / transactionTimeoutMs | Not set | Positive integers, ms; SET LOCAL and a readback at BEGIN; the last field needs PostgreSQL 17+ |
+| onOperation | Not set | A callback with operation/outcome/durationMs/pendingNativeOperations; callback exceptions do not change the SQL result |
+| statistics() | A snapshot | pendingNativeOperations, activeCancellations, unconfirmedCancellations, closed; no SQL and no secrets |
 
-Для необязательных числовых полей отсутствие означает undefined; null, дробные,
-неположительные и выходящие за диапазон значения отклоняются. `query(sql, params)`
-и `execute(sql, params)` сохраняют входы и результаты; root-вызовы теперь резервируют
-соединение на время операции. `ping(signal?)` возвращает boolean, включая false при
-отмене; `close()` не принимает аргументов, идемпотентен и запрещает новые операции.
-`withRetry(provider).ping(signal?)` передаёт тот же необязательный сигнал базовому
-provider и сохраняет его boolean-результат без повторов. Уже отменённый сигнал
-не допускает SQL; отмена ожидающего подключения сохраняет его освобождение при
-поздней выдаче. Проверки используют настоящий PostgresProvider с подставным драйвером:
+For optional numeric fields, absence means undefined; null, fractional, non-positive and
+out-of-range values are rejected. `query(sql, params)` and `execute(sql, params)` keep
+their inputs and results; root calls now reserve a connection for the operation.
+`ping(signal?)` returns a boolean, including false on cancellation; `close()` takes no
+arguments, is idempotent and forbids new operations.
+`withRetry(provider).ping(signal?)` passes the same optional signal to the base provider
+and keeps its boolean result without retries. An already aborted signal allows no SQL;
+cancelling a pending connection keeps its release on a late handout. The checks use the
+real PostgresProvider with a stub driver:
 [orm.retry-ping.test.ts](test/orm.retry-ping.test.ts).
-Root-запросы получают клиентский срок, но SET LOCAL и точная идентичность backend
-для подтверждённого отката подготавливаются внутри transactionScope. Отмена вне
-такой области может дать консервативный неизвестный исход.
+Root queries get a client deadline, but SET LOCAL and the exact backend identity for a
+confirmed rollback are prepared inside transactionScope. A cancellation outside such a
+scope may give a conservative unknown outcome.
 
-При root query/execute (автокоммит) потеря ответа после передачи команды драйверу
-возвращает ORM_TRANSACTION_OUTCOME_UNKNOWN, phase=commit. Это относится и к query:
-SQL может содержать INSERT RETURNING или функцию с побочными эффектами. Соединение
-запрещается к повторному использованию и закрывается; withRetry не повторяет SQL,
-даже если пользовательская isTransient возвращает true. Новый контекст сверяет
-результат по устойчивому бизнес-ключу. Парсинг SQL для угадывания идемпотентности
-не выполняется; новых запросов на успешном пути нет. Подтверждённый ErrorResponse
-с SQLSTATE сохраняется, кроме connection exception, shutdown и 40003, которые
-не доказывают исход. Ошибка допуска до dispatch сохраняет прежнюю семантику.
-Протокол явной транзакции и подтверждение COMMIT остаются прежними.
-После успешного root query/execute ошибка освобождения reservation возвращается
-как существующий PostCommitError с committed=true: автоматический повтор также
-запрещён, поскольку результат команды уже подтверждён.
+For a root query/execute (autocommit), losing the response after the command was handed
+to the driver returns ORM_TRANSACTION_OUTCOME_UNKNOWN, phase=commit. This applies to query
+too: SQL may contain INSERT RETURNING or a function with side effects. The connection is
+forbidden for reuse and closed; withRetry does not retry the SQL even if a user
+isTransient returns true. A new context reconciles the result by a durable business key.
+SQL is not parsed to guess idempotency; there are no new queries on the success path. A
+confirmed ErrorResponse with an SQLSTATE is kept, except connection exception, shutdown and
+40003, which do not prove the outcome. An admission error before dispatch keeps the former
+semantics. The explicit transaction protocol and the COMMIT confirmation stay the same.
+After a successful root query/execute, a reservation release error is returned as the
+existing PostCommitError with committed=true: an automatic retry is also forbidden,
+because the command result is already confirmed.
 
-Событие onOperation: operation=`query|execute|admission|cancellation`,
-outcome=`success|error|unknown`, durationMs — длительность соответствующей фазы,
-pendingNativeOperations — число её незавершённых native операций на provider.
-`statistics()` без аргументов возвращает неизменяемый снимок: pendingNativeOperations
-и activeCancellations — текущие количества; unconfirmedCancellations — накопленный
-счётчик неизвестных отмен; closed — запрет новой работы. Это не счётчик живых
-PostgreSQL backend или подключений и не ограничение всего пользовательского JS.
+The onOperation event: operation=`query|execute|admission|cancellation`,
+outcome=`success|error|unknown`, durationMs is the duration of the matching phase,
+pendingNativeOperations is the number of its unfinished native operations on the provider.
+`statistics()` without arguments returns an immutable snapshot: pendingNativeOperations
+and activeCancellations are current counts; unconfirmedCancellations is an accumulated
+counter of unknown cancellations; closed forbids new work. It is not a counter of live
+PostgreSQL backends or connections and does not limit all user JS.
 
-Дополнительные поля конфигурации `ormOsnvConnect`: max, connectionTimeout,
-idleTimeout, maxLifetime, tls, tlsCa, operationTimeoutMs, cancellationTimeoutMs, cancellationMode,
-maxPendingOperations и четыре плоских поля серверных timeout. Первые три срока
-Bun connection/idle/lifetime заданы в секундах, ORM/server — в миллисекундах.
-Неуказанные native настройки сохраняют поведение Bun; поля должны быть объявлены
-в доменном defineConfig, чтобы иметь env-переопределения. Нулевые idleTimeout и
-maxLifetime разрешены. tls принимает режимы Bun; tlsCa поддерживается только
-с verify-full и превращается в проверяемые ca/serverName/rejectUnauthorized.
-Новый тип PostgresOrmConfigShape расширяет прежний PostgresConfigShape; raw
-Infra-коннектор остаётся отдельным контрактом.
-Полный входной контракт интеграции — [core/orm](../../core/orm/MODULE.md).
+Extra `ormOsnvConnect` configuration fields: max, connectionTimeout, idleTimeout,
+maxLifetime, tls, tlsCa, operationTimeoutMs, cancellationTimeoutMs, cancellationMode,
+maxPendingOperations and four flat server timeout fields. The first three Bun
+connection/idle/lifetime timeouts are in seconds, the ORM/server ones in milliseconds.
+Unspecified native settings keep the Bun behavior; the fields must be declared in the
+domain defineConfig to get env overrides. Zero idleTimeout and maxLifetime are allowed.
+tls takes the Bun modes; tlsCa is supported only with verify-full and becomes the checked
+ca/serverName/rejectUnauthorized. The new type PostgresOrmConfigShape extends the former
+PostgresConfigShape; the raw Infra connector stays a separate contract.
+The full input contract of the integration: [core/orm](../../core/orm/MODULE.md).
 
-Смена конфигурации не применяется к уже созданному singleton. Миграционные и
-owned-store admission scopes сохраняют самостоятельные контракты; их весь
-lifecycle не объявляется ограниченным новым transaction timeout. Произвольные
-пользовательские callbacks невозможно физически прервать средствами JavaScript.
+A configuration change does not apply to an already created singleton. Migration and
+owned-store admission scopes keep their own contracts; their whole lifecycle is not
+declared bounded by the new transaction timeout. Arbitrary user callbacks cannot be
+physically interrupted by JavaScript means.
 
-## 6. Проверки и граница готовности
+## 6. Checks and the readiness boundary
 
-Версия 3: нормальный частый путь не обращается к управляющему пулу. Успешная
-серверная отмена сохраняет соединение и TLS-сессию; цена — до одного дополнительного
-подключения на PostgresProvider и несколько SQL при отмене. Настройки доступа/TLS
-берутся из того же входа, что и рабочее подключение. Новых зависимостей нет;
-квалификация использует тот же код из bun:test и собранного бинарника.
-[Результаты интеграции](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md).
+Version 3: the normal hot path does not touch the control pool. A successful server
+cancellation keeps the connection and the TLS session; the cost is up to one extra
+connection per PostgresProvider and a few SQL statements on cancellation. Access/TLS
+settings come from the same input as the working connection. There are no new
+dependencies; the qualification uses the same code from bun:test and a built binary.
+[Integration results](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md).
 
-SQL pg_cancel_backend принимает PID, а не PID+secret из протокола CancelRequest.
-Проверка pg_stat_activity и отправка сигнала не атомарны относительно системного
-переиспользования PID. Эта граница не объявляется устранённой; failover, PgBouncer,
-другие серверные топологии и клиентские платформы требуют отдельной квалификации.
-При невозможности принять эту границу доступен явный режим close с его известными
-ограничениями. Native Query.cancel Bun не исправлен этим изменением.
+SQL pg_cancel_backend takes a PID, not the PID+secret of the CancelRequest protocol.
+Checking pg_stat_activity and sending the signal are not atomic against the system
+reusing the PID. This limit is not declared removed; failover, PgBouncer, other server
+topologies and client platforms need a separate qualification. If this limit is not
+acceptable, the explicit close mode with its known limits is available. This change does
+not fix Bun's native Query.cancel.
 
-Следующие результаты относятся к предыдущей политике закрытия и сохраняют силу
-для `cancellationMode: "close"`; это история испытаний, а не статус server-режима.
+The following results refer to the former close policy and stay valid for
+`cancellationMode: "close"`; this is a test history, not the status of the server mode.
 
-Версия 2: конечный неизвестный исход проверен при blackhole, рестарте сервера,
-потере ответа на COMMIT и закрытии TLS-соединения. При потерянном COMMIT независимое
-чтение подтвердило сохранённую строку; автоматического повтора и callbacks нет.
-Собранный ORM-бинарник проверен из /tmp с plain TCP, TLS unknown и TLS с явно заданным
-statement timeout. Точные результаты и текущий typecheck — в
-[отчёте версии 2](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
+Version 2: the final unknown outcome was checked with a blackhole, a server restart, a
+lost COMMIT response and a closed TLS connection. With a lost COMMIT an independent read
+confirmed the saved row; there were no automatic retries and no callbacks.
+The built ORM binary was checked from /tmp with plain TCP, TLS unknown and TLS with an
+explicitly set statement timeout. Exact results and the current typecheck are in the
+[version 2 report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
 
-**TLS fast cancellation — FAIL.** Native session.close({timeout:0}) завершилась,
-но PostgreSQL продолжал активный SQL. В строгом бинарном сценарии backend оставался
-активным после 5 секунд, ORM вернула unknown. В отдельной проверке с серверным
-statementTimeoutMs=600 подтверждённый rollback занял 641 мс; это профиль ограничения
-длительности SQL, а не устранение дефекта native cancel и не универсальное время
-от abort. Доверенный CA/hostname проверяются; неверный hostname отклоняется.
+**TLS fast cancellation: FAIL.** The native session.close({timeout:0}) finished, but
+PostgreSQL kept running the active SQL. In the strict binary scenario the backend stayed
+active after 5 seconds, and the ORM returned unknown. In a separate check with a server
+statementTimeoutMs=600 the confirmed rollback took 641 ms; this is a profile of bounding
+SQL duration, not a fix of the native cancel defect and not a universal time from abort.
+A trusted CA/hostname are checked; a wrong hostname is rejected.
 
-Ниже сохранены результаты версии 1 для обычного TCP; они не являются доказательством TLS:
+The version 1 results for plain TCP are kept below; they are not evidence for TLS:
 
-| Проверка | Результат | Доказательство / граница |
+| Check | Result | Evidence / limit |
 | --- | --- | --- |
-| Отмена активного SQL | PASS | 8 сочетаний scope × query/execute, сервер подтвердил SQL до отмены, завершение 395–402 мс |
-| Остальные границы отмены на PostgreSQL | PASS | 6 сценариев: выход callback, сигнал родителя, соседний запрос, pre-abort, очередь max=1, timeout / afterCommit |
-| Прежние физические сценарии и нагрузка | PASS | 44 теста, 800 транзакций, 12 000 строк; два ENV_OFF guard пропущены при ENV_ON |
-| Unit и типы | Результаты в отчёте | Проверки выполняются через закреплённый wrapper с очищенным live-окружением |
+| Cancelling active SQL | PASS | 8 scope × query/execute combinations, the server confirmed the SQL before cancellation, completion in 395–402 ms |
+| Other cancellation limits on PostgreSQL | PASS | 6 scenarios: callback exit, parent signal, a neighboring query, pre-abort, queue max=1, timeout / afterCommit |
+| Earlier physical scenarios and load | PASS | 44 tests, 800 transactions, 12 000 rows; two ENV_OFF guards were skipped with ENV_ON |
+| Unit and types | Results in the report | Checks run through the pinned wrapper with a cleaned live environment |
 
-Точные команды, логи, хеши и итоговые счётчики:
-[отчёт исправления](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-cancellation-fix.md).
-Нативный `Bun.SQL Query.cancel()` остаётся отдельным непройденным upstream gate:
-[предыдущая квалификация](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-qualification.md).
-Изменение не обновляет toolchain и не утверждает исправление самого Bun.
+Exact commands, logs, hashes and final counters:
+[fix report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-cancellation-fix.md).
+The native `Bun.SQL Query.cancel()` stays a separate failed upstream gate:
+[earlier qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-qualification.md).
+The change does not update the toolchain and does not claim a fix of Bun itself.
 
-## 8. Типизированные условия (DX, 2026-10-02)
+## 8. Typed conditions (DX, 2026-10-02)
 
-Дополнительная область паспорта: Query/conditions.ts и контракты выбора колонок
-Query/ImmediateMutations.ts. Это компоненты существующей ORM, новые модули,
-регистрации и runtime-зависимости не добавлены. Тип Operand<T> сохраняет тип
-поля модели; FieldSelector<T> выдаёт такие операнды, eq/ne/in проверяют значения,
-строковые операции доступны только строкам, ordered-сравнения — string/number/
-bigint/Date. Выбор колонки для сортировки и conflictBy зависит только от property;
-проверка принадлежности conflictBy текущему proxy в runtime сохранена.
+An extra passport scope: Query/conditions.ts and the column selection contracts of
+Query/ImmediateMutations.ts. These are components of the existing ORM; no new modules,
+registrations or runtime dependencies were added. The Operand<T> type keeps the model
+field type; FieldSelector<T> returns such operands, eq/ne/in check values, string
+operations are available only for strings, ordered comparisons for string/number/
+bigint/Date. Choosing a column for sorting and conflictBy depends only on the property;
+the runtime check that conflictBy belongs to the current proxy is kept.
 
-Codegen использует общий TypeScript Program, анализирует тип Predicate и
-отклоняет `&&`, `||`, `!` и условные переходы по предикату с кодом
-OSNV_ORM_PREDICATE_LOGIC, файлом и позицией. Правильный вход:
-`u => u.age.gte(18).and(u.name.startsWith("A"))`. Публичная семантика SQL и
-сохранения не меняется. Цена проверки приходится на генерацию, runtime query
-не разбирает исходный код. Новых performance-гарантий не заявлено.
+Codegen uses the shared TypeScript Program, analyzes the Predicate type and rejects `&&`,
+`||`, `!` and conditional branches on a predicate with the code OSNV_ORM_PREDICATE_LOGIC,
+the file and the position. The correct input:
+`u => u.age.gte(18).and(u.name.startsWith("A"))`. The public SQL and save semantics do
+not change. The check costs generation time; the runtime query does not parse source
+code. No new performance guarantees are claimed.
 
-Граница гарантии: выбранная codegen-цель и доступная TypeScript-информация.
-JavaScript, any и ручной запуск без генерации требуют соблюдения .and/.or/.not;
-защита runtime от JS truthiness не заявляется.
+The guarantee boundary: the chosen codegen target and the available TypeScript
+information. JavaScript, any and a manual run without generation must follow
+.and/.or/.not; no runtime protection from JS truthiness is claimed.
 
-Проверки: [типы и диагностика](../../core/scripts/test/orm-predicate-codegen.test.ts),
-[реальный pipeline и сохранность предыдущих outputs](../../core/scripts/test/codegen-dx.integration.test.ts),
-[существующие immediate mutation контракты](test/orm.immediate-mutations-v1.test.ts).
-Физические транзакционные/серверные проверки из предыдущих разделов этим
-изменением не переисполнялись.
+Checks: [types and diagnostics](../../core/scripts/test/orm-predicate-codegen.test.ts),
+[the real pipeline and keeping earlier outputs](../../core/scripts/test/codegen-dx.integration.test.ts),
+[the existing immediate mutation contracts](test/orm.immediate-mutations-v1.test.ts).
+The physical transaction/server checks from the previous sections were not rerun by
+this change.
 
-## 9. Разветвлённый include (2026-10-02)
+## 9. Branched include (2026-10-02)
 
-`Query/IncludeLoader.ts` остаётся внутренним компонентом существующей атомарной
-ORM. Входы `include(selector)`, `thenInclude(selector)` и `asNoTracking()` не
-изменены. В пределах одного исполнения запроса каждый общий префикс пути
-загружается один раз и сохраняет полученные экземпляры для всех своих веток.
-Это относится к reference и collection, включая пустой результат; уже
-загруженная ветка не заменяется новыми экземплярами при `asNoTracking()`.
-Порядок первого появления путей и существующее разбиение SQL по лимиту
-параметров сохранены. Ошибка чтения по-прежнему отклоняет весь запрос.
+`Query/IncludeLoader.ts` stays an internal component of the existing atomic ORM. The
+`include(selector)`, `thenInclude(selector)` and `asNoTracking()` inputs did not change.
+Within one query execution each shared path prefix is loaded once and keeps the received
+instances for all its branches. This applies to reference and collection, including an
+empty result; an already loaded branch is not replaced with new instances under
+`asNoTracking()`. The order of first appearance of paths and the existing SQL splitting by
+the parameter limit are kept. A read error still rejects the whole query.
 
-Кэш принадлежит одному вызову `IncludeLoader.load`, не сохраняется между
-чтениями и не подменяет ChangeTracker. Новых публичных типов, DI-регистраций,
-таблиц и миграций нет. Ветви `children.leaves` и `children.note` в изолированной
-фикстуре выполняют четыре SELECT вместе с корнем вместо прежних пяти; это
-измерение количества запросов, а не обещание задержки под нагрузкой.
+The cache belongs to one `IncludeLoader.load` call, is not kept between reads and does
+not replace the ChangeTracker. There are no new public types, DI registrations, tables or
+migrations. The branches `children.leaves` and `children.note` in an isolated fixture run
+four SELECTs together with the root instead of the former five; this measures the number
+of queries, not a latency promise under load.
 
-Проверки: [orm.include-branches.test.ts](test/orm.include-branches.test.ts) —
-reference/collection, оба режима tracking, оба порядка веток, повторный и
-пустой префикс, повторное исполнение с новыми данными. Используется настоящий
-ORM с подставным read-only provider; физический PostgreSQL и бинарная сборка
-этой проверкой не квалифицируются.
-Отдельная [физическая регрессия](../../core/orm/test/orm.release-095.postgres.live.test.ts)
-проверяет те же восемь сочетаний на собственных таблицах PostgreSQL. Её guard
-и выделенный URL описаны в [паспорте core/orm](../../core/orm/MODULE.md).
+Checks: [orm.include-branches.test.ts](test/orm.include-branches.test.ts):
+reference/collection, both tracking modes, both branch orders, a repeated and an empty
+prefix, a repeated execution with new data. The real ORM with a stub read-only provider
+is used; physical PostgreSQL and the binary build are not qualified by this check.
+A separate [physical regression](../../core/orm/test/orm.release-095.postgres.live.test.ts)
+checks the same eight combinations on its own PostgreSQL tables. Its guard and dedicated
+URL are described in the [core/orm passport](../../core/orm/MODULE.md).
 
-## 10. Канонический экземпляр сущности (2026-10-04)
+## 10. Canonical entity instance (2026-10-04)
 
-Существующая атомарная ORM сохраняет один экземпляр сохранённой сущности для
-пары «модель, первичный ключ». `ChangeTracker` проверяет этот инвариант, а
-`SaveExecutor` проверяет весь набор ключей до SQL и повторно после `RETURNING`,
-внутри транзакции, до принятия любого нового снимка. Входы `add`, `attach`,
-`update`, `remove`, `saveChanges` и публичные типы не изменены.
+The existing atomic ORM keeps one instance of a saved entity per "model, primary key"
+pair. `ChangeTracker` checks this invariant, and `SaveExecutor` checks the whole key set
+before SQL and again after `RETURNING`, inside the transaction, before accepting any new
+snapshot. The `add`, `attach`, `update`, `remove`, `saveChanges` inputs and the public
+types did not change.
 
-Попытка прикрепить другой объект с ключом уже отслеживаемой сущности даёт
-`DbUpdateError` до изменения трекера. Значение ключа в ошибку не включается.
-Изменять нужно ранее полученный экземпляр; для действительно отсоединённого
-объекта используется контекст, где этот ключ ещё не отслеживается.
-Повторная операция над тем же экземпляром остаётся допустимой.
+Attaching another object with the key of an already tracked entity gives `DbUpdateError`
+before the tracker changes. The key value is not included in the error.
+Change the instance you got earlier; for a truly detached object use a context where
+this key is not tracked yet. Repeating an operation on the same instance stays allowed.
 
-Ручные ключи `Added` можно назначить после `add`. Такие записи не индексируются
-до сохранения; конфликт между ними или с последующим `attach` отклоняется при
-`saveChanges` до первого SQL. Это сохраняет линейную сложность проверки набора
-и позволяет добавлять несколько ещё не заполненных объектов. У генерируемых
-ключей одинаковые начальные значения, включая `0`, считаются временными;
-проверяются окончательные ключи из `RETURNING`. Конфликт откатывает транзакцию
-и восстанавливает исходные ключи и состояния всех записей.
+Manual `Added` keys can be assigned after `add`. Such records are not indexed until
+saving; a conflict between them or with a later `attach` is rejected on `saveChanges`
+before the first SQL. This keeps the set check linear and allows adding several objects
+that are not filled in yet. For generated keys, equal initial values, including `0`, are
+treated as temporary; the final keys from `RETURNING` are checked. A conflict rolls back
+the transaction and restores the original keys and states of all records.
 
-Удаление, сохранённое внутри внешней транзакции, остаётся предварительным:
-до её окончания ключ удерживается за прежним экземпляром, даже если он уже
-не виден в обычном трекере. Иначе rollback не смог бы восстановить запись
-без конфликта с новым объектом. Удержание снимается при commit или rollback.
-Удалить и снова добавить тот же экземпляр в одной транзакции можно; заменить
-его другим объектом с тем же ключом можно после commit. Ранее для замены во
-внешней транзакции не было согласованного состояния трекера при откате.
+A deletion saved inside an outer transaction stays provisional: until it ends the key is
+held for the former instance, even if it is no longer visible in the regular tracker.
+Otherwise a rollback could not restore the record without a conflict with a new object.
+The hold is released on commit or rollback. Deleting and re-adding the same instance in
+one transaction is allowed; replacing it with another object with the same key is allowed
+after commit. Before, replacing it inside an outer transaction left no consistent tracker
+state on rollback.
 
-Внутренние обработчики завершения трекера помечаются закрытым `WeakSet`.
-`runPostCommitCallbacks` выполняет их после подтверждённого COMMIT, перед
-публичными `afterCommit`; относительный порядок публичных обработчиков
-сохраняется. Ошибка одного обработчика не пропускает остальные и остаётся
-`PostCommitError`. При rollback и неизвестном исходе этот путь не вызывается.
+Internal tracker completion handlers are marked with a private `WeakSet`.
+`runPostCommitCallbacks` runs them after a confirmed COMMIT, before the public
+`afterCommit`; the relative order of public handlers is kept. An error of one handler does
+not skip the others and stays a `PostCommitError`. This path is not called on rollback and
+on an unknown outcome.
 
-Проверки через публичный `DbContext`:
-[orm.identity-map.test.ts](test/orm.identity-map.test.ts) — атомарный отказ,
-ручные/составные/генерируемые ключи, несколько начальных `0`, конфликт всех
-`RETURNING` до commit, внешние rollback, освобождение ключа после commit и
-повторное добавление прежнего экземпляра. SQL подставлен; проверки не заменяют
-физическую квалификацию PostgreSQL.
+Checks through the public `DbContext`:
+[orm.identity-map.test.ts](test/orm.identity-map.test.ts): an atomic rejection,
+manual/composite/generated keys, several initial `0`, a conflict of all `RETURNING` rows
+before commit, outer rollbacks, releasing the key after commit and re-adding the former
+instance. SQL is stubbed; the checks do not replace physical PostgreSQL qualification.
 
-## 11. Нативные JSONB-значения (2026-10-04)
+## 11. Native JSONB values (2026-10-04)
 
-`PostgresDialect` работает с нативными значениями Bun.SQL: JSON-строки,
-числа, boolean, массивы и объекты после чтения уже разобраны драйвером.
-Повторного `JSON.parse` нет: JSON-строки `"123"`, `"false"`, `"null"` и
-`"{\"role\":\"reader\"}"` сохраняют свой строковый тип как в сущности,
-так и в проекции. `null` продолжает представлять отсутствующее значение.
+`PostgresDialect` works with native Bun.SQL values: JSON strings, numbers, booleans,
+arrays and objects are already parsed by the driver after reading.
+There is no second `JSON.parse`: the JSON strings `"123"`, `"false"`, `"null"` and
+`"{\"role\":\"reader\"}"` keep their string type both in an entity and in a projection.
+`null` still represents a missing value.
 
-На запись Bun 1.4.0 определяет bare number/boolean как SQL-число/boolean,
-что PostgreSQL отвергает при присваивании JSONB. Только для этих двух
-JSON-типов диалект создаёт замороженный внутренний объект с `toJSON`,
-возвращающим исходный скаляр. Драйвер выбирает JSON-привязку и сам выполняет
-сериализацию. Нативные строки, массивы и объекты передаются прежним способом:
-предварительный `JSON.stringify` дал бы двойное кодирование.
+On write, Bun 1.4.0 binds a bare number/boolean as an SQL number/boolean, which
+PostgreSQL rejects when assigning to JSONB. Only for these two JSON types the dialect
+creates a frozen internal object with `toJSON` returning the original scalar. The driver
+picks the JSON binding and serializes it itself. Native strings, arrays and objects are
+passed the former way: a prior `JSON.stringify` would encode them twice.
 
-`ImmediateMutations` сохраняет этот объект без копирования только после
-проверки его принадлежности закрытому `WeakSet` диалекта. Внутри — лишь
-неизменяемое число/boolean; пользовательские функции, `toJSON`, getters и
-поддельные результаты произвольного диалекта остаются запрещёнными прежней
-проверкой входа. Новых публичных API, типов параметров, SQL-cast, DI-регистраций
-и таблиц приложения нет.
+`ImmediateMutations` keeps this object without copying only after checking that it
+belongs to the dialect's private `WeakSet`. It holds only an immutable number/boolean;
+user functions, `toJSON`, getters and fake results of an arbitrary dialect stay forbidden
+by the existing input check. There are no new public APIs, parameter types, SQL casts,
+DI registrations or application tables.
 
-Проверки: [orm.json-native.test.ts](test/orm.json-native.test.ts) покрывает
-чтение 17 значений, `saveChanges`, `executeUpdate`, `insertIfAbsent` и сохранение
-отказа для посторонних `toJSON` без вызова пользовательского кода.
+Checks: [orm.json-native.test.ts](test/orm.json-native.test.ts) covers reading 17 values,
+`saveChanges`, `executeUpdate`, `insertIfAbsent` and keeping the rejection of foreign
+`toJSON` without calling user code.
 [orm.json-native.postgres.live.test.ts](test/orm.json-native.postgres.live.test.ts)
-проверяет PostgreSQL entity/projection, INSERT/UPDATE через свежие контексты
-и immediate-операции. Физический тест включается только через
-`OSNV_ORM_REPEAT_AUDIT_LIVE=1` и `OSNV_PG_URL`: база `orm_audit`, адрес
-`127.0.0.1`, отдельный явно указанный порт, отличный от `5432`. Он создаёт
-и удаляет только собственную случайную схему. Само наличие теста и его
-ENV_OFF-пропуск не являются успешной физической проверкой; результаты
-конкретного запуска фиксируются отдельно в отчёте повторного аудита.
+checks a PostgreSQL entity/projection, INSERT/UPDATE through fresh contexts and the
+immediate operations. The physical test is enabled only with
+`OSNV_ORM_REPEAT_AUDIT_LIVE=1` and `OSNV_PG_URL`: the `orm_audit` database, the address
+`127.0.0.1`, a separate explicitly set port other than `5432`. It creates and drops only
+its own random schema. The test's existence and its ENV_OFF skip are not a successful
+physical check; the results of a specific run are recorded separately in the repeated
+audit report.
 
 ## 12. UUID v7 keys (2026-10-05)
 

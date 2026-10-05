@@ -1,104 +1,104 @@
 # DI Folder Map
 
-Карта структуры `src/osnv/core/di`. Границы ответственности и контракты ядра
-описаны в [MODULE.md](MODULE.md).
+A map of the `src/osnv/core/di` structure. The core's responsibility boundaries and
+contracts are described in [MODULE.md](MODULE.md).
 
-## Публичный API
+## Public API
 
-- `index.ts` — единая публичная точка входа DI.
-- `MODULE.md` — контракты, границы и проверки ядра DI.
+- `index.ts`: the single public DI entry point.
+- `MODULE.md`: the contracts, boundaries and checks of the DI core.
 
-## Ядро контейнера
+## Container core
 
-- `ServiceProvider.ts` — координация resolve, планы зависимостей и создание объектов.
-- `ServiceCollection.ts` — регистрация сервисов.
-- `ServiceScope.ts` — scoped-резолв и scoped-dispose.
-- `container.ts` — совместимый alias-обертка над `ServiceProvider`.
-- `token.ts` — токены DI (`createToken`, open generic family).
+- `ServiceProvider.ts`: resolve coordination, dependency plans and object creation.
+- `ServiceCollection.ts`: service registration.
+- `ServiceScope.ts`: scoped resolve and scoped dispose.
+- `container.ts`: a compatible alias wrapper over `ServiceProvider`.
+- `token.ts`: DI tokens (`createToken`, open generic family).
 
-## Внутренние детали (не использовать напрямую)
+## Internals (do not use directly)
 
 - `internal/`:
-  - `ServiceRegistry.ts` — регистрационная идентичность, keyed-поиск и материализация generics.
-  - `ResolutionTracker.ts` — активные создания объектов, граф ожиданий и обнаружение циклов.
-  - `ScopeLifecycle.ts` — владение scopes и ресурсами, правила lifetime и завершение dispose.
-  - `classDeps.ts` — runtime map deps класса.
-  - `ResolutionScopeState.ts` — состояние root/scope.
-  - `ServiceRegistration.ts` — внутренняя запись регистрации.
-  - `ResolutionPlan.ts` — нормализованный список зависимостей провайдера (кэш горячего пути).
-  - `NamedTokenIndex.ts` — индекс «имя типа → токен» для name-based auto deps.
-  - `GraphValidator.ts` — build-time валидация графа (циклы, missing/captive deps, арность класса).
-  - `OpenGenericRegistration.ts` — внутренняя модель open generic registration.
-  - `disposal.ts` — dispose/disposeAsync helper.
+  - `ServiceRegistry.ts`: registration identity, keyed lookup and generic materialization.
+  - `ResolutionTracker.ts`: active object creations, the wait graph and cycle detection.
+  - `ScopeLifecycle.ts`: ownership of scopes and resources, lifetime rules and dispose completion.
+  - `classDeps.ts`: the runtime map of class deps.
+  - `ResolutionScopeState.ts`: root/scope state.
+  - `ServiceRegistration.ts`: the internal registration record.
+  - `ResolutionPlan.ts`: the normalized dependency list of a provider (hot-path cache).
+  - `NamedTokenIndex.ts`: the "type name → token" index for name-based auto deps.
+  - `GraphValidator.ts`: build-time graph validation (cycles, missing/captive deps, class arity).
+  - `OpenGenericRegistration.ts`: the internal model of an open generic registration.
+  - `disposal.ts`: the dispose/disposeAsync helper.
 
-## Модульный слой
+## Module layer
 
-- `module/DI.ts` — low-level конструкторы провайдеров.
-- `module/shortcuts.ts` — короткий API (`singleton/scoped/transient`).
-- `module/createContainer.ts` — сборка контейнера из модулей.
-- `module/encapsulation.ts` — build-time проверка изоляции модулей (`exports`).
-- `module/ModuleRegistrar.ts` — helper-регистратор для `configure(di)`.
-- `module/types/` — контракты модулей (`OsnvModule`, `DiRegistrar`).
-- `module/autoDeps.ts` — автоподхват deps из generated map.
+- `module/DI.ts`: low-level provider constructors.
+- `module/shortcuts.ts`: the short API (`singleton/scoped/transient`).
+- `module/createContainer.ts`: builds a container from modules.
+- `module/encapsulation.ts`: build-time check of module isolation (`exports`).
+- `module/ModuleRegistrar.ts`: the helper registrar for `configure(di)`.
+- `module/types/`: module contracts (`OsnvModule`, `DiRegistrar`).
+- `module/autoDeps.ts`: picks up deps from the generated map.
 
-## Провайдеры и типы
+## Providers and types
 
 - `provider/`:
-  - `index.ts` — экспорты провайдеров.
-  - `providerGuards.ts` — type guards.
-  - `types/` — все provider-контракты (`Provider`, `ClassProvider`, `FactoryProvider`, ...).
+  - `index.ts`: provider exports.
+  - `providerGuards.ts`: type guards.
+  - `types/`: all provider contracts (`Provider`, `ClassProvider`, `FactoryProvider`, ...).
 
-## Ошибки
+## Errors
 
-- `errors/` — все DI-ошибки (один класс = один файл).
+- `errors/`: all DI errors (one class = one file).
 
-## Расширения
+## Extensions
 
-- `extensions/` — options, hosted services, запуск приложения и создание объектов с ручными аргументами.
-- `extensions/options.ts` — options + validated options (`addValidatedOptions`, fail-fast на старте).
-- `extensions/options-reloadable.ts` — reloadable options (`OptionsMonitor`/`OptionsSnapshot`, `addReloadableOptions`) — аналог .NET `IOptionsMonitor`/`IOptionsSnapshot`.
-- `extensions/application.ts` — `Application`/`runApplication`: запуск hosted services и graceful shutdown.
-- `extensions/activator.ts` — `createInstance`: создание объекта с миксом DI-зависимостей и ручных аргументов (аналог .NET `ActivatorUtilities`).
+- `extensions/`: options, hosted services, application startup and object creation with manual arguments.
+- `extensions/options.ts`: options + validated options (`addValidatedOptions`, fail-fast at startup).
+- `extensions/options-reloadable.ts`: reloadable options (`OptionsMonitor`/`OptionsSnapshot`, `addReloadableOptions`), the counterpart of .NET `IOptionsMonitor`/`IOptionsSnapshot`.
+- `extensions/application.ts`: `Application`/`runApplication`: starts hosted services and shuts down gracefully.
+- `extensions/activator.ts`: `createInstance`: creates an object from a mix of DI dependencies and manual arguments (the counterpart of .NET `ActivatorUtilities`).
 
 ## Codegen
 
-- `generated/deps.ts` — автогенерируемая карта зависимостей классов.
-- `../scripts/di-generate.ts` — генератор карты.
+- `src/generated/osnv/deps.ts` in the application: the generated class dependency map.
+- `../scripts/di-generate.ts`: the map generator.
 
-> ⚠️ `generated/deps.ts` не редактируется вручную.
+> ⚠️ Do not edit `src/generated/osnv/deps.ts` by hand.
 
-## Правила структуры
+## Structure rules
 
-- Один класс — один файл.
-- Типы лежат рядом с доменом в `types/`.
-- Внешний код импортирует DI через `osnv` для common path или через
-  `@/core/di` для точечного доступа.
-- `internal/` считается приватным слоем контейнера.
+- One class, one file.
+- Types live next to their domain in `types/`.
+- External code imports DI through `osnv` for the common path or through
+  `osnv/core/di` for targeted access.
+- `internal/` is the container's private layer.
 
 ## Style Rule (DI usage)
 
-- По умолчанию используем только короткие шорткаты:
+- By default use only the short shortcuts:
   - `singleton(...)`
   - `scoped(...)`
   - `transient(...)`
-- Низкоуровневый путь (`DI.classProvider(...)`, `DI.factoryProvider(...)`) используем только для редких кейсов, где действительно нужна ручная настройка.
+- Use the low-level path (`DI.classProvider(...)`, `DI.factoryProvider(...)`) only for rare cases that really need manual setup.
 
 ## Contributing Checklist
 
-Перед коммитом DI-изменений проверь:
+Before committing DI changes, check:
 
-1. **Структура файлов**
-   - runtime-классы в доменных папках (`module/`, `errors/`, `extensions/`, root ядро);
-   - внутренние служебные детали только в `internal/`;
-   - type-only контракты в ближайшем `types/`.
+1. **File structure**
+   - runtime classes in domain folders (`module/`, `errors/`, `extensions/`, the root core);
+   - internal service details only in `internal/`;
+   - type-only contracts in the nearest `types/`.
 
-2. **Публичный API**
-   - если добавляешь внешний API, экспортируй его из `src/osnv/core/di/index.ts`;
-   - не экспортируй `internal/*` во внешний контракт.
+2. **Public API**
+   - if you add an external API, export it from `src/osnv/core/di/index.ts`;
+   - do not export `internal/*` in the external contract.
 
-3. **Codegen магия**
-   - настрой закреплённый Bun по [инструкции toolchain](../../../../toolchain/README.md);
-   - после изменения конструкторов сервисов запусти `./scripts/osnv-bun run di:generate`;
-   - не редактируй `src/generated/osnv/` вручную;
-   - выполняй тесты и сборку через `./scripts/osnv-bun run test` и
-     `./scripts/osnv-bun run build:bin` (в них есть автогенерация).
+3. **Codegen**
+   - set up the pinned Bun as in the [toolchain notes](../../../../toolchain/README.md);
+   - after changing service constructors run `./scripts/osnv-bun run di:generate`;
+   - do not edit `src/generated/osnv/` by hand;
+   - run tests and builds through `./scripts/osnv-bun run test` and
+     `./scripts/osnv-bun run build:bin` (they run the generation).

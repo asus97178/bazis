@@ -1,23 +1,23 @@
-# src/validation — модуль валидации классов
+# src/osnv/library/validation: class validation module
 
-Самодостаточный модуль валидации в ООП-стиле: один декоратор `@Validator(options)`
-на полях класса + статические `Validator.validate` / `Validator.validateAsync`.
+A self-contained OOP-style validation module: one `@Validator(options)` decorator
+on class fields + the static `Validator.validate` / `Validator.validateAsync`.
 
-Полная спецификация (все сценарии с примерами, описание опций, коды ошибок,
-плейсхолдеры) — в [SPEC.md](SPEC.md).
+The full specification (every scenario with examples, the options, error codes,
+placeholders) is in [SPEC.md](SPEC.md).
 
-Принципы (общие для всего фреймворка):
+Principles (shared by the whole framework):
 
-- без внешних зависимостей — только Bun API;
-- без рефлексии: стандартные TC39-декораторы + `Symbol.metadata`
-  (никаких `experimentalDecorators`, `emitDecoratorMetadata`, `reflect-metadata`);
-- совместимость с `bun build --compile` (проверено бинарником `validation-demo`);
-- минимум аллокаций: план валидации класса компилируется один раз и кэшируется
-  в WeakMap, объекты сообщений создаются только на пути ошибки;
-- отказоустойчивость: исключения в `custom`/`validateIf` перехватываются
-  (код `customError`), валидация продолжается и собирает все ошибки.
+- no external dependencies, only Bun APIs;
+- no reflection: standard TC39 decorators + `Symbol.metadata`
+  (no `experimentalDecorators`, `emitDecoratorMetadata` or `reflect-metadata`);
+- compatible with `bun build --compile`;
+- few allocations: a class's validation plan is compiled once and cached in a
+  WeakMap, message objects are created only on the error path;
+- resilience: exceptions in `custom`/`validateIf` are caught
+  (code `customError`), and validation continues and collects all errors.
 
-## Быстрый старт
+## Quick start
 
 ```ts
 import { Validator } from "@/library/validation";
@@ -31,32 +31,32 @@ class CreateUserDto {
 }
 
 const result = Validator.validate(dto);      // ValidationResult
-await Validator.validateAsync(dto);           // ждёт async custom-функции
-Validator.setDefaultMessages({ required: "Поле {property} обязательно" });
+await Validator.validateAsync(dto);           // awaits async custom functions
+Validator.setDefaultMessages({ required: "{property} is required" });
 ```
 
-Полная демонстрация (сложные условия, async, вложенные объекты):
-`bun src/examples/osnv/validation.ts`.
+More scenarios (complex conditions, async, nested objects) are in
+[test/validation.test.ts](test/validation.test.ts).
 
-## Карта папки
+## Folder map
 
-| Файл | Назначение |
+| File | Purpose |
 |---|---|
-| `Validator.ts` | публичный фасад: декоратор + `validate`/`validateAsync`/`setDefaultMessages` |
-| `ValidationError.ts` | одна ошибка: `property`, `value`, `message`, `code` |
-| `ValidationResult.ts` | итог: `isValid`, `errors`, `getErrorsFor`, `hasErrorsFor` |
-| `RuleEngine.ts` | движок: один проход по плану, sync/async, nested, защита от циклов |
-| `RuleCompiler.ts` | компиляция правил класса в план + WeakMap-кэш (RegExp, enum-Set) |
-| `MessageRegistry.ts` | шаблоны сообщений, плейсхолдеры, приоритет local > global > built-in; встроенные на английском, `RU_VALIDATION_MESSAGES` — русский набор для `setDefaults` |
-| `metadata.ts` | хранение правил через `context.metadata` / `Symbol.metadata` |
-| `types/ValidatorOptions.ts` | все опции декоратора |
-| `types/ValidationCode.ts` | коды ошибок |
-| `test/validation.test.ts` | тесты модуля |
+| `Validator.ts` | public facade: the decorator + `validate`/`validateAsync`/`setDefaultMessages` |
+| `ValidationError.ts` | one error: `property`, `value`, `message`, `code` |
+| `ValidationResult.ts` | the outcome: `isValid`, `errors`, `getErrorsFor`, `hasErrorsFor` |
+| `RuleEngine.ts` | the engine: one pass over the plan, sync/async, nested, cycle protection |
+| `RuleCompiler.ts` | compiles class rules into a plan + WeakMap cache (RegExp, enum Set) |
+| `MessageRegistry.ts` | message templates, placeholders, priority local > global > built-in; built-in texts are English, `RU_VALIDATION_MESSAGES` is a Russian set for `setDefaults` |
+| `metadata.ts` | stores rules through `context.metadata` / `Symbol.metadata` |
+| `types/ValidatorOptions.ts` | all decorator options |
+| `types/ValidationCode.ts` | error codes |
+| `test/validation.test.ts` | module tests |
 
-## Замечание про `design:type`
+## A note on `design:type`
 
-`Reflect.getMetadata("design:type")` сознательно не используется: он требует
-`emitDecoratorMetadata` и внешний пакет `reflect-metadata`, что нарушает
-принципы «без зависимостей и рефлексии». Вместо этого ожидаемый тип
-выводится из самих правил (`minLength` ⇒ строка, `min` ⇒ число,
-`mustBeTrue` ⇒ boolean) или задаётся явной подсказкой `type`.
+`Reflect.getMetadata("design:type")` is deliberately not used: it requires
+`emitDecoratorMetadata` and the external `reflect-metadata` package, which breaks
+the "no dependencies, no reflection" principles. Instead the expected type is
+inferred from the rules themselves (`minLength` ⇒ string, `min` ⇒ number,
+`mustBeTrue` ⇒ boolean) or set with an explicit `type` hint.

@@ -1,65 +1,65 @@
-# src/osnv/core/cache — модуль кэширования
+# src/osnv/core/cache: caching module
 
-Актуальные контракты DI, изоляция ключей и предел `maxInFlight` описаны в
-[паспорте модуля](MODULE.md). MemoryCache допускает по умолчанию 1024 выполняемые
-factory; новый miss при заполненном лимите получает `CacheCapacityError` без запуска
-новой работы. Готовые значения и объединение запросов одного ключа остаются доступны.
+The current DI contracts, key isolation and the `maxInFlight` limit are described in
+the [module passport](MODULE.md). MemoryCache allows 1024 running factories by
+default; a new miss at the full limit gets `CacheCapacityError` without starting
+new work. Ready values and coalescing of requests for one key stay available.
 
-Backend-agnostic кэш osnv: in-memory + распределённый (multi-instance) уровень.
-Фреймворк знает только абстракцию `IDistributedCache`; конкретный backend (Redis и т.п.)
-живёт в `@/core/infra` и подключается опцией `redisConnect(redisConfig, { cache: "distributed" })`
-в манифесте `@Infra` — cache-модуль находит бэкенд через DI. Полная спецификация
-для приложений: **[SPEC.md](SPEC.md)**.
+Backend-agnostic osnv cache: an in-memory level plus a distributed (multi-instance) level.
+The framework knows only the `IDistributedCache` abstraction; a concrete backend (Redis and so on)
+lives in `@/core/infra` and is enabled with the `redisConnect(redisConfig, { cache: "distributed" })`
+option in the `@Infra` manifest; the cache module finds the backend through DI. The full
+specification for applications: **[SPEC.md](SPEC.md)**.
 
-## Два уровня × два backend'а
+## Two levels × two backends
 
-| Декоратор | Уровень | Store |
+| Decorator | Level | Store |
 |-----------|---------|-------|
 | `@OutputCache` | HTTP controller | in-memory (`ICache`) |
 | `@OutputRedisCache` | HTTP controller | distributed (`IDistributedCache`) |
-| `@Cacheable` | метод сервиса | in-memory (`ICache`) |
-| `@CacheableRedis` | метод сервиса | distributed (`IDistributedCache`) |
+| `@Cacheable` | service method | in-memory (`ICache`) |
+| `@CacheableRedis` | service method | distributed (`IDistributedCache`) |
 
-«Redis» в именах декораторов = «распределённый уровень». Сам Redis в `@/core/cache` не импортируется.
+"Redis" in the decorator names means "distributed level". `@/core/cache` itself never imports Redis.
 
-## Архитектура распределённого кэша
+## Distributed cache architecture
 
 ```
 @/core/cache (framework)               @/core/infra (redis backend)
   IDistributedCache        interface
-  DistributedCache         вся политика  ──▶ RedisDistributedCacheDriver  примитивы Bun RedisClient
-    (fencing lock,                            RedisDistributedCacheBackend стора per connection
+  DistributedCache         all policy    ──▶ RedisDistributedCacheDriver  Bun RedisClient primitives
+    (fencing lock,                            RedisDistributedCacheBackend stores per connection
      anti-stampede, tags,                       redisConnect(cfg, { cache: "distributed" })
      value-size guard)
-  DistributedCacheDriver   ◀─ реализует ── RedisDistributedCacheDriver
-  DistributedCacheStores  ◀─ реализует ── RedisDistributedCacheBackend
+  DistributedCacheDriver   ◀─ implements ── RedisDistributedCacheDriver
+  DistributedCacheStores  ◀─ implements ── RedisDistributedCacheBackend
 ```
 
-Вся «умная» логика — один раз в `DistributedCache` (ядро). Backend реализует ~7 примитивов
-(`read/write/delete/acquireLock/releaseLock/addTagMembers/tagMembers`). Lock снимается атомарно
-по fencing-token (Lua `compare-and-del`), а не безусловным `DEL`.
+All the "smart" logic lives once in `DistributedCache` (the core). A backend implements ~7 primitives
+(`read/write/delete/acquireLock/releaseLock/addTagMembers/tagMembers`). A lock is released atomically
+by its fencing token (Lua `compare-and-del`), not by an unconditional `DEL`.
 
-## Минимальный пример (только in-memory)
+## Minimal example (in-memory only)
 
 ```ts
 import { memory } from "@/core/cache";
 
-// Значение, которое само себя устанавливает: output-cache composer публикуется
-// через DI-токен `ROUTE_MIDDLEWARE_COMPOSER` и собирается `httpModule` автоматически.
+// A self-installing value: the output-cache composer is published through the
+// `ROUTE_MIDDLEWARE_COMPOSER` DI token, and `httpModule` picks it up automatically.
 await runApp(AppModule, { cache: memory({ maxEntries: 1000 }), http: {} });
 
-// Именованные политики/тюнинг — через продвинутый билдер:
+// Named policies/tuning go through the advanced builder:
 import { buildCacheModule } from "@/core/cache";
 const cache = buildCacheModule({
   policies: { catalog: { seconds: 60, varyByQuery: ["limit"], tags: ["catalog"] } },
 });
 ```
 
-## Подключение распределённого backend (Redis)
+## Connecting the distributed backend (Redis)
 
-Backend живёт в `@/core/infra` (реализует `DistributedCacheStores` поверх
-Bun `RedisClient`) и включается одним режимом в манифесте `@Infra`.
-Соединением управляет InfraLifecycle; у backend нет `start/stop`:
+The backend lives in `@/core/infra` (it implements `DistributedCacheStores` on top of
+Bun `RedisClient`) and is enabled with one mode in the `@Infra` manifest.
+InfraLifecycle manages the connection; the backend has no `start/stop`:
 
 ```ts
 import { Infra, redisConnect } from "@/core/infra";
@@ -73,9 +73,9 @@ export class AppInfra {}
 await runApp(AppModule, { cache: memory(), infra: AppInfra, http: {} });
 ```
 
-`@CacheableRedis` / `@OutputRedisCache` находят бэкенд через DI автоматически.
-Ядро `@/core/cache` не импортирует Redis вовсе — только абстракцию
-`IDistributedCache`/`DistributedCacheDriver`.
+`@CacheableRedis` / `@OutputRedisCache` find the backend through DI automatically.
+The `@/core/cache` core does not import Redis at all, only the
+`IDistributedCache`/`DistributedCacheDriver` abstraction.
 
 ## Compatibility
 

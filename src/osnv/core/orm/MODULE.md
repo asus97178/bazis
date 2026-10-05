@@ -1,88 +1,91 @@
-# ORM: подключение и эксплуатационная политика
+# ORM: connection and operational policy
 
-Версия: 5. Дата сверки: 2026-10-02.
-Тип: существующая атомарная интеграция библиотечной ORM с DI и Infra.
-Область этого паспорта: дополнительные входы `ormOsnvConnect` и передача
-сигнала lifecycle/health. Остальные контракты `ormModule` сохраняются.
+Version: 5. Check date: 2026-10-02.
+Type: the existing atomic integration of the library ORM with DI and Infra.
+Scope of this passport: the extra `ormOsnvConnect` inputs and passing the
+lifecycle/health signal. The other `ormModule` contracts are kept.
 
-`databaseConnector.ts` получает объявление `AppConfig<PostgresOrmConfigShape>`;
-при наличии `ConfigRegistry` читает представление текущего kernel через `reader`.
-Объявление конфигурации не мутируется. Основные параметры подключения проверяет
-общий `postgresConnectionOptions` из Infra. Дополнительная политика принадлежит
-ORM-коннектору. Новых модулей и регистраций DI нет.
+`databaseConnector.ts` gets an `AppConfig<PostgresOrmConfigShape>` declaration;
+with a `ConfigRegistry` it reads the current kernel's view through `reader`.
+The configuration declaration is not mutated. The shared Infra
+`postgresConnectionOptions` checks the main connection parameters. The extra policy
+belongs to the ORM connector. There are no new modules or DI registrations.
 
-Коннектор создаёт один `PostgresProvider`, публикует его под `DATABASE_PROVIDER`,
-подключает в фазе −110 и закрывает при остановке. Сигнал `connect` и `healthCheck`
-передаётся в `provider.ping(signal)`. Недоступная БД даёт `false` в health и
-`InfraError` на этапе подключения. При закрытии provider запрещает новую работу.
-Фабрика `ormModule` и feature-контексты продолжают пользоваться общим provider.
+The connector creates one `PostgresProvider`, publishes it under `DATABASE_PROVIDER`,
+connects in phase −110 and closes it at shutdown. The `connect` and `healthCheck`
+signal is passed to `provider.ping(signal)`. An unavailable database gives `false`
+in health and `InfraError` while connecting. On close the provider forbids new work.
+The `ormModule` factory and feature contexts keep using the shared provider.
 
-## Проверка плана запуска (D2, 2026-10-02)
+## Startup plan check (D2, 2026-10-02)
 
-`OrmHostedPlan.validator.ts` владеет конфликтами фаз/владельцев таблиц/FK и
-несовместимостью legacy admission. OrmLifecycle, OrmOwnedStoreLifecycle и provider
-lifecycle предоставляют его через общий `HostedService.planValidator`, включая
-ручную композицию. Проверка выполняется Kernel до любого onInit/start.
-Новые options и отдельные DI-регистрации не нужны; прежние error codes и phases
-сохраняются. Один stateless объект проверяет весь план один раз, не владеет БД.
-`strictSchemaHostedIdentity.ts` владеет именно правилами ORM: общий DB-слот
-должен предоставлять тот же DI-токен DATABASE_PROVIDER и фазу −110. Для LLM и
-checkpoint protection разрешена фаза −100 только с неизменённой identity фабрики.
-Обычные внутренние ORM-lifecycle сохраняют прежние markers.
-Общий механизм привязки коннектора к lifecycle расположен в Infra и не импортирует
-ORM; ORM читает его сведения, не меняя владение соединением. Копии lifecycle,
-копии/наследники коннектора и подмена его полей не приобретают разрешение.
-Внутренние функции identity не экспортируются публичными фасадами.
-Проверки DB-слота теперь находятся у владельца политики:
-[orm.infra.test.ts](test/orm.infra.test.ts). Проверяются legacy strict и owned-store
-планы, отказ до создания клиента и обратный порядок остановки.
+`OrmHostedPlan.validator.ts` owns the conflicts of phases/table owners/FKs and the
+incompatibility with legacy admission. OrmLifecycle, OrmOwnedStoreLifecycle and the
+provider lifecycle expose it through the shared `HostedService.planValidator`,
+including manual composition. The Kernel runs the check before any onInit/start.
+No new options or separate DI registrations are needed; the existing error codes
+and phases are kept. One stateless object checks the whole plan once and owns no database.
+`strictSchemaHostedIdentity.ts` owns the ORM-specific rules: the shared DB slot
+must provide the same DATABASE_PROVIDER DI token and phase −110. For LLM and
+checkpoint protection, phase −100 is allowed only with an unchanged factory identity.
+Regular internal ORM lifecycles keep their existing markers.
+The shared mechanism that binds a connector to its lifecycle lives in Infra and does
+not import the ORM; the ORM reads its information without changing connection
+ownership. Copies of the lifecycle, copies/subclasses of the connector and replaced
+fields of it do not gain the permission.
+The internal identity functions are not exported by public facades.
+The DB slot checks now live with the policy owner:
+[orm.infra.test.ts](test/orm.infra.test.ts). They check legacy strict and owned-store
+plans, rejection before a client is created and the reverse shutdown order.
 
-По указанию владельца от 2026-10-02 признак `kind` удалён из InfraConnector и
-проверки ORM. Собственный коннектор с контрактом DatabaseProvider допускается
-на тех же условиях, что встроенный: общий токен и подключение в фазе −110.
-Имя записи манифеста не влияет на допуск. Другой токен, даже с именем
-`DatabaseProvider`, не заменяет общий. Ошибка подключения останавливает запуск
-до допуска схемы и прикладных служб, созданный ресурс освобождается один раз.
-Проверки owned-store, strict admission и приватной identity LLM/protector сохраняются.
+By the owner's decision of 2026-10-02 the `kind` marker was removed from
+InfraConnector and the ORM checks. A custom connector with the DatabaseProvider
+contract is admitted on the same terms as the built-in one: the shared token and a
+connection in phase −110. The manifest entry name does not affect admission. Another
+token, even one named `DatabaseProvider`, does not replace the shared one. A
+connection error stops startup before schema admission and application services;
+the created resource is released once.
+The owned-store, strict admission and private LLM/protector identity checks are kept.
 
-## Входные поля
+## Input fields
 
-Все дополнительные поля ниже необязательны, `null` не допускается. Источник —
-объявленная конфигурация приложения и её представление текущего kernel. Поля
-нужно объявить в `defineConfig`, чтобы работали типизированные env-переопределения.
-Неизвестные коннектору ключи игнорируются; коннектор сам строки в числа не переводит.
-Неправильное известное поле вызывает `InfraError` до создания SQL-клиента.
+All extra fields below are optional, and `null` is not allowed. The source is the
+application's declared configuration and its view for the current kernel. Declare the
+fields in `defineConfig` so typed env overrides work.
+Keys unknown to the connector are ignored; the connector does not convert strings to numbers.
+A wrong known field raises `InfraError` before the SQL client is created.
 
-| Поле | Тип / единица / допустимые значения | При отсутствии |
+| Field | Type / unit / allowed values | When absent |
 | --- | --- | --- |
-| host, port, database, username, password | Исходный `PostgresConfigShape`; пароль — `Secret` | Обязательные прежние поля |
-| max | Целое 1..2147483647, соединения | Настройка Bun |
-| connectionTimeout | Целое 1..2147483647, секунды | Настройка Bun |
-| idleTimeout, maxLifetime | Целое 0..2147483647, секунды; 0 отключает соответствующий native лимит | Настройка Bun |
-| tls | `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` | Настройка Bun |
-| tlsCa | PEM-текст; непустой — только при `tls=verify-full`. Пустая строка означает отсутствие CA: `defineConfig` не умеет необязательных ключей (2026-10-04) | Без дополнительного CA |
-| operationTimeoutMs | Целое 1..2147483647, мс | 30000 |
-| cancellationMode | `server` или `close` | Серверная отмена; один дополнительный ленивый control pool max=1 |
-| cancellationTimeoutMs | Целое 1..2147483647, мс | 5000 |
-| maxPendingOperations | Целое 1..2147483647, незавершённые native операции | 256 |
-| statementTimeoutMs | Целое 1..2147483647, мс; `statement_timeout` | Не меняется |
-| lockTimeoutMs | Целое 1..2147483647, мс; `lock_timeout` | Не меняется |
-| idleInTransactionTimeoutMs | Целое 1..2147483647, мс; `idle_in_transaction_session_timeout` | Не меняется |
-| transactionTimeoutMs | Целое 1..2147483647, мс; `transaction_timeout`, PostgreSQL 17+ | Не меняется |
+| host, port, database, username, password | The original `PostgresConfigShape`; the password is a `Secret` | The existing required fields |
+| max | Integer 1..2147483647, connections | Bun setting |
+| connectionTimeout | Integer 1..2147483647, seconds | Bun setting |
+| idleTimeout, maxLifetime | Integer 0..2147483647, seconds; 0 turns off the matching native limit | Bun setting |
+| tls | `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` | Bun setting |
+| tlsCa | PEM text; non-empty only with `tls=verify-full`. An empty string means no CA: `defineConfig` cannot express optional keys (2026-10-04) | No extra CA |
+| operationTimeoutMs | Integer 1..2147483647, ms | 30000 |
+| cancellationMode | `server` or `close` | Server cancellation; one extra lazy control pool max=1 |
+| cancellationTimeoutMs | Integer 1..2147483647, ms | 5000 |
+| maxPendingOperations | Integer 1..2147483647, unfinished native operations | 256 |
+| statementTimeoutMs | Integer 1..2147483647, ms; `statement_timeout` | Unchanged |
+| lockTimeoutMs | Integer 1..2147483647, ms; `lock_timeout` | Unchanged |
+| idleInTransactionTimeoutMs | Integer 1..2147483647, ms; `idle_in_transaction_session_timeout` | Unchanged |
+| transactionTimeoutMs | Integer 1..2147483647, ms; `transaction_timeout`, PostgreSQL 17+ | Unchanged |
 
-`tlsCa` передаётся как `ca`, host — как `serverName`, проверка сертификата
-включена через `rejectUnauthorized: true`. Значения pool/connection/TLS идут
-в Bun.SQL options; поля серверных сроков — в `serverTimeouts` провайдера.
-cancellationMode передаётся библиотечному provider; TLS и credentials управляющего
-пула совпадают с рабочим, оба закрываются при dispose. SET LOCAL-профиль применяется и проверяется внутри транзакции после BEGIN;
-он не является глобальной настройкой сервера или deadline миграционного lifecycle.
+`tlsCa` is passed as `ca`, the host as `serverName`, and certificate verification
+is enabled with `rejectUnauthorized: true`. Pool/connection/TLS values go to the
+Bun.SQL options; the server timeout fields go to the provider's `serverTimeouts`.
+cancellationMode is passed to the library provider; the control pool's TLS and
+credentials match the working pool, and both are closed on dispose. The SET LOCAL
+profile is applied and checked inside the transaction after BEGIN; it is not a
+global server setting and not a deadline of the migration lifecycle.
 
-Пример дополнительных полей внутри существующего объявления dbConfig
-(значения иллюстративные, их нужно согласовать с длительностью запросов приложения):
+An example of extra fields inside an existing dbConfig declaration (the values are
+illustrative; align them with the application's query durations):
 
 ```ts
 max: 10,
-connectionTimeout: 5,       // секунды Bun
+connectionTimeout: 5,       // Bun seconds
 idleTimeout: 30,
 maxLifetime: 1800,
 tls: "verify-full",
@@ -95,64 +98,64 @@ idleInTransactionTimeoutMs: 10_000,
 transactionTimeoutMs: 15_000, // PostgreSQL 17+
 ```
 
-Настройки действуют при создании provider; уже работающий singleton не
-переконфигурируется. Новые таблицы, миграции, HTTP/AI/UI-входы и фоновые обработчики
-не добавляются. Публичный TypeScript-тип `PostgresOrmConfigShape` экспортируется
-из `core/orm/index.ts`; private runtime policy наружу не экспортируется.
+The settings apply when the provider is created; a singleton that is already running
+is not reconfigured. No new tables, migrations, HTTP/AI/UI inputs or background
+handlers are added. The public TypeScript type `PostgresOrmConfigShape` is exported
+from `core/orm/index.ts`; the private runtime policy is not exported.
 
-## Проверки и ограничения
+## Checks and limits
 
-`test/orm.connection-policy.test.ts` проверяет неверные поля, прохождение срока
-операции и сигнала health. Физические сценарии, бинарное исполнение и TLS-проверка
-описаны в [отчёте реализации](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
-Типы и итоговые результаты всегда берутся из последнего receipt отчёта.
+`test/orm.connection-policy.test.ts` checks invalid fields and the passing of the
+operation timeout and the health signal. Physical scenarios, binary execution and the
+TLS check are described in the [implementation report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
+Types and final results always come from the report's latest receipt.
 
-Серверная отмена через отдельное Bun.SQL-подключение по умолчанию включена;
-[её квалификация](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md)
-отделена от старого режима close. Прямая быстрая отмена закрытием TLS на
-квалифицированном Bun 1.4.0 остаётся непройденной:
-закрытие native Promise не гарантирует немедленное прекращение SQL на сервере.
-Контракт конечного неизвестного исхода, сроки и запрет повторов определены в
-[паспорте библиотечной ORM](../../library/orm/MODULE.md). `statement_timeout`
-ограничивает выполнение SQL от его начала, а не время после произвольного abort.
+Server cancellation through a separate Bun.SQL connection is on by default;
+[its qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md)
+is separate from the old close mode. Direct fast cancellation by closing TLS on the
+qualified Bun 1.4.0 still fails:
+closing a native Promise does not guarantee that SQL stops on the server at once.
+The contract of the final unknown outcome, the timeouts and the retry ban are defined
+in the [library ORM passport](../../library/orm/MODULE.md). `statement_timeout`
+bounds SQL execution from its start, not the time after an arbitrary abort.
 
-## Граница сохранения (DX, 2026-10-02)
+## Save boundary (DX, 2026-10-02)
 
-IRepository<T> адресует одну сущность, но saveChanges() по-прежнему сохраняет
-все изменения его DbContext. Контракты методов и транзакционная семантика
-сохранены. Для новых прикладных сервисов и CLI-шаблонов используется явный
-DbContext с DbSet и db.saveChanges(), без дополнительного Unit of Work.
-Сервисы Users/Product и шаблоны getAll возвращают существующий PageResult<T>
-(items, total); HTTP-контроллеры отвечают за JSON:API. paginate не менялся:
-count и ограниченный SELECT, ключи для стабильного порядка, max limit 1000.
+IRepository<T> addresses one entity, but saveChanges() still saves all changes of
+its DbContext. The method contracts and the transactional semantics are kept. New
+application services and CLI templates use an explicit DbContext with DbSet and
+db.saveChanges(), without an extra Unit of Work.
+The getAll of the CLI templates returns the existing PageResult<T>
+(items, total); HTTP controllers are responsible for JSON:API. paginate did not
+change: a count and a bounded SELECT, keys for a stable order, max limit 1000.
 
-## Значения ListQuery-фильтров (2026-10-02)
+## ListQuery filter values (2026-10-02)
 
-`listQuery.ts` принадлежит существующей атомарной интеграции ORM. Публичный
-вход `paginate(query, list): Promise<PageResult>` и структура `ListQuery`
-сохранены: `filters[].field/op/value` и такие же правила в `or[][]` поступают
-от парсера с белыми списками полей и операторов; value — строка либо массив
-строк для `in`/`nin`. Преобразование теперь использует `PropertyModel.type`
-выбранной колонки, а не предполагаемый тип по внешнему виду строки.
+`listQuery.ts` belongs to the existing atomic ORM integration. The public
+`paginate(query, list): Promise<PageResult>` entry and the `ListQuery` structure
+are kept: `filters[].field/op/value` and the same rules in `or[][]` come from the
+parser with allow lists of fields and operators; value is a string or an array of
+strings for `in`/`nin`. The conversion now uses the `PropertyModel.type` of the
+chosen column, not a type guessed from how the string looks.
 
-Для `text` значения `0012`, `000.50`, `9007199254740993` остаются точными
-строками в сравнении и списках. Для `integer`/`real` десятичные числовые строки
-преобразуются в числа; целые вне безопасного диапазона JavaScript — в bigint
-для integer. Для `boolean` сохранены `true`/`false` и прежние числовые значения
-`0`/`1`. `datetime`/`json` передаются строками существующему конвертеру/диалекту.
-Проверка неизвестной колонки остаётся в ORM compiler. Новая HTTP-валидация
-значений не добавлена: неподходящие значения и диапазоны хранения по-прежнему
-обрабатываются существующим конвертером, диалектом и provider.
+For `text`, the values `0012`, `000.50`, `9007199254740993` stay exact strings in
+comparisons and lists. For `integer`/`real`, decimal numeric strings become
+numbers; integers outside the JavaScript safe range become bigint for integer.
+For `boolean`, `true`/`false` and the existing numeric values `0`/`1` are kept.
+`datetime`/`json` are passed as strings to the existing converter/dialect.
+The unknown column check stays in the ORM compiler. No new HTTP validation of
+values was added: unsuitable values and storage ranges are still handled by the
+existing converter, dialect and provider.
 
-SQL остаётся параметризованным; `count` и выборка страницы получают одинаковые
-условия. Проверки [orm.listQuery.test.ts](test/orm.listQuery.test.ts) проверяют
-скомпилированные параметры PostgreSQL для scalar/in/nin/OR, text, numeric и
-boolean, включая bigint. Это provider-independent тесты без физической БД;
-не объявляют проверенным выполнение фильтра на PostgreSQL или в бинарнике.
+SQL stays parameterized; `count` and the page query get the same conditions.
+[orm.listQuery.test.ts](test/orm.listQuery.test.ts) checks the compiled PostgreSQL
+parameters for scalar/in/nin/OR, text, numeric and boolean, including bigint. These
+are provider-independent tests without a physical database; they do not claim the
+filter was checked on PostgreSQL or in a binary.
 
-[Физическая регрессия](test/orm.release-095.postgres.live.test.ts) предназначена
-только для одноразового PostgreSQL: `OSNV_RELEASE_095_PG=owned-disposable-v1`,
-`OSNV_RELEASE_095_PG_URL` с `127.0.0.1`, явным портом, отличным от 5432, и базой
-`osnv_release_095`. Тест создаёт уникальную схему `release_095_<uuid>` и свои
-таблицы, проверяет фактическую выборку и удаляет только эту схему в `finally`.
-Обычный прогон без guard даёт SKIP и не подтверждает физическую квалификацию.
+The [physical regression](test/orm.release-095.postgres.live.test.ts) is meant
+only for a throwaway PostgreSQL: `OSNV_RELEASE_095_PG=owned-disposable-v1`,
+`OSNV_RELEASE_095_PG_URL` with `127.0.0.1`, an explicit port other than 5432 and the
+`osnv_release_095` database. The test creates a unique `release_095_<uuid>` schema
+and its own tables, checks the actual query and drops only this schema in `finally`.
+A regular run without the guard gives SKIP and does not confirm physical qualification.
