@@ -64,7 +64,7 @@ test("a cancelled run stops waiting for another caller's connection and releases
     await bounded(running);
     expect({ outcome, activeRuns }).toMatchObject({ outcome: { state: "rejected" }, activeRuns: 0 });
     expect(after).toEqual(before);
-    expect(await f.client.run(input(new AbortController().signal))).toBe("Ответ: fixture-message");
+    expect(await f.client.run(input(new AbortController().signal))).toBe("Reply: fixture-message");
   } finally {
     await f.close();
     await connecting.catch(() => undefined);

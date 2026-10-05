@@ -67,12 +67,12 @@ class ProductRequirementsDocument {
 @Agent({
   name: "system-analyst",
   description: "Prepares business artifacts.",
-  goal: "Помочь пользователю выполнить бизнес-сценарий.",
-  instructions: ["Отвечай кратко.", "Не выдумывай данные."],
+  goal: "Help the user complete a business scenario.",
+  instructions: ["Answer briefly.", "Do not invent data."],
   sections: [
     {
       kind: "tool-policy",
-      content: "Для данных используй только tools.",
+      content: "Use only tools for data.",
     },
   ],
 })
@@ -126,13 +126,13 @@ describe("agent metadata", () => {
       }),
     ]);
     expect(agentMetadataOf(SystemAnalystAgent)).toMatchObject({
-      goal: "Помочь пользователю выполнить бизнес-сценарий.",
-      instructions: ["Отвечай кратко.", "Не выдумывай данные."],
+      goal: "Help the user complete a business scenario.",
+      instructions: ["Answer briefly.", "Do not invent data."],
       constraints: [],
       sections: [
         {
           kind: "tool-policy",
-          content: ["Для данных используй только tools."],
+          content: ["Use only tools for data."],
         },
       ],
     });

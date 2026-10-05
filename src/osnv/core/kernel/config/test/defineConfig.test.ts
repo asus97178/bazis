@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 describe("defineConfig", () => {
-  test("дефолты с типами; get возвращает примитивы нужного типа", () => {
+  test("typed defaults; get returns primitives of the right type", () => {
     const config = defineConfig({
       default: { "http.port": 3000, "log.level": "debug", "feature.x": false },
     });
@@ -26,7 +26,7 @@ describe("defineConfig", () => {
     expect(config.get("feature.x")).toBe(false);
   });
 
-  test("env переопределяет и приводится к типу дефолта", () => {
+  test("env overrides and is converted to the default's type", () => {
     process.env.OSNV_HTTP__PORT = "8080";
     process.env.OSNV_FEATURE__X = "true";
     const config = defineConfig({
@@ -36,7 +36,7 @@ describe("defineConfig", () => {
     expect(config.get("feature.x")).toBe(true);
   });
 
-  test("секция стенда переопределяет дефолт (OSNV_ENV)", () => {
+  test("the environment section overrides the default (OSNV_ENV)", () => {
     process.env.OSNV_ENV = "production";
     const config = defineConfig({
       default: { "log.level": "debug" },
@@ -59,7 +59,7 @@ describe("defineConfig", () => {
     expect(config.get("log.level")).toBe("debug");
   });
 
-  test("секрет с dev-дефолтом — Secret, редактируется в логах", () => {
+  test("a secret with a dev default is a Secret and is redacted in logs", () => {
     const config = defineConfig({
       default: { "jwt.admin.secret": secret("admin-dev-secret-key-padding-0123456789") },
     });
@@ -69,7 +69,7 @@ describe("defineConfig", () => {
     expect(`${value}`).toBe("***");
   });
 
-  test("секрет из env переопределяет dev-дефолт", () => {
+  test("a secret from env overrides the dev default", () => {
     process.env.OSNV_JWT__ADMIN__SECRET = "real-secret-from-env-0123456789-abcdef";
     const config = defineConfig({
       default: { "jwt.admin.secret": secret("dev-fallback-key-padding-0123456789xxx") },
@@ -77,7 +77,7 @@ describe("defineConfig", () => {
     expect(config.get("jwt.admin.secret").reveal()).toBe("real-secret-from-env-0123456789-abcdef");
   });
 
-  test("обязательный секрет без значения — fail-fast", () => {
+  test("a required secret without a value fails fast", () => {
     process.env.OSNV_ENV = "production";
     const config = defineConfig({
       default: { "jwt.admin.secret": secret("dev-only") },
@@ -86,7 +86,7 @@ describe("defineConfig", () => {
     expect(() => config.ensureValid()).toThrow(/jwt.admin.secret/);
   });
 
-  test("нечисловое значение в env — fail-fast", () => {
+  test("a non-numeric env value fails fast", () => {
     process.env.OSNV_HTTP__PORT = "abc";
     const config = defineConfig({ default: { "http.port": 3000 } });
     expect(() => config.ensureValid()).toThrow(/expected a finite number/);
@@ -104,8 +104,8 @@ describe("defineConfig", () => {
     expect(config.get("maxRetries")).toBe(3);
   });
 
-  describe("неймспейс (префикс домена)", () => {
-    test("ключи читаются без префикса, env — с префиксом домена", () => {
+  describe("namespace (domain prefix)", () => {
+    test("keys are read without the prefix, env with the domain prefix", () => {
       process.env.OSNV_DB__HOST = "db.internal";
       const config = defineConfig("db", {
         default: { host: "localhost", port: 5432 },
@@ -114,14 +114,14 @@ describe("defineConfig", () => {
       expect(config.get("port")).toBe(5432);
     });
 
-    test("env без префикса домена не переопределяет namespaced-ключ", () => {
+    test("env without the domain prefix does not override a namespaced key", () => {
       process.env.OSNV_HOST = "wrong";
       const config = defineConfig("db", { default: { host: "localhost" } });
       expect(config.get("host")).toBe("localhost");
       delete process.env.OSNV_HOST;
     });
 
-    test("обязательный секрет домена сообщает полный env-ключ в ошибке", () => {
+    test("a required domain secret reports the full env key in the error", () => {
       process.env.OSNV_ENV = "production";
       const config = defineConfig("db", {
         default: { password: secret("dev-only") },

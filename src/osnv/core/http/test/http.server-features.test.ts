@@ -100,14 +100,14 @@ test("HTTP: port 0 delegates collision-free ephemeral allocation to the OS", asy
   }
 });
 
-describe("HTTP: лимит тела запроса", () => {
+describe("HTTP: request body limit", () => {
   let app: StartedServer;
   beforeAll(async () => {
     app = await startServer({ maxBodyBytes: 32 });
   });
   afterAll(() => app.dispose());
 
-  test("Content-Length больше лимита -> 413", async () => {
+  test("Content-Length above the limit -> 413", async () => {
     const big = JSON.stringify({ payload: "x".repeat(100) });
     const response = await fetch(`${app.base}/things`, {
       method: "POST",
@@ -118,7 +118,7 @@ describe("HTTP: лимит тела запроса", () => {
     expect(((await response.json()) as { error: string }).error).toBe("Payload Too Large");
   });
 
-  test("streaming body без Content-Length тоже ограничивается -> 413", async () => {
+  test("a streaming body without Content-Length is limited too -> 413", async () => {
     const big = JSON.stringify({ payload: "x".repeat(100) });
     const response = await fetch(`${app.base}/things`, {
       method: "POST",
@@ -129,7 +129,7 @@ describe("HTTP: лимит тела запроса", () => {
     expect(((await response.json()) as { error: string }).error).toBe("Payload Too Large");
   });
 
-  test("тело в пределах лимита проходит", async () => {
+  test("a body within the limit passes", async () => {
     const response = await fetch(`${app.base}/things`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -141,7 +141,7 @@ describe("HTTP: лимит тела запроса", () => {
 });
 
 describe("HTTP: CORS config safety", () => {
-  test("credentials требуют явный origin allow-list или predicate", async () => {
+  test("credentials require an explicit origin allow list or predicate", async () => {
     await expect(startServer({ cors: { credentials: true } })).rejects.toThrow("CORS credentials require");
     await expect(startServer({ cors: { origin: "*", credentials: true } })).rejects.toThrow("CORS credentials require");
     await expect(startServer({ cors: { origin: ["*"], credentials: true } })).rejects.toThrow("CORS credentials require");
@@ -163,27 +163,27 @@ describe("HTTP: CORS config safety", () => {
   });
 });
 
-describe("HTTP: авто-HEAD", () => {
+describe("HTTP: automatic HEAD", () => {
   let app: StartedServer;
   beforeAll(async () => {
     app = await startServer({});
   });
   afterAll(() => app.dispose());
 
-  test("HEAD на GET-маршрут: статус и заголовки без тела", async () => {
+  test("HEAD on a GET route: status and headers without a body", async () => {
     const response = await fetch(`${app.base}/things/7`, { method: "HEAD" });
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(await response.text()).toBe("");
   });
 
-  test("HEAD на маршрут без GET -> 405", async () => {
+  test("HEAD on a route without GET -> 405", async () => {
     // /things supports only POST.
     const response = await fetch(`${app.base}/things`, { method: "HEAD" });
     expect(response.status).toBe(405);
   });
 
-  test("HEAD отменяет streaming body GET fallback", async () => {
+  test("HEAD cancels the streaming body of the GET fallback", async () => {
     const response = await fetch(`${app.base}/things/stream`, { method: "HEAD" });
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
@@ -192,7 +192,7 @@ describe("HTTP: авто-HEAD", () => {
 });
 
 describe("HTTP: access log", () => {
-  test("логирует метод, путь, статус и длительность", async () => {
+  test("logs method, path, status and duration", async () => {
     const entries: AccessLogEntry[] = [];
     const app = await startServer({ accessLog: { log: (entry) => entries.push(entry) } });
     try {
@@ -205,7 +205,7 @@ describe("HTTP: access log", () => {
     }
   });
 
-  test("логирует framework 404 и ошибка sink не ломает ответ", async () => {
+  test("logs a framework 404, and a sink error does not break the response", async () => {
     const entries: AccessLogEntry[] = [];
     const app = await startServer({
       accessLog: {
@@ -233,7 +233,7 @@ describe("HTTP: access log", () => {
 });
 
 describe("HTTP: health endpoint", () => {
-  test("без HealthService -> 200 healthy", async () => {
+  test("without HealthService -> 200 healthy", async () => {
     const app = await startServer({ health: true });
     try {
       const response = await fetch(`${app.base}/health`);
@@ -244,7 +244,7 @@ describe("HTTP: health endpoint", () => {
     }
   });
 
-  test("падающая проверка -> 503 с отчётом", async () => {
+  test("a failing check -> 503 with a report", async () => {
     const providers = [
       DI.singleton(
         DI.valueProvider(HEALTH_CHECK, {
@@ -272,7 +272,7 @@ describe("HTTP: health endpoint", () => {
     }
   });
 
-  test("details доступны только по явному opt-in", async () => {
+  test("details are available only with an explicit opt-in", async () => {
     const providers = [
       DI.singleton(
         DI.valueProvider(HEALTH_CHECK, {
