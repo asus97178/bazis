@@ -121,7 +121,7 @@ Legacy по умолчанию выключен. Если задан, тольк
 Состояние ring принадлежит процессу. Распространение набора и списка отзывов,
 его безопасное хранение и восстановление после restart принадлежат host.
 Обязательная последовательность rollout, TTL/clock skew и действия при
-компрометации: [эксплуатационная инструкция](../../../../docs/audits/2026-09-14-jwt/OPERATIONS.md).
+компрометации: [эксплуатационная инструкция](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/OPERATIONS.md).
 
 ## 4. Настройки и публичные операции
 
@@ -224,7 +224,7 @@ timingSafeEqual остаётся совместимым экспортом; HMAC
 ## 5. Проверки и границы
 
 Текущий результат после подключения штатного Auth и bounded legacy migration:
-[INTEGRATION.md](../../../../docs/audits/2026-09-14-jwt/INTEGRATION.md).
+[INTEGRATION.md](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/INTEGRATION.md).
 Числа ниже относятся к предыдущему снимку квалификации до этого подключения.
 
 JWT, регрессии, HTTP-граница, config isolation/TTL и Admin access validation:
@@ -241,15 +241,15 @@ HS256/RS256 также запущен вне исходного каталога
 после прогрева — 5.75 MiB; отсутствие всех утечек этим не доказывается.
 
 Доказательства, команды, SHA-256 и границы:
-[квалификация](../../../../docs/audits/2026-09-14-jwt/QUALIFICATION.md).
+[квалификация](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/QUALIFICATION.md).
 История первоначальных шести исправлений и 30 audit-проб:
-[FIXES.md](../../../../docs/audits/2026-09-14-jwt/FIXES.md).
+[FIXES.md](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/FIXES.md).
 Независимое внешнее заключение, production rollout ключей и SLO отсутствуют.
 DI-конструкторы не менялись, результаты codegen вручную не редактировались.
 
 ## 6. Источники
 
-- [Первичный аудит JWT](../../../../docs/audits/2026-09-14-jwt/REPORT.md).
+- [Первичный аудит JWT](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/REPORT.md).
 - [Архитектура модулей](../../../../docs/architecture/MODULE_ARCHITECTURE.md).
 - [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519.html).
 - [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html).

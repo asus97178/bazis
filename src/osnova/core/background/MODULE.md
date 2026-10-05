@@ -66,5 +66,5 @@ HostedService. BackgroundService владеет отменой, выполняе
 В собранной через `bun build --compile` регрессионной fixture проверены три
 запуска задачи при sync throw и Promise rejection диагностического callback;
 бинарник исполнен вне проекта. Команды и результаты — в
-[отчёте об исправлениях](../../../../docs/audits/framework-reaudit-2026-10-04/FIXES.md).
+[отчёте об исправлениях](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-reaudit-2026-10-04/FIXES.md).
 БД, нагрузочные испытания и production не затрагивались.

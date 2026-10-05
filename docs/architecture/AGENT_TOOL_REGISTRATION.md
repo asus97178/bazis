@@ -157,4 +157,4 @@ Admin build и бинарная проба. БД и внешний LLM для э
 управляемыми портами; живые PostgreSQL и провайдер в этой задаче не запускались.
 Результат: 471 тест без ошибок, TypeScript/Admin build и сборка app/CLI — PASS.
 Браузерная проверка формы и запуск бинарной пробы вне checkout — PASS.
-Команды и границы — в [отчёте](../audits/agent-tools-module-2026-10-02.md).
+Команды и границы — в [отчёте](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agent-tools-module-2026-10-02.md).

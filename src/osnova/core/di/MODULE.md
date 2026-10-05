@@ -6,8 +6,8 @@
 Путь: `src/osnova/core/di`.
 Точки подключения: `ServiceCollection.buildServiceProvider()` и `createContainer()`.
 Область паспорта: регистрация, разрешение зависимостей, активации, scopes и
-освобождение ресурсов. Модульные расширения и Options/Application подробно
-описаны в [DI.md](DI.md); этот паспорт не заменяет их контрактов.
+освобождение ресурсов, модульные расширения и Options/Application; публичные
+сигнатуры — в [index.ts](index.ts) и типах `provider/`, `module/`.
 Создание каркаса: существовал до обязательной генерации через CLI. В этом
 рефакторинге добавлены внутренние классы существующего DI; новые архитектурные
 модули и декларации `@Module` не создавались.
@@ -176,7 +176,7 @@ open generic проходит то же преобразование до пуб
 
 Поля регистраций и dependency descriptors определены в
 [ProviderDefinition](provider/types/ProviderDefinition.ts),
-[Provider](provider/types/Provider.ts), [token.ts](token.ts) и [DI.md](DI.md).
+[Provider](provider/types/Provider.ts) и [token.ts](token.ts).
 Здесь зафиксированы входы затронутого ядра; необязательное расширение
 `ClassProvider.activation` после архитектурного аудита описано в §5.
 
@@ -240,7 +240,7 @@ DI удерживает уже созданный ресурс для освоб
 
 Проверено на macOS arm64, Bun 1.4.0 / `34cbb9a40`, через закреплённый launcher.
 Подробные результаты, исходный snapshot и команды — в
-[отчёте рефакторинга](../../../../docs/audits/di-structure-2026-09-19.md).
+[отчёте рефакторинга](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/di-structure-2026-09-19.md).
 
 | Проверка | Результат |
 | --- | --- |
@@ -261,14 +261,14 @@ DI удерживает уже созданный ресурс для освоб
 изоляции scoped-экземпляров, независимости публичных массивов и ограничения
 роста новых кэшей при 10 000 отсутствующих ключей.
 Измерения, проверка бинарника и границы результата — в
-[отчёте производительности](../../../../docs/audits/di-performance-2026-09-19/REPORT.md).
+[отчёте производительности](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/di-performance-2026-09-19/REPORT.md).
 
 Проверки исправлений от 2026-10-02: DI-регрессии constructor identity,
 late bootstrap, module cycles, выбор владельца token/key/generic и активация
 обёрток входят в последовательный набор **693 PASS / 0 FAIL**.
 TypeScript, реальный codegen и standalone-бинарник — PASS. Команды, отдельный
 HTTP-прогон и промежуточные сбои сохранены в
-[отчёте исправлений](../../../../docs/audits/framework-architecture-2026-10-02/FIXES.md).
+[отчёте исправлений](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-architecture-2026-10-02/FIXES.md).
 
 ### Проверка плана hosted-служб (2026-10-02)
 
@@ -328,7 +328,6 @@ Helpers сохраняют экземпляр перед вызовом его `
 Повторный stop разделяет результат выполненной очистки. После его завершения
 разрешён новый start. Ошибка старта сама по себе не вызывает dispose: эти
 низкоуровневые helpers сохраняют ответственность вызывающего за cleanup.
-Контракты ручного сценария и ограничения описаны в [DI.md](DI.md#616-application-запуск-и-graceful-shutdown).
 Регрессии: [di.hosted-lifecycle.test.ts](test/di.hosted-lifecycle.test.ts).
 
 ### Встроенная зависимость ServiceProvider (2026-10-02)

@@ -6,7 +6,7 @@
 входы зафиксированы в [контрактах config](config/README.md).
 Тип: существующая атомарная инфраструктурная ответственность — жизненный цикл host.
 Точка подключения: `KernelBuilder.build()` / `Osnova.run()`.
-Область паспорта: K01–K08 из [аудита](../../../../docs/audits/kernel-2026-09-13.md)
+Область паспорта: K01–K08 из [аудита](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-2026-09-13.md)
 и принятое решение о разделении объявления конфигурации и представления kernel.
 Это частичный паспорт: полные контракты config sources, health, корреляции,
 модульных подписчиков и ORM admission здесь не переопределяются.
@@ -23,7 +23,7 @@ Promise обработано. Check должен быть зарегистрир
 Infra checks. Лимит `concurrency` остаётся лимитом одного отчёта; разные экземпляры
 HealthService и разные проверки не получают общего глобального лимита.
 Сигнатуры `HealthCheckOptions` и результата сохранены. Обоснование и приёмка:
-[план](../../../../docs/audits/2026-09-14-infra-config-acceptance/PLAN.md).
+[план](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/PLAN.md).
 
 ## 1. Ответственность и структура
 
@@ -224,7 +224,7 @@ RestartPolicy сохраняет `maxAttempts` (3), `backoffMs` (100), `maxBacko
 | TypeScript всего `src` при исправлении K01–K08 | PASS, exit 0; промежуточные ошибки WebSocket сохранены в отчёте |
 
 Проверенные команды и журналы фиксируются в
-[отчёте об исправлениях](../../../../docs/audits/kernel-fixes-2026-09-14.md).
+[отчёте об исправлениях](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-fixes-2026-09-14.md).
 Физические PostgreSQL/контейнерные проверки неприменимы к этим изменениям.
 Эти результаты относятся к исправлениям K01–K08 и не подтверждают реализацию §7.
 Публичные конструкторные зависимости и генерируемые контракты при фиксации
@@ -279,4 +279,4 @@ RestartPolicy сохраняет `maxAttempts` (3), `backoffMs` (100), `maxBacko
 30 файлов. Двенадцать новых проверок изоляции находятся в kernel, auth и session.
 TypeScript затронутой области, codegen и бинарные проверки прошли.
 Состояние общего TypeScript и состав SKIP перечислены в
-[отчёте](../../../../docs/audits/kernel-config-isolation-2026-09-14.md).
+[отчёте](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).

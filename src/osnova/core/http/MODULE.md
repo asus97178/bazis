@@ -33,15 +33,15 @@
 ## Проверки
 
 Исправление HTTP-E05 и повторная проверка исходников/HTTP-бинарника без клиентского
-приложения: [отчёт](../../../../docs/audits/2026-09-14-http-enterprise-fixes/REPORT.md).
+приложения: [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-enterprise-fixes/REPORT.md).
 Следующие ссылки и счётчики относятся к предыдущим снимкам.
 
-Дополнительная [квалификация приложения, браузеров, Node-клиента и нагрузки](../../../../docs/audits/2026-09-14-http-qualification/REPORT.md)
+Дополнительная [квалификация приложения, браузеров, Node-клиента и нагрузки](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-qualification/REPORT.md)
 проверяет ту же серверную реализацию с реально включённой общей конфигурацией
 приложения. Отдельно указаны Safari WebDriver и результаты текущей Vue-сборки.
 Ниже — результаты предыдущего снимка согласованного протокола.
 
-Проверено: opt-in с обеих сторон, обычные redirects без согласования, HEAD, CORS и cache metadata, immutable Response, raw file Range, задержанный поток и ошибка конфигурации. Полный HTTP-набор — 274 PASS / 0 FAIL; согласованный режим в Chromium — 28 сценариев / 73 assertions; штатный режим — ещё 22 сценария / 68 assertions. TypeScript — PASS. [Отчёт и команды](../../../../docs/audits/2026-09-14-http-redirects/REPORT.md).
+Проверено: opt-in с обеих сторон, обычные redirects без согласования, HEAD, CORS и cache metadata, immutable Response, raw file Range, задержанный поток и ошибка конфигурации. Полный HTTP-набор — 274 PASS / 0 FAIL; согласованный режим в Chromium — 28 сценариев / 73 assertions; штатный режим — ещё 22 сценария / 68 assertions. TypeScript — PASS. [Отчёт и команды](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-redirects/REPORT.md).
 
 Нативная ошибка открытия файла возникает после pipeline и может не содержать подтверждения протокола; клиент сохраняет такой HTTP 500 как ошибку HTTP. CORS для этой нативной ошибки сохраняет существующие ограничения сервера. Нагрузка, Node, другие браузеры и production в эти проверки не входят.
 
@@ -78,7 +78,7 @@
 на всех уровнях, сохраняя generated hydration вложенных DTO и массивов, лимиты
 глубины/сложности и защиту ключей. Обычные HTTP-вызовы сохраняют удаление лишних
 полей и существующий валидатор. Эти options не добавлены в HTTP barrel exports.
-Проверки: [исправления Agent/Tool](../../../../docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
+Проверки: [исправления Agent/Tool](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
 
 ## Проверка примитивных типов (0.96.1)
 

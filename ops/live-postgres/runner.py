@@ -19,10 +19,10 @@ BASE.mkdir(parents=True, exist_ok=False)
 DOCKER = '/usr/local/bin/docker'
 IMAGE = 'postgres:17-alpine'
 LAUNCHER = str(ROOT / 'scripts/osnova-bun')
-IGNORES = ['--path-ignore-patterns=**/*.browser.spec.ts', '--path-ignore-patterns=**/docs/audits/**', '--path-ignore-patterns=**/bin/**']
+IGNORES = ['--path-ignore-patterns=**/*.browser.spec.ts', '--path-ignore-patterns=**/bin/**']
 # Upstream driver defects documented elsewhere: reported, never counted as PASS.
 KNOWN_EXTERNAL = {'orm.qualification-20260913.native-cancel.live.test.ts':
-                  'Bun.SQL cancel() does not cancel the server query; see docs/audits/orm-2026-09-14-qualification.md'}
+                  'Bun.SQL cancel() does not cancel the server query; see https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-qualification.md'}
 run_id = uuid.uuid4().hex[:12]
 label = 'osnova.orm-qualification-run=' + run_id
 password, worker_password = secrets.token_hex(24), secrets.token_hex(24)

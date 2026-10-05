@@ -104,11 +104,11 @@ transactionTimeoutMs: 15_000, // PostgreSQL 17+
 
 `test/orm.connection-policy.test.ts` проверяет неверные поля, прохождение срока
 операции и сигнала health. Физические сценарии, бинарное исполнение и TLS-проверка
-описаны в [отчёте реализации](../../../../docs/audits/orm-bun-sql-hardening-2026-09-14.md).
+описаны в [отчёте реализации](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
 Типы и итоговые результаты всегда берутся из последнего receipt отчёта.
 
 Серверная отмена через отдельное Bun.SQL-подключение по умолчанию включена;
-[её квалификация](../../../../docs/audits/orm-server-cancel-integration-2026-09-14.md)
+[её квалификация](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md)
 отделена от старого режима close. Прямая быстрая отмена закрытием TLS на
 квалифицированном Bun 1.4.0 остаётся непройденной:
 закрытие native Promise не гарантирует немедленное прекращение SQL на сервере.

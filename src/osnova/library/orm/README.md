@@ -222,15 +222,15 @@ ORM-коннектор передаёт настройки пула, подкл�
 [паспорте core/orm](../../core/orm/MODULE.md).
 
 Результаты текущего server-режима, реальные AbortSignal-сценарии TCP/TLS и
-бинарная квалификация — в [отчёте интеграции](../../../../docs/audits/orm-server-cancel-integration-2026-09-14.md).
+бинарная квалификация — в [отчёте интеграции](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md).
 Прежние физические проверки close-режима подтвердили отмену за 395–402 мс, rollback,
 восстановление ключей, снятие advisory locks, сохранность соседнего активного
 запроса в том же пуле и дальнейшие сохранения. Это измерение локального прогона,
-а не срок для любой среды. [Исправление и доказательства](../../../../docs/audits/orm-2026-09-14-cancellation-fix.md),
+а не срок для любой среды. [Исправление и доказательства](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-cancellation-fix.md),
 [контракт отмены](MODULE.md). Прямой вызов `Bun.SQL Query.cancel()` остаётся
-отдельным непройденным gate из [предыдущей квалификации](../../../../docs/audits/orm-2026-09-14-qualification.md).
+отдельным непройденным gate из [предыдущей квалификации](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-qualification.md).
 Новые ограничения времени, сбои сети, TLS и бинарное исполнение описаны в
-[отчёте доработки](../../../../docs/audits/orm-bun-sql-hardening-2026-09-14.md).
+[отчёте доработки](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
 
 `findForUpdate()` обновляет только чистую отслеживаемую сущность. Несохранённые
 обычные присваивания, изменения JSON/Date и явный `update()` вызывают отказ

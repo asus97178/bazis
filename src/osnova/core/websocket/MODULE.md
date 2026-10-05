@@ -254,13 +254,13 @@ strict initialize: явное reliable.requireAof=false снимает пров�
 ## 6. Проверки и граница готовности
 
 Актуальные команды, PASS/FAIL, профиль нагрузки, хеши и эксплуатационные границы:
-[квалификация enterprise WebSocket](../../../../docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
+[квалификация enterprise WebSocket](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
 Проверки используют закреплённый Bun 1.4.0; toolchain не менялся. Production и
 прикладная БД не изменялись. Отклонений от
 [MOD-ARCH-001](../../../../docs/architecture/MODULE_ARCHITECTURE.md) нет.
 
-Исторические проверки: [надёжность replay](../../../../docs/audits/2026-09-14-websocket-reliability/REPORT.md)
-и [семь исправлений аудита](../../../../docs/audits/2026-09-14-websocket-fixes/REPORT.md).
+Исторические проверки: [надёжность replay](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-reliability/REPORT.md)
+и [семь исправлений аудита](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-fixes/REPORT.md).
 Они не заменяют квалификацию текущего состояния файлов.
 
 ## Прикладная авторизация через DI и отдельный выходной лимит (2026-09-20)
@@ -318,4 +318,4 @@ TCP-подключения к закрытому listener и завершени�
 Redis и нагрузочная квалификация этим изменением не подтверждены.
 Новых зависимостей, ресурсов или dynamic imports нет; проверки собранной
 регрессионной fixture описаны в
-[отчёте об исправлениях](../../../../docs/audits/framework-reaudit-2026-10-04/FIXES.md).
+[отчёте об исправлениях](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-reaudit-2026-10-04/FIXES.md).

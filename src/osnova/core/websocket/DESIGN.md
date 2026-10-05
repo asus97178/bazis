@@ -229,7 +229,7 @@ AOF LOADING is not readiness: keep the application out of traffic until the
 store serves commands, then initialize with bounded retries.
 
 Physical evidence and the supported deployment boundary are in the
-[enterprise qualification](../../../../docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
+[enterprise qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
 The atomic boundary is one Redis primary/replication group. Cross-slot Redis
 Cluster, arbitrary automatic replica promotion, WAN and production WSS require
 separate deployment evidence. External exactly-once effects remain application-owned.

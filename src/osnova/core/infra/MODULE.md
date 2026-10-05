@@ -53,7 +53,7 @@ LLM-адаптеру достаточно `create(options)`; `connect`, `dispose
 остаются необязательными. Выбор реализации выполняется передачей самого адаптера.
 Новых реестров типов, полей классификации и модулей не введено.
 Сценарии пользовательских коннекторов, отказы ORM, результаты и бинарные проверки:
-[отчёт изменения контракта](../../../../docs/audits/framework-design-2026-10-02/INFRA_CONNECTOR_CONTRACT.md).
+[отчёт изменения контракта](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-design-2026-10-02/INFRA_CONNECTOR_CONTRACT.md).
 
 | Операция / поле | Тип, default | Проверка / результат |
 | --- | --- | --- |
@@ -73,10 +73,10 @@ Null для входов не поддерживается. Ошибки в ко
 
 ## Проверки и компромиссы
 
-Выполнены D02/D03 и связанные регрессии из [плана](../../../../docs/audits/2026-09-14-infra-config/WORK_PLAN.md).
+Выполнены D02/D03 и связанные регрессии из [плана](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config/WORK_PLAN.md).
 Простой stateful lifecycle оставляет одного владельца ресурса. Настройки и граф
 проверяются на холодном пути; новые сетевые вызовы и retries не добавляются.
-Бинарное исполнение проверено контролируемой фикстурой; итоги в [отчёте](../../../../docs/audits/2026-09-14-infra-config/RESULT.md).
+Бинарное исполнение проверено контролируемой фикстурой; итоги в [отчёте](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config/RESULT.md).
 
 ## Конфигурация каждого kernel
 
@@ -90,10 +90,10 @@ standalone-вызовы. Lifecycle сохраняет идентичность �
 значения конфигурации. Проверяются также отложенные фабрики профилей LLM.
 
 Реализовано и проверено для двух kernel с общим манифестом:
-[отчёт об изоляции](../../../../docs/audits/kernel-config-isolation-2026-09-14.md).
+[отчёт об изоляции](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
 Эта проверка не подменяет приёмку остальных работ аудита Infra.
 При отдельной проверке изоляции физические сервисы не запускались.
-Позднее выполнена [локальная эксплуатационная приёмка](../../../../docs/audits/2026-09-14-infra-config-acceptance/RESULT.md)
+Позднее выполнена [локальная эксплуатационная приёмка](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/RESULT.md)
 с PostgreSQL/Valkey и измерениями. Допуск новых платформ не заявляется.
 Отклонений от архитектурной спецификации нет.
 
@@ -174,7 +174,7 @@ LLM router создаёт адаптеры при первом connect/complete/
 Отмена health возвращает false, остальные запросы отклоняются.
 Пользовательский fetch обязан соблюдать signal; принудительная остановка
 произвольной реализации не обещается. Контролируемые сетевые сценарии и границы:
-[эксплуатационная приёмка](../../../../docs/audits/2026-09-14-infra-config-acceptance/PLAN.md).
+[эксплуатационная приёмка](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/PLAN.md).
 
 ## Структурированный вывод LLM
 
@@ -193,7 +193,7 @@ LLM router создаёт адаптеры при первом connect/complete/
 `additionalProperties: false`; схемы приложения должны соответствовать этим
 ограничениям. [Протокол OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs).
 Wire format проверен локальным fetch; реальные model endpoints не вызывались.
-[Проверки исправлений](../../../../docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
+[Проверки исправлений](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
 
 ## Поток текста модели
 
@@ -220,7 +220,7 @@ Router разрешает fallback только до первого непуст
 ограниченные имя и аргументы. Частичный или противоречивый вызов не передаётся executor.
 Модельные аргументы дополнительно проверяются обычным Tool executor перед выполнением.
 Совместимость Ollama: [официальный протокол](https://docs.ollama.com/api/openai-compatibility).
-Проверки потока: [source, binary и браузер](../../../../docs/audits/client-chat-streaming-2026-09-20.md).
+Проверки потока: [source, binary и браузер](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/client-chat-streaming-2026-09-20.md).
 
 ## Codex App Server
 
@@ -329,9 +329,9 @@ Callback отменяется по lifetime signal; ожидание огран�
 Agents передаёт callback в штатный AgentToolExecutor, где действуют DTO, допуск,
 scope, timeout и hooks. Добавление операций записи требует отдельной политики допуска.
 
-Проверки: [codex.test.ts](test/codex.test.ts), физический прогон — [отчёт](../../../../docs/audits/codex-chatgpt-2026-09-20.md) (скрипты пробы удалены в 0.96.1, остались в истории git).
+Проверки: [codex.test.ts](test/codex.test.ts), физический прогон — [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/codex-chatgpt-2026-09-20.md) (скрипты пробы удалены в 0.96.1, остались в истории git).
 Изоляция навыков: проверка настоящего CLI без аккаунта
-— [результаты от 2026-09-21](../../../../docs/audits/codex-skills-2026-09-21.md).
+— [результаты от 2026-09-21](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/codex-skills-2026-09-21.md).
 PASS: реальный CLI handshake/policy/account-read без входа; mock subprocess
 streaming, отмена/смерть/ошибки/изоляция; собранный binary + отдельная PostgreSQL БД
 и реальные WebSocket. Реальная генерация ChatGPT требует входа владельца и до
