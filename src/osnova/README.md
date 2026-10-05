@@ -1,49 +1,125 @@
-# osnv — Osnova
+# osnv
 
-Модульный backend-фреймворк для [Bun](https://bun.com) на TypeScript: DI с
-кодогенерацией, HTTP, ORM для PostgreSQL, JWT, WebSocket, фоновые службы,
-AI-агенты и CLI. Пакет поставляется исходниками TypeScript и работает только
-в Bun (≥ 1.4.0): сборка в JavaScript не нужна, типы берутся из исходников.
+A modular backend framework for [Bun](https://bun.com), written in TypeScript:
+constructor dependency injection wired by code generation, HTTP controllers
+with validated request models, an ORM for PostgreSQL, configuration with
+per-environment defaults, JWT, WebSocket, gRPC, background services, AI agents
+and a CLI that scaffolds, runs, tests and compiles your app into a single
+executable.
 
-## Новый проект
+The package ships TypeScript sources and runs on Bun only (≥ 1.4.0). There is
+no build step and no separate type package.
+
+## Quick start
 
 ```sh
 bunx osnv new MyApp
 cd my-app
 bun install
-bunx osnv dev      # GET http://127.0.0.1:3000/health
+bunx osnv dev            # GET http://127.0.0.1:3000/health
 ```
 
-Модуль внутри проекта: `bunx osnv g module Task --empty` (кодогенерация
-запускается сама). Разработка с перезапуском при изменениях: `bunx osnv dev --watch`.
-Тесты: `bunx osnv test`. Проверка типов: `bunx osnv build`; бинарник: `bunx osnv build --bin`.
+`osnv new` creates a project with `src/index.ts`, a root `AppModule`,
+`osnv.config.json`, scripts, a `/health` test and an `.env.example`.
 
-`osnv dev`, `test`, `build` сами запускают кодогенерацию. Если запустить
-приложение в обход CLI после правки кода, оно предупредит при старте, что
-сгенерированный код устарел.
+## CLI
 
-## В существующем проекте
+| Command | What it does |
+| --- | --- |
+| `osnv new <Name>` | Create a project in `./<name>` |
+| `osnv g module <Name> --empty\|--minimal\|--full` | Add a module: empty; CRUD with ORM, validation and paging; or the same with auth guards |
+| `osnv g pack <Name> --parts a,b` | Add a composite module made of several atomic ones |
+| `osnv codegen` | Regenerate dependency wiring into `src/generated/osnv` |
+| `osnv dev [--watch]` | Codegen, then run the app from source with `OSNV_ENV=development` (unless set); `--watch` restarts on changes in `src/` |
+| `osnv test [args]` | Codegen, then `bun test` |
+| `osnv build` | Codegen and typecheck |
+| `osnv build --bin` | Also compile `bin/<name>`, a standalone executable |
 
-```sh
-bun add osnv
-```
+`dev`, `test` and `build` run codegen themselves. If you start the app some
+other way after changing code, it warns at startup that the generated code is
+out of date. A compiled binary carries everything it needs and skips that
+check.
+
+## A module
 
 ```ts
-// src/index.ts — так его создаёт `bunx osnv new`
-import { runApp } from "osnv/core/app";
-import { AppModule } from "./app/modules/App.module";
-import { registerOsnovaGeneratedRuntime } from "./generated/osnv/runtime";
+// src/app/modules/greeting/Greeting.module.ts
+import { Module, scoped } from "osnv/core/di";
+import { Controller, Get } from "osnv/core/http";
 
-await registerOsnovaGeneratedRuntime();
-await runApp(AppModule, { http: { hostname: "127.0.0.1", port: 3000, health: true } });
+export class GreetingService {
+  hello(name: string) {
+    return { message: `Hello, ${name}` };
+  }
+}
+
+@Controller("greetings")
+export class GreetingController {
+  // No registration code: `osnv codegen` reads the constructor.
+  constructor(private readonly greetings: GreetingService) {}
+
+  @Get(":name")
+  get(name: string) {
+    return this.greetings.hello(name);
+  }
+}
+
+@Module({
+  controllers: [GreetingController],
+  providers: [scoped(GreetingService)],
+  exports: [GreetingService],
+})
+export class GreetingModule {}
 ```
 
-`src/generated/osnv/` создаёт кодогенерация
-`bun run node_modules/osnv/core/scripts/di-generate.ts` по файлу
-`osnv.config.json`: она связывает зависимости конструкторов и HTTP-модели.
-Проще всего начать с `bunx osnv new` — он создаёт эти файлы и скрипты.
-Публичные входы перечислены в `exports` файла `package.json`.
+`bunx osnv g module Greeting --empty` creates this file with an empty module
+and adds `GreetingModule` to the `imports` of `AppModule`. With the code above,
+`GET /greetings/world` answers `{"message":"Hello, world"}`. Another module
+that imports `GreetingModule` can take `GreetingService` in its own
+constructor.
 
-## Лицензия
+## Database
+
+```ts
+// src/app/infra/App.infra.ts
+import { Infra } from "osnv/core/infra";
+import { ormOsnovaConnect } from "osnv/core/orm";
+import { dbConfig } from "../config/db.config"; // defineConfig("db", { default: { host, port, ... } })
+
+@Infra({ db: ormOsnovaConnect(dbConfig) })
+export class AppInfra {}
+
+// src/index.ts
+await runApp(AppModule, { infra: AppInfra, http: { port: 3000, health: true } });
+```
+
+A feature module attaches its own `DbContext` and entities with
+`ormOsnova: { context, entities }`; its services take that context in their
+constructors. `bunx osnv g module Task --minimal` generates such a module.
+Configuration values can be overridden from the environment
+(`OSNV_DB__HOST`, `OSNV_DB__PASSWORD`, ...). Invalid configuration or a
+missing production secret stops startup with an error that names the key.
+
+## Example
+
+The source repository contains `examples/todo`: three modules (projects,
+tasks and a report), PostgreSQL, cross-module injection, validation, JSON:API
+lists, an end-to-end test and a binary build.
+
+## Entry points
+
+Import from the subpaths listed in `exports` of `package.json`:
+`osnv/core/app`, `osnv/core/di`, `osnv/core/http`, `osnv/core/orm`,
+`osnv/core/infra`, `osnv/core/kernel`, `osnv/library/validation`,
+`osnv/library/jsonapi` and others. Anything not listed there is internal.
+
+## Status
+
+Pre-1.0: a minor version (0.x) can contain breaking changes; a patch version
+does not. Some built-in texts (validation messages, parts of the CLI
+scaffold) are in Russian for now. Validation messages can be replaced with
+`MessageRegistry.setDefaults` from `osnv/library/validation`.
+
+## License
 
 MIT
