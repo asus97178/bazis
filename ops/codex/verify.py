@@ -54,7 +54,7 @@ try:
     (home/'fixture-account').write_text('fixture')
     fixture=ROOT/'src/osnova/core/infra/test/fixtures/codex-server.py'; fixture.chmod(0o700)
     settings=json.loads((PREVIEW/'private-config.json').read_text())['app_env']
-    settings.update(OSNV_DB__DATABASE=database,OSNV_HTTP__PORT='3102',OSNV_ADMIN_PORT='3102',OSNV_LLM__BASE_URL=f'http://127.0.0.1:{model.server_port}/v1',
+    settings.update(OSNV_DB__DATABASE=database,OSNV_HTTP__PORT='3102',OSNV_LLM__BASE_URL=f'http://127.0.0.1:{model.server_port}/v1',
         OSNV_CODEX__ENABLED='true',OSNV_CODEX__BINARY=str(fixture),OSNV_CODEX__STATE_DIRECTORY=str(state))
     with (BASE/'app.log').open('w') as log: app=subprocess.Popen([str(ROOT/'bin/osnova-app')],cwd=work,env=dict(env,**settings),stdin=subprocess.DEVNULL,stdout=log,stderr=log)
     for _ in range(150):

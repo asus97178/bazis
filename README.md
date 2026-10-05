@@ -55,9 +55,7 @@ SMS.RU нужен при фактической отправке SMS. Redis и O
 
 ```sh
 ./scripts/osnova-bun run dev
-# Отдельный backend для разработки Admin UI:
-./scripts/osnova-bun run admin:backend
-# В другом терминале:
+# Admin UI (Vite проксирует /api на этот же backend, порт 3000), в другом терминале:
 ./scripts/osnova-bun run admin:ui
 ```
 
@@ -84,9 +82,9 @@ SMS.RU нужен при фактической отправке SMS. Redis и O
 
 | Настройка | Development default | Production / ограничения |
 | --- | --- | --- |
-| `http.port` / `http.adminPort` | 3000 | Целое 1…65535; прежний `OSNV_ADMIN_PORT` поддерживается |
-| `http.hostname` / `http.adminHostname` | `0.0.0.0` | IPv4/IPv6 либо `localhost`; для loopback задайте `127.0.0.1`; alias `OSNV_ADMIN_HTTP__HOSTNAME` |
-| `http.corsOrigins` / `http.adminCorsOrigins` | Локальные UI origins | В production список пуст; задайте точные origins через запятую |
+| `http.port` | 3000 | Целое 1…65535 |
+| `http.hostname` | `0.0.0.0` | IPv4/IPv6 либо `localhost`; для loopback задайте `127.0.0.1` |
+| `http.corsOrigins` | Локальные UI origins | В production список пуст; задайте точные origins через запятую |
 | `db.tls` | disable | verify-full по умолчанию; режимы Bun TLS |
 | `db.max` | 10 соединений | Целое 1…1000 |
 | `db.connectionTimeout` | 10 секунд | 1…3600 секунд |

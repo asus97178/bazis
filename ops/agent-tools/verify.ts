@@ -7,7 +7,6 @@ import type { CodexClient } from "@osnova/core/infra";
 import { hs256, TokenService } from "@osnova/library/jwt";
 import { registerOsnovaGeneratedRuntime } from "../../src/generated/osnv/runtime";
 import { AppModule } from "../../src/app/modules/App.module";
-import { AdminUiDevModule } from "../../src/app/modules/AdminUiDev.module";
 import { ACCESS_TOKEN_VALIDATOR } from "../../src/app/modules/auth/accessTokenValidation";
 import { TokenKind } from "../../src/app/modules/auth/tokenKinds";
 import type { AgentDocument } from "../../src/app/modules/agents/contracts/Agent.document";
@@ -17,7 +16,6 @@ import { ToolsModule } from "../../src/app/modules/agents/tools/Tools.module";
 
 await registerOsnovaGeneratedRuntime();
 assert.deepEqual(AgentRegistry.fromModules([AppModule]).listTools().map(tool => tool.metadata.name), ["agents.getAll"]);
-assert.deepEqual(AgentRegistry.fromModules([AdminUiDevModule]).listTools().map(tool => tool.metadata.name), ["agents.getAll"]);
 const definition: AgentDocument = { id: "probe", name: "Probe", description: "", instructions: "Read the agent catalog.",
   toolNames: ["agents.getAll"], modelProfile: "", enabled: true, revision: 1, createdAt: "", updatedAt: "" };
 let reads = 0;
