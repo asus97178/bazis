@@ -192,7 +192,7 @@ export class ModelBuilder {
     let generated: KeyGeneration = "none";
     if (isKey) {
       if (convention === "uuid" || raw.type === "uuid") {
-        generated = "uuid";
+        generated = raw.uuidVersion === "v7" ? "uuidV7" : "uuid";
         convention = undefined;
       } else if (raw.keyGenerated ?? storageType === "integer") {
         generated = "identity";
@@ -203,7 +203,6 @@ export class ModelBuilder {
         `Entity "${entityName}": key "${raw.propertyName}" has keyGenerated=true but is not an integer identity key.`,
       );
     }
-    if (raw.uuidVersion === "v7") throw new ModelBuildError(`Entity "${entityName}": UUID v7 is not supported by PostgreSQL exact schema admission.`);
     // The key and semantic timestamp fields are always NOT NULL.
     const required =
       isKey ||

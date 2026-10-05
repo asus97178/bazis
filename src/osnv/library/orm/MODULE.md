@@ -1,6 +1,6 @@
 # ORM: сроки операций и отмена transactionScope
 
-Версия паспорта: 8. Дата сверки: 2026-10-04.
+Версия паспорта: 9. Дата сверки: 2026-10-05.
 Статус: серверная отмена интегрирована; результаты TCP/TLS и бинарной квалификации приведены в разделе 6. Production-топологии и остальные платформы не квалифицированы.
 Тип: существующая атомарная библиотечная функция управления ORM-транзакцией.
 Путь: `src/osnv/library/orm`.
@@ -386,3 +386,33 @@ JSON-типов диалект создаёт замороженный внут�
 и удаляет только собственную случайную схему. Само наличие теста и его
 ENV_OFF-пропуск не являются успешной физической проверкой; результаты
 конкретного запуска фиксируются отдельно в отчёте повторного аудита.
+
+## 12. UUID v7 keys (2026-10-05)
+
+`@UUID({ version: "v7" })` and a dynamic-table key `{ type: "uuid", isKey: true,
+uuidVersion: "v7" }` compile to `KeyGeneration` `uuidV7`. Before this change
+the decorator option was rejected at model build, and the dynamic table
+silently got a v4 database default.
+
+The ORM assigns `Bun.randomUUIDv7()` in `applyConventions` to an `Added` entity
+whose key is unset (`undefined`, `null` or `""`); a key set by the application
+is kept. INSERT sends the key as a parameter without `RETURNING`. The column
+is a native `uuid NOT NULL` primary key without a default, so the contract does
+not depend on the PostgreSQL 18 `uuidv7()` function. Foreign keys to the key get
+the `uuid` physical type as for v4 keys.
+
+`isDatabaseGenerated(generation)` in `Metadata/types.ts` is the single rule for
+"the database assigns the key"; `CommandBuilder`, `SaveExecutor` and
+`ChangeTracker` use it, so a v7 key is treated as an application key. The
+duplicate-key preflight skips only unassigned v7 keys and rechecks after the
+ORM assigns them. `insertIfAbsent` keeps its contract: it inserts the given
+values and does not apply conventions. Owned stores still accept only
+`uuidDefault` uuid columns, so a v7 key there is rejected by admission.
+
+Checks: [orm.uuid-v7.test.ts](test/orm.uuid-v7.test.ts) (model, DDL, expected
+schema, assignment, kept and duplicate keys, dynamic tables) and
+[orm.uuid-v7.postgres.live.test.ts](test/orm.uuid-v7.postgres.live.test.ts)
+(`ensureCreated` and its replay, native `uuid` columns without defaults, a
+foreign key, a round trip through a fresh context). The live test passed on
+PostgreSQL 17 and 15.7 in throwaway local containers, together with the
+existing `orm.ensure-created.postgres.live.test.ts` on 15.7.

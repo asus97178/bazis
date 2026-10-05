@@ -23,6 +23,10 @@ First public release on npm.
   (`ensureCreated` or `migrateOnStart` in `ormOsnv`).
 - Configuration with per-environment defaults and `OSNV_*` environment
   variables, JWT, WebSocket, gRPC, background services, agents and tools.
+- `@UUID({ version: "v7" })`: the ORM assigns a time-ordered UUID v7 key
+  before INSERT (native `uuid` column, no database default, any supported
+  PostgreSQL version). Dynamic tables with `uuidVersion: "v7"` keys get the same
+  behavior instead of a v4 database default.
 - Built-in texts are English; Russian sets `RU_VALIDATION_MESSAGES`,
   `RU_CODEX_MESSAGES` and `RU_UI_LABELS` are included.
 - `examples/todo` in the repository: three modules, PostgreSQL,

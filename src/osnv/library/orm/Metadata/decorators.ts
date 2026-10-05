@@ -51,9 +51,12 @@ export interface KeyOptions {
 /** `@UUID` options. */
 export interface UUIDOptions {
   /**
-   * UUID version. Entity classes support only `v4` (the default): PostgreSQL
-   * generates the key with `gen_random_uuid()`, and `v7` is rejected when the
-   * model is built.
+   * UUID version:
+   * - `v4` (default): PostgreSQL generates the key (`DEFAULT gen_random_uuid()`)
+   *   and the ORM reads it through `RETURNING`;
+   * - `v7`: the ORM generates a time-ordered key (`Bun.randomUUIDv7()`) before
+   *   INSERT; the column is a native `uuid` without a default, so any supported
+   *   PostgreSQL version works and inserts stay close together in the index.
    */
   readonly version?: "v4" | "v7";
   readonly name?: string;
@@ -228,8 +231,11 @@ export function Check<T extends object>(name: string, predicate: CheckPredicate<
 }
 
 /**
- * UUID primary key. Generated **by PostgreSQL** (`DEFAULT gen_random_uuid()`);
- * the value is read through `RETURNING` after INSERT.
+ * UUID primary key. By default PostgreSQL generates a v4 value
+ * (`DEFAULT gen_random_uuid()`) and the ORM reads it through `RETURNING`;
+ * `@UUID({ version: "v7" })` makes the ORM assign a v7 value before INSERT.
+ * With v7 a key already set by the application is kept; with v4 INSERT omits
+ * the key column and the database value always wins.
  */
 
 export function UUID(options: UUIDOptions = {}) {

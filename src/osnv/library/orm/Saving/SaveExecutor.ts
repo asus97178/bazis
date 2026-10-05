@@ -1,6 +1,6 @@
 import { Validator } from "../../validation";
 import { DbUpdateError, isCommittedOutcome, OrmValidationError, UniqueViolationError } from "../errors";
-import type { EntityModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel } from "../Metadata/types";
 import { maxRowsPerInsert } from "../Providers/limits";
 import { decodeProperty } from "../Providers/propertyConversion";
 import type { DatabaseProvider, DbExecutor } from "../Providers/types";
@@ -179,7 +179,7 @@ export class SaveExecutor {
 
   private captureGeneratedKeys(entries: readonly TrackedEntry[]): GeneratedKeySnapshot[] {
     return entries
-      .filter((entry) => entry.state === EntityState.Added && entry.model.key.length === 1 && entry.model.key[0].generation !== "none")
+      .filter((entry) => entry.state === EntityState.Added && entry.model.key.length === 1 && isDatabaseGenerated(entry.model.key[0].generation))
       .map((entry) => ({
         entry,
         value: entry.model.key.length === 1 ? (entry.entity as Record<string, unknown>)[entry.model.key[0].propertyName] : undefined,
@@ -358,7 +358,7 @@ export class SaveExecutor {
   /** Batch insert of an Added group of one model (chunked by the parameter limit). */
   private async insertBatch(tx: DbExecutor, model: EntityModel, group: TrackedEntry[]): Promise<void> {
     const columnsPerRow =
-      model.properties.filter((property) => property.generation !== "identity" && property.generation !== "uuid")
+      model.properties.filter((property) => !isDatabaseGenerated(property.generation))
         .length;
     // PostgreSQL DEFAULT VALUES inserts exactly one row per statement.
     const maxRows = columnsPerRow === 0 ? 1 : maxRowsPerInsert(this.provider, columnsPerRow);

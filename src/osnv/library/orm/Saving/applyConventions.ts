@@ -28,6 +28,12 @@ export function applyConventions(pending: readonly TrackedEntry[]): void {
     const isModified = entry.state === EntityState.Modified;
 
     for (const property of entry.model.properties) {
+      if (property.generation === "uuidV7") {
+        if (isAdded && isUnset(entity[property.propertyName])) {
+          entity[property.propertyName] = Bun.randomUUIDv7();
+        }
+        continue;
+      }
       switch (property.convention) {
         case "uuid":
           // The database generates UUID keys (generation === "uuid"); only non-key
