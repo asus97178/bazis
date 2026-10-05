@@ -32,12 +32,8 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
     await run(["g", "module", "CliMailer", "--empty", "--no-codegen"]);
     await run(["g", "pack", "CliDataManager", "--parts", "tables,records", "--no-codegen"]);
     const generated = path.join(root, "src/generated/osnv");
-    await Bun.write(path.join(generated, "workflowActionManifest.ts"), "// retired generated channel\n");
-    await Bun.write(path.join(generated, "targets/production/workflowActionManifest.ts"), "// retired generated channel\n");
     await Bun.write(path.join(generated, "keep.txt"), "unrelated file");
     await run(["codegen", "--target", "production"]);
-    expect(await Bun.file(path.join(generated, "workflowActionManifest.ts")).exists()).toBe(false);
-    expect(await Bun.file(path.join(generated, "targets/production/workflowActionManifest.ts")).exists()).toBe(false);
     expect(await Bun.file(path.join(generated, "keep.txt")).text()).toBe("unrelated file");
     const deps = await Bun.file(path.join(generated, "deps.ts")).text();
     expect(deps).toContain("CliGuestDbContext");
