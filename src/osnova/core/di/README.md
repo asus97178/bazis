@@ -99,6 +99,6 @@
 3. **Codegen магия**
    - настрой закреплённый Bun по [инструкции toolchain](../../../../toolchain/README.md);
    - после изменения конструкторов сервисов запусти `./scripts/osnova-bun run di:generate`;
-   - не редактируй `src/osnova/core/di/generated/deps.ts` вручную;
+   - не редактируй `src/generated/osnv/` вручную;
    - выполняй тесты и сборку через `./scripts/osnova-bun run test` и
      `./scripts/osnova-bun run build:bin` (в них есть автогенерация).
