@@ -1,12 +1,12 @@
 {
   "name": "osnv-workspace",
-  "module": "src/osnova/index.ts",
+  "module": "src/osnv/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
     "toolchain:check": "bun run scripts/bun-toolchain-check.ts --receipt",
-    "di:generate": "bun run scripts/bun-toolchain-check.ts && bun run src/osnova/core/scripts/di-generate.ts",
-    "osnv": "bun run src/osnova/cli/main.ts",
+    "di:generate": "bun run scripts/bun-toolchain-check.ts && bun run src/osnv/core/scripts/di-generate.ts",
+    "osnv": "bun run src/osnv/cli/main.ts",
     "prebuild": "bun run di:generate",
     "build": "bun run scripts/bun-toolchain-check.ts && bun x tsc --noEmit",
     "pretest": "bun run scripts/bun-toolchain-check.ts && bun run di:generate --target all",
@@ -14,7 +14,7 @@
     "ci": "bun run scripts/ci.ts",
     "package:check": "bun run scripts/package-check.ts",
     "prebuild:bin": "bun run di:generate",
-    "build:bin": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/osnova/cli/main.ts bin/osnv"
+    "build:bin": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/osnv/cli/main.ts bin/osnv"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",
@@ -25,6 +25,6 @@
   },
   "version": "0.96.1",
   "workspaces": [
-    "src/osnova"
+    "src/osnv"
   ]
 }

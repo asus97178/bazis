@@ -1,3 +1,3 @@
-import { registerOsnovaGeneratedRuntime } from "./runtime";
+import { registerOsnvGeneratedRuntime } from "./runtime";
 
-await registerOsnovaGeneratedRuntime();
+await registerOsnvGeneratedRuntime();

@@ -1,4 +1,4 @@
-# Примеры кода модулей Osnova
+# Примеры кода модулей osnv
 
 Приложение к [MOD-ARCH-001](MODULE_ARCHITECTURE.md), версия 1.3.
 Примеры используют публичные API текущего репозитория. Task — учебная функция
@@ -6,7 +6,7 @@
 в `src/app/modules` этой документационной задачей не создаётся и не подключается.
 DataManager ниже воспроизводит существующую композицию.
 
-При реализации нового модуля сначала создать его командой Osnova CLI по
+При реализации нового модуля сначала создать его командой osnv CLI по
 §8.1 спецификации. Например, для Task подходит `g module Task --empty`;
 после генерации заполнить `MODULE.md` и доработать исходники по примерам ниже.
 Копирование этих примеров не заменяет обязательную генерацию каркаса через CLI.
@@ -43,7 +43,7 @@ task/
 
 ```ts
 // file: src/app/modules/task/contracts/CreateTaskInput.ts
-import { Validator } from "@osnova/library/validation";
+import { Validator } from "osnv/library/validation";
 
 export class CreateTaskInput {
   @Validator({ required: true, type: "string", minLength: 2, maxLength: 200 })
@@ -59,7 +59,7 @@ HTTP-модель наследует эти поля. `@RequestModel()` явно
 
 ```ts
 // file: src/app/modules/task/http/contracts/TaskRequests.ts
-import { RequestModel } from "@osnova/core/http";
+import { RequestModel } from "osnv/core/http";
 import { CreateTaskInput } from "../../contracts/CreateTaskInput";
 
 @RequestModel()
@@ -88,7 +88,7 @@ initializer `0`, а явно переданный `null` не должен пр�
 
 ```ts
 // file: src/app/modules/task/model/Task.model.ts
-import { Column, Entity, Key } from "@osnova/core/orm";
+import { Column, Entity, Key } from "osnv/core/orm";
 
 @Entity({ table: "Tasks" })
 export class Task {
@@ -108,7 +108,7 @@ export class Task {
 
 ```ts
 // file: src/app/modules/task/model/TaskDbContext.ts
-import { DbContext } from "@osnova/core/orm";
+import { DbContext } from "osnv/core/orm";
 import { Task } from "./Task.model";
 
 export class TaskDbContext extends DbContext {
@@ -146,7 +146,7 @@ export function toTaskResponse(task: Task): TaskResponse {
 
 ```ts
 // file: src/app/modules/task/services/ITask.service.ts
-import { createToken } from "@osnova/core/di";
+import { createToken } from "osnv/core/di";
 import type { CreateTaskInput } from "../contracts/CreateTaskInput";
 import type { TaskResponse } from "../contracts/TaskResponse";
 
@@ -161,7 +161,7 @@ export const ITaskService = createToken<ITaskService>("ITaskService");
 
 ```ts
 // file: src/app/modules/task/errors/TaskInputError.ts
-import type { ValidationError } from "@osnova/library/validation";
+import type { ValidationError } from "osnv/library/validation";
 
 export class TaskInputError extends Error {
   constructor(readonly errors: readonly ValidationError[]) {
@@ -179,7 +179,7 @@ DI-вызов не зависит от того, прошёл ли запрос 
 ```ts
 // file: src/app/modules/task/services/Task.service.ts
 import { TaskDbContext } from "../model/TaskDbContext";
-import { Validator } from "@osnova/library/validation";
+import { Validator } from "osnv/library/validation";
 import { CreateTaskInput } from "../contracts/CreateTaskInput";
 import { toTaskResponse, type TaskResponse } from "../contracts/TaskResponse";
 import { TaskInputError } from "../errors/TaskInputError";
@@ -231,7 +231,7 @@ export class TaskService implements ITaskService {
 import {
   Authorize, Controller, Created, Get, HttpContext,
   ModelValidationError, NotFound, Ok, Post,
-} from "@osnova/core/http";
+} from "osnv/core/http";
 import { requireTokenKind } from "../../auth/jwtAuth";
 import { TokenKind } from "../../auth/tokenKinds";
 import { TaskInputError } from "../errors/TaskInputError";
@@ -273,7 +273,7 @@ export class TaskController {
 
 ```ts
 // file: src/app/modules/task/Task.module.ts
-import { Module, scoped } from "@osnova/core/di";
+import { Module, scoped } from "osnv/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { Task } from "./model/Task.model";
 import { TaskDbContext } from "./model/TaskDbContext";
@@ -283,7 +283,7 @@ import { TaskController } from "./http/TaskController";
 
 @Module({
   imports: [AuthModule],
-  ormOsnova: { context: TaskDbContext, entities: [Task] },
+  ormOsnv: { context: TaskDbContext, entities: [Task] },
   providers: [scoped(ITaskService, TaskService)],
   controllers: [TaskController],
   exports: [ITaskService],
@@ -309,9 +309,9 @@ ORM-контекст получает общий `DATABASE_PROVIDER`. Схема
 
 ```ts
 // file: src/app/modules/task/background/TaskStatsReporter.ts
-import { Background, PeriodicBackgroundService } from "@osnova/core/background";
-import type { ServiceProvider } from "@osnova/core/di";
-import type { Logger } from "@osnova/core/kernel";
+import { Background, PeriodicBackgroundService } from "osnv/core/background";
+import type { ServiceProvider } from "osnv/core/di";
+import type { Logger } from "osnv/core/kernel";
 import { ITaskService } from "../services/ITask.service";
 
 @Background({ intervalMs: 60_000, runImmediately: false })
@@ -343,7 +343,7 @@ Singleton-фон не держит scoped `ITaskService` в конструкто
 
 ```ts
 // file: src/app/modules/task/ui/TasksAdminUiProfile.ts
-import { UiProfile } from "@osnova";
+import { UiProfile } from "osnv";
 import { TaskResponse } from "../contracts/TaskResponse";
 import { TaskController } from "../http/TaskController";
 
@@ -367,8 +367,8 @@ Tool читает задачу через тот же публичный сер�
 
 ```ts
 // file: src/app/modules/task/ai/tools/TaskLookupTool.ts
-import { Tool, type AgentToolExecutionContext } from "@osnova/core/agent";
-import { Validator } from "@osnova/library/validation";
+import { Tool, type AgentToolExecutionContext } from "osnv/core/agent";
+import { Validator } from "osnv/library/validation";
 import { TaskResponse } from "../../contracts/TaskResponse";
 import type { ITaskService } from "../../services/ITask.service";
 
@@ -446,7 +446,7 @@ export class TaskLookupTool {
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
-import { Module } from "@osnova/core/di";
+import { Module } from "osnv/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { DataManagerTablesModule } from "./tables_module/DataManagerTables.module";
 import { DataManagerFieldsModule } from "./fields_module/DataManagerFields.module";
@@ -472,7 +472,7 @@ export class DataManagerModule {}
 
 ```ts
 // file: src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts
-import { Module, scoped } from "@osnova/core/di";
+import { Module, scoped } from "osnv/core/di";
 import { DataManagerTablesModule } from "../tables_module/DataManagerTables.module";
 import { DataManagerValidatorsModule } from "../validators_module/DataManagerValidators.module";
 import { DataController } from "./http/DataController";
@@ -501,7 +501,7 @@ Records получает каталог/валидацию через imports, �
 
 ```ts
 // file: src/app/modules/TaskExampleApp.module.ts
-import { Module } from "@osnova/core/di";
+import { Module } from "osnv/core/di";
 import { TaskModule } from "./task/Task.module";
 import { DataManagerModule } from "./datamanager_modules/DataManager.module";
 
@@ -511,7 +511,7 @@ export class TaskExampleAppModule {}
 
 ```ts
 // file: src/task-example.ts
-import { runApp } from "@osnova";
+import { runApp } from "osnv";
 import { AppInfra } from "./app/infra/App.infra";
 import { TaskExampleAppModule } from "./app/modules/TaskExampleApp.module";
 

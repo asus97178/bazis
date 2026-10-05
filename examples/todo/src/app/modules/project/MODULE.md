@@ -2,7 +2,7 @@
 
 Passport 1.0. Type: atomic. CLI profile: minimal.
 Created with (from `examples/todo`):
-`../../scripts/osnova-bun node_modules/osnv/cli/main.ts g module Project --minimal`
+`../../scripts/osnv-bun node_modules/osnv/cli/main.ts g module Project --minimal`
 File names were renamed to `<Module>.<role>.ts` after the 0.96.1 CLI naming
 change (the command above generated `ProjectController.ts`-style names).
 Entry: [Project.module.ts](Project.module.ts), class `ProjectModule`.

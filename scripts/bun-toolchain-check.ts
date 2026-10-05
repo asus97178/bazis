@@ -6,9 +6,9 @@ import { resolve } from "node:path";
 // family as osVersion ("glibc") and use osBuild "any": the image, not the
 // machine, decides the distribution there; the executable hash stays exact.
 type Host = Readonly<{ platform: string; arch: string; osName: "macOS" | "Linux"; osVersion: string; osBuild: string; executableSha256: string }>;
-export type Authority = Readonly<{ schemaVersion: "osnova.bun-toolchain/v1"; runtime: Readonly<{ version: "1.4.0"; revision: string }>; qualifiedHosts: readonly Host[] }>;
+export type Authority = Readonly<{ schemaVersion: "osnv.bun-toolchain/v1"; runtime: Readonly<{ version: "1.4.0"; revision: string }>; qualifiedHosts: readonly Host[] }>;
 export type ToolchainFacts = Readonly<{ version: string; revision: string; executableSha256: string; platform: string; arch: string; osName: string; osVersion: string; osBuild: string }>;
-export type ToolchainReceipt = Readonly<{ schemaVersion: "osnova.bun-toolchain/v1"; authoritySha256: string; runtime: Readonly<{ version: "1.4.0"; revision: string }>; host: Readonly<Omit<Host, "executableSha256">>; executableSha256: string }>;
+export type ToolchainReceipt = Readonly<{ schemaVersion: "osnv.bun-toolchain/v1"; authoritySha256: string; runtime: Readonly<{ version: "1.4.0"; revision: string }>; host: Readonly<Omit<Host, "executableSha256">>; executableSha256: string }>;
 const DIAGNOSTICS = new Set(["OSNV_BUN_AUTHORITY_INVALID", "OSNV_BUN_SHA256_MISMATCH", "OSNV_BUN_VERSION_MISMATCH", "OSNV_BUN_REVISION_MISMATCH", "OSNV_BUN_PLATFORM_NOT_QUALIFIED", "OSNV_BUN_OS_FINGERPRINT_MISMATCH"]);
 const authorityPath = resolve(import.meta.dir, "../toolchain/bun.json");
 const sha256 = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex");
@@ -19,7 +19,7 @@ export function loadAuthority(path = authorityPath): Readonly<{ authority: Autho
   if (raw.charCodeAt(0) === 0xfeff) return fail("OSNV_BUN_AUTHORITY_INVALID");
   assertNoDuplicateJsonKeys(raw);
   let parsed: unknown; try { parsed = JSON.parse(raw); } catch { return fail("OSNV_BUN_AUTHORITY_INVALID"); }
-  if (!isRecord(parsed) || !exactKeys(parsed, ["schemaVersion", "runtime", "qualifiedHosts"]) || parsed.schemaVersion !== "osnova.bun-toolchain/v1" || !isRecord(parsed.runtime) || !exactKeys(parsed.runtime, ["version", "revision"]) || parsed.runtime.version !== "1.4.0" || !isShaRevision(parsed.runtime.revision) || !Array.isArray(parsed.qualifiedHosts) || parsed.qualifiedHosts.length === 0) return fail("OSNV_BUN_AUTHORITY_INVALID");
+  if (!isRecord(parsed) || !exactKeys(parsed, ["schemaVersion", "runtime", "qualifiedHosts"]) || parsed.schemaVersion !== "osnv.bun-toolchain/v1" || !isRecord(parsed.runtime) || !exactKeys(parsed.runtime, ["version", "revision"]) || parsed.runtime.version !== "1.4.0" || !isShaRevision(parsed.runtime.revision) || !Array.isArray(parsed.qualifiedHosts) || parsed.qualifiedHosts.length === 0) return fail("OSNV_BUN_AUTHORITY_INVALID");
   const hosts: Host[] = parsed.qualifiedHosts.map((value) => {
     if (!isRecord(value) || !exactKeys(value, ["platform", "arch", "osName", "osVersion", "osBuild", "executableSha256"]) || typeof value.platform !== "string" || typeof value.arch !== "string" || !isOsName(value.osName) || (value.osName === "Linux" && (value.platform !== "linux" || value.osBuild !== "any")) || !isOsValue(value.osVersion) || !isOsValue(value.osBuild) || !isSha(value.executableSha256)) return fail("OSNV_BUN_AUTHORITY_INVALID");
     return Object.freeze({ platform: value.platform, arch: value.arch, osName: value.osName, osVersion: value.osVersion, osBuild: value.osBuild, executableSha256: value.executableSha256 });

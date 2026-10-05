@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-// One CI entry point for any host: run through scripts/osnova-bun so every step
+// One CI entry point for any host: run through scripts/osnv-bun so every step
 // uses the qualified Bun (process.execPath). Steps stop at the first failure.
 // `--live <evidence-dir>` adds the disposable PostgreSQL qualification (Docker).
 const usage = "Usage: bun scripts/ci.ts [--live <evidence-dir>]";
@@ -42,7 +42,7 @@ run("tests", [bun, "run", "test"]);
 run("cli binary build", [bun, "run", "build:bin"]);
 
 // Binaries must work without the source tree: run them from an empty directory.
-const outside = mkdtempSync(join(tmpdir(), "osnova-ci-bin-"));
+const outside = mkdtempSync(join(tmpdir(), "osnv-ci-bin-"));
 try {
   run("cli binary", [join(root, "bin/osnv"), "--help"], outside);
 } finally {

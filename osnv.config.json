@@ -4,12 +4,12 @@
   "targets": {
     "production": {
       "entrypoints": [
-        "src/osnova/index.ts"
+        "src/osnv/index.ts"
       ]
     },
     "test": {
       "entrypoints": [
-        "src/osnova/core/http/test/fixtures/conventionControllers.ts"
+        "src/osnv/core/http/test/fixtures/conventionControllers.ts"
       ]
     }
   }
