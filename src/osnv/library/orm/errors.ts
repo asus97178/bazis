@@ -2,7 +2,7 @@ import type { ValidationError } from "../validation";
 import type { SchemaVerificationResult } from "./Schema/ExactSchemaVerifier";
 import { formatSchemaDifferences } from "./Schema/formatSchemaDifferences";
 
-/** Базовая ошибка ORM. */
+/** Base ORM error. */
 export class OrmError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -84,17 +84,17 @@ export function isCommittedOutcome(error: unknown): error is { readonly committe
   }
 }
 
-/** Ошибка построения модели (конфигурации сущности). Бросается на старте. */
+/** Model building (entity configuration) error. Thrown at startup. */
 export class ModelBuildError extends OrmError {}
 
-/** Запрос `first()` не нашёл ни одной строки. */
+/** A `first()` query found no rows. */
 export class EntityNotFoundError extends OrmError {
   constructor(entityName: string) {
     super(`Sequence contains no elements for entity "${entityName}".`);
   }
 }
 
-/** Класс не зарегистрирован как сущность в этом контексте. */
+/** The class is not registered as an entity in this context. */
 export class EntityNotMappedError extends OrmError {
   constructor(name: string) {
     super(
@@ -103,7 +103,7 @@ export class EntityNotMappedError extends OrmError {
   }
 }
 
-/** Ошибка во время применения изменений (SaveChanges). */
+/** Error while applying changes (SaveChanges). */
 export class DbUpdateError extends OrmError {}
 
 /**
@@ -179,7 +179,7 @@ export class UniqueViolationError extends DbUpdateError {
   }
 }
 
-/** Сущность не прошла валидацию перед сохранением. */
+/** The entity failed validation before saving. */
 export class OrmValidationError extends DbUpdateError {
   constructor(
     readonly entityName: string,

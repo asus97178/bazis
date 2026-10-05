@@ -3,9 +3,9 @@ import type { Row, SqlDialect } from "../Providers/types";
 import { decodeProperty } from "../Providers/propertyConversion";
 
 /**
- * Гидратация строки результата в экземпляр сущности. Создаётся реальный
- * экземпляр класса (вызывается конструктор без аргументов), затем колонки
- * раскладываются по свойствам с обратной конвертацией типов (через диалект).
+ * Hydrates a result row into an entity instance. A real class instance is
+ * created (the constructor is called without arguments), then columns are
+ * mapped to properties with reverse type conversion (through the dialect).
  */
 export function materialize<T extends object>(model: EntityModel, row: Row, dialect: SqlDialect): T {
   const entity = new model.ctor() as Record<string, unknown>;
@@ -17,7 +17,7 @@ export function materialize<T extends object>(model: EntityModel, row: Row, dial
   return entity as T;
 }
 
-/** Проекция строки в plain-объект по списку alias -> property. */
+/** Projects a row into a plain object by the alias -> property list. */
 export function materializeProjection(
   model: EntityModel,
   row: Row,

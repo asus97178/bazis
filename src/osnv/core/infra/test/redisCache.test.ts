@@ -19,8 +19,8 @@ import {
 const redisConfig = defineConfig("redis", { default: { url: "redis://localhost:6379" } });
 
 /**
- * In-memory Redis-double, реализующий узкий контракт {@link RedisCommandClient}.
- * Эмулирует ровно те команды, что использует драйвер (включая EVAL для fencing).
+ * In-memory Redis double implementing the narrow {@link RedisCommandClient} contract.
+ * Emulates exactly the commands the driver uses (including EVAL for fencing).
  */
 class FakeRedis implements RedisCommandClient {
   public readonly store = new Map<string, string>();
@@ -229,7 +229,7 @@ describe("RedisDistributedCacheDriver", () => {
     expect(await driver.acquireLock("lock", "token-a", 5)).toBe(true);
     expect(await driver.acquireLock("lock", "token-b", 5)).toBe(false);
 
-    // Чужой токен не снимает лок; свой — снимает.
+    // Someone else's token does not release the lock; our own does.
     await driver.releaseLock("lock", "token-b");
     expect(await driver.acquireLock("lock", "token-c", 5)).toBe(false);
     await driver.releaseLock("lock", "token-a");

@@ -3,7 +3,7 @@ import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
 
-/** Соединение раньше серверов и ORM-фич: открыть БД до того, как кто-то её спросит. */
+/** Connect before the servers and ORM features: open the database before anyone asks for it. */
 const DATABASE_PHASE = -110;
 
 /** Optional operational fields belong to the ORM connection contract. */
@@ -59,16 +59,17 @@ function buildPostgresProvider<T extends PostgresOrmConfigShape>(config: AppConf
 }
 
 /**
- * Connection-коннектор БД для `@Infra` — мост между инфраструктурой и ORM
- * (модель «как в EF Core»: соединение даётся снаружи, ORM работает поверх него).
+ * Database connection connector for `@Infra`: the bridge between infrastructure
+ * and the ORM (the EF Core model: the connection comes from outside, the ORM
+ * works on top of it).
  *
- * Принимает конфиг PostgreSQL подсистемы целиком (`dbConfig` из
- * `defineConfig("db", ...)`) и сам читает объявленные ключи. Публикует `DatabaseProvider` под общим токеном
- * {@link DATABASE_PROVIDER}, открывает на старте (фаза −110, раньше ORM-фич и
- * серверов) и закрывает на остановке.
+ * Takes the whole PostgreSQL subsystem config (`dbConfig` from
+ * `defineConfig("db", ...)`) and reads the declared keys itself. Publishes a
+ * `DatabaseProvider` under the shared {@link DATABASE_PROVIDER} token, opens it
+ * at start (phase −110, before ORM features and servers) and closes it at shutdown.
  *
- * Миграции остаются на фиче (модель-зависимы): `ormOsnv: { context, entities,
- * ensureCreated }` без `provider` работает поверх этого общего соединения.
+ * Migrations stay with the feature (they depend on the model): `ormOsnv: { context,
+ * entities, ensureCreated }` without `provider` works on top of this shared connection.
  *
  * ```ts
  * export const dbConfig = defineConfig("db", {
@@ -78,7 +79,7 @@ function buildPostgresProvider<T extends PostgresOrmConfigShape>(config: AppConf
  * export class AppInfra {}
  *
  * @Module({ ormOsnv: { context: UsersDbContext, entities: [User], ensureCreated: true } })
- * export class UsersModule {}  // потребитель общего DATABASE_PROVIDER
+ * export class UsersModule {}  // consumer of the shared DATABASE_PROVIDER
  * ```
  */
 export function ormOsnvConnect<T extends PostgresOrmConfigShape>(config: AppConfig<T>): InfraConnector<DatabaseProvider>;

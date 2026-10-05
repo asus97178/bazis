@@ -3,9 +3,8 @@ import type { DatabaseProvider } from "./Providers/types";
 import type { ChangeTracker } from "./Tracking/ChangeTracker";
 
 /**
- * Внутренний рантайм, который `DbContext` передаёт в `DbSet`. Вынесен в
- * отдельный модуль, чтобы разорвать циклы импортов между контекстом, набором
- * и трекером.
+ * Internal runtime that `DbContext` passes to `DbSet`. Kept in a separate
+ * module to break import cycles between the context, the set and the tracker.
  */
 export interface DbContextRuntime {
   readonly provider: DatabaseProvider;

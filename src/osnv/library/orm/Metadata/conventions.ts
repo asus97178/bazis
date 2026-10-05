@@ -1,13 +1,13 @@
 /**
- * Соглашения по умолчанию. Применяются в `ModelBuilder`, где явные настройки
- * декораторов всегда переопределяют выведенное по соглашению.
+ * Default conventions. Applied in `ModelBuilder`; explicit decorator settings
+ * always override what a convention infers.
  */
 
 import type { ColumnOptionsType, ColumnType, PropertyConvention } from "./types";
 
 /**
- * Множественное число для имени таблицы (упрощённые правила английского).
- * Регистр сохраняется: `User` -> `Users`, `Category` -> `Categories`.
+ * Plural form for a table name (simplified English rules).
+ * Case is preserved: `User` -> `Users`, `Category` -> `Categories`.
  */
 export function pluralize(name: string): string {
   if (name.length === 0) {
@@ -22,21 +22,21 @@ export function pluralize(name: string): string {
   return `${name}s`;
 }
 
-/** Имя таблицы по умолчанию. */
+/** Default table name. */
 export function defaultTableName(className: string): string {
   return pluralize(className);
 }
 
 /**
- * Является ли свойство первичным ключом по соглашению: `id` или
- * `<ClassName>Id` (регистронезависимо).
+ * Whether the property is the primary key by convention: `id` or
+ * `<ClassName>Id` (case-insensitive).
  */
 export function isConventionalKey(propertyName: string, className: string): boolean {
   const lower = propertyName.toLowerCase();
   return lower === "id" || lower === `${className.toLowerCase()}id`;
 }
 
-/** Раскладывает семантический `@Column({ type })` на физический тип и соглашение. */
+/** Splits a semantic `@Column({ type })` into a physical type and a convention. */
 export function resolveColumnType(
   optionsType: ColumnOptionsType | undefined,
   isKey: boolean,

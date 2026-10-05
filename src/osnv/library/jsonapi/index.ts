@@ -1,16 +1,16 @@
 /**
- * Универсальный list-запрос в стиле спецификации JSON:API.
+ * Universal list request in the style of the JSON:API specification.
  *
- * Чистая библиотека (только Web-API, ноль зависимостей от ядра/среды),
- * совместима с компиляцией в бинарник. Состоит из:
- * - {@link parseListQuery} — разбор query-параметров (`sort`/`filter`/`page`/
- *   `include`/`fields`) в типизированный {@link ListQuery} с валидацией;
- * - {@link buildListDocument} — сборка ответа коллекции (`data`/`meta`/`links`);
- * - {@link ListQueryError} — ошибка разбора (слой HTTP маппит её в 400).
+ * A pure library (Web APIs only, zero dependencies on the kernel/environment),
+ * compatible with binary compilation. It consists of:
+ * - {@link parseListQuery}: parses query parameters (`sort`/`filter`/`page`/
+ *   `include`/`fields`) into a typed, validated {@link ListQuery};
+ * - {@link buildListDocument}: builds the collection response (`data`/`meta`/`links`);
+ * - {@link ListQueryError}: the parsing error (the HTTP layer maps it to 400).
  *
- * Применение запроса к источнику данных — отдельный слой интеграции:
- * мост к ORM — `paginate(...)` в `@/core/orm`, биндинг — `List(...)`
- * в `@/core/http`.
+ * Applying the request to a data source is a separate integration layer:
+ * the ORM bridge is `paginate(...)` in `@/core/orm`, the binding is `ListRequest`
+ * in `@/core/http`.
  */
 export { parseListQuery } from "./parseListQuery";
 export { buildListDocument, serializeListQuery } from "./document";

@@ -1,14 +1,14 @@
 import type { ValidatorOptions } from "./types/ValidatorOptions";
 
-// Полифилл одной строкой: Bun выполняет стандартные TC39-декораторы нативно,
-// но Symbol.metadata может отсутствовать в рантайме. Symbol.for даёт общий
-// символ для всех копий модуля.
+// One-line polyfill: Bun runs standard TC39 decorators natively,
+// but Symbol.metadata may be missing at runtime. Symbol.for gives one shared
+// symbol for all module copies.
 (Symbol as { metadata?: symbol }).metadata ??= Symbol.for("Symbol.metadata");
 
-/** Ключ, под которым правила валидации лежат в метаданных класса. */
+/** Key under which validation rules are stored in the class metadata. */
 const FIELD_RULES = Symbol.for("osnv:validation:rules");
 
-/** Одно зарегистрированное правило: поле + опции одного декоратора. */
+/** One registered rule: a field + the options of one decorator. */
 export interface FieldRule {
   readonly property: string;
   readonly options: ValidatorOptions;
@@ -19,12 +19,12 @@ interface RulesMetadata {
 }
 
 /**
- * Регистрирует правило поля в метаданных класса (вызывается декоратором).
+ * Registers a field rule in the class metadata (called by the decorator).
  *
- * Метаданные TC39-декораторов наследуются прототипно: метадата-объект
- * подкласса имеет прототипом метадату родителя. Поэтому при первой записи
- * в конкретный класс делаем copy-on-write — копируем унаследованные правила
- * в собственный массив, не мутируя родительские.
+ * TC39 decorator metadata is inherited prototypically: a subclass's metadata
+ * object has the parent's metadata as its prototype. So on the first write to a
+ * concrete class we copy on write: the inherited rules are copied into the
+ * class's own array without mutating the parent's.
  */
 export function registerFieldRule(context: ClassFieldDecoratorContext, options: ValidatorOptions): void {
   if (context.static) {
@@ -43,8 +43,8 @@ export function registerFieldRule(context: ClassFieldDecoratorContext, options: 
 }
 
 /**
- * Возвращает правила валидации класса (включая унаследованные) или
- * `undefined`, если на классе нет ни одного декоратора `@Validator`.
+ * Returns the validation rules of a class (including inherited ones), or
+ * `undefined` if the class has no `@Validator` decorators.
  */
 export function rulesOf(ctor: object | undefined | null): readonly FieldRule[] | undefined {
   if (typeof ctor !== "function") {
@@ -58,8 +58,8 @@ export function rulesOf(ctor: object | undefined | null): readonly FieldRule[] |
 }
 
 /**
- * Есть ли у значения класс с зарегистрированными правилами валидации.
- * Используется для автоопределения `nested`.
+ * Whether the value's class has registered validation rules.
+ * Used to auto-detect `nested`.
  */
 export function hasRules(value: unknown): boolean {
   if (value === null || typeof value !== "object") {

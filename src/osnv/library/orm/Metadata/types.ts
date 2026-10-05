@@ -4,57 +4,54 @@ import type { CheckAst } from "../Schema/CheckExpression";
 import type { CanonicalDefault } from "../Schema/introspection";
 
 /**
- * Тип хранения колонки. Сопоставление с типами конкретной СУБД делает
- * диалект провайдера (`SqlDialect.columnType`).
- */
-/**
- * Физический тип колонки в БД (DDL, encode/decode).
+ * Physical column type in the database (DDL, encode/decode). The provider
+ * dialect maps it to the types of a concrete DBMS (`SqlDialect.columnType`).
  */
 export type StorageColumnType = "integer" | "real" | "text" | "boolean" | "datetime" | "json";
 
 /**
- * Семантические типы `@Column({ type })` с автоповедением при `SaveChanges`.
- * В модели раскладываются на `StorageColumnType` + `PropertyConvention`.
+ * Semantic `@Column({ type })` types with automatic behavior on `SaveChanges`.
+ * In the model they split into `StorageColumnType` + `PropertyConvention`.
  */
 export type SemanticColumnType = "uuid" | "createdAt" | "updatedAt";
 
-/** Тип в опциях `@Column({ type })`. */
+/** Type in the `@Column({ type })` options. */
 export type ColumnOptionsType = StorageColumnType | SemanticColumnType;
 
-/** Физический тип в скомпилированной `PropertyModel`. */
+/** Physical type in a compiled `PropertyModel`. */
 export type ColumnType = StorageColumnType;
 
-/** Стратегия генерации значения первичного ключа. */
+/** Primary key value generation strategy. */
 export type KeyGeneration = "identity" | "uuid" | "none";
 
-/** Автоматические соглашения колонки (`@UUID`, `@CreatedAt`, `@UpdatedAt`). */
+/** Automatic column conventions (`@UUID`, `@CreatedAt`, `@UpdatedAt`). */
 export type PropertyConvention = "uuid" | "createdAt" | "updatedAt";
 
-/** Скомпилированная модель одной колонки/свойства сущности. */
+/** Compiled model of one entity column/property. */
 export interface PropertyModel {
-  /** Имя свойства в классе. */
+  /** Property name in the class. */
   readonly propertyName: string;
-  /** Имя колонки в таблице. */
+  /** Column name in the table. */
   readonly columnName: string;
-  /** Тип хранения. */
+  /** Storage type. */
   readonly type: ColumnType;
-  /** Часть первичного ключа. */
+  /** Part of the primary key. */
   readonly isKey: boolean;
-  /** Как генерируется ключ (`identity` / `uuid` — на стороне БД, `none` — задаёт код). */
+  /** How the key is generated (`identity` / `uuid`: by the database, `none`: set by the code). */
   readonly generation: KeyGeneration;
   /** NOT NULL. */
   readonly required: boolean;
-  /** Опциональный конвертер значения (шифрование, сериализация и т.д.). */
+  /** Optional value converter (encryption, serialization and so on). */
   readonly converter?: ValueConverter;
-  /** Автоматическое значение при сохранении (см. `@UUID`, `@CreatedAt`, `@UpdatedAt`). */
+  /** Automatic value on save (see `@UUID`, `@CreatedAt`, `@UpdatedAt`). */
   readonly convention?: PropertyConvention;
-  /** Версия UUID для `@UUID` (по умолчанию v4). */
+  /** UUID version for `@UUID` (default v4). */
   readonly uuidVersion?: "v4" | "v7";
   /** Closed physical database default; it never affects entity initialization. */
   readonly databaseDefault: CanonicalDefault;
 }
 
-/** Скомпилированная модель индекса. */
+/** Compiled index model. */
 export interface IndexModel {
   readonly name: string;
   readonly columns: readonly string[];
@@ -62,30 +59,30 @@ export interface IndexModel {
 }
 export interface CheckModel { readonly name: string; readonly expression: CheckAst }
 
-/** Тип навигации: ссылка (many-to-one) или коллекция (one-to-many). */
+/** Navigation kind: a reference (many-to-one) or a collection (one-to-many). */
 export type RelationKind = "reference" | "collection";
 
 /**
- * Скомпилированная модель навигационной связи.
+ * Compiled navigation relation model.
  *
- * - `reference`: внешний ключ `foreignKey` находится на ЭТОЙ сущности и
- *   указывает на первичный ключ цели.
- * - `collection`: внешний ключ `foreignKey` находится на ЦЕЛЕВОЙ сущности и
- *   указывает на первичный ключ этой сущности.
+ * - `reference`: the `foreignKey` is on THIS entity and points to the target's
+ *   primary key.
+ * - `collection`: the `foreignKey` is on the TARGET entity and points to this
+ *   entity's primary key.
  *
- * `target` — ленивый thunk (для разрыва циклических импортов между сущностями).
+ * `target` is a lazy thunk (to break circular imports between entities).
  */
 export interface RelationModel {
   readonly navigationName: string;
   readonly kind: RelationKind;
   readonly target: () => new () => object;
-  /** Имя свойства внешнего ключа (на зависимой стороне). */
+  /** Name of the foreign key property (on the dependent side). */
   readonly foreignKey: string | readonly string[];
 }
 
-/** Внешний ключ для DDL-ограничения (из `@ForeignKey` или reference-связи). */
+/** Foreign key for a DDL constraint (from `@ForeignKey` or a reference relation). */
 export interface ForeignKeyModel {
-  /** Имя свойства внешнего ключа на этой сущности. */
+  /** Name of the foreign key property on this entity. */
   readonly property: string;
   readonly properties: readonly string[];
   readonly name?: string;
@@ -94,17 +91,17 @@ export interface ForeignKeyModel {
   readonly target: () => new () => object;
 }
 
-/** Скомпилированная модель сущности (таблицы). */
+/** Compiled entity (table) model. */
 export interface EntityModel {
-  /** Конструктор класса сущности. */
+  /** Entity class constructor. */
   readonly ctor: new () => object;
-  /** Имя сущности (имя класса). */
+  /** Entity name (the class name). */
   readonly name: string;
-  /** Имя таблицы (физическое, без схемы). */
+  /** Table name (physical, without the schema). */
   readonly tableName: string;
-  /** Схема БД PostgreSQL. */
+  /** PostgreSQL database schema. */
   readonly schema?: string;
-  /** Все замапленные свойства в порядке объявления. */
+  /** All mapped properties in declaration order. */
   readonly properties: readonly PropertyModel[];
   /** The sole ordered primary-key authority. */
   readonly key: readonly [PropertyModel, ...PropertyModel[]];
@@ -112,16 +109,16 @@ export interface EntityModel {
   readonly keyName?: string;
   readonly indexes: readonly IndexModel[];
   readonly checks: readonly CheckModel[];
-  /** Навигационные связи. */
+  /** Navigation relations. */
   readonly relations: readonly RelationModel[];
-  /** Внешние ключи для DDL-ограничений. */
+  /** Foreign keys for DDL constraints. */
   readonly foreignKeys: readonly ForeignKeyModel[];
-  /** Глобальные фильтры запросов (`@QueryFilter`), применяются ко всем SELECT. */
+  /** Global query filters (`@QueryFilter`), applied to every SELECT. */
   readonly queryFilters: readonly Condition[];
-  /** Имя свойства soft-delete (NULL = не удалено). `@SoftDelete` / `@Entity({ softDelete })`. */
+  /** Soft-delete property name (NULL = not deleted). `@SoftDelete` / `@Entity({ softDelete })`. */
   readonly softDeleteProperty?: string;
-  /** Свойство по имени. */
+  /** Property by name. */
   propertyByName(name: string): PropertyModel | undefined;
-  /** Навигация по имени. */
+  /** Navigation by name. */
   relationByName(name: string): RelationModel | undefined;
 }

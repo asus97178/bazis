@@ -273,7 +273,7 @@ describe("boolean и enum", () => {
     dto.accepted = true;
     dto.level = 99;
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.enum]);
-    // Имя члена enum ("Low") — не допустимое значение, допустимы только 0 и 1.
+    // The enum member name ("Low") is not an allowed value; only 0 and 1 are.
     dto.level = "Low" as unknown as number;
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.enum]);
   });
@@ -479,7 +479,7 @@ describe("вложенная валидация", () => {
     const b = new NodeDto();
     a.name = "a";
     a.next = b;
-    b.next = a; // цикл; b.name отсутствует
+    b.next = a; // a cycle; b.name is missing
     const result = Validator.validate(a);
     expect(result.hasErrorsFor("next.name")).toBe(true);
     expect(result.errors).toHaveLength(1);
@@ -604,7 +604,7 @@ describe("ValidationResult и устойчивость", () => {
     const result = Validator.validate(new ChildDto());
     expect(result.hasErrorsFor("id")).toBe(true);
     expect(result.hasErrorsFor("extra")).toBe(true);
-    // Правила потомка не «протекли» в родителя.
+    // The subclass rules did not leak into the parent.
     const baseResult = Validator.validate(new BaseDto());
     expect(baseResult.errors).toHaveLength(1);
   });

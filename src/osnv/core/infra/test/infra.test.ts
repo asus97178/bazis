@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { RedisClient } from "bun";
-import { createContainer, createToken, Global, HOSTED_SERVICE, Module, singletonValue, type HostedService } from "@/core/di";
-import { Configuration, defineConfig, HEALTH_CHECK, LifecycleCoordinator, Osnv, secret, type HealthCheck } from "@/core/kernel";
+import { createContainer, createToken, HOSTED_SERVICE, Module, type HostedService } from "@/core/di";
+import { defineConfig, HEALTH_CHECK, LifecycleCoordinator, Osnv, secret, type HealthCheck } from "@/core/kernel";
 import {
   Infra,
   infraModule,
@@ -19,13 +19,7 @@ import {
 } from "@/core/infra";
 
 function containerFor(manifest: InfraManifest) {
-  // Configuration больше не используется коннекторами (конфиг приходит объектом),
-  // но Infra-фабрика всё ещё объявляет её зависимостью — даём пустую.
-  @Global()
-  @Module({ providers: [singletonValue(Configuration, new Configuration(new Map()))], exports: [Configuration] })
-  class ConfigModule {}
-
-  @Module({ imports: [ConfigModule, infraModule(manifest)] })
+  @Module({ imports: [infraModule(manifest)] })
   class Root {}
 
   return createContainer(Root);
@@ -39,7 +33,7 @@ const searchConfig = defineConfig("search", {
   default: { url: "https://localhost:9200", username: "admin", password: secret("os-pass") },
 });
 
-/** Манифест приложения: каждый коннектор получает свой конфиг-объект целиком. */
+/** Application manifest: each connector gets its whole config object. */
 function appManifest(): InfraManifest {
   return {
     db: postgres(dbConfig),

@@ -105,7 +105,7 @@ describe("radix-роутер", () => {
     const unsupported = router.match("GET", ["things"], "9.9");
     expect(unsupported.kind).toBe("unsupported-version");
     expect([...(unsupported as { supported: readonly string[] }).supported].sort()).toEqual(["1.0", "2.0"]);
-    // Запрос без версии, безверсионного маршрута нет.
+    // A request without a version, and there is no unversioned route.
     expect(router.match("GET", ["things"]).kind).toBe("unsupported-version");
   });
 

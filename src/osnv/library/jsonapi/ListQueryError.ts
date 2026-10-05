@@ -1,17 +1,17 @@
-/** Одна проблема разбора list-запроса (привязана к конкретному параметру). */
+/** One list-request parsing problem (tied to a specific parameter). */
 export interface ListQueryProblem {
-  /** Имя query-параметра, например `sort`, `filter[age]`, `page[size]`. */
+  /** Query parameter name, for example `sort`, `filter[age]`, `page[size]`. */
   readonly parameter: string;
-  /** Человекочитаемое описание проблемы. */
+  /** Human-readable description of the problem. */
   readonly message: string;
 }
 
 /**
- * Ошибка разбора/валидации list-запроса. Собирает все проблемы сразу, чтобы
- * клиент увидел полный список, а не первую попавшуюся.
+ * List-request parsing/validation error. Collects all problems at once so the
+ * client sees the full list, not just the first one.
  *
- * Библиотека намеренно не знает про HTTP — слой интеграции маппит её в 400
- * (см. биндинг `List(...)` в `@/core/http`).
+ * The library deliberately knows nothing about HTTP: the integration layer maps
+ * it to 400 (see the `ListRequest` binding in `@/core/http`).
  */
 export class ListQueryError extends Error {
   constructor(readonly problems: readonly ListQueryProblem[]) {

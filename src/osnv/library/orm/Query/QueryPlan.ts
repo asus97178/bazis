@@ -7,9 +7,9 @@ export interface OrderClause {
 }
 
 /**
- * Декларативный план запроса — собирается цепочкой where/orderBy/take/skip и
- * транслируется в SQL. Иммутабелен: каждый шаг возвращает новый план, что
- * позволяет переиспользовать базовый запрос и кэшировать трансляцию.
+ * Declarative query plan, built by the where/orderBy/take/skip chain and
+ * translated into SQL. Immutable: each step returns a new plan, so a base query
+ * can be reused and its translation cached.
  */
 export interface QueryPlan {
   readonly conditions: readonly Condition[];
@@ -20,16 +20,16 @@ export interface QueryPlan {
   /** Invalid explicit take survives implicit first/firstOrDefault take(1). */
   readonly invalidRequestedLimit?: number;
   readonly offset?: number;
-  /** AsNoTracking: не регистрировать результат в ChangeTracker. */
+  /** AsNoTracking: do not register the result in the ChangeTracker. */
   readonly noTracking: boolean;
   /**
-   * Пути жадной загрузки навигаций (Include/ThenInclude). Каждый путь —
-   * последовательность имён навигаций от корня, например `["posts", "comments"]`.
+   * Eager loading paths of navigations (Include/ThenInclude). Each path is a
+   * sequence of navigation names from the root, for example `["posts", "comments"]`.
    */
   readonly includes: readonly (readonly string[])[];
-  /** Не применять глобальные `@QueryFilter` и soft-delete фильтр. */
+  /** Do not apply global `@QueryFilter`s and the soft-delete filter. */
   readonly ignoreQueryFilters: boolean;
-  /** Проекция колонок: alias -> propertyName (из `.select(...)`). */
+  /** Column projection: alias -> propertyName (from `.select(...)`). */
   readonly projections: readonly { readonly alias: string; readonly property: string }[];
   /** Row lock held by the caller-owned transaction until commit/rollback. */
   readonly rowLock?: RowLockMode;

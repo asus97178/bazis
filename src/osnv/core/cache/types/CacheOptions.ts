@@ -1,33 +1,33 @@
 import { createOptionsToken } from "../../di";
 
-/** Опции in-memory кэша. */
+/** In-memory cache options. */
 export interface CacheOptions {
-  /** Максимальное число записей; при переполнении вытесняется LRU-запись. */
+  /** Maximum number of entries; the LRU entry is evicted when full. */
   readonly maxEntries?: number;
-  /** Максимум одновременно выполняемых factory; по умолчанию 1024.
-   * При переполнении новый cache miss получает CacheCapacityError до запуска factory.
+  /** Maximum number of factories running at once; 1024 by default.
+   * When full, a new cache miss gets CacheCapacityError before the factory starts.
    */
   readonly maxInFlight?: number;
-  /** TTL по умолчанию для {@link ICache.set} (секунды). */
+  /** Default TTL for {@link ICache.set} (seconds). */
   readonly defaultTtlSeconds?: number;
-  /** Максимальная длина ключа (символы). По умолчанию 256. */
+  /** Maximum key length (characters). 256 by default. */
   readonly maxKeyLength?: number;
-  /** Лимит размера строкового значения (байты UTF-8). Не задан — без лимита. */
+  /** Size limit of a string value (UTF-8 bytes). Unset means no limit. */
   readonly maxValueBytes?: number;
 }
 
-/** Пер-запись опции записи. */
+/** Per-entry write options. */
 export interface CacheSetOptions {
-  /** TTL этой записи (секунды); перекрывает default из {@link CacheOptions}. */
+  /** TTL of this entry (seconds); overrides the default from {@link CacheOptions}. */
   readonly ttlSeconds?: number;
-  /** Теги для групповой инвалидации через {@link ICache.evictByTag}. */
+  /** Tags for group invalidation via {@link ICache.evictByTag}. */
   readonly tags?: readonly string[];
 }
 
 export const DEFAULT_MAX_KEY_LENGTH = 256;
 export const DEFAULT_MAX_IN_FLIGHT = 1024;
 
-/** DI-токен validated options кэша. */
+/** DI token of the validated cache options. */
 export const CACHE_OPTIONS = createOptionsToken<CacheOptions>("Cache");
 
 export function validateCacheOptions(options: CacheOptions): readonly string[] {

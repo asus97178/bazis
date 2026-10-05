@@ -6,59 +6,60 @@ import { compileCheck, type CheckPredicate } from "../Schema/CheckExpression";
 
 type EntityClass = new () => object;
 
-// Стандартные TC39-декораторы (как в validation/http): без reflect-metadata
-// и experimentalDecorators — это сохраняет совместимость с bun build --compile.
+// Standard TC39 decorators (as in validation/http): no reflect-metadata
+// and no experimentalDecorators, which keeps bun build --compile compatible.
 (Symbol as { metadata?: symbol }).metadata ??= Symbol.for("Symbol.metadata");
 
 const ENTITY_META = Symbol.for("osnv:orm:entity");
 
-/** Опции `@Entity`. */
+/** `@Entity` options. */
 export interface EntityOptions {
-  /** Имя таблицы (по умолчанию — множественное число от имени класса). */
+  /** Table name (defaults to the plural of the class name). */
   readonly table?: string;
   /**
-   * Имя свойства soft-delete (`datetime`, nullable). Эквивалент `@SoftDelete()`
-   * на колонке. `remove()` ставит метку времени вместо DELETE; запросы фильтруют
-   * `IS NULL`, если не вызван `ignoreQueryFilters()`.
+   * Soft-delete property name (`datetime`, nullable). Equivalent to `@SoftDelete()`
+   * on the column. `remove()` sets a timestamp instead of DELETE; queries filter
+   * `IS NULL` unless `ignoreQueryFilters()` is called.
    */
   readonly softDelete?: string;
 }
 
-/** Опции `@Column`. */
+/** `@Column` options. */
 export interface ColumnOptions {
-  /** Имя колонки (по умолчанию — имя свойства). */
+  /** Column name (defaults to the property name). */
   readonly name?: string;
-  /** Тип: физический (`text`, `datetime`, …) или семантический (`uuid`, `createdAt`, `updatedAt`). */
+  /** Type: physical (`text`, `datetime`, …) or semantic (`uuid`, `createdAt`, `updatedAt`). */
   readonly type?: ColumnOptionsType;
-  /** Разрешать NULL (по умолчанию true; `@Required` ставит false). */
+  /** Allow NULL (default true; `@Required` sets false). */
   readonly nullable?: boolean;
   /** Closed physical PostgreSQL default. It is not an application initializer or SQL fragment. */
   readonly default?: ColumnDefaultValue;
 }
 export type ColumnDefaultValue = null | boolean | number | string;
 
-/** Опции `@Key`. */
+/** `@Key` options. */
 export interface KeyOptions {
   /**
-   * Генерировать ли значение на стороне БД (автоинкремент). По умолчанию
-   * `true` для целочисленного ключа, иначе `false` (значение задаёт код,
-   * например GUID).
+   * Whether the database generates the value (auto-increment). Defaults to
+   * `true` for an integer key, otherwise `false` (the code sets the value,
+   * for example a GUID).
    */
   readonly generated?: boolean;
   readonly name?: string;
 }
 
-/** Опции `@UUID`. */
+/** `@UUID` options. */
 export interface UUIDOptions {
   /**
-   * Версия UUID при автогенерации ключа: `v4` (по умолчанию) или `v7`
-   * (монотонный, лучше для индексов БД).
+   * UUID version. Entity classes support only `v4` (the default): PostgreSQL
+   * generates the key with `gen_random_uuid()`, and `v7` is rejected when the
+   * model is built.
    */
   readonly version?: "v4" | "v7";
   readonly name?: string;
 }
 
-/** Опции `@Index` (на свойстве). */
+/** `@Index` options (on a property). */
 export interface IndexOptions {
   readonly unique?: boolean;
   readonly name?: string;
@@ -67,13 +68,13 @@ export interface CompositeKeyOptions { readonly name?: string }
 export type ReferentialAction = "noAction" | "restrict" | "cascade" | "setNull";
 export interface CompositeForeignKeyOptions { readonly name?: string; readonly properties: readonly [string, ...string[]]; readonly onDelete?: ReferentialAction; readonly onUpdate?: ReferentialAction }
 
-/** Опции навигации. */
+/** Navigation options. */
 export interface RelationOptions {
-  /** Имя свойства внешнего ключа (на зависимой стороне). */
+  /** Name of the foreign key property (on the dependent side). */
   readonly foreignKey: string | readonly string[];
 }
 
-/** Сырое описание свойства, накопленное декораторами. */
+/** Raw property description accumulated by decorators. */
 export interface RawProperty {
   propertyName: string;
   columnName?: string;
@@ -84,17 +85,17 @@ export interface RawProperty {
   nullable?: boolean;
   default?: ColumnDefaultValue;
   index?: { unique: boolean; name?: string };
-  /** `@ForeignKey(() => Principal)` на скалярной колонке — для DDL FK. */
+  /** `@ForeignKey(() => Principal)` on a scalar column, for the DDL FK. */
   fkTarget?: () => EntityClass;
-  /** `@ValueConverter(...)` — преобразование до/после диалекта. */
+  /** `@HasConversion(...)`: conversion before/after the dialect. */
   converter?: ValueConverter;
   /** `@UUID` / `@CreatedAt` / `@UpdatedAt`. */
   convention?: PropertyConvention;
-  /** Версия UUID для `@UUID` (по умолчанию v4). */
+  /** UUID version for `@UUID` (default v4). */
   uuidVersion?: "v4" | "v7";
 }
 
-/** Сырая навигационная связь. */
+/** Raw navigation relation. */
 export interface RawRelation {
   navigationName: string;
   kind: RelationKind;
@@ -102,7 +103,7 @@ export interface RawRelation {
   foreignKey: string | readonly string[];
 }
 
-/** Сырые метаданные сущности до применения соглашений. */
+/** Raw entity metadata before conventions are applied. */
 export interface RawEntity {
   isEntity: boolean;
   table?: string;
@@ -110,7 +111,7 @@ export interface RawEntity {
   properties: Map<string, RawProperty>;
   relations: RawRelation[];
   queryFilters?: Condition[];
-  /** Имя свойства soft-delete (см. `@SoftDelete` / `@Entity({ softDelete })`). */
+  /** Soft-delete property name (see `@SoftDelete` / `@Entity({ softDelete })`). */
   softDeleteProperty?: string;
   keyDeclaration?: { properties: readonly string[]; name?: string; anchor: string; composite: boolean };
   indexes?: Array<{ properties: readonly string[]; unique: boolean; name?: string }>;
@@ -147,9 +148,9 @@ function cloneCondition(condition: Condition): Condition {
 }
 
 /**
- * Собственные (copy-on-write) метаданные сущности для декорируемого класса.
- * Метадата TC39-декораторов наследуется прототипно — первая запись в подкласс
- * копирует унаследованное (нужно для будущих иерархий TPH/TPT/TPC).
+ * Own (copy-on-write) entity metadata of the decorated class. TC39 decorator
+ * metadata is inherited prototypically: the first write in a subclass copies
+ * the inherited state.
  */
 function ownRaw(metadata: object): RawEntity {
   const carrier = metadata as MetadataCarrier;
@@ -179,7 +180,7 @@ function fieldName(context: FieldContext): string {
   return String(context.name);
 }
 
-/** Помечает класс как сущность (таблицу). */
+/** Marks a class as an entity (a table). */
 export function Entity(options: EntityOptions = {}) {
   return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
     const raw = ownRaw(context.metadata);
@@ -192,9 +193,9 @@ export function Entity(options: EntityOptions = {}) {
 }
 
 /**
- * PostgreSQL-схема таблицы. Без декоратора или с пустым именем — таблица в
- * `public`, `CREATE SCHEMA` не выполняется. С именем — мигратор создаёт схему
- * (`CREATE SCHEMA IF NOT EXISTS`) перед таблицей.
+ * PostgreSQL schema of the table. Without the decorator or with an empty name
+ * the table goes to `public` and no `CREATE SCHEMA` runs. With a name the
+ * migrator creates the schema (`CREATE SCHEMA IF NOT EXISTS`) before the table.
  */
 export function Schema(name?: string) {
   return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
@@ -205,7 +206,7 @@ export function Schema(name?: string) {
   };
 }
 
-/** Первичный ключ. По умолчанию автоинкремент для целочисленного ключа. */
+/** Primary key. Auto-increment by default for an integer key. */
 export function Key(options?: KeyOptions): (value: undefined, context: ClassFieldDecoratorContext) => void;
 export function Key(properties: readonly [string, string, ...string[]], options?: CompositeKeyOptions): (value: undefined, context: ClassFieldDecoratorContext) => void;
 export function Key(first: KeyOptions | readonly [string, string, ...string[]] = {}, options: CompositeKeyOptions = {}) {
@@ -227,8 +228,8 @@ export function Check<T extends object>(name: string, predicate: CheckPredicate<
 }
 
 /**
- * Первичный ключ UUID. Генерируется **в PostgreSQL** (`DEFAULT gen_random_uuid()`),
- * значение читается через `RETURNING` после INSERT.
+ * UUID primary key. Generated **by PostgreSQL** (`DEFAULT gen_random_uuid()`);
+ * the value is read through `RETURNING` after INSERT.
  */
 
 export function UUID(options: UUIDOptions = {}) {
@@ -243,8 +244,8 @@ export function UUID(options: UUIDOptions = {}) {
 }
 
 /**
- * Метка создания (`datetime`). Заполняется при первой вставке.
- * Эквивалент `@Column({ type: "createdAt" })`.
+ * Creation timestamp (`datetime`). Set on the first insert.
+ * Equivalent to `@Column({ type: "createdAt" })`.
  */
 export function CreatedAt() {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
@@ -253,8 +254,8 @@ export function CreatedAt() {
 }
 
 /**
- * Метка обновления (`datetime`). Заполняется при вставке и при каждом UPDATE.
- * Эквивалент `@Column({ type: "updatedAt" })`.
+ * Update timestamp (`datetime`). Set on insert and on every UPDATE.
+ * Equivalent to `@Column({ type: "updatedAt" })`.
  */
 export function UpdatedAt() {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
@@ -262,7 +263,7 @@ export function UpdatedAt() {
   };
 }
 
-/** Замапленная колонка. Тип не выводится из TS-типа (нет рефлексии) — задаётся здесь. */
+/** Mapped column. The type is not inferred from the TS type (no reflection); it is set here. */
 export function Column(options: ColumnOptions = {}) {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
     const prop = ownProperty(context.metadata, fieldName(context));
@@ -282,7 +283,7 @@ export function Required() {
   };
 }
 
-/** Индекс по колонке свойства. */
+/** Index on the property's column. */
 export function Index(options?: IndexOptions): (value: undefined, context: ClassFieldDecoratorContext) => void;
 export function Index(properties: readonly [string, ...string[]], options?: IndexOptions): (value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext) => void;
 export function Index(first: IndexOptions | readonly [string, ...string[]] = {}, options: IndexOptions = {}) {
@@ -298,9 +299,9 @@ export function Index(first: IndexOptions | readonly [string, ...string[]] = {},
 }
 
 /**
- * Помечает скалярную колонку как внешний ключ к `target` (для DDL-ограничения).
- * Достаточно, если навигационного свойства нет; иначе FK выводится из
- * `@ManyToOne`.
+ * Marks a scalar column as a foreign key to `target` (for the DDL constraint).
+ * Use it when there is no navigation property; otherwise the FK is inferred
+ * from `@ManyToOne`.
  */
 export function ForeignKey(target: () => EntityClass): (value: undefined, context: ClassFieldDecoratorContext) => void;
 export function ForeignKey(target: () => EntityClass, options: CompositeForeignKeyOptions): (value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext) => void;
@@ -314,7 +315,7 @@ export function ForeignKey(target: () => EntityClass, options?: CompositeForeign
 }
 
 /**
- * Ссылочная навигация (many-to-one): внешний ключ на этой сущности.
+ * Reference navigation (many-to-one): the foreign key is on this entity.
  *
  * ```ts
  * @Column({ type: "integer" }) authorId = 0;
@@ -333,7 +334,7 @@ export function ManyToOne(target: () => EntityClass, options: RelationOptions) {
 }
 
 /**
- * Коллекционная навигация (one-to-many): внешний ключ на целевой сущности.
+ * Collection navigation (one-to-many): the foreign key is on the target entity.
  *
  * ```ts
  * @OneToMany(() => Post, { foreignKey: "authorId" }) posts: Post[] = [];
@@ -350,7 +351,7 @@ export function OneToMany(target: () => EntityClass, options: RelationOptions) {
   };
 }
 
-/** Конвертер значения колонки (шифрование, сериализация). */
+/** Column value converter (encryption, serialization). */
 export function HasConversion(converter: ValueConverter) {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
     ownProperty(context.metadata, fieldName(context)).converter = converter;
@@ -358,8 +359,8 @@ export function HasConversion(converter: ValueConverter) {
 }
 
 /**
- * Глобальный фильтр запросов для сущности (multi-tenant, флаги и т.д.).
- * Применяется автоматически; отключается через `ignoreQueryFilters()`.
+ * Global query filter for the entity (multi-tenant, flags and so on).
+ * Applied automatically; disabled with `ignoreQueryFilters()`.
  */
 export function QueryFilter<T extends object>(predicate: PredicateFn<T>) {
   return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
@@ -369,7 +370,7 @@ export function QueryFilter<T extends object>(predicate: PredicateFn<T>) {
   };
 }
 
-/** Помечает колонку soft-delete: `remove()` ставит метку времени вместо DELETE. */
+/** Marks a soft-delete column: `remove()` sets a timestamp instead of DELETE. */
 export function SoftDelete() {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
     const name = fieldName(context);
@@ -379,7 +380,7 @@ export function SoftDelete() {
   };
 }
 
-/** Читает сырые метаданные сущности (или undefined, если класс не сущность). */
+/** Reads the raw entity metadata (or undefined if the class is not an entity). */
 export function readRawEntity(ctor: object): RawEntity | undefined {
   const metadata = (ctor as { [key: symbol]: unknown })[Symbol.metadata as unknown as symbol] as
     | MetadataCarrier

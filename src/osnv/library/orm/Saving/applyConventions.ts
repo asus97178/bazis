@@ -14,8 +14,8 @@ function generateUuid(property: PropertyModel): string {
 }
 
 /**
- * Применяет соглашения `@UUID`, `@CreatedAt`, `@UpdatedAt` перед построением SQL.
- * Вызывается после `detectChanges`, чтобы timestamp-поля попали в INSERT/UPDATE.
+ * Applies the `@UUID`, `@CreatedAt`, `@UpdatedAt` conventions before SQL is built.
+ * Called after `detectChanges` so timestamp fields get into INSERT/UPDATE.
  */
 export function applyConventions(pending: readonly TrackedEntry[]): void {
   const now = new Date();
@@ -30,8 +30,8 @@ export function applyConventions(pending: readonly TrackedEntry[]): void {
     for (const property of entry.model.properties) {
       switch (property.convention) {
         case "uuid":
-          // UUID-ключи генерирует БД (generation === "uuid"); сюда попадают только
-          // не-ключевые uuid-поля, если они появятся в модели.
+          // The database generates UUID keys (generation === "uuid"); only non-key
+          // uuid fields are generated here.
           if (property.isKey) {
             break;
           }

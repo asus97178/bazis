@@ -1,9 +1,9 @@
 import type { DistributedCacheDriver, DistributedCacheFencedWrite } from "../../cache";
 
 /**
- * Узкий контракт Redis-клиента, который нужен драйверу. Bun `RedisClient`
- * удовлетворяет ему структурно — но через интерфейс драйвер тестируется без
- * живого сервера (любой fake реализует эти пять методов).
+ * The narrow Redis client contract the driver needs. Bun `RedisClient`
+ * satisfies it structurally, and the interface lets the driver be tested
+ * without a live server (any fake implementing these five methods).
  */
 export interface RedisCommandClient {
   get(key: string): Promise<string | null>;
@@ -14,8 +14,8 @@ export interface RedisCommandClient {
 }
 
 /**
- * Снимает лок, только если он всё ещё держит наш fencing-token (атомарно).
- * Иначе медленный воркер мог бы удалить лок, который уже перезахватил другой.
+ * Releases the lock only if it still holds our fencing token (atomically).
+ * Otherwise a slow worker could delete a lock already re-acquired by another.
  */
 const RELEASE_LOCK_SCRIPT =
   "if redis.call('get', KEYS[1]) == ARGV[1] then redis.call('del', KEYS[1]); if KEYS[2] then redis.call('del', KEYS[2]) end; return 1 else return 0 end";
@@ -73,9 +73,9 @@ end
 return 1`;
 
 /**
- * Реализация {@link DistributedCacheDriver} поверх Redis/Valkey (нативный Bun
- * `RedisClient`). Только низкоуровневые примитивы — вся политика кэша
- * (anti-stampede, теги, лимиты) живёт в `DistributedCache` ядра.
+ * {@link DistributedCacheDriver} implementation on top of Redis/Valkey (the
+ * native Bun `RedisClient`). Low-level primitives only: the whole cache policy
+ * (anti-stampede, tags, limits) lives in the kernel `DistributedCache`.
  */
 export class RedisDistributedCacheDriver implements DistributedCacheDriver {
   public constructor(private readonly client: RedisCommandClient) {}

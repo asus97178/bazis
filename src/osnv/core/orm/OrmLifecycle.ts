@@ -4,9 +4,9 @@ import { DatabaseFacade, type DbContextOptions, type Migration } from "../../lib
 import { compileExpectedSchema } from "../../library/orm/Schema/ExpectedSchema";
 
 /**
- * Hosted-сервис жизненного цикла ORM: при старте (опционально) создаёт схему
- * или выполняет авто-миграцию, при остановке закрывает соединение/пул.
- * Запускается рано (отрицательная фаза), чтобы БД была готова до серверов.
+ * ORM lifecycle hosted service: at start it (optionally) creates the schema or
+ * runs the auto-migration; at shutdown it closes the connection/pool.
+ * Starts early (negative phase) so the database is ready before the servers.
  */
 export class OrmLifecycle implements HostedService {
   readonly planValidator = ormHostedPlanValidator;
@@ -29,10 +29,10 @@ export class OrmLifecycle implements HostedService {
     private readonly migrations: readonly Migration[] = [],
     private readonly runMigrationsOnStart: boolean = false,
     /**
-     * Владеет ли этот lifecycle соединением. `false` для feature-режима поверх
-     * общего {@link DATABASE_PROVIDER}: соединением владеет инфраструктура
-     * (connection-модуль / `@Infra`-коннектор), и закрывать его на остановке
-     * фичи нельзя — иначе двойное закрытие общего пула.
+     * Whether this lifecycle owns the connection. `false` for the feature mode on
+     * top of the shared {@link DATABASE_PROVIDER}: the infrastructure owns the
+     * connection (the connection module / `@Infra` connector), and the feature
+     * must not close it at shutdown, or the shared pool would be closed twice.
      */
     private readonly ownsConnection: boolean = true,
   ) {

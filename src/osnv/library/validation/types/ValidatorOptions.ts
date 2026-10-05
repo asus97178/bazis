@@ -1,13 +1,13 @@
 import type { ValidationError } from "../ValidationError";
 
 /**
- * Подсказка о типе значения поля.
+ * Hint about the field value type.
  *
- * Опциональна: модуль работает без рефлексии (`emitDecoratorMetadata` и
- * `reflect-metadata` не используются — они несовместимы с принципом
- * «без внешних зависимостей»), поэтому ожидаемый тип либо задаётся явно,
- * либо выводится из самих правил (`minLength` подразумевает строку,
- * `min` — число и т.д.).
+ * Optional: the module works without reflection (`emitDecoratorMetadata` and
+ * `reflect-metadata` are not used; they conflict with the "no external
+ * dependencies" principle), so the expected type is either set explicitly or
+ * inferred from the rules themselves (`minLength` implies a string, `min` a
+ * number and so on).
  */
 export type ValidationTypeHint =
   | "string"
@@ -21,134 +21,133 @@ export type ValidationTypeHint =
   | "any";
 
 /**
- * Результат `custom`-проверки:
- * - `true` или `void` — значение корректно;
- * - `false` — ошибка со стандартным сообщением (код `custom`);
- * - `string` — ошибка с этим сообщением (код `custom`);
- * - `ValidationError` — добавляется в результат как есть.
+ * Result of a `custom` check:
+ * - `true` or `void`: the value is valid;
+ * - `false`: an error with the standard message (code `custom`);
+ * - `string`: an error with this message (code `custom`);
+ * - `ValidationError`: added to the result as is.
  */
 export type CustomOutcome = boolean | string | void | ValidationError;
 
 /**
- * Пользовательская проверка. Может быть синхронной или асинхронной
- * (асинхронные выполняются только через `Validator.validateAsync`).
+ * Custom check. May be synchronous or asynchronous (async checks run only
+ * through `Validator.validateAsync`).
  *
- * @param value Текущее значение поля.
- * @param instance Весь проверяемый экземпляр — для перекрёстных проверок
- *   вида «если поле A равно X, то поле B обязательно».
+ * @param value Current field value.
+ * @param instance The whole instance being checked, for cross-field checks
+ *   such as "if field A equals X, field B is required".
  */
 export type CustomValidator = (value: unknown, instance: unknown) => CustomOutcome | Promise<CustomOutcome>;
 
 /**
- * Набор правил одного декоратора `@Validator(...)`.
+ * The rule set of one `@Validator(...)` decorator.
  *
- * На поле можно повесить несколько декораторов — выполняются все.
- * Правила внутри одного декоратора проверяются в фиксированном порядке:
- * `validateIf` -> `required` -> подсказка `type` -> строковые/числовые/
- * boolean/enum-правила -> `custom` -> `nested`.
+ * A field may have several decorators; all of them run. Rules inside one
+ * decorator are checked in a fixed order: `validateIf` -> `required` -> the
+ * `type` hint -> string/number/boolean/enum/date rules -> `custom` -> `nested`.
  */
 export interface ValidatorOptions {
-  /** Явная подсказка типа значения. См. {@link ValidationTypeHint}. */
+  /** Explicit value type hint. See {@link ValidationTypeHint}. */
   type?: ValidationTypeHint;
 
-  // ── Общие ────────────────────────────────────────────────────────────────
+  // ── General ──────────────────────────────────────────────────────────────
 
-  /** Значение обязательно: `undefined` и `null` — ошибка (код `required`). */
+  /** The value is required: `undefined` and `null` are errors (code `required`). */
   required?: boolean;
 
   /**
-   * Условная валидация: если функция вернёт `false`, все остальные правила
-   * этого декоратора пропускаются. Получает весь экземпляр — можно опираться
-   * на значения других полей.
+   * Conditional validation: if the function returns `false`, all other rules of
+   * this decorator are skipped. It gets the whole instance, so it can rely on
+   * the values of other fields.
    */
   validateIf?: (instance: never) => boolean;
 
   /**
-   * Пользовательская проверка (синхронная или асинхронная).
-   * Исключение внутри функции перехватывается и превращается в
-   * `ValidationError` с кодом `customError` — валидация продолжается.
+   * Custom check (synchronous or asynchronous).
+   * An exception inside the function is caught and turned into a
+   * `ValidationError` with the `customError` code; validation continues.
    */
   custom?: CustomValidator;
 
   /**
-   * Локальное сообщение об ошибке для всех правил этого декоратора.
-   * Имеет наивысший приоритет (выше `Validator.setDefaultMessages`).
-   * Поддерживает плейсхолдеры: `{property}`, `{value}`, `{min}`, `{max}`,
+   * Local error message for all rules of this decorator.
+   * Has the highest priority (above `Validator.setDefaultMessages`).
+   * Supports placeholders: `{property}`, `{value}`, `{min}`, `{max}`,
    * `{pattern}`, `{contains}`, `{allowed}`, `{expected}`, `{actual}`.
    */
   message?: string;
 
   /**
-   * Рекурсивная проверка значения как класса с декораторами `@Validator`.
-   * Если не задано — включается автоматически, когда значение поля является
-   * экземпляром класса с зарегистрированными правилами. `nested: false`
-   * отключает авто-режим. Массивы проверяются поэлементно
-   * (`items[0].name`), циклические ссылки безопасно пропускаются.
+   * Recursive check of the value as a class with `@Validator` decorators.
+   * If not set, it turns on automatically when the field value is an instance
+   * of a class with registered rules. `nested: false` turns off the auto mode.
+   * Arrays are checked element by element (`items[0].name`); circular
+   * references are safely skipped.
    */
   nested?: boolean;
 
-  // ── Строки ───────────────────────────────────────────────────────────────
+  // ── Strings ──────────────────────────────────────────────────────────────
 
-  /** Строка не должна быть пустой (`""`). */
+  /** The string must not be empty (`""`). */
   notEmpty?: boolean;
-  /** Минимальная длина строки (включительно). */
+  /** Minimum string length (inclusive). */
   minLength?: number;
-  /** Максимальная длина строки (включительно); превышение пропускает проверки содержимого этого декоратора. */
+  /** Maximum string length (inclusive); exceeding it skips this decorator's content checks. */
   maxLength?: number;
-  /** Диапазон длины строки `[min, max]` (включительно); превышение max пропускает проверки содержимого этого декоратора. */
+  /** String length range `[min, max]` (inclusive); exceeding max skips this decorator's content checks. */
   length?: readonly [number, number];
-  /** Строка должна содержать подстроку. */
+  /** The string must contain the substring. */
   contains?: string;
-  /** Строка не должна содержать подстроку. */
+  /** The string must not contain the substring. */
   notContains?: string;
   /**
-   * Регулярное выражение (RegExp или строка-источник).
-   * Компилируется один раз при первом обращении к классу и кэшируется.
-   * Для недоверенного ввода задавайте maxLength/length в этом же декораторе.
+   * Regular expression (a RegExp or a source string).
+   * Compiled once on the first access to the class and cached.
+   * For untrusted input set maxLength/length in the same decorator.
    */
   pattern?: RegExp | string;
-  /** Строка должна быть корректным email-адресом. */
+  /** The string must be a valid email address. */
   email?: boolean;
-  /** Строка должна быть корректным URL (проверяется через `URL.canParse`). */
+  /** The string must be a valid URL (checked with `URL.canParse`). */
   url?: boolean;
   /**
-   * Строка должна быть корректным UUID (версии 1–8, включая v4 из
-   * `crypto.randomUUID()` и v7 из `Bun.randomUUIDv7()`; nil-UUID допустим).
+   * The string must be a valid UUID (versions 1–8, including v4 from
+   * `crypto.randomUUID()` and v7 from `Bun.randomUUIDv7()`; the nil UUID is allowed).
    */
   uuid?: boolean;
-  /** Строка должна парситься как JSON. */
+  /** The string must parse as JSON. */
   json?: boolean;
-  /** Строка должна быть телефоном: опциональный `+`, 7–15 цифр, допускаются пробелы, дефисы и скобки. */
+  /** The string must be a phone number: an optional `+`, 7–15 digits; spaces, hyphens and parentheses are allowed. */
   phone?: boolean;
 
-  // ── Числа ────────────────────────────────────────────────────────────────
+  // ── Numbers ──────────────────────────────────────────────────────────────
 
-  /** Число не меньше указанного. */
+  /** The number is not less than this value. */
   min?: number;
-  /** Число не больше указанного. */
+  /** The number is not greater than this value. */
   max?: number;
-  /** Число в диапазоне `[min, max]` (включительно). */
+  /** The number is in the `[min, max]` range (inclusive). */
   range?: readonly [number, number];
-  /** Число строго больше нуля. */
+  /** The number is strictly greater than zero. */
   positive?: boolean;
-  /** Число строго меньше нуля. */
+  /** The number is strictly less than zero. */
   negative?: boolean;
-  /** Число должно быть целым. */
+  /** The number must be an integer. */
   integer?: boolean;
 
   // ── Boolean ──────────────────────────────────────────────────────────────
 
-  /** Значение должно быть строго `true` (например, согласие с условиями). */
+  /** The value must be exactly `true` (for example, accepting terms). */
   mustBeTrue?: boolean;
-  /** Значение должно быть строго `false`. */
+  /** The value must be exactly `false`. */
   mustBeFalse?: boolean;
 
   // ── Enum ─────────────────────────────────────────────────────────────────
 
   /**
-   * Enum-объект, среди значений которого должно находиться значение поля.
-   * Поддерживаются строковые и числовые enum TypeScript (обратные ключи
-   * числовых enum игнорируются).
+   * Enum object whose values must include the field value.
+   * TypeScript string and numeric enums are supported (reverse keys of numeric
+   * enums are ignored).
    */
   enumType?: Record<string, string | number>;
 }

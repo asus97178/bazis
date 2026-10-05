@@ -1,18 +1,18 @@
 import type { ListQuery } from "./types";
 
-/** Метаданные коллекции (счётчики страниц) — кладутся в `meta` ответа. */
+/** Collection metadata (page counters), put into the response `meta`. */
 export interface ListMeta {
-  /** Общее число записей с учётом фильтров (без пагинации). */
+  /** Total number of records with filters applied (without paging). */
   readonly total: number;
-  /** Номер текущей страницы (1-based). */
+  /** Current page number (1-based). */
   readonly page: number;
-  /** Размер страницы. */
+  /** Page size. */
   readonly size: number;
-  /** Всего страниц = `ceil(total / size)`. */
+  /** Total pages = `ceil(total / size)`. */
   readonly pageCount: number;
 }
 
-/** Ссылки пагинации в стиле JSON:API (`links`). */
+/** JSON:API-style paging links (`links`). */
 export interface ListLinks {
   readonly self: string;
   readonly first: string;
@@ -22,8 +22,8 @@ export interface ListLinks {
 }
 
 /**
- * Документ-ответ коллекции. `data` — сами элементы (сущности или DTO), `meta`
- * — счётчики, `links` — навигация по страницам (если задан `basePath`).
+ * Collection response document. `data` holds the items (entities or DTOs),
+ * `meta` the counters, `links` the page navigation (if `basePath` is set).
  */
 export interface ListDocument<T> {
   readonly data: readonly T[];
@@ -31,18 +31,18 @@ export interface ListDocument<T> {
   readonly links?: ListLinks;
 }
 
-/** Опции сборки {@link ListDocument}. */
+/** Options for building a {@link ListDocument}. */
 export interface BuildListDocumentOptions {
   /**
-   * Базовый путь для ссылок пагинации, например `"/api/users"`. Если не задан,
-   * `links` не строятся (полезно, когда ссылки не нужны).
+   * Base path for paging links, for example `"/api/users"`. If not set,
+   * `links` are not built.
    */
   readonly basePath?: string;
 }
 
 /**
- * Собирает JSON:API-подобный документ коллекции из элементов страницы, исходного
- * запроса и общего числа записей.
+ * Builds a JSON:API-like collection document from the page items, the original
+ * request and the total number of records.
  *
  * ```ts
  * const { items, total } = await paginate(repo.query(), query);
@@ -66,8 +66,8 @@ export function buildListDocument<T>(
 }
 
 /**
- * Сериализует запрос в query-строку JSON:API (без ведущего `?`). Полезно для
- * построения ссылок и для round-trip в тестах.
+ * Serializes the request into a JSON:API query string (without the leading `?`).
+ * Useful for building links and for round trips in tests.
  */
 export function serializeListQuery(query: ListQuery, pageNumber?: number): string {
   return toSearchParams(query, pageNumber).toString();

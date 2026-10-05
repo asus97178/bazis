@@ -4,11 +4,11 @@ import type { RouteMiddlewareComposer } from "../options";
 import { resolveAuthorizeMeta } from "./metadata";
 
 /**
- * Встроенный composer для `@Authorize`. HTTP-сервер ставит его первым звеном
- * среди per-route composer'ов. Для маршрутов с требованием авторизации
- * возвращает middleware, который последовательно прогоняет все проверки:
- * любая вернувшая `false` → `403`; проверка может сама бросить `HttpError`
- * (например `UnauthorizedError` → `401`).
+ * Built-in composer for `@Authorize`. The HTTP server puts it first among
+ * the per-route composers. For routes that require authorization it returns
+ * middleware that runs all checks in order: any that returns `false` → `403`;
+ * a check may throw an `HttpError` itself (for example
+ * `UnauthorizedError` → `401`).
  */
 export function createAuthorizeComposer(): RouteMiddlewareComposer {
   return (controllerClass, methodName) => {

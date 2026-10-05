@@ -1,13 +1,13 @@
 /**
- * Реестр «имя класса -> класс» для request-моделей (`@RequestModel()`).
+ * "Class name -> class" registry for request models (`@RequestModel()`).
  *
- * Это HTTP-биндинг concern: сгенерированные конвенции привязок ссылаются на
- * класс тела запроса по имени (генерируемый файл — чистые данные, без импортов
- * пользовательских модулей), а сам класс разрешается из этого реестра при
- * старте сервера.
+ * Generated binding conventions refer to the request body class by name (the
+ * generated file is plain data without imports of user modules). The generated
+ * target resolves its own DTOs; this registry is the fallback for classes it
+ * does not know, such as external DTOs marked with `@RequestModel()`.
  */
 
-/** Маркер: под одним именем зарегистрировано несколько разных классов. */
+/** Marker: several different classes are registered under one name. */
 export const AMBIGUOUS_REQUEST_MODEL: unique symbol = Symbol("ambiguous-request-model");
 
 export type RequestModelClass = new () => object;
@@ -48,11 +48,11 @@ let registry = new Map<string, RequestModelClass | typeof AMBIGUOUS_REQUEST_MODE
 let shapes = new Map<RequestModelClass, RequestModelShape>();
 const FORBIDDEN_SHAPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-/** Регистрирует класс request-модели (вызывается декоратором `@RequestModel()`). */
+/** Registers a request-model class (called by the `@RequestModel()` decorator). */
 export function registerRequestModelClass(ctor: RequestModelClass): void {
   const name = ctor.name;
   if (!name) {
-    return; // анонимный класс не адресуем по имени
+    return; // an anonymous class cannot be addressed by name
   }
   const existing = registry.get(name);
   if (existing === undefined) {
@@ -63,8 +63,8 @@ export function registerRequestModelClass(ctor: RequestModelClass): void {
 }
 
 /**
- * Класс по имени: `undefined` — не зарегистрирован (нет `@RequestModel()`),
- * `AMBIGUOUS_REQUEST_MODEL` — имя неоднозначно (два разных класса).
+ * Class by name: `undefined` if not registered (no `@RequestModel()`),
+ * `AMBIGUOUS_REQUEST_MODEL` if the name is ambiguous (two different classes).
  */
 export function findRequestModelByName(
   name: string,

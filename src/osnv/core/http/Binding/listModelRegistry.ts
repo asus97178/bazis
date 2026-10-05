@@ -1,20 +1,20 @@
 /**
- * Реестр «имя класса -> класс» для list-запросов (наследников `ListRequest`).
+ * "Class name -> class" registry for list requests (`ListRequest` subclasses).
  *
- * Аналогичен {@link requestModelRegistry}: сгенерированные конвенции привязок
- * ссылаются на класс по имени (генерируемый файл — чистые данные), а сам класс
- * разрешается из этого реестра при старте сервера. Регистрация приходит из
- * app-owned generated runtime (`src/generated/osnv/httpListModels.ts`).
+ * Like {@link requestModelRegistry}: generated binding conventions refer to
+ * the class by name (the generated file is plain data), and the class itself
+ * is resolved from this registry when the server starts. Registration comes
+ * from the app-owned generated runtime (`src/generated/osnv/httpListModels.ts`).
  */
 
-/** Маркер: под одним именем зарегистрировано несколько разных классов. */
+/** Marker: several different classes are registered under one name. */
 export const AMBIGUOUS_LIST_MODEL: unique symbol = Symbol("ambiguous-list-model");
 
 export type ListModelClass = new () => object;
 
 let registry = new Map<string, ListModelClass | typeof AMBIGUOUS_LIST_MODEL>();
 
-/** Регистрирует класс list-запроса (вызывается из generated runtime). */
+/** Registers a list-request class (called from the generated runtime). */
 export function registerListModelClass(ctor: ListModelClass): void {
   const name = ctor.name;
   if (!name) {
@@ -29,8 +29,8 @@ export function registerListModelClass(ctor: ListModelClass): void {
 }
 
 /**
- * Класс по имени: `undefined` — не зарегистрирован, `AMBIGUOUS_LIST_MODEL` —
- * имя неоднозначно (два разных класса).
+ * Class by name: `undefined` if not registered, `AMBIGUOUS_LIST_MODEL` if the
+ * name is ambiguous (two different classes).
  */
 export function findListModelByName(name: string): ListModelClass | typeof AMBIGUOUS_LIST_MODEL | undefined {
   return registry.get(name);

@@ -7,16 +7,16 @@ type EntityClass = new () => object;
 export interface DbContextOptionsConfig {
   readonly provider: DatabaseProvider;
   readonly entities: readonly EntityClass[];
-  /** Валидировать сущности перед SaveChanges (по умолчанию true). */
+  /** Validate entities before SaveChanges (default true). */
   readonly validateOnSave?: boolean;
-  /** Повторы при transient-ошибках БД (`EnableRetryOnFailure`). */
+  /** Retries on transient database errors (`EnableRetryOnFailure`). */
   readonly executionStrategy?: ExecutionStrategyOptions;
 }
 
 /**
- * Иммутабельные опции контекста: провайдер БД, скомпилированная модель и флаги
- * поведения. Создаются один раз (модель строится из `entities`) и
- * переиспользуются всеми scoped-экземплярами `DbContext`.
+ * Immutable context options: the database provider, the compiled model and
+ * behavior flags. Created once (the model is built from `entities`) and reused
+ * by all scoped `DbContext` instances.
  */
 export class DbContextOptions {
   readonly provider: DatabaseProvider;

@@ -12,7 +12,7 @@ import { OrmTransaction, type OrmTransactionScopeOptions } from "./Transactions/
 type EntityClass<T extends object> = new () => T;
 
 /**
- * Базовый класс контекста БД (scoped-сервис DI). Наследник объявляет наборы:
+ * Base class of a database context (a scoped DI service). A subclass declares the sets:
  *
  * ```ts
  * class AppDbContext extends DbContext {
@@ -21,12 +21,12 @@ type EntityClass<T extends object> = new () => T;
  * }
  * ```
  *
- * Хранит ChangeTracker, фасад `database` и предоставляет SaveChanges в транзакции.
+ * Holds the ChangeTracker and the `database` facade and provides SaveChanges in a transaction.
  */
 export abstract class DbContext {
-  /** Трекер изменений этого контекста. */
+  /** Change tracker of this context. */
   readonly changeTracker: ChangeTracker;
-  /** Управление базой данных (схема, сырой SQL, транзакции). */
+  /** Database management (schema, raw SQL, transactions). */
   readonly database: DatabaseFacade;
 
   readonly #options: DbContextOptions;
@@ -40,20 +40,20 @@ export abstract class DbContext {
     this.database = new DatabaseFacade(provider, options.model);
   }
 
-  /** Создаёт набор для сущности. Вызывается в инициализаторах полей наследника. */
+  /** Creates a set for an entity. Called in the subclass's field initializers. */
   protected set<T extends object>(entity: EntityClass<T>): DbSet<T> {
     return this.setOf(entity);
   }
 
-  /** Публичный доступ к `DbSet` по классу сущности (для `Repository<T>` и generic-сценариев). */
+  /** Public access to a `DbSet` by entity class (for `Repository<T>` and generic scenarios). */
   setOf<T extends object>(entity: EntityClass<T>): DbSet<T> {
     return new DbSet<T>(this.#options.model.requireByCtor(entity), this.#runtime);
   }
 
   /**
-   * `DbSet` для сущности, зарегистрированной в реестре по имени (без статического
-   * класса в коде) — основа динамических таблиц DataManager. Модель должна быть
-   * предварительно зарегистрирована (`OrmModel.registerModel`), иначе
+   * `DbSet` for an entity registered in the model by name (with no static class
+   * in the code), the basis for dynamic tables built at runtime. The model must
+   * be registered beforehand (`OrmModel.registerModel`), otherwise
    * `EntityNotMappedError`.
    */
   setByName(name: string): DbSet<Record<string, unknown>> {
@@ -89,9 +89,9 @@ export abstract class DbContext {
   }
 
   /**
-   * Применяет все накопленные изменения в одной транзакции и возвращает число
-   * обработанных сущностей. Перед сохранением выполняется DetectChanges и
-   * (если включено) валидация Added/Modified сущностей.
+   * Applies all pending changes in one transaction and returns the number of
+   * processed entities. DetectChanges runs before saving, and (if enabled)
+   * Added/Modified entities are validated.
    */
   saveChanges(): Promise<number> {
     return monitorWholeOperation(this, () => new SaveExecutor(this.#runtime.provider, this.changeTracker, {

@@ -6,8 +6,8 @@ type EntityClass = new () => object;
 type ContextClass<TContext extends DbContext> = new (options: DbContextOptions) => TContext;
 
 /**
- * Регистрирует scoped `IRepository<T>` для каждой сущности контекста и
- * open generic family (для encapsulation / `IRepository.of(Entity)`).
+ * Registers a scoped `IRepository<T>` for each context entity and the
+ * open generic family (for encapsulation / `IRepository.of(Entity)`).
  */
 export function registerRepositories<TContext extends DbContext>(
   di: DiRegistrar,

@@ -1,5 +1,5 @@
-// Композиционный слой: единая точка входа приложения. Зависит от ядра, HTTP, gRPC и
-// библиотеки валидации (это корень композиции — ему можно всё), пряча проводку
-// инфраструктуры от прикладного кода.
+// Composition layer: the single application entry point. Depends on the kernel, HTTP, gRPC and
+// the validation library (it is the composition root, so it may use everything), hiding
+// infrastructure wiring from application code.
 export { runApp, type RunAppOptions } from "./runApp";
 export * from "./ui";

@@ -16,7 +16,7 @@ export interface ModuleNaming {
   readonly moduleClass: string;
   /** API list base path segment (`/api/users`). */
   readonly apiBasePath: string;
-  /** PostgreSQL schema (имя папки модуля, `-` → `_`). */
+  /** PostgreSQL schema (module folder name, `-` → `_`). */
   readonly dbSchema: string;
 }
 
