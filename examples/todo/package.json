@@ -1,0 +1,21 @@
+{
+  "name": "todo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "osnv codegen",
+    "dev": "osnv dev",
+    "test": "osnv test",
+    "build": "osnv build",
+    "build:bin": "osnv build --bin",
+    "start": "./bin/todo"
+  },
+  "dependencies": {
+    "osnv": "file:../../src/osnova"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^5"
+  }
+}

@@ -218,3 +218,11 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 (`src/generated/osnv/fingerprint.ts`). Новый проект получает скрипты `test` и
 `start`, `.env.example`, тест `/health`, `HOST`; копия `vendor/osnv` совпадает по
 составу с npm-пакетом.
+
+`osnv dev` запускает приложение с `OSNV_ENV=development`, если переменная не
+задана в оболочке (раньше без `.env` приложение стартовало как `production`
+и требовало продовые секреты). README пакета переписан на английском.
+Добавлен пример `examples/todo` (модули project, task, report; PostgreSQL с
+автомиграцией, межмодульный DI, валидация, JSON:API, e2e-тест, бинарник);
+`run ci` собирает его как пользователь (`example install/build/test`), e2e-тест
+выполняется при заданном `OSNV_DB__HOST`, иначе помечается skip.

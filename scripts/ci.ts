@@ -14,10 +14,10 @@ const root = resolve(import.meta.dir, "..");
 const bun = process.execPath;
 const results: { step: string; seconds: number }[] = [];
 
-function run(step: string, command: string[], cwd = root): void {
+function run(step: string, command: string[], cwd = root, env: Record<string, string | undefined> = process.env): void {
   console.log(`\n[ci] ${step}`);
   const started = performance.now();
-  const result = Bun.spawnSync(command, { cwd, stdout: "inherit", stderr: "inherit" });
+  const result = Bun.spawnSync(command, { cwd, env, stdout: "inherit", stderr: "inherit" });
   results.push({ step, seconds: Math.round((performance.now() - started) / 100) / 10 });
   if (result.exitCode !== 0) {
     console.error(`[ci] FAIL: ${step} (exit ${result.exitCode ?? "signal"})`);
@@ -53,6 +53,14 @@ try {
 }
 
 run("package", [bun, "run", "scripts/package-check.ts"]);
+
+// examples/todo as a user would build it (its e2e test needs OSNV_DB__HOST, else it is skipped).
+const example = join(root, "examples/todo");
+const exampleEnv = { ...process.env, OSNV_BUN_BIN: bun };
+const exampleCli = join(example, "node_modules/osnv/cli/main.ts");
+run("example install", [bun, "install", "--frozen-lockfile"], example, exampleEnv);
+run("example build", [bun, exampleCli, "build", "--bin"], example, exampleEnv);
+run("example test", [bun, exampleCli, "test"], example, exampleEnv);
 
 if (live !== undefined) run("live PostgreSQL", ["python3", "ops/live-postgres/runner.py", resolve(live)]);
 
