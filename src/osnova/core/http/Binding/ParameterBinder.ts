@@ -67,7 +67,7 @@ export async function bindArguments(
           throw new UnsupportedMediaTypeError("application/json");
         }
         const data = await ctx.json();
-        args[index] = binding.model ? bindModel(binding.model, data, ctx.modelValidator) : data;
+        args[index] = binding.model ? bindModel(binding.model, data, ctx.modelValidator, { primitiveTypes: true }) : data;
         break;
       }
       case "request":

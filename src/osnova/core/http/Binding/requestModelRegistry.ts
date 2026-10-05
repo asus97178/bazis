@@ -18,14 +18,27 @@ export type RequestModelClass = new () => object;
  * expose design types, so this tiny registry is the dependency-free bridge
  * from TypeScript source types to the HTTP binder.
  */
-export interface RequestModelFieldShape {
-  readonly model: RequestModelClass;
+interface RequestModelFieldShapeBase {
   readonly array?: boolean;
   /** `null` is part of the declared property type. */
   readonly nullable?: boolean;
   /** `null` is part of an array element type. */
   readonly elementNullable?: boolean;
 }
+
+/** A field typed as a request-model class (or an array of them). */
+export interface RequestModelNestedFieldShape extends RequestModelFieldShapeBase {
+  readonly model: RequestModelClass;
+}
+
+/** A field declared exactly as `string`, `number` or `boolean` (or an array of one). */
+export interface RequestModelPrimitiveFieldShape extends RequestModelFieldShapeBase {
+  readonly primitive: RequestModelPrimitive;
+}
+
+export type RequestModelPrimitive = "string" | "number" | "boolean";
+export type RequestModelFieldShape = RequestModelNestedFieldShape | RequestModelPrimitiveFieldShape;
+const PRIMITIVES: ReadonlySet<unknown> = new Set<RequestModelPrimitive>(["string", "number", "boolean"]);
 
 export type RequestModelShape = Readonly<Record<string, RequestModelFieldShape>>;
 
@@ -59,7 +72,7 @@ export function findRequestModelByName(
   return registry.get(name);
 }
 
-/** Registers generated nested-model hydration metadata for one DTO class. */
+/** Registers generated hydration metadata (nested models, primitive types) for one DTO class. */
 export function registerRequestModelShape(ctor: RequestModelClass, shape: RequestModelShape): void {
   const snapshot: Record<string, RequestModelFieldShape> = Object.create(null) as Record<string, RequestModelFieldShape>;
   for (const key of Object.keys(shape)) {
@@ -69,16 +82,20 @@ export function registerRequestModelShape(ctor: RequestModelClass, shape: Reques
     ) {
       continue;
     }
-    const field = shape[key];
-    if (field === undefined || typeof field.model !== "function") {
+    const field = shape[key] as Partial<RequestModelNestedFieldShape & RequestModelPrimitiveFieldShape> | undefined;
+    const nested = typeof field?.model === "function";
+    const primitive = PRIMITIVES.has(field?.primitive);
+    if (field === undefined || nested === primitive) {
       throw new TypeError(`Invalid request-model shape for ${ctor.name}.${key}`);
     }
-    snapshot[key] = Object.freeze({
-      model: field.model,
+    const flags = {
       array: field.array === true || undefined,
       nullable: field.nullable === true || undefined,
       elementNullable: field.elementNullable === true || undefined,
-    });
+    };
+    snapshot[key] = Object.freeze(nested
+      ? { model: field.model as RequestModelClass, ...flags }
+      : { primitive: field.primitive as RequestModelPrimitive, ...flags });
   }
   shapes.set(ctor, Object.freeze(snapshot));
 }

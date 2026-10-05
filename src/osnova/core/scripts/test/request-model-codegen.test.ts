@@ -44,7 +44,7 @@ describe("nested request-model codegen", () => {
     expect(hydration.declarations).toEqual([child, request]);
     expect(hydration.fields.get(request)?.map((field) => ({
       property: field.property,
-      model: field.model.name?.text,
+      model: field.model?.name?.text,
       array: field.array,
       nullable: field.nullable,
       elementNullable: field.elementNullable,
@@ -58,11 +58,65 @@ describe("nested request-model codegen", () => {
       [request, "RequestModel_1"],
     ]);
     expect(renderRequestModelShapeRegistrations(hydration, (declaration) => aliases.get(declaration))).toEqual([
+      "registerRequestModelShape(RequestModel_0, {",
+      '  "value": { primitive: "string" },',
+      "});",
       "registerRequestModelShape(RequestModel_1, {",
       '  "child": { model: RequestModel_0 },',
       '  "children": { model: RequestModel_0, array: true, elementNullable: true },',
       "});",
     ]);
+  });
+
+  test("records exactly string, number and boolean fields; leaves other types unchecked", () => {
+    const program = programFor(`
+      enum Color { Red = "red" }
+      export class PrimitiveRequest {
+        name!: string;
+        count?: number;
+        done!: boolean | null;
+        tags!: readonly string[];
+        scores!: (number | null)[] | null;
+        mode!: "a" | "b";
+        color!: Color;
+        when!: Date;
+        pair!: [string, number];
+        mixed!: string | number;
+        any!: unknown;
+        private secret = "";
+        static version = "";
+      }
+      class HiddenRequest {
+        name!: string;
+      }
+      export class Holder {
+        hidden!: HiddenRequest;
+      }
+    `);
+    const source = program.getSourceFile(PROBE_FILE)!;
+    const request = classNamed(source, "PrimitiveRequest");
+    const hidden = classNamed(source, "HiddenRequest");
+    const hydration = analyzeRequestModelHydration({
+      checker: program.getTypeChecker(),
+      roots: [request, hidden],
+      isProjectDeclaration: () => true,
+      isExcludedDeclaration: () => false,
+      isNamedExportedTopLevelClass: isNamedExport,
+      sourcePathForDeclaration: (declaration) => declaration.getSourceFile().fileName,
+      sourceLocation: (node) => `${node.getSourceFile().fileName}:1`,
+    });
+
+    expect(hydration.errors).toEqual([]);
+    expect(hydration.fields.get(request)).toEqual([
+      { property: "count", primitive: "number", array: false, nullable: false, elementNullable: false },
+      { property: "done", primitive: "boolean", array: false, nullable: true, elementNullable: false },
+      { property: "name", primitive: "string", array: false, nullable: false, elementNullable: false },
+      { property: "scores", primitive: "number", array: true, nullable: true, elementNullable: true },
+      { property: "tags", primitive: "string", array: true, nullable: false, elementNullable: false },
+    ]);
+    // Not importable by generated code: binding stays as before, no new error.
+    expect(hydration.fields.get(hidden)).toBeUndefined();
+    expect(hydration.declarations).toEqual([request]);
   });
 
   test("fails closed for an explicit nested union of multiple DTO classes", () => {

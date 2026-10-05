@@ -5,6 +5,8 @@ import {
   findRequestModelShape,
   type RequestModelClass,
   type RequestModelFieldShape,
+  type RequestModelNestedFieldShape,
+  type RequestModelPrimitiveFieldShape,
 } from "./requestModelRegistry";
 
 /** Keys that must never be copied from external input (prototype pollution). */
@@ -24,6 +26,12 @@ export interface ModelBindingOptions {
   readonly declaredFields?: (model: RequestModelClass) => readonly string[] | undefined;
   /** Protobuf bytes only; HTTP/Agent keep their strict JSON boundary. */
   readonly allowBinary?: boolean;
+  /**
+   * Reject a JSON value whose type differs from a field declared exactly as
+   * `string`, `number` or `boolean` (from generated shapes). HTTP enables it;
+   * gRPC (int64 as string/bigint) and agents keep their own conversions.
+   */
+  readonly primitiveTypes?: boolean;
 }
 
 /**
@@ -76,10 +84,7 @@ function hydrateModel(
       }
       const target = instance as Record<string, unknown>;
       const fieldPath = path === "" ? key : `${path}.${key}`;
-      const fieldShape = findFieldShape(model, key);
-      target[key] = fieldShape === undefined
-        ? sanitizeBoundValue(target[key], source[key], fieldPath, traversal, depth + 1)
-        : hydrateField(fieldShape, source[key], fieldPath, traversal, depth + 1);
+      target[key] = bindField(model, key, target[key], source[key], fieldPath, traversal, depth + 1);
     }
     return instance;
   } finally {
@@ -87,8 +92,44 @@ function hydrateModel(
   }
 }
 
+function bindField(
+  model: RequestModelClass,
+  key: string,
+  template: unknown,
+  incoming: unknown,
+  path: string,
+  traversal: BindingTraversal,
+  depth: number,
+): unknown {
+  const shape = findFieldShape(model, key);
+  if (shape !== undefined && "model" in shape) {
+    return hydrateField(shape, incoming, path, traversal, depth);
+  }
+  if (shape !== undefined && traversal.options.primitiveTypes === true) {
+    checkPrimitive(shape, incoming, path);
+  }
+  return sanitizeBoundValue(template, incoming, path, traversal, depth);
+}
+
+/** `undefined` means "absent"; required-ness stays with `@Validator`. */
+function checkPrimitive(shape: RequestModelPrimitiveFieldShape, incoming: unknown, path: string): void {
+  if (incoming === undefined || (incoming === null && shape.nullable === true)) {
+    return;
+  }
+  if (shape.array !== true) {
+    if (typeof incoming !== shape.primitive) throw bindingTypeError(path, shape.primitive);
+    return;
+  }
+  if (!Array.isArray(incoming)) throw bindingTypeError(path, "array");
+  incoming.forEach((item, index) => {
+    if (!(item === null && shape.elementNullable === true) && typeof item !== shape.primitive) {
+      throw bindingTypeError(`${path}[${index}]`, shape.primitive);
+    }
+  });
+}
+
 function hydrateField(
-  shape: RequestModelFieldShape,
+  shape: RequestModelNestedFieldShape,
   incoming: unknown,
   path: string,
   traversal: BindingTraversal,
@@ -204,10 +245,7 @@ function sanitizeBoundValue(
           continue;
         }
         const childPath = `${path}.${key}`;
-        const fieldShape = findFieldShape(targetModel, key);
-        target[key] = fieldShape === undefined
-          ? sanitizeBoundValue(target[key], incoming[key], childPath, traversal, depth + 1)
-          : hydrateField(fieldShape, incoming[key], childPath, traversal, depth + 1);
+        target[key] = bindField(targetModel, key, target[key], incoming[key], childPath, traversal, depth + 1);
       }
       return target;
     }

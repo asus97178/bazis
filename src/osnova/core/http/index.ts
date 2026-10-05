@@ -80,6 +80,9 @@ export {
   registerRequestModelClass,
   registerRequestModelShape,
   type RequestModelFieldShape,
+  type RequestModelNestedFieldShape,
+  type RequestModelPrimitive,
+  type RequestModelPrimitiveFieldShape,
   type RequestModelClass,
   type RequestModelShape,
 } from "./Binding/requestModelRegistry";
