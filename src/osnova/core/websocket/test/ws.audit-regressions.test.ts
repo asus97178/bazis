@@ -1,11 +1,10 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { WebSocketServer, type WebSocketServerOptions } from "../ws-server";
-import { SessionCapacityError, SessionManager, type SessionState } from "../session-manager";
+import { SessionManager, type SessionState } from "../session-manager";
 import { InMemoryWebSocketAdapter } from "../adapter/in-memory.adapter";
 import type { WebSocketAdapterHooks } from "../adapter/adapter.interface";
 import { BinaryPacketCodec } from "../codec/binary.codec";
 import { jsonPacketCodec } from "../codec/json.codec";
-import type { PacketCodec } from "../codec/packet-codec.interface";
 import { dispatchWsHandler, WsDispatchError } from "../ws-dispatch";
 import type { CompiledWsHandler, RegisteredNamespace } from "../explorer";
 import type { AckCallback, OsnovaSocket, ServerPacket } from "../types";

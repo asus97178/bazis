@@ -22,7 +22,6 @@ export {
 /** Public compatibility facade for the owner-private execution driver. */
 export class AgentRuntime {
   private readonly driver: AgentExecutionDriver;
-  private readonly defaultTimeoutMs?: number;
 
   constructor(
     services: ServiceProvider,
@@ -31,7 +30,6 @@ export class AgentRuntime {
     options: AgentRuntimeOptions = {},
   ) {
     this.driver = new AgentExecutionDriver(services, registry, modelProvider, options);
-    this.defaultTimeoutMs = this.driver.defaultTimeoutMs;
   }
 
   invoke(agentName: string, options: AgentRuntimeInvokeOptions = {}): Promise<AgentRuntimeResult> {

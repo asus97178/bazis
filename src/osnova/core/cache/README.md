@@ -79,6 +79,5 @@ await runApp(AppModule, { cache: memory(), infra: AppInfra, http: {} });
 
 ## Compatibility
 
-Canonical DI helpers are `cachedScoped` and `cachedSingleton`. Deprecated
-aliases such as `autoCachedScoped` and `autoCachedSingleton` are kept only for
-the 0.x compatibility window; see [COMPATIBILITY.md](./COMPATIBILITY.md).
+DI helpers are `cachedScoped` and `cachedSingleton`. Former aliases were
+removed before the first npm release; see [COMPATIBILITY.md](./COMPATIBILITY.md).

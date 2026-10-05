@@ -82,7 +82,6 @@ export {
 export { createRouteOutputCacheComposer, type RouteOutputCacheComposer } from "./http/composeOutputCache";
 export {
   guardInsecureOutputCacheRoute,
-  warnInsecureOutputCacheRoute,
   type OutputCacheSecurityWarningOptions,
 } from "./http/outputCacheSecurityWarning";
 export type { CachedHttpPayload } from "./http/CachedHttpPayload";
@@ -95,6 +94,4 @@ export { wrapCachedService, type CacheProxyOptions } from "./services/cacheProxy
 export {
   cachedSingleton,
   cachedScoped,
-  autoCachedSingleton,
-  autoCachedScoped,
 } from "./providers/cachedProviders";

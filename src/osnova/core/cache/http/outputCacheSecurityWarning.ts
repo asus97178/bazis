@@ -56,6 +56,3 @@ export function guardInsecureOutputCacheRoute(
   }
   (options.warn ?? console.warn)(message);
 }
-
-/** @deprecated Use {@link guardInsecureOutputCacheRoute}. */
-export const warnInsecureOutputCacheRoute = guardInsecureOutputCacheRoute;

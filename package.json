@@ -29,7 +29,6 @@
     "build:bin:app": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/index.ts bin/osnova-app",
     "build:bin:cli": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/osnova/cli/main.ts bin/osnv",
     "bin:run": "OSNV_ENV=production ./bin/osnova-app",
-    "bin:run:app": "OSNV_ENV=production ./bin/osnova-app",
     "bin:run:cli": "./bin/osnv",
     "client:ui": "bun run --cwd client-ui start",
     "client:ui:build": "bun run --cwd client-ui build"

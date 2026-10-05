@@ -1,4 +1,4 @@
-import type { EntityModel, PropertyModel } from "../Metadata/types";
+import type { EntityModel } from "../Metadata/types";
 import type { Row, SqlDialect } from "../Providers/types";
 import { decodeProperty } from "../Providers/propertyConversion";
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, Module, ServiceValidationError, createToken, singleton, type HostedService, type OsnovaModuleRef } from "../../di";
+import { DI, HOSTED_SERVICE, Module, ServiceValidationError, createToken, type HostedService, type OsnovaModuleRef } from "../../di";
 import {
   ApplicationLifetime,
   Environment,

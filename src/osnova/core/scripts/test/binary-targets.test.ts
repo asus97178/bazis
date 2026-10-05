@@ -20,7 +20,6 @@ describe("binary build targets", () => {
     expect(pkg.scripts["prebuild:bin"]).toBe("bun run di:generate");
     expect(pkg.scripts.prebuild).toBe("bun run di:generate");
     expect(pkg.scripts["bin:run"]).toBe("OSNV_ENV=production ./bin/osnova-app");
-    expect(pkg.scripts["bin:run:app"]).toBe("OSNV_ENV=production ./bin/osnova-app");
     expect(pkg.scripts["bin:run:cli"]).toBe("./bin/osnv");
   });
 });

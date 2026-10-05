@@ -36,12 +36,6 @@ export interface CacheOutputCacheOptions {
    * Default: "throw". Use "warn" only for compatibility during migration.
    */
   readonly insecureAuthorizedRouteBehavior?: "throw" | "warn" | "ignore";
-  /**
-   * @deprecated Compatibility switch kept through Osnova 0.x. Use
-   * `insecureAuthorizedRouteBehavior`; `false` maps to `"ignore"`.
-   * Earliest removal is 1.0 after a documented migration window.
-   */
-  readonly warnOnAuthorizedRoutesWithoutVaryByUser?: boolean;
   /** Match `jwt({ options: { requireAuthenticationByDefault } })` for security warnings. */
   readonly requireAuthenticationByDefault?: boolean;
 }
@@ -124,7 +118,6 @@ function outputCacheComposerProvider(config: CacheModuleConfig): ProviderDefinit
     globalEnabled: config.outputCache?.enabled !== false,
     cacheToken: token as InjectionToken<ICache<CachedHttpPayload>>,
     securityWarnings: {
-      enabled: config.outputCache?.warnOnAuthorizedRoutesWithoutVaryByUser !== false,
       behavior: outputCacheSecurityBehavior(config.outputCache),
       requireAuthenticationByDefault: config.outputCache?.requireAuthenticationByDefault,
     },
@@ -139,10 +132,7 @@ function outputCacheComposerProvider(config: CacheModuleConfig): ProviderDefinit
 }
 
 function outputCacheSecurityBehavior(options: CacheOutputCacheOptions | undefined): "throw" | "warn" | "ignore" {
-  if (options?.insecureAuthorizedRouteBehavior !== undefined) {
-    return options.insecureAuthorizedRouteBehavior;
-  }
-  return options?.warnOnAuthorizedRoutesWithoutVaryByUser === false ? "ignore" : "throw";
+  return options?.insecureAuthorizedRouteBehavior ?? "throw";
 }
 
 /** Memory health belongs to Cache; connection health belongs to Infra. */

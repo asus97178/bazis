@@ -1,6 +1,6 @@
 import { DI, type DiRegistrar } from "../di";
 import { Repository, type DbContext, type DbContextOptions } from "../../library/orm";
-import { IRepository, repositoryFor } from "./repository";
+import { repositoryFor } from "./repository";
 
 type EntityClass = new () => object;
 type ContextClass<TContext extends DbContext> = new (options: DbContextOptions) => TContext;

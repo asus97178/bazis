@@ -97,7 +97,6 @@ export class MigrationRunner {
   }
 
   private context(tx: DbExecutor): MigrationContext {
-    const dialect = this.provider.dialect;
     return {
       execute: async (sql, ...params) => {
         await tx.execute(this.rewrite(sql, params.length), params);

@@ -5,21 +5,13 @@ import {
   DistributedCache,
   NamedCacheRegistry,
   DISTRIBUTED_SERVICE_CACHE,
-  autoCachedScoped,
-  autoCachedSingleton,
   cachedScoped,
   cachedSingleton,
-  DEFAULT_OUTPUT_CACHE_METHODS,
-  DEFAULT_OUTPUT_CACHE_STATUS_CODES,
   memory,
   jsonCacheCodec,
   type IDistributedCache,
 } from "@/core/cache";
 import { createContainer, Module, createToken, singletonValue } from "@/core/di";
-import {
-  DEFAULT_CACHEABLE_METHODS,
-  DEFAULT_CACHEABLE_STATUS_CODES,
-} from "@/core/cache/internal/resolveCachePolicy";
 import { InMemoryCacheDriver } from "./support/InMemoryCacheDriver";
 
 function distributedRegistry(): NamedCacheRegistry<IDistributedCache> {
@@ -72,19 +64,12 @@ class HybridCounter implements IHybridCounter {
   }
 }
 
-describe("autoCached providers", () => {
-  test("deprecated compatibility aliases point to canonical exports", () => {
-    expect(autoCachedScoped).toBe(cachedScoped);
-    expect(autoCachedSingleton).toBe(cachedSingleton);
-    expect(DEFAULT_CACHEABLE_METHODS).toBe(DEFAULT_OUTPUT_CACHE_METHODS);
-    expect(DEFAULT_CACHEABLE_STATUS_CODES).toBe(DEFAULT_OUTPUT_CACHE_STATUS_CODES);
-  });
-
-  test("autoCachedScoped uses memory cache when no distributed backend is registered", () => {
+describe("cached providers", () => {
+  test("cachedScoped uses memory cache when no distributed backend is registered", () => {
     const cacheModuleRef = memory();
     @Module({
       imports: [cacheModuleRef],
-      providers: [autoCachedScoped(IMemoryCounter, MemoryCounter)],
+      providers: [cachedScoped(IMemoryCounter, MemoryCounter)],
     })
     class TestModule {}
 
@@ -142,7 +127,7 @@ describe("autoCached providers", () => {
     expect(second.next(10)).toBe(12);
   });
 
-  test("autoCachedScoped uses the distributed tier when a service cache is registered", async () => {
+  test("cachedScoped uses the distributed tier when a service cache is registered", async () => {
     hybridMemoryCalls = 0;
     hybridRedisCalls = 0;
 
@@ -152,7 +137,7 @@ describe("autoCached providers", () => {
       imports: [cacheModuleRef],
       providers: [
         singletonValue(DISTRIBUTED_SERVICE_CACHE, distributedRegistry()),
-        autoCachedScoped(IHybridCounter, HybridCounter),
+        cachedScoped(IHybridCounter, HybridCounter),
       ],
     })
     class TestModule {}
@@ -169,11 +154,11 @@ describe("autoCached providers", () => {
     expect(hybridRedisCalls).toBe(1);
   });
 
-  test("autoCachedSingleton caches through interface token", () => {
+  test("cachedSingleton caches through interface token", () => {
     const cacheModuleRef = memory({ maxEntries: 100 });
     @Module({
       imports: [cacheModuleRef],
-      providers: [autoCachedSingleton(IMemoryCounter, MemoryCounter)],
+      providers: [cachedSingleton(IMemoryCounter, MemoryCounter)],
     })
     class TestModule {}
 

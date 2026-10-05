@@ -15,7 +15,7 @@ import { registerModuleMetadataExpander, type OsnovaModuleRef } from "../di";
 import { OrmOwnedStoreAdmissionError, type DbContext } from "../../library/orm";
 import { registerRepositoryEncapsulationHook } from "./encapsulationHook";
 import { ormModule, type OrmModuleConfig } from "./ormModule";
-import { attachOwnedStoreRegistration, readOwnedStoreRegistration, revalidateOwnedStoreRegistration } from "./ownedStoreContributions";
+import { readOwnedStoreRegistration, revalidateOwnedStoreRegistration } from "./ownedStoreContributions";
 
 registerRepositoryEncapsulationHook();
 

@@ -1,7 +1,7 @@
 import { ormHostedPlanValidator } from "./OrmHostedPlan.validator";
 import type { HostedService } from "../di";
 import type { DatabaseProvider } from "../../library/orm";
-import { admitOwnedStoresV1, discardOwnedStoreAdmissionV1, publishOwnedStoreAdmissionV1, type CommittedOwnedStoreAdmissionV1, type OwnedStoreLeaseV1 } from "../../library/orm/Schema/OwnedStoreAdmission";
+import { admitOwnedStoresV1, discardOwnedStoreAdmissionV1, publishOwnedStoreAdmissionV1, type OwnedStoreLeaseV1 } from "../../library/orm/Schema/OwnedStoreAdmission";
 import { OrmOwnedStoreAdmissionError } from "../../library/orm";
 import type { OwnedStoreRegistration } from "./ownedStoreContributions";
 import { preparedOwnedStoreRegistration } from "./ownedStoreContributions";
@@ -18,7 +18,6 @@ export class OrmOwnedStoreLifecycle implements HostedService {
   private state: "idle" | "starting" | "ready" | "failed" | "closing" | "stopped" = "idle";
   private startPromise?: Promise<void>;
   private readonly controller = new AbortController();
-  private receipt?: CommittedOwnedStoreAdmissionV1;
   private leases: readonly OwnedStoreLeaseV1[] = Object.freeze([]);
 
   public constructor(private readonly provider: DatabaseProvider, private readonly registrations: readonly OwnedStoreRegistration[]) {}
@@ -63,7 +62,6 @@ export class OrmOwnedStoreLifecycle implements HostedService {
         for (const lease of leases) lease.revoke();
         throw unavailable();
       }
-      this.receipt = receipt;
       this.leases = leases;
       this.state = "ready";
     } catch (error) {

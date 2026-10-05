@@ -66,17 +66,3 @@ export function cachedScoped<T extends object>(
 ): ProviderDefinition<T> {
   return cachedProvider("scoped", provide, useClass, deps);
 }
-
-/**
- * @deprecated Compatibility alias kept through Osnova 0.x. Use
- * {@link cachedScoped}; earliest removal is 1.0 after a documented migration
- * window.
- */
-export const autoCachedScoped = cachedScoped;
-
-/**
- * @deprecated Compatibility alias kept through Osnova 0.x. Use
- * {@link cachedSingleton}; earliest removal is 1.0 after a documented migration
- * window.
- */
-export const autoCachedSingleton = cachedSingleton;

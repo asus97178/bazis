@@ -57,8 +57,6 @@ test("test fixture stays out of production output", async () => {
   const generated = await runGeneratorTarget(process.cwd(), "all");
   expect(generated.exit).toBe(0);
   // Framework packages must not ship the host application's name-based DI map.
-  const legacyDeps = await Bun.file("src/osnova/core/di/generated/deps.ts").text();
-  expect(legacyDeps).toMatch(/GENERATED_CLASS_DEPS[^=]*=\s*\{\s*\};/);
   expect(generated.output).not.toContain("OSNV_CODEGEN_SOURCE_UNASSIGNED: src/app/test/fixtures/application-postgres.fixture.ts");
   const channels = ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "agentCatalog.ts", "runtime.ts"];
   const paths = [

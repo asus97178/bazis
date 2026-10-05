@@ -6,7 +6,7 @@ import { isIP } from "node:net";
 import { types } from "node:util";
 import { SQL } from "bun";
 import { redactTraceValues } from "../../redaction";
-import type { IntrospectedColumn, IntrospectedForeignKey, IntrospectedIndex, IntrospectedSchema, IntrospectedTable } from "../Schema/introspection";
+import type { IntrospectedColumn, IntrospectedSchema, IntrospectedTable } from "../Schema/introspection";
 import { PostgresDialect } from "./PostgresDialect";
 import { currentPostgresScopeOptions, withPostgresScopeOptions, withoutPostgresScopeOptions, observeProviderDispatch, registerPostgresTransactionCapability, withoutProviderDispatchObserver } from "./ormTransactionRuntime";
 import { runPostCommitCallbacks, runRollbackCallbacks } from "./transactionCallbacks";
@@ -120,10 +120,7 @@ type InternalSchemaAdmissionScope = SchemaAdmissionScope & {
  * сериализуется на стороне PostgreSQL.
  */
 const MIGRATION_ADVISORY_LOCK_KEY = 0x6f_73_6e_76; // "osnv"
-const STRICT_LOCK_DOMAIN = "osnova.orm.strict-migration-lock/v1\0";
 const ADMISSION_LOCK_DOMAIN = "osnova.orm.ensure-created/schema-lock/v1\0";
-/** Detect the astronomically unlikely 64-bit truncation collision rather than merging owners. */
-const strictLockOwners = new Map<string, string>();
 const admissionLockOwners = new Map<string, string>();
 /** Exact retained reservations are fenced by object identity, not ALS. */
 const physicalOwners = new WeakMap<object, PhysicalTransactionOwner>();
@@ -138,9 +135,6 @@ function postgresDatabaseTime(value: unknown): OrmDatabaseTimeV1 {
   return Object.freeze({ instant: Object.freeze(new Date(milliseconds)), epochMilliseconds: milliseconds, precision: "millisecond" });
 }
 
-function strictLockKey(owner: string): bigint {
-  return createHash("sha256").update(STRICT_LOCK_DOMAIN + owner, "utf8").digest().readBigInt64BE(0);
-}
 
 const MIGRATION_LOCK_UNAVAILABLE: DatabaseProviderDiagnostic = {
   code: "postgres.migration_lock_unavailable",
@@ -246,7 +240,6 @@ export class PostgresProvider implements DatabaseProvider {
   /** Advisory/schema owners are borrowed by nested transactions.  Keep their
    * exact physical lifetime, rather than recreating an owner per BEGIN. */
   private readonly lockedSession = new AsyncLocalStorage<PhysicalTransactionOwner>();
-  private readonly strictLock = new AsyncLocalStorage<{ readonly owner: string; readonly key: bigint }>();
   private nextTransactionScopeId = 0;
 
   constructor(options: PostgresProviderOptions = {}) {
