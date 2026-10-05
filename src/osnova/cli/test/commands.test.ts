@@ -199,9 +199,9 @@ test("files and role classes are named by the module; the record and its DTOs st
   const files = result.files.map((file) => path.relative(result.moduleDir, file)).sort();
   expect(files).toEqual([
     "MODULE.md", "Stats.module.ts",
-    "ai/agents/Stats.agent.ts", "ai/contracts/Stats.brief.ts", "ai/tools/Stats.tool.ts",
+    "ai/agents/StatsAnalyst.agent.ts", "ai/contracts/Stats.brief.ts", "ai/tools/StatsSummary.tool.ts",
     "background/Stats.reporter.ts",
-    "http/Stats.controller.ts", "http/contracts/Stats.query.ts", "http/contracts/Stats.requests.ts", "http/contracts/Stats.responses.ts",
+    "http/Stats.controller.ts", "http/contracts/Stats.requests.ts", "http/contracts/Stats.responses.ts", "http/contracts/StatsList.query.ts",
     "model/Stats.dbContext.ts", "model/Stats.model.ts",
     "services/IStats.service.ts", "services/Stats.service.ts",
   ]);

@@ -117,7 +117,7 @@ test("minimal and full lists bound SQL and return data; summary counts all rows 
     const { [entityName!]: Entity } = await import(path.join(directory!, `model/${entityName}.model.ts`));
     const { [`${entityName}DbContext`]: Context } = await import(path.join(directory!, `model/${entityName}.dbContext.ts`));
     const { [`${entityName}Service`]: Service } = await import(path.join(directory!, `services/${entityName}.service.ts`));
-    const { [`${entityName}ListQuery`]: Query } = await import(path.join(directory!, `http/contracts/${entityName}.query.ts`));
+    const { [`${entityName}ListQuery`]: Query } = await import(path.join(directory!, `http/contracts/${entityName}List.query.ts`));
     const statements: { sql: string; params: readonly SqlParam[] }[] = [];
     const provider: DatabaseProvider = {
       name: "postgres", dialect: new PostgresDialect(), limits: { maxParametersPerCommand: 32767 },

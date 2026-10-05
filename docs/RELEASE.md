@@ -237,7 +237,7 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 - CLI: имена по модулю, как его ввели. `g module Stats` создаёт файлы
   `<Модуль>.<роль>.ts` (`Stats.module.ts`, `Stats.controller.ts`,
   `Stats.service.ts`, `IStats.service.ts`, `Stats.model.ts`, `Stats.dbContext.ts`,
-  `Stats.requests.ts`, `Stats.responses.ts`, `Stats.query.ts`) и классы ролей
+  `Stats.requests.ts`, `Stats.responses.ts`, `StatsList.query.ts`) и классы ролей
   `StatsModule`, `StatsController`, `StatsService`, `StatsDbContext`. Единственное
   число остаётся у записи и её DTO (`Stat`, `CreateStatRequest`, `StatResponse`).
   Раньше: `Stat.module.ts`, `StatController.ts`, `StatService`.

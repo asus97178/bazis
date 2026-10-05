@@ -37,7 +37,7 @@ export function buildModuleTemplates(
     { relativePath: `http/${naming.module}.controller.ts`, content: controllerFile(naming, profile, authImportPath) },
     { relativePath: `http/contracts/${naming.module}.requests.ts`, content: requestFile(naming) },
     { relativePath: `http/contracts/${naming.module}.responses.ts`, content: responseFile(naming) },
-    { relativePath: `http/contracts/${naming.module}.query.ts`, content: listQueryFile(naming) },
+    { relativePath: `http/contracts/${naming.module}List.query.ts`, content: listQueryFile(naming) },
     { relativePath: "MODULE.md", content: modulePassport(naming, profile) },
   ];
 
@@ -48,9 +48,9 @@ export function buildModuleTemplates(
   return [
     ...base,
     { relativePath: `background/${naming.module}.reporter.ts`, content: statsReporterFile(naming) },
-    { relativePath: `ai/agents/${naming.module}.agent.ts`, content: agentFile(naming) },
+    { relativePath: `ai/agents/${naming.module}Analyst.agent.ts`, content: agentFile(naming) },
     { relativePath: `ai/contracts/${naming.module}.brief.ts`, content: aiContractsFile(naming) },
-    { relativePath: `ai/tools/${naming.module}.tool.ts`, content: aiToolFile(naming) },
+    { relativePath: `ai/tools/${naming.module}Summary.tool.ts`, content: aiToolFile(naming) },
   ];
 }
 
@@ -60,8 +60,8 @@ function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const providerFactory = profile === "full" ? "cachedScoped" : "scoped";
   const backgroundImport = profile === "full" ? `import { ${n.module}Reporter } from "./background/${n.module}.reporter";\n` : "";
   const aiImports = profile === "full"
-    ? `import { ${n.module}AnalystAgent } from "./ai/agents/${n.module}.agent";
-import { ${n.module}SummaryTool } from "./ai/tools/${n.module}.tool";
+    ? `import { ${n.module}AnalystAgent } from "./ai/agents/${n.module}Analyst.agent";
+import { ${n.module}SummaryTool } from "./ai/tools/${n.module}Summary.tool";
 `
     : "";
   const backgroundLine = profile === "full" ? `  background: [${n.module}Reporter],\n` : "";
@@ -116,7 +116,7 @@ import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok,
   const authWrite = auth ? "  @Authorize(requireTokenKind(TokenKind.Admin))\n" : "";
 
   return `${fullImports}import { buildListDocument } from "osnv/library/jsonapi";
-import { ${n.module}ListQuery } from "./contracts/${n.module}.query";
+import { ${n.module}ListQuery } from "./contracts/${n.module}List.query";
 import { Create${n.entity}Request, Update${n.entity}Request } from "./contracts/${n.module}.requests";
 import type { I${n.module}Service } from "../services/I${n.module}.service";
 
@@ -461,7 +461,7 @@ export class ${n.module}SummaryTool {
 function agentFile(n: ModuleNaming): string {
   return `import { Agent, Task, agentOutput } from "osnv/core/agent";
 import { Prepare${n.module}BriefRequest, ${n.module}BriefDocument } from "../contracts/${n.module}.brief";
-import { ${n.module}SummaryTool } from "../tools/${n.module}.tool";
+import { ${n.module}SummaryTool } from "../tools/${n.module}Summary.tool";
 
 @Agent({
   name: "${n.route}-analyst",
