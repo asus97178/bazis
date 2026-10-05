@@ -95,7 +95,7 @@ async function generateFiles(options: GenerateModuleOptions, naming: ModuleNamin
     } else {
       if (!appInfo.isFile()) throw new Error(`App module must be a regular file: ${appModulePath}`);
       const original = await readFile(appModulePath, "utf8");
-      const content = registerModuleInSource(original, appModulePath, path.join(moduleDir, `${naming.entity}.module.ts`), naming.moduleClass);
+      const content = registerModuleInSource(original, appModulePath, path.join(moduleDir, `${naming.module}.module.ts`), naming.moduleClass);
       if (content !== original) writes.push({ absolute: appModulePath, content, original });
       registered = true;
     }

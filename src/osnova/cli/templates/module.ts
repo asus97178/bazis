@@ -25,13 +25,13 @@ export function buildModuleTemplates(
 
   if (profile === "empty") {
     return [
-      { relativePath: `${entity}.module.ts`, content: `import { Module } from "osnv/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class ${naming.moduleClass} {}\n` },
+      { relativePath: `${naming.module}.module.ts`, content: `import { Module } from "osnv/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class ${naming.moduleClass} {}\n` },
       { relativePath: "MODULE.md", content: modulePassport(naming, profile) },
     ];
   }
 
   const base: ModuleTemplateFiles[] = [
-    { relativePath: `${entity}.module.ts`, content: moduleFile(naming, profile) },
+    { relativePath: `${naming.module}.module.ts`, content: moduleFile(naming, profile) },
     { relativePath: `model/${entity}.model.ts`, content: ormModelFile(naming, profile) },
     { relativePath: `model/${entity}DbContext.ts`, content: dbContextFile(naming) },
     { relativePath: `services/I${entity}.service.ts`, content: serviceInterfaceFile(naming) },

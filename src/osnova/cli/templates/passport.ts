@@ -6,7 +6,7 @@ export function modulePassport(n: ModuleNaming, profile: ModuleTemplateProfile):
 
 Версия паспорта: 1.0. Тип: атомарный. Профиль CLI: ${profile}.
 Статус: сгенерирован каркас; предметная реализация и проверки не завершены.
-Точка подключения: [${n.entity}.module.ts](${n.entity}.module.ts), класс ${n.moduleClass} без аргументов.
+Точка подключения: [${n.module}.module.ts](${n.module}.module.ts), класс ${n.moduleClass} без аргументов.
 
 До изменения прочитать AGENTS.md и docs/architecture/MODULE_ARCHITECTURE.md.
 Область паспорта — файлы этого каркаса. Автор уточняет ответственность и поля
@@ -17,7 +17,7 @@ export function modulePassport(n: ModuleNaming, profile: ModuleTemplateProfile):
 
 Предметная ответственность ещё не определена. Каркас предназначен для одной
 самостоятельной функции; владелец данных и инвариантов определяется при реализации.
-Состав: этот паспорт и ${n.entity}.module.ts. imports: []; exports: [].
+Состав: этот паспорт и ${n.module}.module.ts. imports: []; exports: [].
 Публичный TypeScript-вход — класс ${n.moduleClass}; фабрика и аргументы отсутствуют.
 DI providers, ORM, HTTP, config, background, UI, AI и события не используются:
 предметная реализация ещё не добавлена. Не создавать каталоги заранее.
@@ -45,7 +45,7 @@ DI providers, ORM, HTTP, config, background, UI, AI и события не ис�
 
 | Компонент | Файл | Вход / зависимость | Выход / эффект |
 | --- | --- | --- | --- |
-| ${n.moduleClass} | [${e}.module.ts](${e}.module.ts) | imports host | ORM, DI, HTTP${profile === "full" ? ", background, AI" : ""} |
+| ${n.moduleClass} | [${n.module}.module.ts](${n.module}.module.ts) | imports host | ORM, DI, HTTP${profile === "full" ? ", background, AI" : ""} |
 | ${e} | [model/${e}.model.ts](model/${e}.model.ts) | Поля ниже | Таблица ${n.route} |
 | ${e}DbContext | [model/${e}DbContext.ts](model/${e}DbContext.ts) | Общий ORM provider host | DbSet ${n.collection} |
 | I${e}Service / ${e}Service | [services/${e}.service.ts](services/${e}.service.ts), [token](services/I${e}.service.ts) | ${e}DbContext${profile === "full" ? ", ICache" : ""} | CRUD, count, summary |

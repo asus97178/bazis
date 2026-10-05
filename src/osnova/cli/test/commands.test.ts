@@ -188,3 +188,15 @@ test("osnv dev runs as development unless OSNV_ENV is set in the shell", () => {
   expect(devEnvironment({ OSNV_ENV: "" }).OSNV_ENV).toBe("development");
   expect(devEnvironment({ OSNV_ENV: "staging" }).OSNV_ENV).toBe("staging");
 });
+
+test("a module keeps its name as given; only the CRUD entity is singular", async () => {
+  expect(parseModuleName("Stats")).toMatchObject({ folder: "stats", module: "Stats", moduleClass: "StatsModule", entity: "Stat" });
+  expect(parseModuleName("order-items")).toMatchObject({ folder: "order-items", module: "OrderItems", moduleClass: "OrderItemsModule", entity: "OrderItem", route: "order-items" });
+  expect(parseModuleName("Task")).toMatchObject({ module: "Task", moduleClass: "TaskModule", entity: "Task" });
+
+  const f = await fixture();
+  const result = await generateModule({ ...f, name: "Stats", profile: "minimal" });
+  expect(result.files.map((file) => path.relative(result.moduleDir, file))).toEqual(expect.arrayContaining(["Stats.module.ts", "model/Stat.model.ts"]));
+  expect(await readFile(path.join(result.moduleDir, "Stats.module.ts"), "utf8")).toContain("export class StatsModule {}");
+  expect(await readFile(f.appModulePath, "utf8")).toContain("import { StatsModule } from \"../features/stats/Stats.module\";");
+});
