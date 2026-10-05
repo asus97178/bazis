@@ -16,5 +16,3 @@ export interface GeneratedBindingSpec {
   /** Имя класса DTO (разрешается через generated target; старый реестр — fallback). */
   readonly model?: string;
 }
-
-export type GeneratedBindingsMap = Readonly<Record<string, Readonly<Record<string, readonly GeneratedBindingSpec[]>>>>;

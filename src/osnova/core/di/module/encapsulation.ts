@@ -1,6 +1,5 @@
 import { ModuleEncapsulationError } from "../errors";
 import { getProviderDeps } from "../internal/providerDeps";
-import type { OpenGenericRegistration } from "../internal/OpenGenericRegistration";
 import type { ProviderDefinition, ProviderDependencyList } from "../provider";
 import { isKeyedDependency, isLazyDependency, isNamedDependency } from "../provider";
 import type { OpenGenericTokenFamily, Token } from "../token";
@@ -328,14 +327,6 @@ function hasClosedModules(records: readonly ModuleGraphRecord[]): boolean {
 
 export function isFamilyExport(ref: ModuleExport): ref is OpenGenericTokenFamily<unknown, unknown> {
   return typeof ref === "object" && ref !== null && "of" in ref && typeof (ref as { of: unknown }).of === "function";
-}
-
-export function collectFamilyIds(registrations: readonly OpenGenericRegistration[]): Set<symbol> {
-  const result = new Set<symbol>();
-  for (let index = 0; index < registrations.length; index += 1) {
-    result.add((registrations[index] as OpenGenericRegistration).family.id);
-  }
-  return result;
 }
 
 /**

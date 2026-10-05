@@ -34,8 +34,3 @@ export function applyNamedDependencyEncapsulationHooks(
   }
   return false;
 }
-
-/** @internal Test helper — resets registered hooks. */
-export function resetNamedDependencyEncapsulationHooksForTests(): void {
-  namedDependencyHooks.length = 0;
-}

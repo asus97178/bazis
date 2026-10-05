@@ -541,7 +541,7 @@ export class AgentExecutionDriver {
   private readonly taskSchemaValidator?: AgentToolSchemaValidator;
 
   constructor(
-    private readonly services: ServiceProvider,
+    services: ServiceProvider,
     private readonly registry: AgentRegistry,
     private readonly modelProvider: AgentModelProvider,
     options: AgentRuntimeOptions = {},

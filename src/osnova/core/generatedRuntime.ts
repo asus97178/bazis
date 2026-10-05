@@ -52,25 +52,6 @@ const targetDescriptorLoads = new Map<string, Promise<void>>();
 const committedTargetDescriptorsById = new Map<string, OsnovaGeneratedTargetDescriptor>();
 const explicitlyActivatedTargetIds = new Set<string>();
 
-/** Internal generated-target activation marker retained for generated-runtime compatibility. */
-export function markOsnovaGeneratedTargetActive(): void {
-  // Kept for generated-runtime compatibility. Registration itself records the
-  // target id, so an explicit bootstrap cannot accidentally trigger default IO.
-}
-
-/** Internal bridge for project-owned generated target descriptors. */
-export function registerOsnovaGeneratedClassDeps(target: Class<unknown>, deps: readonly GeneratedClassDependency[]): void {
-  registerGeneratedClassDeps(target, deps);
-}
-
-/** Internal bridge for project-owned generated target descriptors. */
-export function registerOsnovaGeneratedBindings(
-  target: Class<object>,
-  bindings: Readonly<Record<string, readonly GeneratedBindingSpec[]>>,
-): void {
-  registerGeneratedBindings(target, bindings);
-}
-
 /**
  * Internal atomic publication boundary for one complete generated target.
  * Generated modules only export immutable data; validation happens before any

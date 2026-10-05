@@ -1,5 +1,4 @@
 import type { Class, OsnovaModuleRef } from "../di";
-import type { SensitiveRedactionOptions } from "../../library/redaction";
 import type { JsonObject, JsonValue, AgentToolResultStatus } from "./semantic";
 import type { ToolApproval, ToolSideEffect } from "./metadata";
 import type { AgentToolExecutionApproval } from "./AgentToolExecutor";
@@ -38,4 +37,3 @@ export interface AgentToolSettlementHookV1 { settle(event: AgentToolSettlementEv
 export interface AgentToolObserverEventV1 { readonly type: "agent-tool.observer/v1"; readonly settlement: AgentToolSettlementEventV1; }
 export interface AgentToolObserverHookV1 { observe(event: AgentToolObserverEventV1, context: AgentToolHookContextV1): void | Promise<void>; }
 export interface AgentToolAuditHookProjectionV1 extends AgentToolHookRefV1 { readonly tier: "platform" | "application"; readonly order: number; readonly outcome: "allowed" | "denied" | "recorded" | "failed" | "timed-out" | "cancelled" | "invalid-result"; readonly reasonCode?: string; readonly evidence?: JsonObject; }
-export type AgentToolHookRedactionV1 = SensitiveRedactionOptions;

@@ -71,8 +71,3 @@ export function applyClassProviderHooksToDefinition(
     hooked.lifetime, definition.key ?? hooked.key,
   );
 }
-
-/** @internal Test helper — resets registered hooks. */
-export function resetClassProviderHooksForTests(): void {
-  classProviderHooks.length = 0;
-}
