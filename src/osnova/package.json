@@ -1,7 +1,7 @@
 {
   "name": "osnv",
   "version": "0.96.1",
-  "description": "Osnova: модульный backend-фреймворк для Bun на TypeScript — DI, HTTP, ORM для PostgreSQL, JWT, WebSocket, агенты и CLI с кодогенерацией.",
+  "description": "Modular backend framework for Bun in TypeScript: DI wired by codegen, HTTP, a PostgreSQL ORM, JWT, WebSocket, agents and a CLI.",
   "license": "MIT",
   "keywords": [
     "bun",

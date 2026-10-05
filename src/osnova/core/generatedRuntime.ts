@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { AgentMetadataIndex } from "./agent/AgentRegistry";
 import { registerGeneratedClassDeps, restoreGeneratedClassDeps, snapshotGeneratedClassDeps, type GeneratedClassDependency } from "./di/module/autoDeps";
 import { registerGeneratedBindings, restoreGeneratedBindings, snapshotGeneratedBindings } from "./http/Binding/autoBindings";
@@ -140,16 +141,8 @@ export async function loadOsnovaGeneratedAgentMetadata(
 ): Promise<AgentMetadataIndex | undefined> {
   const registered = selectRegisteredAgentMetadata(targets);
   if (registered !== undefined || explicitlyActivatedTargetIds.size > 0) return registered;
-  try {
-    const generatedAgentCatalog = "../../generated/osnv/agentCatalog";
-    const module = (await import(generatedAgentCatalog)) as GeneratedAgentCatalogModule;
-    return module.GENERATED_AGENT_METADATA;
-  } catch (error) {
-    if (isOptionalGeneratedModuleMissing(error, "generated/osnv/agentCatalog")) {
-      return undefined;
-    }
-    throw error;
-  }
+  const module = await importGeneratedModule<GeneratedAgentCatalogModule>("agentCatalog");
+  return module?.GENERATED_AGENT_METADATA;
 }
 
 function selectRegisteredAgentMetadata(targets: readonly Class<object>[]): AgentMetadataIndex | undefined {
@@ -166,16 +159,26 @@ function selectRegisteredAgentMetadata(targets: readonly Class<object>[]): Agent
 }
 
 async function loadRuntimeOnce(): Promise<void> {
-  try {
-    const generatedRuntime = "../../generated/osnv/runtime";
-    const module = (await import(generatedRuntime)) as GeneratedRuntimeModule;
-    await module.registerOsnovaGeneratedRuntime?.();
-  } catch (error) {
-    if (isOptionalGeneratedModuleMissing(error, "generated/osnv/runtime")) {
-      return;
+  const module = await importGeneratedModule<GeneratedRuntimeModule>("runtime");
+  await module?.registerOsnovaGeneratedRuntime?.();
+}
+
+/**
+ * The project's generated module `name`, or undefined when it does not exist.
+ * Framework sources inside the project (`src/osnova`) find `src/generated`
+ * next to them; an installed package (`node_modules/osnv`) cannot, so the
+ * project root is the working directory, as for `osnv dev` and `osnv test`.
+ */
+async function importGeneratedModule<T>(name: string): Promise<T | undefined> {
+  const candidates = [`../../generated/osnv/${name}`, path.join(process.cwd(), "src/generated/osnv", name)];
+  for (const candidate of candidates) {
+    try {
+      return (await import(candidate)) as T;
+    } catch (error) {
+      if (!isOptionalGeneratedModuleMissing(error, `generated/osnv/${name}`)) throw error;
     }
-    throw error;
   }
+  return undefined;
 }
 
 function isOptionalGeneratedModuleMissing(error: unknown, generatedPath: string): boolean {

@@ -53,13 +53,26 @@ try {
     "}", "",
   ].join("\n"));
   writeFileSync(join(probe, "Probe.controller.ts"), [
-    'import { Controller, Get } from "osnv/core/http";',
+    'import { Controller, Get, Post } from "osnv/core/http";',
     'import { ProbeService } from "./Probe.service";',
+    "export class ProbeRequest { name = \"\"; }",
     '@Controller("probe")',
     "export class ProbeController {",
     "  constructor(private readonly probe: ProbeService) {}",
     "  @Get() describe() { return this.probe.describe(); }",
+    "  @Post() echo(body: ProbeRequest) { return body; }",
     "}", "",
+  ].join("\n"));
+  // The lazy loader must find the project's src/generated from node_modules/osnv
+  // (it used to look next to the framework sources only and silently did nothing).
+  writeFileSync(join(app, "src/app/test/generated-runtime.test.ts"), [
+    'import { expect, test } from "bun:test";',
+    'import { loadOsnovaGeneratedRuntime } from "osnv/core/generatedRuntime";',
+    'import { getGeneratedOpenApiMetadata } from "osnv/core/http/OpenApi/generatedOpenApiRegistry";',
+    'test("installed osnv loads the project generated runtime lazily", async () => {',
+    "  await loadOsnovaGeneratedRuntime();",
+    '  expect(Object.keys(getGeneratedOpenApiMetadata().schemas)).toContain("ProbeRequest");',
+    "});", "",
   ].join("\n"));
   writeFileSync(join(probe, "Probe.module.ts"), [
     'import { Module, singleton } from "osnv/core/di";',
