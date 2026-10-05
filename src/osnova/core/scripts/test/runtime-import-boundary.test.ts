@@ -77,12 +77,14 @@ describe("runtime import boundary", () => {
   test("application code imports only public Osnova barrels", () => {
     const offenders: string[] = [];
     const osnovaRoot = `${posix(OSNOVA)}/`;
-    for (const base of [path.join(SRC, "app")]) {
+    // Application code: the host app when present, otherwise the shipped example.
+    for (const base of [path.join(SRC, "app"), path.join(ROOT, "examples/todo/src/app")].filter((dir) => existsSync(dir))) {
       for (const file of sourceFiles(base)) {
         if (file.includes(`${path.sep}test${path.sep}`) || file.endsWith(".test.ts")) continue;
         const content = stripComments(readFileSync(file, "utf8"));
         for (const specifier of allImportSpecifiers(content)) {
-          if (specifier.startsWith("@osnova/") && !isStableOsnovaBarrel(specifier)) {
+          const barrel = specifier.startsWith("osnv/") ? `@osnova/${specifier.slice(5)}` : specifier;
+          if (barrel.startsWith("@osnova/") && !isStableOsnovaBarrel(barrel)) {
             offenders.push(`${relative(file)} -> ${specifier}`);
             continue;
           }

@@ -6,7 +6,7 @@
 
 ## 1. Размещение и регистрация
 
-Общий атомарный [ToolsModule](../../src/app/modules/agents/tools/MODULE.md)
+Общий атомарный [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
 расположен внутри существующей области агентов. Один инструмент — класс с
 методом execute. Он может пользоваться публичными сервисами нескольких модулей.
 Метаагенты остаются определениями в БД, инструмент не копируется для каждого агента.
@@ -79,9 +79,9 @@ AgentsModule в пустой составной корень. Его публи�
 
 ## 3. Объявление и контракты Tool
 
-[AgentsTool](../../src/app/modules/agents/tools/Agents.tool.ts) объявляет имя,
+[AgentsTool](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/Agents.tool.ts) объявляет имя,
 описание, входной DTO, sideEffect, approval и timeout через существующий @Tool.
-[AgentsToolInput](../../src/app/modules/agents/tools/contracts/Agents.input.ts)
+[AgentsToolInput](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/contracts/Agents.input.ts)
 содержит page: целое 1–10000, default 1. Штатный codegen получает JSON Schema
 из класса и его валидаторов. Объявленный output DTO необязателен.
 Если input/output объявлен, но generated schema отсутствует, ToolsInitializer
@@ -97,7 +97,7 @@ Tool использует IAgentsService и доверенный clientUserId и
 
 ## 4. Каталог и назначение
 
-[ToolsService](../../src/app/modules/agents/tools/Tools.service.ts) предоставляет:
+[ToolsService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/Tools.service.ts) предоставляет:
 
 | Операция | HTTP | Вход | Результат |
 | --- | --- | --- | --- |
@@ -116,7 +116,7 @@ approval, timeoutMs; исполняемые классы и зависимост
 смена страницы, поиск и ошибка загрузки не очищают выбор. Сохраняется прежнее
 поле Agent.toolNames, новая таблица или миграция не нужны.
 
-[AgentsService](../../src/app/modules/agents/services/Agents.service.ts) проверяет
+[AgentsService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/services/Agents.service.ts) проверяет
 все новые назначения по общему каталогу до записи. При update под row lock сначала
 проверяется revision, затем новые имена. Историческое отсутствующее имя можно
 сохранить или удалить; новое неизвестное имя отклоняется с issue toolNames.
@@ -124,7 +124,7 @@ Main при старте не перезаписывается. Уже подг�
 
 ## 5. Как инструменты получает модель
 
-[RunService](../../src/app/modules/agents/services/Run.service.ts) берёт toolNames
+[RunService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/services/Run.service.ts) берёт toolNames
 из определения, разрешает их через общий каталог и создаёт AgentRegistry.fromDefinition
 только с назначенным набором. Ручного списка hostTools в сервисе больше нет.
 Неизвестное назначение или недоступная объявленная схема дают 409 до pending-хода
@@ -145,7 +145,7 @@ function/tool calling провайдера. Выходную схему Osnova �
 ## 6. Проверка и поставка
 
 Команда создания CLI и подробные поля закреплены в
-[паспорте ToolsModule](../../src/app/modules/agents/tools/MODULE.md).
+[паспорте ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md).
 Статические импорты и штатный codegen поддерживают исходники и бинарную сборку.
 Каталог собирается один раз; сортировка O(N log N), поиск O(N), выдача ограничена size.
 Дополнительных запросов к БД для чтения каталога нет; замеры ускорения не заявлены.

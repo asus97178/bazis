@@ -134,7 +134,7 @@ PostgresConfigShape дополнен необязательными `max`, `conn
 maxLifetime допускают 0; верхняя техническая граница 2147483647. port — 1…65535.
 Отсутствующие поля оставляют defaults драйвера. tls — disable, allow, prefer,
 require, verify-ca или verify-full. Прикладные defaults и более узкие пределы
-описаны в [db.config.ts](../../../app/config/db.config.ts).
+описаны в [db.config.ts](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/config/db.config.ts).
 Общий builder `postgresConnectionOptions` используется сырой SQL-фабрикой
 и существующим ORM-мостом; дополнения ORM к timeouts/CA сохраняются.
 

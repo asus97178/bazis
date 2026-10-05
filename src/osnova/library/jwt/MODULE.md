@@ -17,7 +17,7 @@ access/refresh. Это одна техническая функция. SigningAl
 
 HTTP, DI, роли, состояние учётной записи, хранилище refresh, отзыв сессий и
 выбор окружения принадлежат приложению. imports и DI-exports отсутствуют;
-[AuthModule](../../../app/modules/auth/Auth.module.ts) регистрирует TokenService
+[AuthModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/auth/Auth.module.ts) регистрирует TokenService
 через существующую фабрику. ORM, HTTP-контроллеры, фоновые службы и AI здесь не используются.
 
 ООП/SOLID и простота: инварианты остаются у существующих владельцев, новых

@@ -45,7 +45,7 @@ test("codegen declares isolated production and test targets", async () => {
     version: 1,
     defaultTarget: "production",
     targets: {
-      production: { entrypoints: ["src/index.ts"] },
+      production: { entrypoints: ["src/osnova/index.ts"] },
       test: {
         entrypoints: ["src/osnova/core/http/test/fixtures/conventionControllers.ts"],
       },

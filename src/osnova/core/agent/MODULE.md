@@ -110,8 +110,8 @@ factory, keyed-only и дублированная регистрация отк�
 generated input/output schemas перед HTTP; выходная схема остаётся необязательной.
 
 Проверки: [agent.module-contributions.test.ts](test/agent.module-contributions.test.ts),
-[каталог и HTTP](../../../app/modules/agents/tools/test/Tools.http.test.ts),
-[запуск](../../../app/modules/agents/test/Run.service.test.ts).
+[каталог и HTTP](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/test/Tools.http.test.ts),
+[запуск](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/test/Run.service.test.ts).
 
 В описанной области нет собственной БД, миграций, HTTP routes, UI или background
 jobs. Переданные metadata/DTO не становятся конфигурацией процесса. Глобальный

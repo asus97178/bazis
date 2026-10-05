@@ -39,14 +39,11 @@ run("codegen", [bun, "run", "di:generate", "--target", "all"]);
 generatedIsCurrent();
 run("typecheck", [bun, "node_modules/typescript/bin/tsc", "--noEmit"]);
 run("tests", [bun, "run", "test"]);
-run("admin-ui", [bun, "run", "admin:ui:check"]);
-run("client-ui", [bun, "run", "client:ui:build"]);
-run("binaries", [bun, "run", "build:bin"]);
+run("cli binary build", [bun, "run", "build:bin"]);
 
 // Binaries must work without the source tree: run them from an empty directory.
 const outside = mkdtempSync(join(tmpdir(), "osnova-ci-bin-"));
 try {
-  run("app binary config", [join(root, "bin/osnova-app"), "config", "check", "--environment=test"], outside);
   run("cli binary", [join(root, "bin/osnv"), "--help"], outside);
 } finally {
   rmSync(outside, { recursive: true, force: true });

@@ -78,24 +78,24 @@ lockfile-only, восстановить исходный состав manifest �
   не коммитить его. После установки сохраняется прежний постоянный bootstrap
   marker; лишний установочный секрет следует убрать. Процедура не создаёт и
   не сохраняет реальное значение автоматически. Контракт и условия локального
-  development/test setup: [AdminAuth](../src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md).
+  development/test setup: [AdminAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md).
   Локальный reverse proxy виден как loopback peer: при внешнем доступе к dev/test
   установочный Secret также нужен, либо setup должен быть закрыт сетью.
 - Client cookie получает Secure в production. При TLS-терминации оператор задаёт
   точный внешний origin, общий для HTTP и WS. Произвольным forwarded headers
   доверия нет. Для локального HTTP используется development/test либо осознанная
-  настройка оператора: [ClientAuth](../src/app/modules/client-auth/MODULE.md).
+  настройка оператора: [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
 - Launcher по умолчанию даёт 15 секунд на остановку. При большем kernel-бюджете
   согласовать `OSNV_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
 - SMS endpoint должен принимать конечный POST без redirects. Перенаправления
-  завершаются ошибкой: [SMS](../src/app/modules/sms/MODULE.md).
+  завершаются ошибкой: [SMS](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/sms/MODULE.md).
 - Admin UI и OpenAPI поставляются вместе: UI берёт разрешённые сортировки из
   `x-osnova-sort-fields`; при отсутствии metadata не предлагает неизвестные поля.
 - Auth ограничивает запросы до разбора тела; административные операции имеют
   предел конкурентного выполнения на процесс. Клиенты за одним proxy делят
   лимит его непосредственного IP. Значения и поведение 429 описаны в паспортах
-  [AdminAuth](../src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md)
-  и [ClientAuth](../src/app/modules/client-auth/MODULE.md).
+  [AdminAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/actor_modules/admin_modules/auth_module/MODULE.md)
+  и [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
 - После превышения верхней границы длины framework пропускает проверки содержимого
   того же декоратора, поэтому массив ошибок короче. Отдельные pattern/custom
   остаются ответственностью автора: [валидация](../src/osnova/library/validation/SPEC.md).
