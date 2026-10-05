@@ -43,9 +43,8 @@ process.exitCode = await runApp(AppModule, { http: { port: Number(process.env.PR
     const bindings = await Bun.file(path.join(root, "src/generated/osnv/bindings.ts")).text();
     expect(bindings).toContain('"list":[]');
     expect(bindings).not.toContain("UserListQuery");
-    const packageBindings = await Bun.file(path.join(repository, "src/osnova/core/http/generated/bindings.ts")).text();
-    expect(packageBindings).not.toContain("UsersController");
-    expect(packageBindings).not.toContain("UserListQuery");
+    // The framework no longer has a package-level bindings file that app routes could leak into.
+    expect(await Bun.file(path.join(repository, "src/osnova/core/http/generated/bindings.ts")).exists()).toBe(false);
     expect(await Bun.file(path.join(repository, "src/osnova/core/http/Binding/autoBindings.ts")).text()).not.toContain('"../generated/bindings"');
     const binary = path.join(root, "consumer-bin");
     await command(["build", "--compile", "src/index.ts", "--outfile", binary]);

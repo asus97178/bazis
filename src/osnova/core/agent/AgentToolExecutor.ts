@@ -2055,36 +2055,6 @@ export class AgentToolExecutor {
     }
   }
 
-  private recordDeadlineResult(
-    call: AgentToolCall,
-    result: AgentToolResult,
-    startedAt: number,
-    metadata: JsonObject,
-    options: AgentToolExecutionOptions,
-    tool: ToolDefinition,
-  ): void {
-    try {
-      const audit = this.auditSettings(options);
-      if (audit.sink === undefined) return;
-      const entry = this.auditProjector.create(
-        "result",
-        call,
-        startedAt,
-        metadata,
-        options,
-        tool,
-        options.agentName,
-        result,
-      );
-      void Promise.resolve()
-        .then(() => auditSinkFunction(audit.sink as AgentToolAuditSink)(entry))
-        .catch((error: unknown) => {
-          console.error("[agent-tool] deadline result audit failed:", redactSensitive(errorMessageOf(error)));
-        });
-    } catch (error) {
-      console.error("[agent-tool] deadline result audit setup failed:", redactSensitive(errorMessageOf(error)));
-    }
-  }
 
   private errorResult(
     call: AgentToolCall,

@@ -7,7 +7,7 @@ import type { CheckAst } from "./CheckExpression";
 import { projectCheckAstIdentifiers } from "./CheckExpression";
 import type { OrmExpectedSchema } from "./ExpectedSchema";
 import { ExactSchemaVerifier } from "./ExactSchemaVerifier";
-import type { IntrospectedSchema, IntrospectedTable } from "./introspection";
+import type { IntrospectedTable } from "./introspection";
 export type PgOidV1 = string;
 export type PgIntV1 = string;
 export type PgSignedIntV1 = string;

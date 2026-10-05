@@ -273,7 +273,6 @@ const advanced = buildCacheModule({
 | --- | --- | --- | --- |
 | `enabled` | `boolean` | `true` | Глобальный выключатель HTTP output cache |
 | `insecureAuthorizedRouteBehavior` | `"throw" \| "warn" \| "ignore"` | `"throw"` | Политика для `@Authorize` route без изоляции по пользователю |
-| `warnOnAuthorizedRoutesWithoutVaryByUser` | `boolean` | — | Deprecated compatibility switch kept through 0.x; `false` эквивалентно `"ignore"` |
 | `requireAuthenticationByDefault` | `boolean` | `false` | Согласовать с `jwtModule({ options: { requireAuthenticationByDefault } })` при guard |
 
 ### 4.3. Распределённые хранилища
@@ -629,10 +628,7 @@ class UserService implements IUserStore {
 | `cachedSingleton` | `@Cacheable` и/или `@CacheableRedis` | `ICache`, `CACHE_POLICIES`, (опц.) `DISTRIBUTED_SERVICE_CACHE` | singleton |
 | `cachedScoped` | `@Cacheable` и/или `@CacheableRedis` | то же | scoped |
 
-`autoCachedSingleton` / `autoCachedScoped` — deprecated public aliases of
-`cachedSingleton` / `cachedScoped`. They are kept through the Osnova 0.x
-compatibility window; new code should use canonical `cached*` helpers. Full
-classification: `src/osnova/core/cache/COMPATIBILITY.md`.
+Removed aliases: `src/osnova/core/cache/COMPATIBILITY.md`.
 
 ```ts
 // Interface token ← proxy ← implementation class with decorators.

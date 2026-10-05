@@ -1,5 +1,5 @@
 import { InfraError, reader, requireValue, postgresConnectionOptions, type InfraConnector, type PostgresConfigShape } from "../infra";
-import type { AppConfig, ConfigRegistry, Secret } from "../kernel";
+import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
 

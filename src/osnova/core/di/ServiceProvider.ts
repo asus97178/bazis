@@ -22,7 +22,6 @@ import type {
   FactoryProvider,
   KeyedDependency,
   Lazy,
-  LazyDependency,
   NamedDependency,
   Provider,
   ProviderDefinition,

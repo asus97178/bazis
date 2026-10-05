@@ -373,7 +373,7 @@ describe("WebSocket: memory bounds", () => {
       await sessions.flushSession("lease");
       expect(await sessions.claimActiveConnection("lease", "new-conn")).toBe(true);
 
-      sessions.clearActiveConnection("lease", "old-conn");
+      await sessions.releaseActiveConnection("lease", "old-conn");
       expect(sessions.getSession("lease")?.activeConnId).toBe("new-conn");
     } finally {
       Date.now = originalNow;

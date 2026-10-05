@@ -280,27 +280,6 @@ export class SessionManager {
     return false;
   }
 
-  /** @deprecated Prefer awaited `claimActiveConnection` at runtime boundaries. */
-  setActiveConnection(sid: string, connId: string): void {
-    void this.claimActiveConnection(sid, connId).catch(() => {});
-  }
-
-  /** @deprecated Runtime boundaries should await `releaseActiveConnection`. */
-  clearActiveConnection(sid: string, expectedConnId?: string): void {
-    this.purgeExpired();
-    const state = this.sessions.get(sid);
-    if (!state || (expectedConnId !== undefined && state.activeConnId !== expectedConnId)) {
-      return;
-    }
-    const now = Date.now();
-    state.activeConnId = undefined;
-    state.ownerInstanceId = undefined;
-    state.activeLeaseExpiresAt = undefined;
-    state.lastSeenAt = now;
-    state.expiresAt = now + this.ttlOf(state);
-    this.bumpAndSave(state);
-  }
-
   /** Atomically snapshots rooms and releases the active connection lease. */
   async releaseActiveConnection(
     sid: string,

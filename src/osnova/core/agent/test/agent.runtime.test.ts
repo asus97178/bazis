@@ -580,8 +580,9 @@ describe("agent runtime", () => {
     const disabledRuntime = new AgentRuntime(container, registry, new NeverProvider(), { timeoutMs: 0 });
     const shortRuntime = new AgentRuntime(container, registry, new NeverProvider(), { timeoutMs: 2 });
     try {
-      expect((defaultRuntime as unknown as { defaultTimeoutMs?: number }).defaultTimeoutMs).toBe(60_000);
-      expect((disabledRuntime as unknown as { defaultTimeoutMs?: number }).defaultTimeoutMs).toBeUndefined();
+      const timeoutOf = (runtime: AgentRuntime) => (runtime as unknown as { driver: { defaultTimeoutMs?: number } }).driver.defaultTimeoutMs;
+      expect(timeoutOf(defaultRuntime)).toBe(60_000);
+      expect(timeoutOf(disabledRuntime)).toBeUndefined();
 
       const timedOut = await shortRuntime.invoke("profiled-agent", { input: "timeout" });
       expect(timedOut.error?.code).toBe("AGENT_PROVIDER_TIMEOUT");

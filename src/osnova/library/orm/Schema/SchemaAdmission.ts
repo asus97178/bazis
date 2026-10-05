@@ -1,4 +1,4 @@
-import type { DatabaseProvider, SchemaAdmissionCapabilityV1, SchemaAdmissionScope } from "../Providers/types";
+import type { DatabaseProvider, SchemaAdmissionScope } from "../Providers/types";
 import { SchemaAdmissionError, SchemaMigrationRequiredError, SchemaVerificationError } from "../errors";
 import type { OrmModel } from "../Metadata/OrmModel";
 import { compileExpectedSchema, type OrmExpectedSchema } from "./ExpectedSchema";

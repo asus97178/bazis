@@ -30,15 +30,3 @@ export function requireCacheSeconds(options: CachePolicy, context: string): numb
 
 export const DEFAULT_OUTPUT_CACHE_METHODS = ["GET", "HEAD"] as const;
 export const DEFAULT_OUTPUT_CACHE_STATUS_CODES = [200] as const;
-
-/**
- * @deprecated Internal compatibility alias kept through Osnova 0.x. Use
- * {@link DEFAULT_OUTPUT_CACHE_METHODS}; earliest removal is 1.0.
- */
-export const DEFAULT_CACHEABLE_METHODS = DEFAULT_OUTPUT_CACHE_METHODS;
-
-/**
- * @deprecated Internal compatibility alias kept through Osnova 0.x. Use
- * {@link DEFAULT_OUTPUT_CACHE_STATUS_CODES}; earliest removal is 1.0.
- */
-export const DEFAULT_CACHEABLE_STATUS_CODES = DEFAULT_OUTPUT_CACHE_STATUS_CODES;

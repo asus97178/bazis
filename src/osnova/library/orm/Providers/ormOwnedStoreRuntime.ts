@@ -1,7 +1,5 @@
 import type { DatabaseProvider } from "./types";
 import { knownExecutionStrategyBase } from "../Saving/ExecutionStrategy";
-import type { OrmOwnedStoreDefinitionV1 } from "../Schema/OrmOwnedStore";
-import { isDefinedOrmOwnedStoreV1 } from "../Schema/OrmOwnedStore";
 import { OrmOwnedStoreAdmissionError } from "../errors";
 import type { ExpectedTable } from "../Schema/ExpectedSchema";
 import type { OwnedStoreCatalogSnapshotV1, OwnedStoreRegistrySnapshotV1 } from "../Schema/OwnedStoreCatalog";
@@ -15,7 +13,6 @@ export interface RegistryLockedOwnedStoreSessionV1 { readonly maxIdentifierLengt
 export interface SecondaryLockedOwnedStoreSessionV1 { inspectCatalog(scopes: readonly OrmCatalogScopeV1[]): Promise<OwnedStoreCatalogSnapshotV1>; createRegistryV1(): Promise<void>; applyCreateOperations(operations: readonly OwnedStoreCreateOperationV1[]): Promise<void>; insertIdentities(rows: readonly OwnedStoreIdentityInsertV1[]): Promise<void>; inspectRegistry(): Promise<OwnedStoreRegistrySnapshotV1>; }
 export interface PostgresOwnedStoreCapability { withOwnedStoreAdmission<T>(signal: AbortSignal | undefined, work: (session: RegistryLockedOwnedStoreSessionV1) => Promise<T>): Promise<T>; }
 const capabilities = new WeakMap<DatabaseProvider, PostgresOwnedStoreCapability>();
-const leases = new WeakMap<DatabaseProvider, WeakMap<object, number>>();
 
 export function registerPostgresOwnedStoreCapability(provider: DatabaseProvider, capability: PostgresOwnedStoreCapability): void { capabilities.set(provider, capability); }
 export function postgresOwnedStoreCapability(provider: DatabaseProvider): PostgresOwnedStoreCapability | undefined { const base = knownExecutionStrategyBase(provider); return base === undefined ? undefined : capabilities.get(base); }

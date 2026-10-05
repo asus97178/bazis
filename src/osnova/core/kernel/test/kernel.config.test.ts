@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { OptionsValidationError, createOptionsToken, type OsnovaModuleRef } from "../../di";
 import {
   ConfigKeyMissingError,
-  Configuration,
   KernelError,
   Osnova,
   Secret,

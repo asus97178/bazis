@@ -1,5 +1,5 @@
 import type { Class } from "../token";
-import type { OsnovaModule, OsnovaModuleRef } from "./types";
+import type { OsnovaModuleRef } from "./types";
 
 /**
  * Собирает классы контроллеров из дерева модулей (сам модуль + `imports`,

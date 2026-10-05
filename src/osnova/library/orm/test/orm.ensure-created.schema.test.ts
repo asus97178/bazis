@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, Entity, Key, ModelBuilder, OrmModel, Schema, UUID } from "../index";
+import { Column, Entity, Key, OrmModel, Schema, UUID } from "../index";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 
 @Schema("admission")

@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { DatabaseProvider, DbExecutor, ExecuteResult, Row, SchemaAdmissionScope, SqlParam } from "./types";
+import type { DatabaseProvider, DbExecutor, ExecuteResult, Row, SchemaAdmissionScope } from "./types";
 import { knownExecutionStrategyBase } from "../Saving/ExecutionStrategy";
 import type { OrmTransactionScopeOptions, OrmDatabaseTimeV1 } from "../Transactions/OrmTransaction";
 
