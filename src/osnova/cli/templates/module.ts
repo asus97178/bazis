@@ -21,8 +21,6 @@ export function buildModuleTemplates(
   /** null: the host has no auth helpers, so `full` emits no @Authorize. */
   authImportPath: string | null = "../../auth",
 ): readonly ModuleTemplateFiles[] {
-  const { entity } = naming;
-
   if (profile === "empty") {
     return [
       { relativePath: `${naming.module}.module.ts`, content: `import { Module } from "osnv/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class ${naming.moduleClass} {}\n` },
@@ -32,14 +30,14 @@ export function buildModuleTemplates(
 
   const base: ModuleTemplateFiles[] = [
     { relativePath: `${naming.module}.module.ts`, content: moduleFile(naming, profile) },
-    { relativePath: `model/${entity}.model.ts`, content: ormModelFile(naming, profile) },
-    { relativePath: `model/${entity}DbContext.ts`, content: dbContextFile(naming) },
-    { relativePath: `services/I${entity}.service.ts`, content: serviceInterfaceFile(naming) },
-    { relativePath: `services/${entity}.service.ts`, content: serviceFile(naming, profile) },
-    { relativePath: `http/${entity}Controller.ts`, content: controllerFile(naming, profile, authImportPath) },
-    { relativePath: `http/contracts/${entity}Requests.ts`, content: requestFile(naming) },
-    { relativePath: `http/contracts/${entity}Responses.ts`, content: responseFile(naming) },
-    { relativePath: `http/contracts/${entity}ListQuery.ts`, content: listQueryFile(naming) },
+    { relativePath: `model/${naming.module}.model.ts`, content: ormModelFile(naming, profile) },
+    { relativePath: `model/${naming.module}.dbContext.ts`, content: dbContextFile(naming) },
+    { relativePath: `services/I${naming.module}.service.ts`, content: serviceInterfaceFile(naming) },
+    { relativePath: `services/${naming.module}.service.ts`, content: serviceFile(naming, profile) },
+    { relativePath: `http/${naming.module}.controller.ts`, content: controllerFile(naming, profile, authImportPath) },
+    { relativePath: `http/contracts/${naming.module}.requests.ts`, content: requestFile(naming) },
+    { relativePath: `http/contracts/${naming.module}.responses.ts`, content: responseFile(naming) },
+    { relativePath: `http/contracts/${naming.module}.query.ts`, content: listQueryFile(naming) },
     { relativePath: "MODULE.md", content: modulePassport(naming, profile) },
   ];
 
@@ -49,10 +47,10 @@ export function buildModuleTemplates(
 
   return [
     ...base,
-    { relativePath: `background/${entity}StatsReporter.ts`, content: statsReporterFile(naming) },
-    { relativePath: `ai/agents/${entity}AnalystAgent.ts`, content: agentFile(naming) },
-    { relativePath: `ai/contracts/${entity}Brief.ts`, content: aiContractsFile(naming) },
-    { relativePath: `ai/tools/${entity}SummaryTool.ts`, content: aiToolFile(naming) },
+    { relativePath: `background/${naming.module}.reporter.ts`, content: statsReporterFile(naming) },
+    { relativePath: `ai/agents/${naming.module}.agent.ts`, content: agentFile(naming) },
+    { relativePath: `ai/contracts/${naming.module}.brief.ts`, content: aiContractsFile(naming) },
+    { relativePath: `ai/tools/${naming.module}.tool.ts`, content: aiToolFile(naming) },
   ];
 }
 
@@ -60,36 +58,36 @@ function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const cacheImport = profile === "full" ? "import { cachedScoped } from \"osnv/core/cache\";\n" : "";
   const moduleImport = "import { Module, scoped } from \"osnv/core/di\";";
   const providerFactory = profile === "full" ? "cachedScoped" : "scoped";
-  const backgroundImport = profile === "full" ? `import { ${n.entity}StatsReporter } from "./background/${n.entity}StatsReporter";\n` : "";
+  const backgroundImport = profile === "full" ? `import { ${n.module}Reporter } from "./background/${n.module}.reporter";\n` : "";
   const aiImports = profile === "full"
-    ? `import { ${n.entity}AnalystAgent } from "./ai/agents/${n.entity}AnalystAgent";
-import { ${n.entity}SummaryTool } from "./ai/tools/${n.entity}SummaryTool";
+    ? `import { ${n.module}AnalystAgent } from "./ai/agents/${n.module}.agent";
+import { ${n.module}SummaryTool } from "./ai/tools/${n.module}.tool";
 `
     : "";
-  const backgroundLine = profile === "full" ? `  background: [${n.entity}StatsReporter],\n` : "";
+  const backgroundLine = profile === "full" ? `  background: [${n.module}Reporter],\n` : "";
   const aiLines = profile === "full"
-    ? `  agents: [${n.entity}AnalystAgent],
-  tools: [${n.entity}SummaryTool],
+    ? `  agents: [${n.module}AnalystAgent],
+  tools: [${n.module}SummaryTool],
 `
     : "";
 
   return `${cacheImport}${moduleImport}
-${aiImports}${backgroundImport}import { ${n.entity}Controller } from "./http/${n.entity}Controller";
-import { ${n.entity} } from "./model/${n.entity}.model";
-import { ${n.entity}DbContext } from "./model/${n.entity}DbContext";
-import { I${n.entity}Service } from "./services/I${n.entity}.service";
-import { ${n.entity}Service } from "./services/${n.entity}.service";
+${aiImports}${backgroundImport}import { ${n.module}Controller } from "./http/${n.module}.controller";
+import { ${n.entity} } from "./model/${n.module}.model";
+import { ${n.module}DbContext } from "./model/${n.module}.dbContext";
+import { I${n.module}Service } from "./services/I${n.module}.service";
+import { ${n.module}Service } from "./services/${n.module}.service";
 
 @Module({
   ormOsnova: {
-    context: ${n.entity}DbContext,
+    context: ${n.module}DbContext,
     entities: [${n.entity}],
   },
-  controllers: [${n.entity}Controller],
+  controllers: [${n.module}Controller],
   providers: [
-    ${providerFactory}(I${n.entity}Service, ${n.entity}Service),
+    ${providerFactory}(I${n.module}Service, ${n.module}Service),
   ],
-${backgroundLine}${aiLines}  exports: [I${n.entity}Service],
+${backgroundLine}${aiLines}  exports: [I${n.module}Service],
 })
 export class ${n.moduleClass} {}
 `;
@@ -118,16 +116,16 @@ import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok,
   const authWrite = auth ? "  @Authorize(requireTokenKind(TokenKind.Admin))\n" : "";
 
   return `${fullImports}import { buildListDocument } from "osnv/library/jsonapi";
-import { ${n.entity}ListQuery } from "./contracts/${n.entity}ListQuery";
-import { Create${n.entity}Request, Update${n.entity}Request } from "./contracts/${n.entity}Requests";
-import type { I${n.entity}Service } from "../services/I${n.entity}.service";
+import { ${n.module}ListQuery } from "./contracts/${n.module}.query";
+import { Create${n.entity}Request, Update${n.entity}Request } from "./contracts/${n.module}.requests";
+import type { I${n.module}Service } from "../services/I${n.module}.service";
 
 @Controller("${n.route}")
-export class ${n.entity}Controller {
-  constructor(private readonly ${n.collection}: I${n.entity}Service) {}
+export class ${n.module}Controller {
+  constructor(private readonly ${n.collection}: I${n.module}Service) {}
 
 ${authList}  @Get()
-  async list(query: ${n.entity}ListQuery, ctx: HttpContext) {
+  async list(query: ${n.module}ListQuery, ctx: HttpContext) {
     const { items, total } = await this.${n.collection}.getAll(query);
     return buildListDocument(items, query, total, { basePath: ctx.path });
   }
@@ -187,9 +185,9 @@ export class ${n.entity} {
 
 function dbContextFile(n: ModuleNaming): string {
   return `import { DbContext } from "osnv/core/orm";
-import { ${n.entity} } from "./${n.entity}.model";
+import { ${n.entity} } from "./${n.module}.model";
 
-export class ${n.entity}DbContext extends DbContext {
+export class ${n.module}DbContext extends DbContext {
   readonly ${n.collection} = this.set(${n.entity});
 }
 `;
@@ -199,12 +197,12 @@ function serviceInterfaceFile(n: ModuleNaming): string {
   return `import { createToken } from "osnv/core/di";
 import type { PageResult } from "osnv/core/orm";
 import type { ListQuery } from "osnv/library/jsonapi";
-import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.entity}Requests";
-import type { ${n.entity}Response, ${n.entity}Summary } from "../http/contracts/${n.entity}Responses";
+import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.module}.requests";
+import type { ${n.entity}Response, ${n.module}Summary } from "../http/contracts/${n.module}.responses";
 
-export interface I${n.entity}Service {
+export interface I${n.module}Service {
   getAll(query: ListQuery): Promise<PageResult<${n.entity}Response>>;
-  summary(): Promise<${n.entity}Summary>;
+  summary(): Promise<${n.module}Summary>;
   count(): Promise<number>;
   getById(id: string): Promise<${n.entity}Response | null>;
   create(body: Create${n.entity}Request): Promise<${n.entity}Response>;
@@ -212,7 +210,7 @@ export interface I${n.entity}Service {
   delete(id: string): Promise<boolean>;
 }
 
-export const I${n.entity}Service = createToken<I${n.entity}Service>("I${n.entity}Service");
+export const I${n.module}Service = createToken<I${n.module}Service>("I${n.module}Service");
 `;
 }
 
@@ -228,21 +226,21 @@ function serviceFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
 
   return `${imports}import { paginate, type PageResult } from "osnv/core/orm";
 import type { ListQuery } from "osnv/library/jsonapi";
-import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.entity}Requests";
-import { to${n.entity}Response, type ${n.entity}Response, type ${n.entity}Summary } from "../http/contracts/${n.entity}Responses";
-import { ${n.entity} } from "../model/${n.entity}.model";
-import { ${n.entity}DbContext } from "../model/${n.entity}DbContext";
-import type { I${n.entity}Service } from "./I${n.entity}.service";
+import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.module}.requests";
+import { to${n.entity}Response, type ${n.entity}Response, type ${n.module}Summary } from "../http/contracts/${n.module}.responses";
+import { ${n.entity} } from "../model/${n.module}.model";
+import { ${n.module}DbContext } from "../model/${n.module}.dbContext";
+import type { I${n.module}Service } from "./I${n.module}.service";
 
-export class ${n.entity}Service implements I${n.entity}Service {
-  constructor(private readonly db: ${n.entity}DbContext${profile === "full" ? ", private readonly cache: ICache" : ""}) {}
+export class ${n.module}Service implements I${n.module}Service {
+  constructor(private readonly db: ${n.module}DbContext${profile === "full" ? ", private readonly cache: ICache" : ""}) {}
 
   async getAll(query: ListQuery): Promise<PageResult<${n.entity}Response>> {
     const { items, total } = await paginate(this.db.${n.collection}.asNoTracking(), query);
     return { items: items.map(to${n.entity}Response), total };
   }
 
-  async summary(): Promise<${n.entity}Summary> {
+  async summary(): Promise<${n.module}Summary> {
     const count = await this.count();
     const items = await this.db.${n.collection}.asNoTracking().orderBy(item => item.id).take(20)
       .select(item => ({ name: item.name })).toList();
@@ -324,7 +322,7 @@ export class Update${n.entity}Request {
 }
 
 function responseFile(n: ModuleNaming): string {
-  return `import type { ${n.entity} } from "../../model/${n.entity}.model";
+  return `import type { ${n.entity} } from "../../model/${n.module}.model";
 
 export interface ${n.entity}Response {
   readonly id: string;
@@ -334,7 +332,7 @@ export interface ${n.entity}Response {
   readonly updatedAt: Date;
 }
 
-export interface ${n.entity}Summary {
+export interface ${n.module}Summary {
   readonly count: number;
   readonly names: readonly string[];
 }
@@ -353,10 +351,10 @@ export function to${n.entity}Response(entity: ${n.entity}): ${n.entity}Response 
 
 function listQueryFile(n: ModuleNaming): string {
   return `import { Filterable, ListOptions, ListRequest, Sortable } from "osnv/core/http";
-import type { ${n.entity} } from "../../model/${n.entity}.model";
+import type { ${n.entity} } from "../../model/${n.module}.model";
 
 @ListOptions({ defaultSize: 20, maxSize: 100 })
-export class ${n.entity}ListQuery extends ListRequest<${n.entity}> {
+export class ${n.module}ListQuery extends ListRequest<${n.entity}> {
   @Sortable()
   @Filterable("eq", "contains", "startsWith")
   name!: string;
@@ -375,10 +373,10 @@ function statsReporterFile(n: ModuleNaming): string {
   return `import { Background, PeriodicBackgroundService } from "osnv/core/background";
 import type { ServiceProvider } from "osnv/core/di";
 import type { Logger } from "osnv/core/kernel";
-import { I${n.entity}Service } from "../services/I${n.entity}.service";
+import { I${n.module}Service } from "../services/I${n.module}.service";
 
 @Background({ intervalMs: 60_000, runImmediately: false })
-export class ${n.entity}StatsReporter extends PeriodicBackgroundService {
+export class ${n.module}Reporter extends PeriodicBackgroundService {
   constructor(
     private readonly provider: ServiceProvider,
     private readonly logger: Logger,
@@ -389,7 +387,7 @@ export class ${n.entity}StatsReporter extends PeriodicBackgroundService {
   protected override async tick(signal: AbortSignal): Promise<void> {
     const scope = this.provider.createScope();
     try {
-      const service = scope.resolve(I${n.entity}Service);
+      const service = scope.resolve(I${n.module}Service);
       const count = await service.count();
       if (!signal.aborted) {
         this.logger.info("${n.route}: records in database", { count });
@@ -405,7 +403,7 @@ export class ${n.entity}StatsReporter extends PeriodicBackgroundService {
 function aiContractsFile(n: ModuleNaming): string {
   return `import { Validator } from "osnv/library/validation";
 
-export class Prepare${n.entity}BriefRequest {
+export class Prepare${n.module}BriefRequest {
   @Validator({ required: true, minLength: 3 })
   topic!: string;
 
@@ -413,7 +411,7 @@ export class Prepare${n.entity}BriefRequest {
   audience = "operators";
 }
 
-export class ${n.entity}BriefDocument {
+export class ${n.module}BriefDocument {
   title = "";
   bullets: string[] = [];
 }
@@ -423,14 +421,14 @@ export class ${n.entity}BriefDocument {
 function aiToolFile(n: ModuleNaming): string {
   return `import { Tool, type AgentToolExecutionContext } from "osnv/core/agent";
 import { Validator } from "osnv/library/validation";
-import type { I${n.entity}Service } from "../../services/I${n.entity}.service";
+import type { I${n.module}Service } from "../../services/I${n.module}.service";
 
-export class ${n.entity}SummaryToolInput {
+export class ${n.module}SummaryToolInput {
   @Validator({ required: true, minLength: 3 })
   topic!: string;
 }
 
-export class ${n.entity}SummaryToolOutput {
+export class ${n.module}SummaryToolOutput {
   topic = "";
   count = 0;
   names: string[] = [];
@@ -439,17 +437,17 @@ export class ${n.entity}SummaryToolOutput {
 
 @Tool({
   name: "${n.route}.summary",
-  description: "Reads the ${n.route} summary through ${n.entity}Service.",
-  input: ${n.entity}SummaryToolInput,
-  output: ${n.entity}SummaryToolOutput,
+  description: "Reads the ${n.route} summary through ${n.module}Service.",
+  input: ${n.module}SummaryToolInput,
+  output: ${n.module}SummaryToolOutput,
   sideEffect: "read",
 })
-export class ${n.entity}SummaryTool {
-  constructor(private readonly ${n.collection}: I${n.entity}Service) {}
+export class ${n.module}SummaryTool {
+  constructor(private readonly ${n.collection}: I${n.module}Service) {}
 
-  async execute(input: ${n.entity}SummaryToolInput, context: AgentToolExecutionContext): Promise<${n.entity}SummaryToolOutput> {
+  async execute(input: ${n.module}SummaryToolInput, context: AgentToolExecutionContext): Promise<${n.module}SummaryToolOutput> {
     const summary = await this.${n.collection}.summary();
-    return Object.assign(new ${n.entity}SummaryToolOutput(), {
+    return Object.assign(new ${n.module}SummaryToolOutput(), {
       topic: input.topic,
       count: summary.count,
       names: [...summary.names],
@@ -462,8 +460,8 @@ export class ${n.entity}SummaryTool {
 
 function agentFile(n: ModuleNaming): string {
   return `import { Agent, Task, agentOutput } from "osnv/core/agent";
-import { Prepare${n.entity}BriefRequest, ${n.entity}BriefDocument } from "../contracts/${n.entity}Brief";
-import { ${n.entity}SummaryTool } from "../tools/${n.entity}SummaryTool";
+import { Prepare${n.module}BriefRequest, ${n.module}BriefDocument } from "../contracts/${n.module}.brief";
+import { ${n.module}SummaryTool } from "../tools/${n.module}.tool";
 
 @Agent({
   name: "${n.route}-analyst",
@@ -478,20 +476,20 @@ import { ${n.entity}SummaryTool } from "../tools/${n.entity}SummaryTool";
       content: "Use read tools before the final summary. Do not make up data.",
     },
   ],
-  tools: [${n.entity}SummaryTool],
+  tools: [${n.module}SummaryTool],
   modelProfile: "reasoning",
   maxSteps: 3,
 })
-export class ${n.entity}AnalystAgent {
+export class ${n.module}AnalystAgent {
   @Task({
     name: "prepare-${n.route}-brief",
     description: "Prepare a short ${n.route} summary from the current module data.",
-    input: Prepare${n.entity}BriefRequest,
-    output: ${n.entity}BriefDocument,
+    input: Prepare${n.module}BriefRequest,
+    output: ${n.module}BriefDocument,
     modelProfile: "reasoning",
     maxSteps: 3,
   })
-  prepareBrief(_input: Prepare${n.entity}BriefRequest): ${n.entity}BriefDocument {
+  prepareBrief(_input: Prepare${n.module}BriefRequest): ${n.module}BriefDocument {
     return agentOutput();
   }
 }

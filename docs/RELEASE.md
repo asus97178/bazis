@@ -234,9 +234,13 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
 - HTTP: поля тела запроса, объявленные как `string`/`number`/`boolean`,
   проверяются по типу JSON без `@Validator` (400, код `type`). gRPC и агенты
   не затронуты.
-- CLI: модуль называется так, как его ввели: `g module Stats` →
-  `Stats.module.ts`, `StatsModule` (раньше `Stat.module.ts`, `StatModule`);
-  единственное число остаётся у CRUD-сущности.
+- CLI: имена по модулю, как его ввели. `g module Stats` создаёт файлы
+  `<Модуль>.<роль>.ts` (`Stats.module.ts`, `Stats.controller.ts`,
+  `Stats.service.ts`, `IStats.service.ts`, `Stats.model.ts`, `Stats.dbContext.ts`,
+  `Stats.requests.ts`, `Stats.responses.ts`, `Stats.query.ts`) и классы ролей
+  `StatsModule`, `StatsController`, `StatsService`, `StatsDbContext`. Единственное
+  число остаётся у записи и её DTO (`Stat`, `CreateStatRequest`, `StatResponse`).
+  Раньше: `Stat.module.ts`, `StatController.ts`, `StatService`.
 - Встроенные тексты фреймворка и шаблоны CLI — на английском. Русские наборы:
   `RU_VALIDATION_MESSAGES`, `RU_CODEX_MESSAGES`, `RU_UI_LABELS`. Приложение
   подключает их при старте. Ошибки конфигурации и заголовки промпта агента

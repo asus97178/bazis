@@ -1,7 +1,7 @@
 import { Conflict, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "osnv/core/http";
 import { buildListDocument } from "osnv/library/jsonapi";
-import { ProjectListQuery } from "./contracts/ProjectListQuery";
-import { CreateProjectRequest, UpdateProjectRequest } from "./contracts/ProjectRequests";
+import { ProjectListQuery } from "./contracts/Project.query";
+import { CreateProjectRequest, UpdateProjectRequest } from "./contracts/Project.requests";
 import type { IProjectService } from "../services/IProject.service";
 
 @Controller("projects")

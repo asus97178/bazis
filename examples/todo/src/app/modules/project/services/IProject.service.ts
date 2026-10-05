@@ -1,8 +1,8 @@
 import { createToken } from "osnv/core/di";
 import type { PageResult } from "osnv/core/orm";
 import type { ListQuery } from "osnv/library/jsonapi";
-import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/ProjectRequests";
-import type { ProjectResponse } from "../http/contracts/ProjectResponses";
+import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/Project.requests";
+import type { ProjectResponse } from "../http/contracts/Project.responses";
 
 export interface IProjectService {
   getAll(query: ListQuery): Promise<PageResult<ProjectResponse>>;

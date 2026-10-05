@@ -1,8 +1,8 @@
 import { Module, scoped } from "osnv/core/di";
 import { ProjectModule } from "../project/Project.module";
-import { TaskController } from "./http/TaskController";
+import { TaskController } from "./http/Task.controller";
 import { Task } from "./model/Task.model";
-import { TaskDbContext } from "./model/TaskDbContext";
+import { TaskDbContext } from "./model/Task.dbContext";
 import { ITaskService } from "./services/ITask.service";
 import { TaskService } from "./services/Task.service";
 
