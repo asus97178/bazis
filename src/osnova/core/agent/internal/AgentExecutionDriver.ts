@@ -169,7 +169,8 @@ type TaskPreparation =
 
 type EngineProgress = Pick<AgentExecutionCheckpointV1, "phase" | "steps" | "messages" | "responses" | "toolResults" | "seenToolCallIds" | "pendingToolBatch" | "terminal">;
 
-type LegacyExecutionState = EngineProgress;
+/** Progress of a run kept only in memory (no checkpoint store). */
+type InMemoryExecutionState = EngineProgress;
 
 type PhaseBridge<TState extends EngineProgress> = {
   evolve(
@@ -1097,20 +1098,20 @@ export class AgentExecutionDriver {
   }
 
   private async drive(plan: PreparedAgentPlan): Promise<AgentRuntimeResult> {
-    const initial: LegacyExecutionState = Object.freeze({
+    const initial: InMemoryExecutionState = Object.freeze({
       phase: "ready-model", steps: 0, messages: Object.freeze([...plan.messages]), responses: Object.freeze([]), toolResults: Object.freeze([]), seenToolCallIds: Object.freeze([...plan.seenToolCallIds]),
     });
-    const legacyBoundary: EngineBoundary<LegacyExecutionState> = {
+    const inMemoryBoundary: EngineBoundary<InMemoryExecutionState> = {
       async checkControl() { return { kind: "continue" }; }, async beforeModelDispatch() {}, async afterModelSettlement() {}, async beforeToolDispatch() {}, async afterToolSettlement() {},
     };
-    const legacyBridge: PhaseBridge<LegacyExecutionState> = {
+    const inMemoryBridge: PhaseBridge<InMemoryExecutionState> = {
       evolve(previous, progress) { return Object.freeze({ ...previous, ...progress }); },
-      boundaryError() { return new AgentRuntimeError("legacy execution boundary rejected a transition."); },
+      boundaryError() { return new AgentRuntimeError("in-memory execution boundary rejected a transition."); },
     };
-    const legacyPlan = { ...plan, modelProfile: plan.modelProfile ?? plan.agent.metadata.modelProfile ?? this.defaultModelProfile };
-    const outcome = await this.drivePhaseEngine(legacyPlan, initial, legacyBoundary, plan.options.signal, legacyBridge, false);
+    const resolvedPlan = { ...plan, modelProfile: plan.modelProfile ?? plan.agent.metadata.modelProfile ?? this.defaultModelProfile };
+    const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, plan.options.signal, inMemoryBridge, false);
     if (outcome.kind === "terminal") return outcome.result;
-    throw new AgentRuntimeError("legacy execution boundary cannot suspend.");
+    throw new AgentRuntimeError("in-memory execution cannot suspend.");
   }
   async invokeTask(
     agentName: string,

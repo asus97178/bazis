@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   AmbiguousNamedDependencyError,
+  CLASS_PROVIDER_HOOK,
   ClassDependenciesMismatchError,
   collectModuleControllers,
   DI,
@@ -9,8 +10,9 @@ import {
   createToken,
   scoped,
   singleton,
+  singletonValue,
   transient,
-  registerClassProviderHook,
+  type ClassProviderRegistration,
   type DiRegistrar,
   type OsnovaModuleRef,
   type ServiceResolver,
@@ -164,13 +166,12 @@ describe("DI core", () => {
     }
 
     const definition = singleton(LateHookService);
-    registerClassProviderHook((request) =>
+    const hook = singletonValue(CLASS_PROVIDER_HOOK, (request: ClassProviderRegistration) =>
       request.useClass === LateHookService
         ? DI.singleton(DI.classProvider(request.provide, HookedService))
-        : undefined,
-    );
+        : undefined);
 
-    const container = createContainer({ providers: [definition] });
+    const container = createContainer({ providers: [definition, hook] });
     expect(container.resolve(LateHookService).source).toBe("hooked");
   });
 

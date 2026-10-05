@@ -52,7 +52,7 @@ export function createContainer(rootModule: OsnovaModuleRef, options?: BuildServ
           return built;
         }),
       ),
-      // Canonical class token for generated identity and legacy named deps.
+      // Canonical class token for generated identity and name-based deps.
       DI.singleton(
         DI.factoryProvider(SERVICE_PROVIDER_BY_TYPE, [], () => {
           if (!built) {

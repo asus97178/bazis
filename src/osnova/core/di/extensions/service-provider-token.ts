@@ -15,7 +15,7 @@ export const SERVICE_PROVIDER = createToken<ServiceProvider>("IServiceProvider")
 
 /**
  * Internal alias for the canonical class token used by generated constructor
- * dependencies. Legacy name-based dependencies resolve this same token, so no
+ * dependencies. Name-based dependencies resolve this same token, so no
  * second token with the debug name `ServiceProvider` competes with the class.
  */
 export const SERVICE_PROVIDER_BY_TYPE = ServiceProvider;

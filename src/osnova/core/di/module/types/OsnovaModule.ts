@@ -67,5 +67,5 @@ export interface OsnovaModuleMetadata {
 /** Класс модуля с метаданными на конструкторе (`@Module`). */
 export type OsnovaModule = OsnovaModuleMetadata & (abstract new (...args: never) => unknown);
 
-/** Внутренний тип: класс модуля или plain metadata (legacy tests). */
+/** Класс модуля (`@Module`) или plain metadata, которую возвращают фабрики модулей (`ormModule`, `memory()`, `infraModule`). */
 export type OsnovaModuleRef = OsnovaModule | OsnovaModuleMetadata;

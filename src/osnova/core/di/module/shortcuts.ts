@@ -5,7 +5,6 @@ import type {
   ProviderDependencyList,
   ResolvedDeps,
 } from "../provider";
-import { applyClassProviderHooks } from "./classProviderHooks";
 import { DI } from "./DI";
 
 function registerClassProvider<T, D extends ProviderDependencyList>(
@@ -14,15 +13,6 @@ function registerClassProvider<T, D extends ProviderDependencyList>(
   useClass: Class<T>,
   deps?: D,
 ): ProviderDefinition<T> {
-  const hooked = applyClassProviderHooks({
-    lifetime,
-    provide: provide as Token<unknown>,
-    useClass: useClass as Class<unknown>,
-    deps,
-  });
-  if (hooked !== undefined) {
-    return hooked as ProviderDefinition<T>;
-  }
   const factory = lifetime === "singleton" ? DI.singleton : lifetime === "scoped" ? DI.scoped : DI.transient;
   return factory(DI.classProvider(provide, useClass, deps));
 }

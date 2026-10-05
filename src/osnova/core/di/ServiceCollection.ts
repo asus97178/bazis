@@ -11,7 +11,7 @@ export class ServiceCollection {
   private readonly openGenericRegistrations: OpenGenericRegistration[] = [];
 
   public add(definition: ProviderDefinition): this {
-    this.definitions.push(applyClassProviderHooksToDefinition(definition));
+    this.definitions.push(definition);
     return this;
   }
 
@@ -71,18 +71,17 @@ export class ServiceCollection {
   }
 
   public tryAddEnumerable(definition: ProviderDefinition): boolean {
-    const normalized = applyClassProviderHooksToDefinition(definition);
     for (let index = 0; index < this.definitions.length; index += 1) {
       const current = this.definitions[index] as ProviderDefinition;
       if (
-        current.provider.provide === normalized.provider.provide &&
-        current.key === normalized.key &&
-        sameProviderIdentity(current.provider, normalized.provider)
+        current.provider.provide === definition.provider.provide &&
+        current.key === definition.key &&
+        sameProviderIdentity(current.provider, definition.provider)
       ) {
         return false;
       }
     }
-    this.definitions.push(normalized);
+    this.definitions.push(definition);
     return true;
   }
 

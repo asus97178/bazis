@@ -152,8 +152,8 @@ ProviderDefinition либо undefined. Null, factory, scoped/transient и keyed
 Hooks применяются после configure к снимку коллекции до проверок видимости/deps;
 open generic проходит то же преобразование до публикации. Исходные definitions
 не изменяются. Прямой ServiceCollection поддерживает тот же контракт.
-Существующий `registerClassProviderHook` остаётся явно процессным API совместимости;
-новые независимые композиции используют value-provider. Работа выполняется при
+Процессный `registerClassProviderHook` удалён в 0.96.1: его никто не вызывал,
+а хуки задаются только value-provider в своём контейнере. Работа выполняется при
 сборке/материализации, дополнительных проверок на каждом resolve нет.
 Проверки: `cache.container-isolation.test.ts`, прежние DI/cache регрессии.
 
