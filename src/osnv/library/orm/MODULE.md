@@ -246,7 +246,7 @@ The version 1 results for plain TCP are kept below; they are not evidence for TL
 | --- | --- | --- |
 | Cancelling active SQL | PASS | 8 scope × query/execute combinations, the server confirmed the SQL before cancellation, completion in 395–402 ms |
 | Other cancellation limits on PostgreSQL | PASS | 6 scenarios: callback exit, parent signal, a neighboring query, pre-abort, queue max=1, timeout / afterCommit |
-| Earlier physical scenarios and load | PASS | 44 tests, 800 transactions, 12 000 rows; two ENV_OFF guards were skipped with ENV_ON |
+| Earlier physical scenarios and load | PASS | 44 tests, 800 transactions, 12 000 rows; two guards for the missing opt-in env were skipped because it was set |
 | Unit and types | Results in the report | Checks run through the pinned wrapper with a cleaned live environment |
 
 Exact commands, logs, hashes and final counters:
@@ -372,11 +372,11 @@ Checks: [orm.json-native.test.ts](test/orm.json-native.test.ts) covers reading 1
 [orm.json-native.postgres.live.test.ts](test/orm.json-native.postgres.live.test.ts)
 checks a PostgreSQL entity/projection, INSERT/UPDATE through fresh contexts and the
 immediate operations. The physical test is enabled only with
-`OSNV_ORM_REPEAT_AUDIT_LIVE=1` and `OSNV_PG_URL`: the `orm_audit` database, the address
+`OSNV_ORM_JSON_NATIVE_LIVE=1` and `OSNV_PG_URL`: the `orm_json_native` database, the address
 `127.0.0.1`, a separate explicitly set port other than `5432`. It creates and drops only
-its own random schema. The test's existence and its ENV_OFF skip are not a successful
-physical check; the results of a specific run are recorded separately in the repeated
-audit report.
+its own random schema. The test's existence and its skip without the opt-in env are
+not a successful physical check; the results of a specific run are recorded separately
+in the repeated audit report.
 
 ## 12. UUID v7 keys (2026-10-05)
 
