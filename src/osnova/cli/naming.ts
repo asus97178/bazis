@@ -2,15 +2,17 @@
 export interface ModuleNaming {
   /** CLI input as given (trimmed). */
   readonly input: string;
-  /** Folder under `modules/` — lowercase (`user`, `order-item`). */
+  /** Folder under `modules/` — lowercase as given (`users`, `order-items`). */
   readonly folder: string;
+  /** PascalCase name as given (`Users`, `OrderItems`): module class and file. */
+  readonly module: string;
   /** PascalCase singular entity (`User`, `OrderItem`). */
   readonly entity: string;
   /** HTTP route segment, usually plural (`users`, `order-items`). */
   readonly route: string;
   /** DbContext collection property (`users`, `orderItems`). */
   readonly collection: string;
-  /** `{Entity}Module` class name. */
+  /** `{Module}Module` class name (`UsersModule`). */
   readonly moduleClass: string;
   /** API list base path segment (`/api/users`). */
   readonly apiBasePath: string;
@@ -32,7 +34,10 @@ const PLURAL_TO_SINGULAR: Readonly<Record<string, string>> = Object.freeze(
   Object.fromEntries(Object.entries(SINGULAR_TO_PLURAL).map(([singular, plural]) => [plural, singular])),
 );
 
-/** Converts `user`, `User`, `users` → consistent naming for scaffold. */
+/**
+ * Converts the CLI name into scaffold names. The module keeps the name as given
+ * (`Users` → `UsersModule`, `Users.module.ts`); the CRUD entity is singular (`User`).
+ */
 export function parseModuleName(raw: string): ModuleNaming {
   const input = raw.trim();
   if (input.length === 0) {
@@ -50,21 +55,27 @@ export function parseModuleName(raw: string): ModuleNaming {
     .filter((part) => part.length > 0);
 
   const folder = parts.join("-");
+  const module = pascal(parts);
   const singular = toSingular(parts);
-  const entity = singular.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("");
+  const entity = pascal(singular);
   const route = toRoute(singular);
   const collection = toCamelPlural(singular);
 
   return {
     input,
     folder,
+    module,
     entity,
     route,
     collection,
-    moduleClass: `${entity}Module`,
+    moduleClass: `${module}Module`,
     apiBasePath: `/api/${route}`,
     dbSchema: folder.replace(/-/g, "_"),
   };
+}
+
+function pascal(parts: readonly string[]): string {
+  return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("");
 }
 
 function toSingular(parts: readonly string[]): readonly string[] {

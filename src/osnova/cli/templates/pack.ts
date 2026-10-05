@@ -7,17 +7,16 @@ export function buildPackTemplates(naming: ModuleNaming, partNames: readonly str
   const parts = partNames.map((name) => {
     const part = parseModuleName(name);
     // A part names a responsibility (Tables), not a CRUD entity (Table).
-    const entity = part.folder.split("-").map((word) => word[0]!.toUpperCase() + word.slice(1)).join("");
-    return { ...part, entity, moduleClass: `${entity}Module`, folder: `${part.folder}_module` };
+    return { ...part, entity: part.module, folder: `${part.folder}_module` };
   });
   if (parts.some((part) => part.moduleClass === naming.moduleClass)) {
     throw new Error("A pack and its parts must have distinct module class names.");
   }
   return [
     {
-      relativePath: `${naming.entity}.module.ts`,
+      relativePath: `${naming.module}.module.ts`,
       content: `import { Module } from "osnv/core/di";
-${parts.map((part) => `import { ${part.moduleClass} } from "./${part.folder}/${part.entity}.module";`).join("\n")}
+${parts.map((part) => `import { ${part.moduleClass} } from "./${part.folder}/${part.module}.module";`).join("\n")}
 
 @Module({
   imports: [${parts.map((part) => part.moduleClass).join(", ")}],
@@ -32,7 +31,7 @@ export class ${naming.moduleClass} {}
 
 Версия паспорта: 1.0. Тип: составной.
 Статус: сгенерирован каркас композиции; части ещё не реализованы.
-Точка подключения: [${naming.entity}.module.ts](${naming.entity}.module.ts).
+Точка подключения: [${naming.module}.module.ts](${naming.module}.module.ts).
 До изменения прочитать AGENTS.md и docs/architecture/MODULE_ARCHITECTURE.md.
 
 ## Ответственность и части
@@ -47,8 +46,8 @@ ${parts.map((part) => `| ${part.moduleClass} | Ещё не определены:
 
 ## Каталог и подключение
 
-Корневые файлы: этот паспорт, ${naming.entity}.module.ts.
-${parts.map((part) => `Каталог ${part.folder}: ${part.entity}.module.ts и MODULE.md.`).join("\n")}
+Корневые файлы: этот паспорт, ${naming.module}.module.ts.
+${parts.map((part) => `Каталог ${part.folder}: ${part.module}.module.ts и MODULE.md.`).join("\n")}
 imports: [${parts.map((part) => part.moduleClass).join(", ")}]. exports: [].
 TypeScript-вход — ${naming.moduleClass}; фабрика и входные поля отсутствуют.
 Публичные токены частей при необходимости реэкспортируются корнем явно.

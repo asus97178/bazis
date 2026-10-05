@@ -143,8 +143,9 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
 export function validatePackParts(parts: readonly string[]): void {
   if (parts.length < 2) throw new Error("A pack needs at least two independent parts. Use --parts tables,records.");
   const names = parts.map(parseModuleName);
+  // `records` and `record` are distinct modules but name one entity: reject the confusion.
   if (new Set(names.map((name) => name.folder)).size !== names.length
-    || new Set(names.map((name) => name.moduleClass)).size !== names.length) {
-    throw new Error("Pack parts must have distinct folder and module class names.");
+    || new Set(names.map((name) => name.entity)).size !== names.length) {
+    throw new Error("Pack parts must have distinct names (also in singular form).");
   }
 }
