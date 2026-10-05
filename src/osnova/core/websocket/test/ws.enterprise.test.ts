@@ -192,7 +192,9 @@ live("WebSocket enterprise: real shared delivery store", () => {
       await adapter.initialize({ localPublish() {} });
       await adapter.close();
       expect(f.client.connected).toBe(true); expect(lane.connected).toBe(true);
-      await lane.send("SELECT", ["1"]);
+      // Any logical database other than the one the URL selects (default 0).
+      const current = Number(new URL(url!).pathname.slice(1) || "0");
+      await lane.send("SELECT", [String(current === 1 ? 2 : 1)]);
       const mismatch = new RedisWebSocketAdapter(f.client, { keyPrefix: f.prefix, deliveryClient: lane });
       await expect(mismatch.initialize({ localPublish() {} })).rejects.toThrow("DELIVERY_STORE_MISMATCH");
       expect(await f.client.send("KEYS", [`${f.prefix}:connection-check:*`])).toEqual([]);
