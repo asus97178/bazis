@@ -168,7 +168,7 @@ memory cache, политики, HTTP composer и `cache:memory`; собстве�
 Это локальные сценарии с подставными клиентами, без Redis-сервера.
 Удаление прежних входов проверяет [контракт TypeScript](test/cache.contracts.typecheck.ts),
 а запуск текущего API в бинарнике — [фикстура композиции](../infra/test/fixtures/cache-orm-composition.ts).
-Результаты удаления API: [дополнение к аудиту](../../../../docs/audits/framework-design-2026-10-02/INFRA_CACHE_FIXES.md#удаление-слоя-совместимости-cache).
+Результаты удаления API: [дополнение к аудиту](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-design-2026-10-02/INFRA_CACHE_FIXES.md#удаление-слоя-совместимости-cache).
 
 Регрессии: [cache.architecture-regressions.test.ts](test/cache.architecture-regressions.test.ts),
 [autoCachedProviders.test.ts](test/autoCachedProviders.test.ts), существующие cache-тесты.
@@ -177,4 +177,4 @@ memory cache, политики, HTTP composer и `cache:memory`; собстве�
 Standalone CLI/codegen/source/compiled runtime проверяется в
 [интеграционной проверке](../../cli/test/standalone-runtime.integration.test.ts).
 Фактические результаты и границы — в
-[отчёте исправлений](../../../../docs/audits/framework-architecture-2026-10-02/FIXES.md).
+[отчёте исправлений](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-architecture-2026-10-02/FIXES.md).

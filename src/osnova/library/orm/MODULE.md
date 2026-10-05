@@ -216,7 +216,7 @@ lifecycle не объявляется ограниченным новым transa
 подключения на PostgresProvider и несколько SQL при отмене. Настройки доступа/TLS
 берутся из того же входа, что и рабочее подключение. Новых зависимостей нет;
 квалификация использует тот же код из bun:test и собранного бинарника.
-[Результаты интеграции](../../../../docs/audits/orm-server-cancel-integration-2026-09-14.md).
+[Результаты интеграции](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md).
 
 SQL pg_cancel_backend принимает PID, а не PID+secret из протокола CancelRequest.
 Проверка pg_stat_activity и отправка сигнала не атомарны относительно системного
@@ -233,7 +233,7 @@ SQL pg_cancel_backend принимает PID, а не PID+secret из прото
 чтение подтвердило сохранённую строку; автоматического повтора и callbacks нет.
 Собранный ORM-бинарник проверен из /tmp с plain TCP, TLS unknown и TLS с явно заданным
 statement timeout. Точные результаты и текущий typecheck — в
-[отчёте версии 2](../../../../docs/audits/orm-bun-sql-hardening-2026-09-14.md).
+[отчёте версии 2](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-bun-sql-hardening-2026-09-14.md).
 
 **TLS fast cancellation — FAIL.** Native session.close({timeout:0}) завершилась,
 но PostgreSQL продолжал активный SQL. В строгом бинарном сценарии backend оставался
@@ -252,9 +252,9 @@ statementTimeoutMs=600 подтверждённый rollback занял 641 мс
 | Unit и типы | Результаты в отчёте | Проверки выполняются через закреплённый wrapper с очищенным live-окружением |
 
 Точные команды, логи, хеши и итоговые счётчики:
-[отчёт исправления](../../../../docs/audits/orm-2026-09-14-cancellation-fix.md).
+[отчёт исправления](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-cancellation-fix.md).
 Нативный `Bun.SQL Query.cancel()` остаётся отдельным непройденным upstream gate:
-[предыдущая квалификация](../../../../docs/audits/orm-2026-09-14-qualification.md).
+[предыдущая квалификация](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-qualification.md).
 Изменение не обновляет toolchain и не утверждает исправление самого Bun.
 
 ## 8. Типизированные условия (DX, 2026-10-02)

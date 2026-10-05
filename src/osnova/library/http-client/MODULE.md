@@ -75,10 +75,10 @@ TypeScript-экспорты остаются в `index.ts`; добавлены `
 ## 6. Проверки и готовность
 
 Текущие исправления и повторная квалификация без клиентского приложения:
-[HTTP-E01–E05](../../../../docs/audits/2026-09-14-http-enterprise-fixes/REPORT.md).
+[HTTP-E01–E05](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-enterprise-fixes/REPORT.md).
 Ниже сохранена история предыдущих проверок; её счётчики не относятся к текущему снимку.
 
-Дополнение квалификации: [подключение Admin UI, браузеры, Node и нагрузка](../../../../docs/audits/2026-09-14-http-qualification/REPORT.md).
+Дополнение квалификации: [подключение Admin UI, браузеры, Node и нагрузка](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-qualification/REPORT.md).
 Причина отмены определяется также по фактическому AbortSignal: WebKit может
 отклонить Fetch/чтение тела с TypeError при истечении timeout. Это по-прежнему
 `ETIMEDOUT`; явная отмена вызывающим кодом имеет приоритет `ERR_CANCELED`.
@@ -88,7 +88,7 @@ TypeScript-экспорты остаются в `index.ts`; добавлены `
 Vue не становится зависимостью библиотеки. Исторический Angular interceptor
 удалён параллельной миграцией UI. Результаты ниже относятся к прежнему снимку.
 
-Текущие результаты: [согласованный режим и проверки](../../../../docs/audits/2026-09-14-http-redirects/REPORT.md) — 274 Bun-теста, 28 согласованных и 22 штатных сценария Chromium, TypeScript PASS. История: [исходные исправления](../../../../docs/audits/2026-09-13-http/REMEDIATION.md), [проверка совместимости](../../../../docs/audits/2026-09-13-http/COMPATIBILITY.md). Проверяются методы/тела, cookies, Authorization, отсутствие утечки, Worker, лимиты, malformed metadata и ошибки HTTP. Полноценная проверка Node и других браузеров в эту работу не входит.
+Текущие результаты: [согласованный режим и проверки](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-http-redirects/REPORT.md) — 274 Bun-теста, 28 согласованных и 22 штатных сценария Chromium, TypeScript PASS. История: [исходные исправления](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-13-http/REMEDIATION.md), [проверка совместимости](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-13-http/COMPATIBILITY.md). Проверяются методы/тела, cookies, Authorization, отсутствие утечки, Worker, лимиты, malformed metadata и ошибки HTTP. Полноценная проверка Node и других браузеров в эту работу не входит.
 
 Нормативное основание браузерного ограничения: [Fetch: opaque redirect](https://fetch.spec.whatwg.org/#concept-filtered-response-opaque-redirect), [HTTP redirect fetch](https://fetch.spec.whatwg.org/#http-redirect-fetch). Архитектурных исключений и изменений DI API нет.
 

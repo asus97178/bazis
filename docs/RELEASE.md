@@ -143,14 +143,14 @@ replace(table: string, input: ReplaceValidatorsRequest) { /* ... */ }
 Физическая проверка выполняется одной командой на одноразовом PostgreSQL 17 с TLS:
 
 ```sh
-python3 ops/live-postgres/runner.py docs/audits/<имя-прогона>
+python3 ops/live-postgres/runner.py <каталог-вне-репозитория>/<имя-прогона>
 ```
 
 Runner прогоняет полный набор и каждый гейтированный live-набор в своей базе,
 проверяет отсутствие сессий и удаляет контейнер. Нативная отмена Bun.SQL
 отмечается как известный внешний дефект и не считается PASS. Redis-наборы
 требуют надёжной конфигурации сервера (`appendonly yes`, `appendfsync always`,
-`maxmemory-policy noeviction`). Результаты: [отчёт](audits/release-0.95-live-postgres-2026-10-04/REPORT.md).
+`maxmemory-policy noeviction`). Результаты: [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/release-0.95-live-postgres-2026-10-04/REPORT.md).
 
 Изменения поведения:
 

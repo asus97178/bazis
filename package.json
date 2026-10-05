@@ -21,7 +21,7 @@
     "admin:token": "OSNV_ENV=development bun run src/app/modules/auth/AdminToken.cli.ts",
     "agent:run": "bun run src/app/modules/agent-chat/client/AgentRun.cli.ts",
     "pretest": "bun run scripts/bun-toolchain-check.ts && bun run di:generate --target all",
-    "test": "bun run scripts/bun-toolchain-check.ts && bun test --isolate --path-ignore-patterns='**/*.browser.spec.ts' --path-ignore-patterns='**/docs/audits/**' --path-ignore-patterns='**/bin/**' --path-ignore-patterns='examples/**'",
+    "test": "bun run scripts/bun-toolchain-check.ts && bun test --isolate --path-ignore-patterns='**/*.browser.spec.ts' --path-ignore-patterns='**/bin/**' --path-ignore-patterns='examples/**'",
     "ci": "bun run scripts/ci.ts",
     "package:check": "bun run scripts/package-check.ts",
     "prebuild:bin": "bun run di:generate",

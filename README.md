@@ -123,12 +123,12 @@ Health выполняет до четырёх checks одновременно: d
 5 секунд на отчёт. Тайм-аут означает unhealthy и передаёт AbortSignal.
 Контракты и ограничения драйверов: [Infra](src/osnova/core/infra/MODULE.md).
 
-Результаты исправлений: [план работ](docs/audits/2026-09-14-infra-config/WORK_PLAN.md)
-и [исходный аудит](docs/audits/2026-09-14-infra-config/AUDIT.md).
+Результаты исправлений: [план работ](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config/WORK_PLAN.md)
+и [исходный аудит](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config/AUDIT.md).
 
-Эксплуатация Infra/Config: [runbook](docs/audits/2026-09-14-infra-config-acceptance/RUNBOOK.md)
-и [результат локальной приёмки](docs/audits/2026-09-14-infra-config-acceptance/RESULT.md).
-Проверка [полного бинарника, восстановления приложения и длительной нагрузки](docs/audits/2026-09-14-infra-config-operations/RESULT.md) содержит актуальные результаты и границы production-готовности.
+Эксплуатация Infra/Config: [runbook](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/RUNBOOK.md)
+и [результат локальной приёмки](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/RESULT.md).
+Проверка [полного бинарника, восстановления приложения и длительной нагрузки](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-operations/RESULT.md) содержит актуальные результаты и границы production-готовности.
 При остановке raw PostgreSQL ожидает завершения запросов не более 1000 мс
 по умолчанию; свой предел задаётся через `postgres(config, { shutdownTimeoutMs })`.
 
@@ -139,7 +139,7 @@ Health выполняет до четырёх checks одновременно: d
 ```sh
 ./scripts/osnova-bun --no-env-file run ci
 # С квалификацией на одноразовом PostgreSQL 17 (нужен Docker):
-./scripts/osnova-bun --no-env-file run ci -- --live docs/audits/<имя-прогона>
+./scripts/osnova-bun --no-env-file run ci -- --live <каталог-вне-репозитория>/<имя-прогона>
 ```
 
 [scripts/ci.ts](scripts/ci.ts) последовательно выполняет toolchain-проверку,

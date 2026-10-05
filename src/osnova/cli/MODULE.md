@@ -265,7 +265,7 @@ TypeScript-проверка CLI и его тестов с публичными �
 full-scan codegen — 10/10 PASS. Для full-scan понадобился test timeout 30000 ms:
 один процесс генерации превысил исходный лимит 5000 ms; исходный отказ не считается
 успехом. Унаследованные DTO и существующий Product UiProfile также проверены.
-Полные команды и свидетельства — в [отчёте Agents](../../../docs/audits/agents-module-2026-09-20.md).
+Полные команды и свидетельства — в [отчёте Agents](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agents-module-2026-09-20.md).
 
 ### Доработка удобства API, 2026-10-03
 
@@ -274,8 +274,7 @@ full-scan codegen — 10/10 PASS. Для full-scan понадобился test t
 отдельный повтор этих трёх тестов с тем же лимитом 30000 ms: 3 PASS / 0 FAIL.
 TypeScript всего проекта и codegen production/test — PASS. Для двух full-scan
 тестов, запускающих компилятор, установлен явный лимит 30000 ms вместо 5000 ms;
-проверяемые условия сохранены. Архивные копии тестов в docs/audits исключены из
-стандартной команды test вместе с прежним исключением browser specs.
+проверяемые условия сохранены. Стандартная команда test исключает browser specs.
 
 [standalone-runtime.integration.test.ts](test/standalone-runtime.integration.test.ts)
 собирает CLI, создаёт проект со снимком vendor, переносит его, генерирует модуль,

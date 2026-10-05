@@ -4,7 +4,7 @@
 Компонент существующего kernel; новый архитектурный модуль не создаётся.
 
 Изоляция представлений каждого kernel, сервисов и коннекторов реализована и
-проверена: [отчёт](../../../../../docs/audits/kernel-config-isolation-2026-09-14.md).
+проверена: [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
 
 `defineConfig` возвращает неизменяемое объявление `ConfigDefinition<T>`.
 Поля `default`, `development`, `test`, `production` сохраняются. Дополнения:

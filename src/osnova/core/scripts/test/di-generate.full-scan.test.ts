@@ -74,7 +74,7 @@ test("normal test lifecycle generates every target while build stays production-
   const manifest = await Bun.file("package.json").json() as { scripts: Record<string, string> };
   expect(manifest.scripts.pretest).toBe("bun run scripts/bun-toolchain-check.ts && bun run di:generate --target all");
   expect(manifest.scripts.test).toBe(
-    "bun run scripts/bun-toolchain-check.ts && bun test --isolate --path-ignore-patterns='**/*.browser.spec.ts' --path-ignore-patterns='**/docs/audits/**' --path-ignore-patterns='**/bin/**' --path-ignore-patterns='examples/**'",
+    "bun run scripts/bun-toolchain-check.ts && bun test --isolate --path-ignore-patterns='**/*.browser.spec.ts' --path-ignore-patterns='**/bin/**' --path-ignore-patterns='examples/**'",
   );
   expect(manifest.scripts.prebuild).toBe("bun run di:generate");
   expect(manifest.scripts["prebuild:bin"]).toBe("bun run di:generate");
