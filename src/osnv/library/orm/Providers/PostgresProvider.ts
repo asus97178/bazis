@@ -45,23 +45,23 @@ import { failure, registerPostgresOwnedStoreCapability, type OwnedStoreCreateOpe
 import type { OwnedStoreRegistrySnapshotV1 } from "../Schema/OwnedStoreCatalog";
 import type { OrmCatalogScopeV1 } from "../Schema/OrmOwnedStore";
 
-/** Нативная форма `sql.listen` Bun (PR oven-sh/bun#32089). */
+/** Native Bun `sql.listen` shape (PR oven-sh/bun#32089). */
 type BunListen = (
   channel: string,
   handler: (payload: string) => void | Promise<void>,
 ) => Promise<{ unlisten?: () => Promise<void> | void } | void>;
 
-/** Минимальная форма результата запроса Bun SQL (массив строк + метаданные). */
+/** Minimal Bun SQL query result shape (an array of rows + metadata). */
 type BunSqlResult = Row[] & { affectedRows?: number; count?: number };
 
-/** Поверхность Bun SQL, которую использует провайдер (общая для пула и транзакции). */
+/** The Bun SQL surface the provider uses (shared by the pool and transactions). */
 interface SqlLike {
   unsafe(query: string, values?: readonly unknown[]): Promise<BunSqlResult>;
   close?(options?: { timeout?: number }): Promise<void>;
 }
 type CancellableSqlQuery = Promise<BunSqlResult> & { cancel?: () => unknown };
 
-/** Зарезервированное соединение Bun SQL (для session-level advisory lock). */
+/** A reserved Bun SQL connection (for a session-level advisory lock). */
 interface ReservedSqlLike extends SqlLike {
   release(): void | Promise<void>;
 }
@@ -115,9 +115,9 @@ type InternalSchemaAdmissionScope = SchemaAdmissionScope & {
 };
 
 /**
- * Ключ advisory-блокировки миграций (произвольная константа bigint). Все
- * инстансы приложения используют один ключ, поэтому конкурентный `migrate()`
- * сериализуется на стороне PostgreSQL.
+ * Advisory lock key for migrations (an arbitrary bigint constant). All
+ * application instances use the same key, so concurrent `migrate()` calls are
+ * serialized by PostgreSQL.
  */
 const MIGRATION_ADVISORY_LOCK_KEY = 0x6f_73_6e_76; // "osnv"
 const ADMISSION_LOCK_DOMAIN = "osnv.orm.ensure-created/schema-lock/v1\0";
@@ -167,11 +167,11 @@ export interface PostgresProviderOptions {
   readonly serverTimeouts?: PostgresServerTimeouts;
   /** Completion telemetry contains no SQL, parameters, credentials or error messages. */
   readonly onOperation?: (event: PostgresOperationEvent) => void;
-  /** Строка подключения, напр. `postgres://user:pass@localhost:5432/db`. */
+  /** Connection string, e.g. `postgres://user:pass@localhost:5432/db`. */
   readonly url?: string;
-  /** Опции Bun SQL (host/port/user/password/database/max/idleTimeout/...). */
+  /** Bun SQL options (host/port/user/password/database/max/idleTimeout/...). */
   readonly options?: Record<string, unknown>;
-  /** Колбэк трассировки SQL — для логгирования/метрик. */
+  /** SQL trace callback, for logging/metrics. */
   readonly onSql?: (sql: string, params: readonly SqlParam[]) => void;
   /**
    * SQL trace params are redacted by default. Pass false only for trusted local
@@ -183,13 +183,13 @@ export interface PostgresProviderOptions {
 }
 
 /**
- * Провайдер PostgreSQL поверх нативного Bun `SQL` — без внешних зависимостей
- * (драйвер встроен в Bun).
+ * PostgreSQL provider on top of the native Bun `SQL`, with no external
+ * dependencies (the driver is built into Bun).
  *
- * Все запросы параметризованы через `unsafe(sql, params)` с плейсхолдерами
- * `$1, $2, ...`. Транзакция резервирует выделенное соединение из пула через
- * `sql.begin`, поэтому в `transaction()` запросы идут через scoped-executor —
- * это безопасно при конкурентных scoped-контекстах (по одному на запрос).
+ * All queries are parameterized through `unsafe(sql, params)` with `$1, $2, ...`
+ * placeholders. A transaction reserves a dedicated pool connection through
+ * `sql.begin`, so inside `transaction()` queries go through a scoped executor;
+ * this is safe with concurrent scoped contexts (one per request).
  */
 export class PostgresProvider implements DatabaseProvider {
   readonly name = "postgres";
@@ -233,7 +233,7 @@ export class PostgresProvider implements DatabaseProvider {
   private readonly redactSqlParams: boolean;
   private readonly onWarning?: (warning: DatabaseProviderDiagnostic) => void;
   private migrationLockFallbackWarned = false;
-  /** Окружающая транзакция текущего async-контекста (для join-семантики). */
+  /** Ambient transaction of the current async context (for join semantics). */
   private readonly ambient = new AsyncLocalStorage<AmbientTransaction>();
   private readonly transactionCallbacks = new AsyncLocalStorage<TransactionCallbackScope>();
   /** Session reserved by an advisory lock; transactions reuse it to avoid pool starvation. */
@@ -315,8 +315,8 @@ export class PostgresProvider implements DatabaseProvider {
   }
 
   transaction<T>(work: (tx: DbExecutor) => Promise<T>): Promise<T> {
-    // Вложенный вызов присоединяется к окружающей транзакции (то же
-    // зарезервированное соединение) — семантика "Required".
+    // A nested call joins the ambient transaction (the same reserved
+    // connection): "Required" semantics.
     const ambient = this.ambient.getStore();
     if (ambient) {
       const callbacks = this.transactionCallbacks.getStore();
@@ -334,8 +334,8 @@ export class PostgresProvider implements DatabaseProvider {
     }
     const reserve = this.reserveConnection;
     if (reserve) return this.transactionOnOwnedReservedSession(reserve, work);
-    // begin резервирует соединение из пула и передаёт scoped sql; ROLLBACK при
-    // ошибке выполняется автоматически. Конкурентные транзакции безопасны (пул).
+    // begin reserves a pool connection and passes a scoped sql; ROLLBACK on
+    // error is automatic. Concurrent transactions are safe (pool).
     const callbacks = createTransactionCallbackScope();
     let workCompleted = false;
     const transaction = this.sql.begin((scoped: SqlLike) => {
@@ -571,18 +571,18 @@ export class PostgresProvider implements DatabaseProvider {
   }
 
   /**
-   * Шлёт уведомление через `pg_notify` (обычный пул — активный listener не
-   * нужен). Работает на любой версии Bun.
+   * Sends a notification through `pg_notify` (the regular pool; no active
+   * listener needed). Works on any Bun version.
    */
   async notify(channel: string, payload?: string): Promise<void> {
     await this.query("SELECT pg_notify($1, $2)", [channel, payload ?? ""]);
   }
 
   /**
-   * Подписка на канал через нативный `sql.listen` Bun (если доступен в рантайме).
-   * Bun сам держит выделенное соединение и переподключается с backoff. Если
-   * рантайм ещё без `listen` — бросаем понятную ошибку, и подписчик уходит в
-   * поллинг.
+   * Subscribes to a channel through the native Bun `sql.listen` (if the runtime
+   * has it). Bun keeps a dedicated connection and reconnects with backoff. If the
+   * runtime has no `listen` yet, a clear error is thrown and the subscriber falls
+   * back to polling.
    */
   async listen(channel: string, handler: (payload: string) => void | Promise<void>): Promise<NotificationSubscription> {
     const native = (this.sql as unknown as { listen?: BunListen }).listen;
@@ -1488,7 +1488,7 @@ export class PostgresProvider implements DatabaseProvider {
   }
 }
 
-/** Значение-соединение PostgreSQL для `ormModule({ provider: postgres(...) })`. */
+/** PostgreSQL connection value for `ormModule({ provider: postgres(...) })`. */
 export function postgres(options: PostgresProviderOptions = {}): PostgresProvider {
   return new PostgresProvider(options);
 }

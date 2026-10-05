@@ -10,7 +10,7 @@ import { executeImmediateDelete, executeImmediateUpdate, type OrmMutationResultV
 
 export interface ForUpdateOptionsV1 { readonly skipLocked?: boolean; }
 
-/** Тип элемента навигации: `Post[]` -> `Post`, `User | undefined` -> `User`. */
+/** Navigation element type: `Post[]` -> `Post`, `User | undefined` -> `User`. */
 export type NavigationElement<N> = N extends readonly (infer E)[] ? E : NonNullable<N>;
 function captureNavigation<T>(selector: (entity: T) => unknown): string {
   let captured = "";
@@ -30,7 +30,7 @@ function captureNavigation<T>(selector: (entity: T) => unknown): string {
   return captured;
 }
 
-/** Захватывает проекцию `.select(u => ({ alias: u.prop }))`. */
+/** Captures the `.select(u => ({ alias: u.prop }))` projection. */
 function captureProjection<T, R extends Record<string, unknown>>(
   selector: (entity: T) => R,
 ): { readonly alias: string; readonly property: string }[] {
@@ -47,9 +47,9 @@ function captureProjection<T, R extends Record<string, unknown>>(
 }
 
 /**
- * Иммутабельный LINQ-подобный запрос к одной сущности. Каждый шаг
- * (where/orderBy/take/skip/asNoTracking) возвращает новый `EntityQuery` с
- * расширенным планом; терминальные методы (toList/first/count/...) выполняют SQL.
+ * Immutable LINQ-like query over one entity. Each step
+ * (where/orderBy/take/skip/asNoTracking) returns a new `EntityQuery` with an
+ * extended plan; terminal methods (toList/first/count/...) run the SQL.
  */
 export class EntityQuery<T extends object, TResult = T> {
   constructor(
@@ -62,7 +62,7 @@ export class EntityQuery<T extends object, TResult = T> {
     return new EntityQuery<T, TResult>(this.model, this.runtime, plan);
   }
 
-  /** Фильтр. Несколько вызовов комбинируются через AND. */
+  /** Filter. Several calls are combined with AND. */
   where(predicate: PredicateFn<T>): EntityQuery<T, TResult> {
     const result = predicate(fieldSelector<T>());
     return this.derive(withCondition(this.plan, result.node));
@@ -85,12 +85,12 @@ export class EntityQuery<T extends object, TResult = T> {
     return this.derive({ ...this.plan, offset: Math.max(0, Math.trunc(count)) });
   }
 
-  /** Read-only: результат не отслеживается ChangeTracker'ом (быстрее). */
+  /** Read-only: the result is not tracked by the ChangeTracker (faster). */
   asNoTracking(): EntityQuery<T, TResult> {
     return this.derive({ ...this.plan, noTracking: true });
   }
 
-  /** Не применять глобальные `@QueryFilter` и soft-delete фильтр. */
+  /** Do not apply global `@QueryFilter`s and the soft-delete filter. */
   ignoreQueryFilters(): EntityQuery<T, TResult> {
     return this.derive({ ...this.plan, ignoreQueryFilters: true });
   }
@@ -105,7 +105,7 @@ export class EntityQuery<T extends object, TResult = T> {
   }
 
   /**
-   * Проекция колонок в plain-объект (без материализации полной сущности).
+   * Projects columns into a plain object (without materializing the full entity).
    *
    * ```ts
    * await ctx.users.select(u => ({ name: u.name, age: u.age })).toList();
@@ -117,8 +117,8 @@ export class EntityQuery<T extends object, TResult = T> {
   }
 
   /**
-   * Жадная загрузка навигации (split-запрос). Цепочкой `.thenInclude(...)`
-   * можно догрузить вложенные навигации.
+   * Eager loading of a navigation (split query). Chain `.thenInclude(...)`
+   * to load nested navigations.
    *
    * ```ts
    * ctx.users.include((u) => u.posts).thenInclude((p) => p.comments).toList();
@@ -142,7 +142,7 @@ export class EntityQuery<T extends object, TResult = T> {
     for (let i = 0; i < rows.length; i += 1) {
       let entity = materialize<T>(this.model, rows[i]!, this.runtime.provider.dialect);
       if (!this.plan.noTracking) {
-        // trackLoaded возвращает канонический инстанс (identity resolution).
+        // trackLoaded returns the canonical instance (identity resolution).
         entity = this.plan.rowLock
           ? this.runtime.tracker.trackReloaded(entity, this.model) as T
           : this.runtime.tracker.trackLoaded(entity, this.model) as T;
@@ -155,14 +155,14 @@ export class EntityQuery<T extends object, TResult = T> {
     return result as unknown as TResult[];
   }
 
-  /** Первый элемент или null. */
+  /** The first element or null. */
   async firstOrDefault(predicate?: PredicateFn<T>): Promise<TResult | null> {
     const query = predicate ? this.where(predicate) : this;
     const rows = await query.take(1).toList();
     return rows.length > 0 ? rows[0]! : null;
   }
 
-  /** Первый элемент или ошибка, если ничего не найдено. */
+  /** The first element, or an error if nothing is found. */
   async first(predicate?: PredicateFn<T>): Promise<TResult> {
     const result = await this.firstOrDefault(predicate);
     if (result === null) {
@@ -201,8 +201,8 @@ function assertSkipLocked(model: EntityModel, runtime: DbContextRuntime, plan: Q
 }
 
 /**
- * Запрос с активной цепочкой Include: `thenInclude` догружает навигацию
- * последней включённой сущности (`TLast`).
+ * Query with an active Include chain: `thenInclude` loads a navigation of the
+ * last included entity (`TLast`).
  */
 export class IncludableQuery<T extends object, TLast> extends EntityQuery<T> {
   thenInclude<N>(selector: (entity: TLast) => N): IncludableQuery<T, NavigationElement<N>> {
@@ -217,7 +217,7 @@ export class IncludableQuery<T extends object, TLast> extends EntityQuery<T> {
   }
 }
 
-/** Запрос с проекцией `.select(...)` — `toList()` возвращает plain-объекты. */
+/** Query with a `.select(...)` projection: `toList()` returns plain objects. */
 export class ProjectedQuery<T extends object, R> extends EntityQuery<T, R> {
   protected override derive(plan: QueryPlan): ProjectedQuery<T, R> {
     return new ProjectedQuery<T, R>(this.model, this.runtime, plan);

@@ -1,10 +1,10 @@
 import { registerRequestModelClass, type RequestModelClass } from "./requestModelRegistry";
 
 /**
- * Помечает класс как request-модель (DTO), адресуемую по имени.
+ * Marks a class as a request model (DTO) addressable by name.
  *
- * Совместимость для DTO вне сканируемых исходников и старого runtime-реестра.
- * Штатный codegen регистрирует DTO из сигнатур автоматически:
+ * Needed only for DTOs declared outside the scanned sources (for example in
+ * another package). Codegen registers all other DTOs from method signatures:
  *
  * ```ts
  * @RequestModel()
@@ -13,12 +13,12 @@ import { registerRequestModelClass, type RequestModelClass } from "./requestMode
  *   name!: string;
  * }
  *
- * // В контроллере достаточно типа параметра:
+ * // In the controller the parameter type is enough:
  * @Post()
  * create(dto: CreateUserDto) { ... }
  * ```
  *
- * Для DTO в исходниках приложения декоратор не требуется.
+ * DTOs in the application sources do not need the decorator.
  */
 export function RequestModel() {
   return (value: RequestModelClass, _context: ClassDecoratorContext): void => {

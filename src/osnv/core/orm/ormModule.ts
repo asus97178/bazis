@@ -23,52 +23,51 @@ type EntityClass = new () => object;
 type ContextClass<TContext extends DbContext> = new (options: DbContextOptions) => TContext;
 
 /**
- * Единая форма регистрации ORM. Одна функция — три сценария по тому, какие
- * поля переданы:
+ * The single ORM registration shape. One function, three scenarios depending
+ * on which fields are passed:
  *
- * - **Соединение** (`{ provider }`, без `context`) — глобальный модуль, который
- *   публикует общий {@link DATABASE_PROVIDER}. Создаётся один раз в корне.
- * - **Feature** (`{ context, entities }`, без `provider`) — контекст и его
- *   репозитории, подключённые к общему {@link DATABASE_PROVIDER}.
- * - **Standalone** (`{ context, entities, provider }`) — контекст с собственным
- *   провайдером (тесты, изолированные модули).
+ * - **Connection** (`{ provider }`, no `context`): a global module that
+ *   publishes the shared {@link DATABASE_PROVIDER}. Created once at the root.
+ * - **Feature** (`{ context, entities }`, no `provider`): a context and its
+ *   repositories connected to the shared {@link DATABASE_PROVIDER}.
+ * - **Standalone** (`{ context, entities, provider }`): a context with its own
+ *   provider (tests, isolated modules).
  *
- * Провайдер — это значение (`postgres(...)`), как infra-коннектор
- * в кэше: инфраструктура конфигурируется значением, а не вложенным модулем.
+ * The provider is a value (the ORM `postgres(...)`), not a nested module.
  */
 export interface OrmModuleConfig<TContext extends DbContext> {
-  /** Класс контекста (наследник DbContext). Опускается в режиме «соединение». */
+  /** Context class (a DbContext subclass). Omitted in the "connection" mode. */
   readonly context?: ContextClass<TContext>;
-  /** Сущности, замапленные этим контекстом. */
+  /** Entities mapped by this context. */
   readonly entities?: readonly EntityClass[];
   /**
-   * Провайдер-значение БД (`postgres(...)`). Без него контекст
-   * подключается к общему {@link DATABASE_PROVIDER} (feature-режим).
+   * Database provider value (`postgres(...)`). Without it the context connects
+   * to the shared {@link DATABASE_PROVIDER} (feature mode).
    */
   readonly provider?: DatabaseProvider;
-  /** Валидировать сущности перед SaveChanges (по умолчанию true). */
+  /** Validate entities before SaveChanges (default true). */
   readonly validateOnSave?: boolean;
-  /** Создавать схему на старте (`CREATE TABLE IF NOT EXISTS`). По умолчанию false. */
+  /** Create the schema at start (`CREATE TABLE IF NOT EXISTS`). Default false. */
   readonly ensureCreated?: boolean;
   /**
-   * Запускать аддитивную авто-миграцию на старте для всех сущностей контекста.
-   * Режим создания схемы задаёт только модуль. По умолчанию false.
+   * Run the additive auto-migration at start for all context entities.
+   * Only the module decides how the schema is created. Default false.
    */
   readonly migrateOnStart?: boolean;
-  /** Версионированные миграции (compile-safe массив). История в `__OsnvMigrations`. */
+  /** Versioned migrations (a compile-safe array). History is kept in `__OsnvMigrations`. */
   readonly migrations?: readonly Migration[];
-  /** Запускать `migrateVersioned` на старте (по умолчанию false). */
+  /** Run `migrateVersioned` at start (default false). */
   readonly runMigrationsOnStart?: boolean;
-  /** Повторы при transient-ошибках БД в SaveChanges. */
+  /** Retries on transient database errors in SaveChanges. */
   readonly executionStrategy?: DbContextOptionsConfig["executionStrategy"];
   /**
-   * Регистрировать health-check соединения. По умолчанию: включён для режимов
-   * «соединение» и «standalone», выключен для feature (его включает корень).
+   * Register the connection health check. Default: on for the "connection" and
+   * "standalone" modes, off for feature (the root turns it on).
    */
   readonly healthCheck?: boolean;
-  /** Регистрировать scoped `IRepository<T>` для сущностей (по умолчанию true). */
+  /** Register scoped `IRepository<T>` for the entities (default true). */
   readonly registerRepositories?: boolean;
-  /** Модули с зависимостями контекста. */
+  /** Modules holding the context's dependencies. */
   readonly imports?: readonly OsnvModuleRef[];
   /** Approved owned PostgreSQL store descriptor; admission is owned by the core lifecycle. */
   readonly ownedStore?: import("../../library/orm").OrmOwnedStoreDefinitionV1;
@@ -108,7 +107,7 @@ function defineConnectionModule(provider: DatabaseProvider, healthCheck: boolean
   return { global: true, providers, exports: [DATABASE_PROVIDER] };
 }
 
-/** Единая точка регистрации ORM (см. {@link OrmModuleConfig}). */
+/** Single ORM registration entry point (see {@link OrmModuleConfig}). */
 export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TContext>): OsnvModuleRef {
   if (config.ownedStore !== undefined) {
     if (!config.context || !config.entities || config.entities.length === 0 || config.provider || config.ensureCreated || config.migrateOnStart || config.runMigrationsOnStart || config.migrations !== undefined) {
@@ -124,7 +123,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
   }
   if (config.ensureCreated && (config.migrateOnStart || config.runMigrationsOnStart || (config.migrations?.length ?? 0) > 0)) throw new OrmError("ensureCreated is mutually exclusive with ORM migration startup options.");
   if (config.ensureCreated && config.provider?.name === "postgres" && config.context) throw new OrmError("PostgreSQL ensureCreated requires the shared DATABASE_PROVIDER from @Infra.");
-  // Режим «соединение»: только провайдер, без контекста.
+  // "Connection" mode: a provider only, no context.
   if (!config.context) {
     if (!config.provider) {
       throw new OrmError("ormModule requires a `provider` (connection) and/or a `context` (feature).");
@@ -134,7 +133,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
 
   const buildConfig = config as OrmBuildConfig<TContext>;
 
-  // Standalone: контекст со своим провайдером-значением.
+  // Standalone: a context with its own provider value.
   if (config.provider) {
     // Pre-D standalone construction eagerly captured only DbContextOptions.
     // Lifecycle flags and migrations deliberately stayed resolve-time until an
@@ -155,7 +154,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
     return module;
   }
 
-  // Feature: контекст на общем DATABASE_PROVIDER.
+  // Feature: a context on the shared DATABASE_PROVIDER.
   // The source config remains the ordinary-only compatibility path. When an
   // owned store is present in this container, the graph compiler snapshots it
   // once and the factories below resolve that same opaque registration view.

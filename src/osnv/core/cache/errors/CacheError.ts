@@ -1,4 +1,4 @@
-/** Базовая ошибка модуля кэша. */
+/** Base error of the cache module. */
 export class CacheError extends Error {
   public constructor(message: string) {
     super(message);
@@ -6,11 +6,11 @@ export class CacheError extends Error {
   }
 }
 
-/** Некорректный ключ кэша (тип, длина, запрещённое имя). */
+/** Invalid cache key (type, length, forbidden name). */
 export class CacheKeyError extends CacheError {}
 
-/** Некорректное значение (превышен лимит размера и т.п.). */
+/** Invalid value (size limit exceeded and the like). */
 export class CacheValueError extends CacheError {}
 
-/** Лимит незавершённых factory исчерпан; новая factory не запускалась. */
+/** The limit of unfinished factories is exhausted; the new factory was not started. */
 export class CacheCapacityError extends CacheError {}

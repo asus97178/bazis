@@ -1,19 +1,19 @@
 import type { FilterOperator, ListQueryOptions, PageOptions } from "./types";
 
-// Полифилл: Bun исполняет TC39-декораторы нативно, но Symbol.metadata может
-// отсутствовать в рантайме. Symbol.for даёт общий символ для всех копий модуля.
+// Polyfill: Bun runs TC39 decorators natively, but Symbol.metadata may be
+// missing at runtime. Symbol.for gives one shared symbol for all module copies.
 (Symbol as { metadata?: symbol }).metadata ??= Symbol.for("Symbol.metadata");
 
-/** Ключ, под которым схема list-запроса лежит в метаданных класса. */
+/** Key under which the list-request schema is stored in the class metadata. */
 const LIST_SCHEMA = Symbol.for("osnv:listing:schema");
 
-/** Разрешения одного поля: можно ли сортировать и какими операторами фильтровать. */
+/** Permissions of one field: whether it is sortable and which filter operators are allowed. */
 export interface FieldSchema {
   sortable: boolean;
   readonly filterOps: FilterOperator[];
 }
 
-/** Схема класса-запроса целиком (поля + лимиты пагинации + разрешённые include). */
+/** The whole request-class schema (fields + paging limits + allowed includes). */
 export interface ListSchema {
   readonly fields: Record<string, FieldSchema>;
   page?: PageOptions;
@@ -24,20 +24,20 @@ interface SchemaMetadata {
   [LIST_SCHEMA]?: ListSchema;
 }
 
-/** Параметры декоратора {@link ListOptions} (на уровне класса). */
+/** Parameters of the {@link ListOptions} decorator (class level). */
 export interface ListOptionsConfig {
-  /** Размер страницы по умолчанию. */
+  /** Default page size. */
   readonly defaultSize?: number;
-  /** Максимально допустимый размер страницы. */
+  /** Maximum allowed page size. */
   readonly maxSize?: number;
-  /** Разрешённые пути include (`?include=`). */
+  /** Allowed include paths (`?include=`). */
   readonly include?: readonly string[];
 }
 
 /**
- * Метаданные TC39-декораторов наследуются прототипно: метадата подкласса имеет
- * прототипом метадату родителя. При первой записи в конкретный класс делаем
- * copy-on-write, чтобы не мутировать схему родителя.
+ * TC39 decorator metadata is inherited prototypically: a subclass's metadata
+ * has the parent's metadata as its prototype. On the first write to a concrete
+ * class we copy on write so the parent schema is not mutated.
  */
 function ensureOwnSchema(metadata: SchemaMetadata): ListSchema {
   if (!Object.prototype.hasOwnProperty.call(metadata, LIST_SCHEMA)) {
@@ -71,7 +71,7 @@ function assertInstanceField(context: ClassFieldDecoratorContext, decorator: str
 }
 
 /**
- * Разрешает сортировку по полю (`?sort=field` / `?sort=-field`).
+ * Allows sorting by the field (`?sort=field` / `?sort=-field`).
  *
  * ```ts
  * class UserListQuery extends ListRequest<User> {
@@ -87,7 +87,7 @@ export function Sortable() {
 }
 
 /**
- * Разрешает фильтрацию по полю перечисленными операторами
+ * Allows filtering by the field with the listed operators
  * (`?filter[field][op]=value`).
  *
  * ```ts
@@ -110,7 +110,7 @@ export function Filterable(...operators: FilterOperator[]) {
 }
 
 /**
- * Лимиты пагинации и разрешённые include для класса-запроса.
+ * Paging limits and allowed includes for a request class.
  *
  * ```ts
  * @ListOptions({ defaultSize: 20, maxSize: 100, include: ["posts"] })
@@ -127,7 +127,7 @@ export function ListOptions(config: ListOptionsConfig) {
   };
 }
 
-/** Схема класса-запроса (включая унаследованную) или `undefined`. */
+/** Schema of a request class (including the inherited one), or `undefined`. */
 export function listSchemaOf(ctor: unknown): ListSchema | undefined {
   if (typeof ctor !== "function") {
     return undefined;
@@ -139,8 +139,8 @@ export function listSchemaOf(ctor: unknown): ListSchema | undefined {
 }
 
 /**
- * Собирает {@link ListQueryOptions} (белый список для {@link parseListQuery})
- * из декларативной схемы класса-запроса.
+ * Builds {@link ListQueryOptions} (the allow list for {@link parseListQuery})
+ * from the declarative schema of a request class.
  */
 export function optionsFromSchema(ctor: unknown): ListQueryOptions {
   const schema = listSchemaOf(ctor);

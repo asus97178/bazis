@@ -1,11 +1,11 @@
 /**
- * Порт валидации request-моделей (Dependency Inversion).
+ * Request-model validation port (dependency inversion).
  *
- * `@/core/http` (ядро) определяет абстракцию, но не знает о конкретном движке
- * валидации. Библиотека `@/library/validation` реализует её и регистрирует адаптер
- * через {@link useModelValidator} (вызывается в композиционном корне —
- * `createApp` — или в тестах). Без зарегистрированного валидатора привязка тела
- * не валидируется.
+ * `@/core/http` (the kernel) defines the abstraction but knows nothing about a
+ * concrete validation engine. The `@/library/validation` library implements it;
+ * the composition root (`runApp`) or a test registers the adapter through
+ * {@link useModelValidator}. Without a registered validator the bound body is
+ * not validated.
  */
 export interface ModelValidationIssue {
   readonly property: string;
@@ -19,12 +19,12 @@ export interface ModelValidator {
 
 let activeValidator: ModelValidator | undefined;
 
-/** Подключить конкретный валидатор (мост из `@/library/validation`). Идемпотентно. */
+/** Plugs in a concrete validator (bridge from `@/library/validation`). Idempotent. */
 export function useModelValidator(validator: ModelValidator): void {
   activeValidator = validator;
 }
 
-/** Текущий валидатор или `undefined`, если не подключён. */
+/** The current validator, or `undefined` if none is plugged in. */
 export function getModelValidator(): ModelValidator | undefined {
   return activeValidator;
 }

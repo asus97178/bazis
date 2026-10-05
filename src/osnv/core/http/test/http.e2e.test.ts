@@ -23,7 +23,7 @@ import {
   type ResponseBuilder,
 } from "@/core/http";
 
-// ── Тестовое приложение ─────────────────────────────────────────────────────
+// ── Test application ────────────────────────────────────────────────────────
 
 interface UsersService {
   byId(id: number): { id: number; name: string } | undefined;
@@ -183,7 +183,7 @@ class DataV2Controller {
   }
 }
 
-// ── Инфраструктура тестов ───────────────────────────────────────────────────
+// ── Test infrastructure ─────────────────────────────────────────────────────
 
 let container: DiContainer;
 let server: HttpServer;
@@ -228,7 +228,7 @@ afterAll(async () => {
   await container.dispose();
 });
 
-// ── Тесты ───────────────────────────────────────────────────────────────────
+// ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("маршрутизация и привязка", () => {
   test("GET с int-параметром и DI-зависимостью контроллера", async () => {
@@ -409,7 +409,7 @@ describe("ошибки, фильтры, middleware", () => {
 
   test("порядок middleware: global снаружи controller", async () => {
     const response = await fetch(`${base}/api/users/1`);
-    // Заголовки добавляются после next() — изнутри наружу.
+    // Headers are added after next(), from the inside out.
     expect(response.headers.get("x-trace")).toBe("controller, global");
   });
 });

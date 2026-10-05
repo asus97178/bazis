@@ -3,20 +3,20 @@ import type { DatabaseProvider, ForeignKeyConstraint } from "../Providers/types"
 import type { AdditiveSchemaOperation } from "./SchemaDiffer";
 import { physicalTableIdentity } from "./tableKey";
 
-/** Итог миграции схемы. */
+/** Schema migration outcome. */
 export interface MigrationResult {
-  /** Число применённых операций. */
+  /** Number of applied operations. */
   readonly applied: number;
-  /** Человекочитаемое описание применённых операций. */
+  /** Human-readable description of the applied operations. */
   readonly operations: readonly string[];
-  /** Деструктивные расхождения, оставленные без изменений. */
+  /** Destructive differences left untouched. */
   readonly warnings: readonly string[];
 }
 
 /**
- * Применяет аддитивные операции изменения схемы в одной транзакции.
- * FK-ограничения для `createTable` вычисляет переданный резолвер
- * (имена колонок/таблиц уже разрешены).
+ * Applies additive schema change operations in one transaction.
+ * FK constraints for `createTable` are computed by the given resolver
+ * (column/table names already resolved).
  */
 export class Migrator {
   constructor(

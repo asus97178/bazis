@@ -14,9 +14,9 @@ import type {
 import type { CanonicalDefault } from "../Schema/introspection";
 
 /**
- * Превращает сырые метаданные класса (декораторы) в скомпилированную
- * `EntityModel`, применяя соглашения там, где явных настроек нет.
- * Любая ошибка конфигурации — `ModelBuildError` на старте (fail fast).
+ * Turns raw class metadata (decorators) into a compiled `EntityModel`,
+ * applying conventions where there are no explicit settings.
+ * Any configuration error is a `ModelBuildError` at startup (fail fast).
  */
 export class ModelBuilder {
   static build(ctor: new () => object): EntityModel {
@@ -68,7 +68,7 @@ export class ModelBuilder {
       target: relation.target,
       foreignKey: relation.foreignKey,
     }));
-    // Reference-связи неявно объявляют внешний ключ для DDL.
+    // Reference relations implicitly declare a foreign key for DDL.
     for (const relation of relations) {
       const names = Array.isArray(relation.foreignKey) ? relation.foreignKey : [relation.foreignKey];
       if (relation.kind === "reference" && !foreignKeys.some((fk) => fk.properties.join("\0") === names.join("\0"))) {
@@ -110,7 +110,7 @@ export class ModelBuilder {
       }
       relationByName.set(relation.navigationName, relation);
     }
-    // FK reference-связи должен существовать как замапленная колонка.
+    // The FK of a reference relation must exist as a mapped column.
     for (const relation of relations) {
       const relationForeignKeys = Array.isArray(relation.foreignKey) ? relation.foreignKey : [relation.foreignKey];
       if (relation.kind === "reference" && relationForeignKeys.some((name) => !byName.has(name))) {
@@ -204,7 +204,7 @@ export class ModelBuilder {
       );
     }
     if (raw.uuidVersion === "v7") throw new ModelBuildError(`Entity "${entityName}": UUID v7 is not supported by PostgreSQL exact schema admission.`);
-    // Ключ и семантические timestamp-поля всегда NOT NULL.
+    // The key and semantic timestamp fields are always NOT NULL.
     const required =
       isKey ||
       raw.required === true ||

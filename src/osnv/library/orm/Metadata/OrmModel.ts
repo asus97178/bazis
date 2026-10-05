@@ -5,9 +5,9 @@ import type { EntityModel } from "./types";
 type EntityClass = new () => object;
 
 /**
- * Реестр скомпилированных моделей сущностей контекста. Строится один раз на
- * старте из списка `entities` (детерминированно, без глобальных side-effect'ов
- * и рефлексии — дружелюбно к бинарнику).
+ * Registry of the compiled entity models of a context. Built once at startup
+ * from the `entities` list (deterministically, without global side effects or
+ * reflection, which keeps it binary-friendly).
  */
 export class OrmModel {
   private readonly byCtor = new Map<EntityClass, EntityModel>();
@@ -26,12 +26,12 @@ export class OrmModel {
   }
 
   /**
-   * Регистрирует уже построенную `EntityModel` в рантайме (например, собранную
-   * из каталога метаданных `DynamicModelBuilder`). Регистрация идемпотентна для
-   * той же модели; повторная регистрация под тем же именем заменяет предыдущую.
+   * Registers an already built `EntityModel` at runtime (for example one built
+   * by `DynamicModelBuilder` from a metadata catalog). Registration is idempotent
+   * for the same model; registering again under the same name replaces the previous one.
    *
-   * Это единственная мутирующая точка реестра — её используют контролируемые
-   * сценарии (динамические таблицы), а не произвольный код.
+   * This is the only mutating point of the registry; it is used by controlled
+   * scenarios (dynamic tables), not by arbitrary code.
    */
   registerModel(model: EntityModel): void {
     const previous = this.byName.get(model.name);
@@ -42,7 +42,7 @@ export class OrmModel {
     this.byName.set(model.name, model);
   }
 
-  /** Снимает динамическую модель с регистрации по имени (archive/drop таблицы). */
+  /** Unregisters a dynamic model by name (table archive/drop). */
   unregister(name: string): void {
     const model = this.byName.get(name);
     if (model) {
@@ -55,7 +55,7 @@ export class OrmModel {
     return this.byCtor.get(ctor);
   }
 
-  /** Модель по имени сущности/таблицы (для доступа к динамическим наборам). */
+  /** Model by entity/table name (for access to dynamic sets). */
   tryByName(name: string): EntityModel | undefined {
     return this.byName.get(name);
   }
@@ -68,12 +68,12 @@ export class OrmModel {
     return model;
   }
 
-  /** Модель для экземпляра по его конструктору. */
+  /** Model for an instance, by its constructor. */
   requireForInstance(entity: object): EntityModel {
     return this.requireByCtor(entity.constructor as EntityClass);
   }
 
-  /** Разрешает ленивый thunk цели навигации в модель. */
+  /** Resolves the lazy navigation target thunk into a model. */
   targetModel(target: () => EntityClass): EntityModel {
     return this.requireByCtor(target());
   }

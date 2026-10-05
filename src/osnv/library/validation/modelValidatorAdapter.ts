@@ -8,12 +8,13 @@ interface AdapterValidationIssue {
 }
 
 /**
- * Чистый адаптер библиотеки валидации под структурный контракт валидатора
- * request-моделей. Намеренно **не импортирует ядро**: возвращает объект формы
- * `{ validate(instance) => { isValid, errors } }`, который структурно совместим
- * с портом `ModelValidator` из `osnv/core/http`.
+ * Pure adapter of the validation library to the structural request-model
+ * validator contract. It deliberately **does not import the kernel**: it returns
+ * an object of the shape `{ validate(instance) => { isValid, errors } }`, which is
+ * structurally compatible with the `ModelValidator` port from `osnv/core/http`.
  *
- * Склейку выполняет композиционный корень (или тест):
+ * `runApp` plugs it in by default (unless `options.validator` is given). Outside
+ * `runApp`, for example in a test, wire it yourself:
  *
  * ```ts
  * import { useModelValidator } from "osnv/core/http";
@@ -22,8 +23,8 @@ interface AdapterValidationIssue {
  * useModelValidator(modelValidatorAdapter);
  * ```
  *
- * Так библиотека остаётся независимой от ядра и среды выполнения, а ядро —
- * не знающим о конкретном движке валидации (Dependency Inversion).
+ * This keeps the library independent of the kernel and the runtime, and the
+ * kernel unaware of the concrete validation engine (dependency inversion).
  */
 export const modelValidatorAdapter = {
   validate(instance: object): {

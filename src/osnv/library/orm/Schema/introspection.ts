@@ -1,6 +1,7 @@
 /**
- * Снимок фактической схемы БД, полученный интроспекцией. Источник «текущего»
- * состояния для аддитивной авто-миграции (целевое — модель из декораторов).
+ * Snapshot of the actual database schema obtained by introspection. The source
+ * of the "current" state for the additive auto-migration (the target is the
+ * model from the decorators).
  */
 
 export interface IntrospectedColumn {
@@ -33,7 +34,7 @@ export interface IntrospectedCheck { readonly name: string; readonly expression:
 
 export interface IntrospectedTable {
   readonly name: string;
-  /** Колонки по имени. */
+  /** Columns by name. */
   readonly columns: ReadonlyMap<string, IntrospectedColumn>;
   readonly indexes: readonly IntrospectedIndex[];
   readonly primaryKey?: IntrospectedPrimaryKey;
@@ -44,7 +45,7 @@ export interface IntrospectedTable {
 }
 
 export interface IntrospectedSchema {
-  /** Таблицы по имени. */
+  /** Tables by name. */
   readonly tables: ReadonlyMap<string, IntrospectedTable>;
   /** Normalized physical schemas observed by the provider for this admission unit. */
   readonly schemas?: ReadonlySet<string>;

@@ -11,19 +11,19 @@ import {
 import type { RedisCommandClient } from "./RedisDistributedCacheDriver";
 import { RedisDistributedCacheDriver } from "./RedisDistributedCacheDriver";
 
-/** Тюнинг распределённого кэша поверх Redis (всё необязательно). */
+/** Tuning of the Redis-backed distributed cache (all optional). */
 export interface RedisDistributedCacheTuning {
-  /** Имя соединения для декораторов (`connection`). По умолчанию `"default"`. */
+  /** Connection name for the decorators (`connection`). Defaults to `"default"`. */
   readonly connection?: string;
-  /** Префикс всех ключей — изолирует кэш приложения в общем Redis. */
+  /** Prefix of all keys; isolates the application cache in a shared Redis. */
   readonly keyPrefix?: string;
-  /** TTL anti-stampede лока на промахе (секунды). */
+  /** TTL of the anti-stampede lock on a miss (seconds). */
   readonly defaultLockSeconds?: number;
-  /** Максимальная длина ключа. */
+  /** Maximum key length. */
   readonly maxKeyLength?: number;
-  /** Лимит размера сериализованного значения (байты); `set` деградирует мягко. */
+  /** Size limit of a serialized value (bytes); `set` degrades gracefully. */
   readonly maxValueBytes?: number;
-  /** Интервал поллинга (мс) при ожидании результата от другого воркера. */
+  /** Polling interval (ms) while waiting for another worker's result. */
   readonly pollIntervalMs?: number;
 }
 
@@ -32,10 +32,10 @@ const DEFAULT_LOCK_SECONDS = 10;
 const DEFAULT_CONNECTION = "default";
 
 /**
- * Распределённый backend кэша поверх одного Redis-соединения. Строит два стора
- * (HTTP-ответы и значения методов) с раздельными namespace и кодеками, отдаёт их
- * как {@link NamedCacheRegistry}. Соединение открывает/закрывает Redis-коннектор
- * `redisConnect(...)`.
+ * Distributed cache backend on top of one Redis connection. Builds two stores
+ * (HTTP responses and method values) with separate namespaces and codecs and
+ * exposes them as a {@link NamedCacheRegistry}. The `redisConnect(...)`
+ * connector opens and closes the connection.
  */
 export class RedisDistributedCacheBackend implements DistributedCacheStores {
   public readonly connectionNames: readonly string[];

@@ -16,10 +16,10 @@ import { InfraError, type InfraConnector } from "./InfraConnector";
 import { InfraLifecycle } from "./InfraLifecycle";
 
 /**
- * Манифест инфраструктуры: читаемая карта «логическое имя → коннектор».
- * Ключ (`db`, `cache`, `search`) — это имя инстанса: оно попадает в
- * health-check (`infra:db`) и диагностику, поэтому файл с манифестом
- * читается как спецификация подключений приложения.
+ * Infrastructure manifest: a readable "logical name → connector" map.
+ * The key (`db`, `cache`, `search`) is the instance name: it appears in the
+ * health check (`infra:db`) and in diagnostics, so the manifest file reads as
+ * the application's connection spec.
  */
 export type InfraManifest = Readonly<Record<string, InfraConnector>>;
 
@@ -52,8 +52,8 @@ function buildInfraDefinitions(manifest: InfraManifest): {
   const exports: ModuleExport[] = [];
   const config: ModuleConfig[] = [];
   const seenConfig = new Set<ModuleConfig>();
-  // Один токен = один клиент-singleton. Два инстанса под одним токеном дали бы
-  // общий клиент с двумя lifecycle (двойной connect/dispose) — падаем явно.
+  // One token = one singleton client. Two instances under one token would give
+  // a shared client with two lifecycles (double connect/dispose), so fail loudly.
   const seenTokens = new Map<InfraConnector["token"], string>();
 
   for (const [name, connector] of Object.entries(manifest)) {
@@ -79,8 +79,8 @@ function buildInfraDefinitions(manifest: InfraManifest): {
       }
     }
 
-    // DI регистрирует владельца раньше клиента: даже ранняя резолюция или
-    // исключение другой фабрики не оставляют созданный ресурс без cleanup.
+    // DI registers the owner before the client: even an early resolution or
+    // a failing factory elsewhere cannot leave a created resource without cleanup.
     const ownerToken = createToken<InfraLifecycle<unknown>>(`infra:${name}:lifetime`);
     const owner = DI.singleton(DI.factoryProviderWithResolver(ownerToken, [], (resolver) =>
       new InfraLifecycle(name, connector, undefined, resolver.has(ConfigRegistry) ? resolver.resolve(ConfigRegistry) : undefined)));
@@ -90,14 +90,14 @@ function buildInfraDefinitions(manifest: InfraManifest): {
       DI.singleton(DI.externallyOwned(DI.factoryProvider(connector.token, [ownerToken], (lifetime) => lifetime.getClient()))),
     );
 
-    // 2. Lifecycle — открывает/закрывает соединение в фазах ядра.
+    // 2. Lifecycle: opens/closes the connection in the kernel phases.
     providers.push(
       DI.singleton(
         DI.factoryProvider(HOSTED_SERVICE, [ownerToken], (lifetime) => lifetime),
       ),
     );
 
-    // 3. Health-check — только если коннектор его поддерживает.
+    // 3. Health check: only if the connector supports it.
     if (connector.healthCheck) {
       const healthCheck = connector.healthCheck.bind(connector);
       providers.push(
@@ -112,7 +112,7 @@ function buildInfraDefinitions(manifest: InfraManifest): {
 
     exports.push(connector.token);
 
-    // 4. Доп. провайдеры коннектора (например, распределённый кэш поверх Redis).
+    // 4. Extra connector providers (for example a distributed cache on top of Redis).
     if (connector.providers !== undefined) {
       providers.push(...connector.providers);
     }
@@ -125,8 +125,8 @@ function buildInfraDefinitions(manifest: InfraManifest): {
 }
 
 /**
- * Динамический инфраструктурный модуль (plain-объект метаданных) — то же, что
- * `@Infra`, но без класса. Удобно для `imports` или для `runApp({ infra })`.
+ * Dynamic infrastructure module (a plain metadata object): the same as
+ * `@Infra`, but without a class. Handy for `imports` or `runApp({ infra })`.
  */
 export function infraModule(manifest: InfraManifest): OsnvModuleRef {
   const { providers, exports, config } = buildInfraDefinitions(manifest);
@@ -134,12 +134,12 @@ export function infraModule(manifest: InfraManifest): OsnvModuleRef {
 }
 
 /**
- * Собирательный декоратор инфраструктуры. Вешает на класс метаданные обычного
- * **global-модуля**, поэтому класс становится валидным `OsnvModuleRef` —
- * его можно передать в `runApp({ infra: AppInfra })` или в `imports`.
+ * Infrastructure decorator. Puts the metadata of a regular **global module**
+ * on the class, so the class becomes a valid `OsnvModuleRef`: it can be passed
+ * to `runApp({ infra: AppInfra })` or to `imports`.
  *
- * Класс остаётся чистыми метаданными (как `@Module`) и **не инстанцируется**:
- * живут и держат состояние только клиенты, которые он перечисляет.
+ * The class stays pure metadata (like `@Module`) and is **never instantiated**:
+ * only the clients it lists live and hold state.
  *
  * ```ts
  * @Infra({

@@ -6,27 +6,27 @@ import type { DiRegistrar } from "./DiRegistrar";
 /** What a module can expose to its importers: a token, a class-token or an open generic family. */
 export type ModuleExport = Token<unknown> | OpenGenericTokenFamily<unknown, unknown>;
 
-/** Конфиг, который модуль приносит в приложение и который нужно проверить на старте. */
+/** A config the module brings into the application, to be validated at startup. */
 export interface ModuleConfig {
   ensureValid(environment?: "development" | "test" | "production"): void;
 }
 
-/** Метаданные модуля (без имени — имя берётся из класса через `@Module`). */
+/** Module metadata (no name: the name comes from the class through `@Module`). */
 export interface OsnvModuleMetadata {
   readonly imports?: readonly OsnvModuleRef[];
   /**
-   * Декларативные конфиги, которыми владеет модуль. `runApp` собирает их из
-   * дерева модулей и вызывает `ensureValid()` до сборки контейнера и старта
-   * серверов. Это держит, например, `jwtConfig` внутри `AuthModule`, а не в
-   * `index.ts`.
+   * Declarative configs owned by the module. `runApp` collects them from the
+   * module tree and calls `ensureValid()` before the container is built and the
+   * servers start. This keeps, for example, `jwtConfig` inside `AuthModule`
+   * rather than in `index.ts`.
    */
   readonly config?: ModuleConfig | readonly ModuleConfig[];
   readonly providers?: readonly ProviderDefinition[];
   /**
-   * HTTP-контроллеры модуля (классы с `@Controller`). Регистрируются scoped —
-   * один экземпляр на запрос. `httpModule` собирает их из `imports` для
-   * маршрутизации; явный `controllers` в `httpModule({ ... })` остаётся для
-   * обратной совместимости.
+   * HTTP controllers of the module (classes with `@Controller`). Registered scoped,
+   * one instance per request. `httpModule` collects them from `imports` for
+   * routing; an explicit `controllers` in `httpModule({ ... })` remains for
+   * backward compatibility.
    */
   readonly controllers?: readonly Class<object>[];
   /**
@@ -64,8 +64,8 @@ export interface OsnvModuleMetadata {
   configure?(di: DiRegistrar): void;
 }
 
-/** Класс модуля с метаданными на конструкторе (`@Module`). */
+/** Module class with metadata on its constructor (`@Module`). */
 export type OsnvModule = OsnvModuleMetadata & (abstract new (...args: never) => unknown);
 
-/** Класс модуля (`@Module`) или plain metadata, которую возвращают фабрики модулей (`ormModule`, `memory()`, `infraModule`). */
+/** A module class (`@Module`) or plain metadata returned by module factories (`ormModule`, `memory()`, `infraModule`). */
 export type OsnvModuleRef = OsnvModule | OsnvModuleMetadata;

@@ -1,11 +1,11 @@
 /**
- * Модуль валидации классов Osnv.
+ * Class validation module of Osnv.
  *
- * Самодостаточный (только Bun API), без рефлексии и внешних зависимостей,
- * совместим с компиляцией в бинарник (`bun build --compile`).
+ * Self-contained (Bun APIs only), with no reflection or external dependencies,
+ * compatible with binary compilation (`bun build --compile`).
  *
- * Точка входа — {@link Validator}: декоратор полей и статические методы
- * `validate` / `validateAsync` / `setDefaultMessages`.
+ * The entry point is {@link Validator}: a field decorator plus the static
+ * methods `validate` / `validateAsync` / `setDefaultMessages`.
  */
 export { Validator } from "./Validator";
 export { modelValidatorAdapter } from "./modelValidatorAdapter";

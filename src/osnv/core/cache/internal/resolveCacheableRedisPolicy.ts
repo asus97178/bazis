@@ -4,9 +4,9 @@ import type { CacheableRedisOptions } from "../types/CacheableRedisOptions";
 import { resolveCacheOptions } from "./resolveCachePolicy";
 
 /**
- * Сливает inline-опции `@CacheableRedis` с именованной политикой и подставляет
- * `connection` по умолчанию. `seconds` здесь НЕ требуется — её валидирует вызывающий
- * уже после проверки `enabled`/`noStore`, чтобы выключенный кэш без TTL не падал.
+ * Merges inline `@CacheableRedis` options with the named policy and fills in the
+ * default `connection`. `seconds` is NOT required here: the caller validates it
+ * after checking `enabled`/`noStore`, so a disabled cache without a TTL does not fail.
  */
 export function resolveCacheableRedisOptions(
   inline: CacheableRedisOptions,

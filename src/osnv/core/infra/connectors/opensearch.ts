@@ -4,28 +4,28 @@ import { reader, requireValue } from "../connectorConfig";
 import { InfraError, type InfraConnector } from "../InfraConnector";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 
-/** Таймаут запроса к кластеру по умолчанию (мс) — fail-fast вместо зависания. */
+/** Default cluster request timeout (ms): fail fast instead of hanging. */
 const DEFAULT_OPENSEARCH_TIMEOUT_MS = 5000;
 const DEFAULT_OPENSEARCH_MAX_RESPONSE_BYTES = 1024 * 1024;
 const MAX_ERROR_PREVIEW_CHARS = 4096;
 
 export interface OpenSearchClientOptions {
-  /** Базовый URL кластера, напр. `https://localhost:9200`. */
+  /** Cluster base URL, e.g. `https://localhost:9200`. */
   readonly url: string;
-  /** Пользователь (basic auth), необязательно. */
+  /** User (basic auth), optional. */
   readonly username?: string;
-  /** Пароль (basic auth), необязательно. Раскрытый секрет — не логируется. */
+  /** Password (basic auth), optional. A revealed secret; never logged. */
   readonly password?: string;
-  /** Таймаут запроса в мс (по умолчанию 5000). Защищает старт от зависания. */
+  /** Request timeout in ms (default 5000). Keeps startup from hanging. */
   readonly timeoutMs?: number;
-  /** Максимальный размер response body. По умолчанию 1 MiB. */
+  /** Maximum response body size. Defaults to 1 MiB. */
   readonly maxResponseBytes?: number;
 }
 
 /**
- * Минимальный клиент OpenSearch поверх `fetch` — без внешних зависимостей.
- * Покрывает то, что обычно нужно приложению: ping/health, search, index.
- * REST-протокол OpenSearch совместим с этим набором операций.
+ * Minimal OpenSearch client on top of `fetch`, with no external dependencies.
+ * Covers what an application usually needs: ping/health, search, index,
+ * through the OpenSearch REST API.
  */
 export class OpenSearchClient {
   private readonly lifetime = new AbortController();
@@ -44,7 +44,7 @@ export class OpenSearchClient {
     if (!Number.isSafeInteger(this.maxResponseBytes) || this.maxResponseBytes <= 0) {
       throw new InfraError("OpenSearch maxResponseBytes must be a positive integer.");
     }
-    // Заголовки постоянны на всё время жизни клиента — собираем один раз.
+    // Headers are constant for the client's lifetime, so build them once.
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (options.username !== undefined || options.password !== undefined) {
       const raw = `${options.username ?? ""}:${options.password ?? ""}`;
@@ -53,7 +53,7 @@ export class OpenSearchClient {
     this.headers = headers;
   }
 
-  /** Низкоуровневый запрос к кластеру. Бросает {@link InfraError} на не-2xx. */
+  /** Low-level cluster request. Throws {@link InfraError} on a non-2xx response. */
   public async request<T = unknown>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const label = `${safeMethod(method)} ${safePath(path)}`;
     let response: Response;
@@ -96,7 +96,7 @@ export class OpenSearchClient {
     }
   }
 
-  /** Информация о кластере (`GET /`). */
+  /** Cluster information (`GET /`). */
   public info(): Promise<unknown> {
     return this.request("GET", "/");
   }
@@ -106,17 +106,17 @@ export class OpenSearchClient {
     this.lifetime.abort(new InfraError("OpenSearch client is disposed."));
   }
 
-  /** Здоровье кластера (`GET /_cluster/health`). */
+  /** Cluster health (`GET /_cluster/health`). */
   public clusterHealth(signal?: AbortSignal): Promise<{ status: "green" | "yellow" | "red" }> {
     return this.request("GET", "/_cluster/health", undefined, signal);
   }
 
-  /** Поиск по индексу. */
+  /** Searches an index. */
   public search<T = unknown>(index: string, body: unknown): Promise<T> {
     return this.request("POST", `/${indexSegment(index)}/_search`, body);
   }
 
-  /** Индексация документа (с явным id — PUT, без — POST с авто-id). */
+  /** Indexes a document (with an explicit id: PUT; without: POST with an auto id). */
   public index<T = unknown>(index: string, document: unknown, id?: string): Promise<T> {
     return id === undefined
       ? this.request("POST", `/${indexSegment(index)}/_doc`, document)
@@ -134,26 +134,26 @@ export class OpenSearchClient {
   }
 }
 
-/** Токен клиента OpenSearch для инъекции в сервисы приложения. */
+/** OpenSearch client token for injection into application services. */
 export const OPENSEARCH: InjectionToken<OpenSearchClient> = createToken<OpenSearchClient>("OpenSearch");
 
 /**
- * Интерфейс конфига, который требует коннектор OpenSearch. Конфиг подсистемы
- * поиска (`defineConfig<SearchConfig>("search", ...)`) должен предоставлять эти ключи.
+ * Config interface required by the OpenSearch connector. The search subsystem
+ * config (`defineConfig<SearchConfig>("search", ...)`) must provide these keys.
  */
 export interface OpenSearchConfigShape {
-  /** Базовый URL кластера, напр. `https://localhost:9200`. */
+  /** Cluster base URL, e.g. `https://localhost:9200`. */
   readonly url: string;
   readonly username: string;
-  /** Пароль basic-auth — объявляется как `secret(...)`, читается как `Secret`. */
+  /** Basic-auth password: declared as `secret(...)`, read as a `Secret`. */
   readonly password: Secret;
 }
 
 export interface OpenSearchConnectorOptions {
   readonly token?: InjectionToken<OpenSearchClient>;
-  /** Таймаут запроса в мс (по умолчанию 5000). */
+  /** Request timeout in ms (default 5000). */
   readonly timeoutMs?: number;
-  /** Максимальный размер response body. По умолчанию 1 MiB. */
+  /** Maximum response body size. Defaults to 1 MiB. */
   readonly maxResponseBytes?: number;
 }
 
@@ -266,11 +266,11 @@ async function readBoundedText(response: Response, maxBytes: number, label: stri
 }
 
 /**
- * Коннектор OpenSearch для манифеста `@Infra`. Конфигурация берётся из
- * переданного `searchConfig` (`defineConfig("search", ...)`) — коннектор читает
- * объявленные ключи `url`/`username`/`password`. Клиент — fetch-обёртка, поэтому
- * «открытие соединения» — это ping кластера на старте (fail-fast, если кластер
- * недоступен). Закрытие отменяет активные запросы и запрещает новые.
+ * OpenSearch connector for the `@Infra` manifest. Configuration comes from the
+ * given `searchConfig` (`defineConfig("search", ...)`): the connector reads the
+ * declared `url`/`username`/`password` keys. The client is a fetch wrapper, so
+ * "opening the connection" is a cluster ping at start (fail fast if the cluster
+ * is unreachable). Closing aborts active requests and rejects new ones.
  *
  * ```ts
  * export const searchConfig = defineConfig("search", {
@@ -278,7 +278,7 @@ async function readBoundedText(response: Response, maxBytes: number, label: stri
  * });
  * @Infra({ search: openSearchConnect(searchConfig) })
  * export class AppInfra {}
- * // инъекция: constructor(private readonly search: OpenSearchClient) {}  // токен OPENSEARCH
+ * // injection by token: scoped(ISearchService, SearchService, [OPENSEARCH] as const)
  * ```
  */
 export function openSearchConnect<T extends OpenSearchConfigShape>(

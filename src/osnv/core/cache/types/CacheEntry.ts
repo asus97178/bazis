@@ -1,7 +1,7 @@
-/** Одна запись кэша, возвращаемая {@link ICache.list}. */
+/** One cache entry returned by {@link ICache.list}. */
 export interface CacheEntry<TValue> {
   readonly key: string;
   readonly value: TValue;
-  /** Unix timestamp (ms) истечения; отсутствует — запись бессрочная. */
+  /** Expiry Unix timestamp (ms); absent means the entry never expires. */
   readonly expiresAt?: number;
 }

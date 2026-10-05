@@ -2,39 +2,39 @@ import { rulesOf } from "./metadata";
 import type { ValidatorOptions } from "./types/ValidatorOptions";
 
 /**
- * Режим вложенной валидации для конкретного правила:
- * - `explicit` — `nested: true`, рекурсия даже без автоопределения;
- * - `auto` — рекурсия, если значение является экземпляром класса с декораторами;
- * - `none` — это правило вложенную валидацию не запускает.
+ * Nested validation mode for a specific rule:
+ * - `explicit`: `nested: true`, recursion even without auto-detection;
+ * - `auto`: recursion if the value is an instance of a decorated class;
+ * - `none`: this rule does not run nested validation.
  *
- * На поле с несколькими декораторами носителем вложенной проверки назначается
- * ровно одно правило — иначе ошибки вложенного объекта дублировались бы.
+ * On a field with several decorators exactly one rule is assigned to carry the
+ * nested check; otherwise the nested object's errors would be duplicated.
  */
 export type NestedMode = "explicit" | "auto" | "none";
 
 /**
- * Скомпилированное правило одного декоратора: всё дорогое (компиляция RegExp,
- * сбор значений enum в Set) сделано заранее, в горячем пути валидации
- * остаются только проверки.
+ * Compiled rule of one decorator: everything expensive (RegExp compilation,
+ * collecting enum values into a Set) is done in advance, so only the checks
+ * remain on the hot validation path.
  */
 export interface CompiledRule {
   readonly property: string;
   readonly options: ValidatorOptions;
-  /** Запускает ли это правило вложенную валидацию и в каком режиме. */
+  /** Whether this rule runs nested validation and in which mode. */
   nested: NestedMode;
-  /** Предкомпилированный `pattern` (из RegExp или строки-источника). */
+  /** Precompiled `pattern` (from a RegExp or a source string). */
   readonly pattern?: RegExp;
-  /** Допустимые значения enum (O(1)-проверка членства). */
+  /** Allowed enum values (O(1) membership check). */
   readonly enumValues?: ReadonlySet<unknown>;
-  /** Человекочитаемый список значений enum для сообщения `{allowed}`. */
+  /** Human-readable list of enum values for the `{allowed}` message. */
   readonly enumLabel?: string;
-  /** Есть строковые правила — значение обязано быть строкой. */
+  /** There are string rules: the value must be a string. */
   readonly needsString: boolean;
-  /** Есть числовые правила — значение обязано быть числом. */
+  /** There are number rules: the value must be a number. */
   readonly needsNumber: boolean;
-  /** Есть boolean-правила — значение обязано быть boolean. */
+  /** There are boolean rules: the value must be a boolean. */
   readonly needsBoolean: boolean;
-  /** Проверки-флаги с учётом подсказки `type` (type: "email" === email: true). */
+  /** Flag checks, taking the `type` hint into account (type: "email" === email: true). */
   readonly checkEmail: boolean;
   readonly checkUrl: boolean;
   readonly checkUuid: boolean;
@@ -44,18 +44,18 @@ export interface CompiledRule {
 }
 
 /**
- * Компилирует и кэширует план валидации класса.
+ * Compiles and caches the validation plan of a class.
  *
- * Кэш — WeakMap по конструктору: правила собираются при первом обращении
- * к классу и переиспользуются всеми последующими вызовами `validate`.
- * WeakMap не удерживает классы от сборки мусора.
+ * The cache is a WeakMap by constructor: rules are collected on the first access
+ * to the class and reused by all later `validate` calls. The WeakMap does not
+ * keep classes from being garbage collected.
  */
 export class RuleCompiler {
   private static readonly cache = new WeakMap<object, readonly CompiledRule[]>();
 
   /**
-   * План валидации для конструктора или `undefined`, если на классе
-   * (и его родителях) нет декораторов `@Validator`.
+   * Validation plan for a constructor, or `undefined` if the class (and its
+   * parents) has no `@Validator` decorators.
    */
   static planFor(ctor: object | undefined | null): readonly CompiledRule[] | undefined {
     if (typeof ctor !== "function") {
@@ -76,10 +76,10 @@ export class RuleCompiler {
   }
 
   /**
-   * Выбирает для каждого поля единственное правило-носитель вложенной
-   * валидации: явный `nested: true` приоритетнее автоопределения; если
-   * хоть один декоратор поля указал `nested: false` и явного `true` нет —
-   * вложенная проверка для поля отключается целиком.
+   * Picks the single nested-validation carrier rule for each field: an explicit
+   * `nested: true` wins over auto-detection; if any decorator of the field set
+   * `nested: false` and there is no explicit `true`, nested checking is turned
+   * off for the field entirely.
    */
   private static assignNestedCarriers(plan: CompiledRule[]): void {
     const carrierByProperty = new Map<string, CompiledRule>();
@@ -138,8 +138,8 @@ export class RuleCompiler {
 
     const needsBoolean = o.type === "boolean" || o.mustBeTrue === true || o.mustBeFalse === true;
 
-    // Строка-источник компилируется здесь один раз — это обычный конструктор
-    // RegExp, никакого eval/динамической компиляции кода.
+    // A source string is compiled here once; it is the regular RegExp
+    // constructor, with no eval or dynamic code compilation.
     const pattern = o.pattern === undefined ? undefined : o.pattern instanceof RegExp ? o.pattern : new RegExp(o.pattern);
 
     let enumValues: ReadonlySet<unknown> | undefined;
@@ -147,12 +147,12 @@ export class RuleCompiler {
     if (o.enumType !== undefined) {
       const values = new Set<unknown>();
       for (const key of Object.keys(o.enumType)) {
-        // hasOwnProperty: защита от prototype pollution в переданном объекте.
+        // hasOwnProperty: protection against prototype pollution in the given object.
         if (!Object.prototype.hasOwnProperty.call(o.enumType, key)) {
           continue;
         }
-        // Числовые enum TypeScript содержат обратные ключи ("0" -> "Admin") —
-        // их пропускаем, иначе имена значений попали бы в допустимые.
+        // TypeScript numeric enums contain reverse keys ("0" -> "Admin");
+        // skip them, otherwise the value names would become allowed values.
         if (/^\d+$/.test(key)) {
           continue;
         }

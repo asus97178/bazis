@@ -1,20 +1,21 @@
 /**
- * Библиотека JWT для Osnv.
+ * JWT library for Osnv.
  *
- * Чистая логика JWT без сервисов, контроллеров и зависимостей от ядра:
- * только Web Crypto и стандартные API, совместимо с компиляцией в бинарник
+ * Pure JWT logic without services, controllers or kernel dependencies: only
+ * Web Crypto and standard APIs, compatible with binary compilation
  * (`bun build --compile`).
  *
- * Слои:
- * - {@link SigningAlgorithm} — стратегия подписи (HS256 / RS256), кэширует ключи.
- * - {@link JwtEncoder} / {@link JwtValidator} — кодирование и строгая валидация.
- * - {@link TokenIssuer} — выпуск пары access/refresh для одного вида токена.
- * - {@link TokenService} — реестр видов токенов (USER / ADMIN / EMPLOYEE …),
- *   каждый со своим ключом и `aud`; токены видов взаимно невалидны.
+ * Layers:
+ * - {@link SigningAlgorithm}: signing strategy (HS256 / RS256), caches keys.
+ * - {@link JwtKeyRing}: a set of keys addressed by `kid`, for key rotation.
+ * - {@link JwtEncoder} / {@link JwtValidator}: encoding and strict validation.
+ * - {@link TokenIssuer}: issues an access/refresh pair for one token kind.
+ * - {@link TokenService}: registry of token kinds (for example `user` / `admin`),
+ *   each with its own key and `aud`; tokens of different kinds reject each other.
  *
- * Безопасность по умолчанию: fail-closed валидация, проверка `alg` (защита от
- * algorithm confusion), проверка HMAC через Web Crypto, обязательная привязка
- * `token_use` в TokenIssuer (access ≠ refresh). Контракты: MODULE.md.
+ * Secure by default: fail-closed validation, an `alg` check (protection against
+ * algorithm confusion), HMAC verification through Web Crypto, and a mandatory
+ * `token_use` binding in TokenIssuer (access ≠ refresh). Contracts: MODULE.md.
  */
 
 export { base64UrlEncode, base64UrlDecode, base64UrlEncodeString, base64UrlDecodeToString, timingSafeEqual } from "./base64url";

@@ -5,7 +5,7 @@ const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 const encoder = new TextEncoder();
 
-/** Проверяет ключ кэша: тип, длина, защита от prototype pollution. */
+/** Validates a cache key: type, length, prototype pollution protection. */
 export function assertCacheKey(key: unknown, maxKeyLength = DEFAULT_MAX_KEY_LENGTH): asserts key is string {
   if (typeof key !== "string") {
     throw new CacheKeyError("Cache key must be a string");
@@ -21,15 +21,15 @@ export function assertCacheKey(key: unknown, maxKeyLength = DEFAULT_MAX_KEY_LENG
   }
 }
 
-/** Оценивает размер строкового значения в байтах UTF-8. */
+/** Estimates the size of a string value in UTF-8 bytes. */
 export function measureStringBytes(value: string): number {
   return encoder.encode(value).byteLength;
 }
 
 /**
- * Best-effort размер значения в байтах для лимита `maxValueBytes`.
- * Покрывает строки, бинарные буферы и HTTP-payload (по `body: Uint8Array`).
- * Возвращает `undefined`, если размер измерить нельзя — тогда лимит не применяется.
+ * Best-effort value size in bytes for the `maxValueBytes` limit.
+ * Covers strings, binary buffers and HTTP payloads (via `body: Uint8Array`).
+ * Returns `undefined` when the size cannot be measured; the limit is not applied then.
  */
 export function measureValueBytes(value: unknown): number | undefined {
   if (typeof value === "string") {

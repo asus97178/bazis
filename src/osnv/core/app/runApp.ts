@@ -26,39 +26,39 @@ import { resolveUiProfileAuthoringV1, UiProfileV1Registry, type UiLabels } from 
 import { UiSurfaceDocumentProvider, UiSurfaceHttpController } from "./ui/uiSurfaceHttp";
 
 /**
- * Опции запуска приложения. Всё необязательно: без `http` и `grpc` приложение
- * стартует как воркер/CLI (только ядро и hosted-сервисы).
+ * Application start options. Everything is optional: without `http` and `grpc` the app
+ * starts as a worker/CLI (kernel and hosted services only).
  */
 export interface RunAppOptions {
   /**
-   * Поднять HTTP-сервер. Контроллеры собираются из всего дерева модулей
-   * автоматически — перечислять их не нужно. Передай `{}` для значений по
-   * умолчанию (порт 3000) или объект с настройками (port/prefix/cors/...).
+   * Start the HTTP server. Controllers are collected from the whole module tree
+   * automatically, no need to list them. Pass `{}` for the defaults
+   * (port 3000) or an object with settings (port/prefix/cors/...).
    */
   readonly http?: HttpModuleOptions;
   /** gRPC server; discovers feature-module grpcControllers, independently of HTTP. */
   readonly grpc?: GrpcModuleOptions;
-  /** Опции ядра (окружение, таймаут остановки, сигналы, ...). */
+  /** Kernel options (environment, shutdown timeout, signals, ...). */
   readonly kernel?: KernelOptions;
   /**
-   * Валидатор request-моделей. По умолчанию подключается движок
-   * `@/library/validation`. Передай свой, чтобы заменить.
+   * Request-model validator. The `@/library/validation` engine is used by
+   * default. Pass your own to replace it.
    */
   readonly validator?: ModelValidator;
-  /** Тонкая настройка билдера ядра (логгер, конфиг-источники, ...). */
+  /** Fine-tuning of the kernel builder (logger, config sources, ...). */
   readonly configure?: (builder: KernelBuilder) => void;
   /**
-   * Дополнительные декларативные конфиги (`defineConfig`), если они не
-   * принадлежат конкретному модулю. Обычно configs живут рядом с владельцем:
-   * `@Infra` приносит configs коннекторов, а feature-модуль — свой `config`.
-   * Каждый config проверяется на старте (fail-fast): отсутствующие секреты и
-   * неверные значения роняют запуск сразу.
+   * Additional declarative configs (`defineConfig`) that do not belong to a
+   * specific module. Usually configs live next to their owner: `@Infra` brings
+   * connector configs, and a feature module brings its own `config`.
+   * Every config is checked at startup (fail-fast): missing secrets and
+   * invalid values stop the start immediately.
    */
   readonly config?: ValidatableConfig | readonly ValidatableConfig[];
   /**
-   * Манифест инфраструктуры — класс с `@Infra` (или результат `infraModule(...)`).
-   * Это global-модуль с коннекторами (БД/кэш/поиск): клиенты регистрируются под
-   * своими токенами, соединения открываются до серверов и гасятся после них.
+   * Infrastructure manifest: a class with `@Infra` (or the result of `infraModule(...)`).
+   * It is a global module with connectors (DB/cache/search): clients are registered under
+   * their tokens, connections open before the servers and close after them.
    *
    * ```ts
    * await runApp(AppModule, { infra: AppInfra, http: { port: 3000 } });
@@ -66,10 +66,10 @@ export interface RunAppOptions {
    */
   readonly infra?: OsnvModuleRef;
   /**
-   * Кэш приложения как self-installing значение. Передай `memory({ ... })` для
-   * in-memory кэша. Распределённый Redis-backend включается отдельно через
+   * Application cache as a self-installing value. Pass `memory({ ... })` for
+   * an in-memory cache. The distributed Redis backend is enabled separately via
    * `infra: AppInfra` (`redisConnect(redisConfig, { cache: "distributed" })`).
-   * Регистрирует `ICache`, включает `@OutputCache`/`@Cacheable` и health-check.
+   * Registers `ICache`, enables `@OutputCache`/`@Cacheable` and a health check.
    *
    * ```ts
    * import { memory } from "@/core/cache";
@@ -220,7 +220,7 @@ function normalizeAbsolutePath(path: string): string {
 }
 
 /**
- * Единая точка входа приложения — проще, чем `NestFactory`.
+ * The single application entry point, simpler than `NestFactory`.
  *
  * ```ts
  * // main.ts
@@ -230,18 +230,18 @@ function normalizeAbsolutePath(path: string): string {
  * await runApp(AppModule, { http: { port: 3000, prefix: "api" } });
  * ```
  *
- * Делает за тебя три вещи, которые иначе пришлось бы писать руками:
- * 1. поднимает HTTP-сервер и собирает контроллеры из всего дерева модулей;
- * 2. подключает валидатор тела запросов (DIP-склейка ядра и библиотеки);
- * 3. запускает ядро с graceful shutdown по SIGINT/SIGTERM.
+ * It does three things you would otherwise write by hand:
+ * 1. starts the HTTP server and collects controllers from the whole module tree;
+ * 2. plugs in the request body validator (DIP glue between the kernel and the library);
+ * 3. starts the kernel with graceful shutdown on SIGINT/SIGTERM.
  *
- * Корневой модуль остаётся чистым: `@Module({ imports: [UsersModule] })`.
+ * The root module stays clean: `@Module({ imports: [UsersModule] })`.
  */
 export async function runApp(root: OsnvModuleRef, options: RunAppOptions = {}): Promise<number> {
   const configure = options.configure;
   await loadOsnvGeneratedRuntime();
 
-  // Инфраструктура и кэш — global-модули; добавляем их в граф рядом с корнем фич.
+  // Infrastructure and cache are global modules; add them to the graph next to the feature root.
   const globals: OsnvModuleRef[] = [];
   if (options.infra !== undefined) {
     globals.push(options.infra);
@@ -258,8 +258,8 @@ export async function runApp(root: OsnvModuleRef, options: RunAppOptions = {}): 
       : root;
 
   if (options.http !== undefined) {
-    // Склейка валидации делается в композиционном корне (ядро HTTP знает только
-    // про порт `ModelValidator`, а движок валидации — это библиотека).
+    // Validation is glued in the composition root (the HTTP kernel only knows
+    // the `ModelValidator` port; the validation engine is a library).
     const validator = options.validator ?? modelValidatorAdapter;
     // Keep the legacy bridge for direct bindModel() callers, while also
     // passing an instance-owned validator to the HTTP server. Capturing it per

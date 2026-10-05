@@ -178,7 +178,7 @@ describe("HTTP: авто-HEAD", () => {
   });
 
   test("HEAD на маршрут без GET -> 405", async () => {
-    // /things поддерживает только POST.
+    // /things supports only POST.
     const response = await fetch(`${app.base}/things`, { method: "HEAD" });
     expect(response.status).toBe(405);
   });
