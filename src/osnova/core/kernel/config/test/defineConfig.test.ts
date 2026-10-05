@@ -89,7 +89,7 @@ describe("defineConfig", () => {
   test("нечисловое значение в env — fail-fast", () => {
     process.env.OSNV_HTTP__PORT = "abc";
     const config = defineConfig({ default: { "http.port": 3000 } });
-    expect(() => config.ensureValid()).toThrow(/число/);
+    expect(() => config.ensureValid()).toThrow(/expected a finite number/);
   });
 
   test("camelCase numeric schema key reads the conventional lowercased environment key", () => {

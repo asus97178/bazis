@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { ValidationCodes, ValidationError, Validator } from "@/library/validation";
+import { RU_VALIDATION_MESSAGES, ValidationCodes, ValidationError, Validator } from "@/library/validation";
 
 afterEach(() => {
   Validator.resetDefaultMessages();
@@ -532,7 +532,21 @@ describe("сообщения и кастомизация", () => {
       username?: string;
     }
     const result = Validator.validate(new Dto());
-    expect(result.errors[0]!.message).toBe('Поле "username" обязательно для заполнения');
+    expect(result.errors[0]!.message).toBe('Field "username" is required');
+  });
+
+  test("RU_VALIDATION_MESSAGES switches every built-in code to Russian", () => {
+    class Dto {
+      @Validator({ required: true })
+      username?: string;
+    }
+    try {
+      Validator.setDefaultMessages(RU_VALIDATION_MESSAGES);
+      expect(Validator.validate(new Dto()).errors[0]!.message).toBe('Поле "username" обязательно для заполнения');
+    } finally {
+      Validator.resetDefaultMessages();
+    }
+    expect(Validator.validate(new Dto()).errors[0]!.message).toBe('Field "username" is required');
   });
 
   test("reset возвращает встроенные сообщения", () => {
@@ -543,7 +557,7 @@ describe("сообщения и кастомизация", () => {
     }
     expect(Validator.validate(new Dto()).errors[0]!.message).toBe("ОБЯЗАТЕЛЬНО!");
     Validator.resetDefaultMessages();
-    expect(Validator.validate(new Dto()).errors[0]!.message).toBe('Поле "a" обязательно для заполнения');
+    expect(Validator.validate(new Dto()).errors[0]!.message).toBe('Field "a" is required');
   });
 
   test("неизвестные плейсхолдеры остаются как есть", () => {

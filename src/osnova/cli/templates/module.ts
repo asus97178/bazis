@@ -9,11 +9,11 @@ export interface ModuleTemplateFiles {
 }
 
 /**
- * Scaffold фича-модуля.
+ * Feature module scaffold.
  *
- * `minimal` — default: компактный CRUD, который легко прочитать и сразу
- * адаптировать. `empty` — точка подключения и паспорт. `full` — витрина: auth/cache/background/JSON:API list
- * и AI-вход в той же вертикальной фиче.
+ * `minimal` (default): a compact CRUD that is easy to read and adapt.
+ * `empty`: the entry point and passport. `full`: a showcase with
+ * auth/cache/background/JSON:API list and an AI entry in the same feature.
  */
 export function buildModuleTemplates(
   naming: ModuleNaming,
@@ -410,7 +410,7 @@ export class Prepare${n.entity}BriefRequest {
   topic!: string;
 
   @Validator({ required: true, minLength: 3 })
-  audience = "операторы";
+  audience = "operators";
 }
 
 export class ${n.entity}BriefDocument {
@@ -439,7 +439,7 @@ export class ${n.entity}SummaryToolOutput {
 
 @Tool({
   name: "${n.route}.summary",
-  description: "Читает сводку ${n.route} через ${n.entity}Service.",
+  description: "Reads the ${n.route} summary through ${n.entity}Service.",
   input: ${n.entity}SummaryToolInput,
   output: ${n.entity}SummaryToolOutput,
   sideEffect: "read",
@@ -467,15 +467,15 @@ import { ${n.entity}SummaryTool } from "../tools/${n.entity}SummaryTool";
 
 @Agent({
   name: "${n.route}-analyst",
-  role: "Аналитик ${n.route}",
+  role: "${n.route} analyst",
   sections: [
     {
       kind: "developer",
-      content: "Готовь короткие и конкретные операционные сводки по домену ${n.route}.",
+      content: "Write short, concrete operational summaries of the ${n.route} domain.",
     },
     {
       kind: "tool-policy",
-      content: "Перед финальной сводкой используй read-инструменты. Не выдумывай данные.",
+      content: "Use read tools before the final summary. Do not make up data.",
     },
   ],
   tools: [${n.entity}SummaryTool],
@@ -485,7 +485,7 @@ import { ${n.entity}SummaryTool } from "../tools/${n.entity}SummaryTool";
 export class ${n.entity}AnalystAgent {
   @Task({
     name: "prepare-${n.route}-brief",
-    description: "Подготовить краткую сводку ${n.route} по актуальным данным модуля.",
+    description: "Prepare a short ${n.route} summary from the current module data.",
     input: Prepare${n.entity}BriefRequest,
     output: ${n.entity}BriefDocument,
     modelProfile: "reasoning",

@@ -4,8 +4,43 @@
  */
 export type MessageParams = Readonly<Record<string, unknown>>;
 
-/** Встроенные сообщения по умолчанию (русский язык). */
+/** Built-in default messages (English). */
 const BUILT_IN: Readonly<Record<string, string>> = {
+  required: 'Field "{property}" is required',
+  notEmpty: 'Field "{property}" must not be empty',
+  minLength: 'Field "{property}" must be at least {min} characters long',
+  maxLength: 'Field "{property}" must be at most {max} characters long',
+  length: 'Field "{property}" must be {min} to {max} characters long',
+  contains: 'Field "{property}" must contain "{contains}"',
+  notContains: 'Field "{property}" must not contain "{contains}"',
+  pattern: 'Field "{property}" does not match the format {pattern}',
+  email: 'Field "{property}" must be a valid email address',
+  url: 'Field "{property}" must be a valid URL',
+  uuid: 'Field "{property}" must be a valid UUID',
+  type: 'Field "{property}" must be of type {expected}, got: {actual}',
+  min: 'Field "{property}" must be at least {min}',
+  max: 'Field "{property}" must be at most {max}',
+  range: 'Field "{property}" must be between {min} and {max}',
+  positive: 'Field "{property}" must be a positive number',
+  negative: 'Field "{property}" must be a negative number',
+  integer: 'Field "{property}" must be an integer',
+  mustBeTrue: 'Field "{property}" must be true',
+  mustBeFalse: 'Field "{property}" must be false',
+  enum: 'Field "{property}" must be one of: {allowed}',
+  json: 'Field "{property}" must be a valid JSON string',
+  phone: 'Field "{property}" must be a valid phone number',
+  date: 'Field "{property}" must be a valid date',
+  custom: 'Field "{property}" failed a custom check',
+  customError: 'Check of field "{property}" failed with an error: {error}',
+  asyncCustomInSyncCall:
+    'Field "{property}": an async custom check is not supported by synchronous validate(); use validateAsync()',
+};
+
+/**
+ * Russian texts for every built-in code. Apply once at startup:
+ * `MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES)`.
+ */
+export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   required: 'Поле "{property}" обязательно для заполнения',
   notEmpty: 'Поле "{property}" не должно быть пустым',
   minLength: 'Поле "{property}" должно содержать не менее {min} символов',
@@ -34,7 +69,7 @@ const BUILT_IN: Readonly<Record<string, string>> = {
   customError: 'Проверка поля "{property}" завершилась ошибкой: {error}',
   asyncCustomInSyncCall:
     'Поле "{property}": асинхронная custom-проверка не поддерживается синхронным validate(), используйте validateAsync()',
-};
+});
 
 /**
  * Реестр шаблонов сообщений об ошибках.

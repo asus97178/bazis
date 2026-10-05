@@ -160,21 +160,21 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       const raw = selected?.raw ?? (isSecret(cell) || isEnum(cell) ? cell.default : cell);
       let value: ConfigValueType | undefined;
       if (type === "secret") {
-        if (typeof raw !== "string" || !raw.trim()) issues.push(`${fullKey(key)}: не задан обязательный непустой секрет (${names.get(key)!.join(", ")})`);
+        if (typeof raw !== "string" || !raw.trim()) issues.push(`${fullKey(key)}: required non-empty secret is not set (${names.get(key)!.join(", ")})`);
         else value = new Secret(raw);
       } else if (type === "number") {
         const parsed = Number(raw);
-        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)}: ожидалось конечное число`);
+        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)}: expected a finite number`);
         else value = parsed;
       } else if (type === "boolean") {
         const normalized = String(raw).toLowerCase();
         if (normalized === "true" || normalized === "1") value = true;
         else if (normalized === "false" || normalized === "0") value = false;
-        else issues.push(`${fullKey(key)}: ожидалось boolean`);
+        else issues.push(`${fullKey(key)}: expected a boolean`);
       } else if (typeof raw === "string") value = raw;
-      else issues.push(`${fullKey(key)}: ожидалась строка`);
+      else issues.push(`${fullKey(key)}: expected a string`);
       if (value === undefined) continue;
-      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)}: значение не входит в объявленный enum`);
+      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)}: value is not one of the declared enum values`);
       try {
         const issue = validators[key]?.(value);
         if (issue) issues.push(`${fullKey(key)}: ${issue}`);
@@ -188,7 +188,7 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
         const sensitive = value instanceof Secret ? value.reveal() : typeof value === "string" && isSensitiveKey(key) ? value : undefined;
         if (sensitive) message = message.replaceAll(sensitive, "***");
       }
-      throw new KernelError(`Конфигурация (стенд "${environment}") некорректна: ${message}.`);
+      throw new KernelError(`Invalid configuration (environment "${environment}"): ${message}.`);
     }
     const rows = Object.freeze(inspection);
     return Object.freeze({

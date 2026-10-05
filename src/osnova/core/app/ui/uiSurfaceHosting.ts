@@ -1,3 +1,4 @@
+import type { UiLabels } from "./uiProfileResolver";
 import type { AuthorizeCheck, HttpContext } from "../../http";
 import type {
   UiSurfacePolicyDecision,
@@ -25,6 +26,8 @@ export interface RunAppUiSurfaceOptions {
 export interface RunAppUiOptions {
   readonly app?: RunAppUiAppInfo;
   readonly surfaces: readonly RunAppUiSurfaceOptions[];
+  /** Texts of generated profiles; default English, `RU_UI_LABELS` for Russian. */
+  readonly labels?: UiLabels;
 }
 
 /** Fully normalized options used by the UI surface HTTP runtime. */

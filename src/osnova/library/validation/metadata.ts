@@ -28,10 +28,10 @@ interface RulesMetadata {
  */
 export function registerFieldRule(context: ClassFieldDecoratorContext, options: ValidatorOptions): void {
   if (context.static) {
-    throw new Error(`@Validator: статическое поле "${String(context.name)}" не поддерживается — декоратор работает только с полями экземпляра.`);
+    throw new Error(`@Validator: static field "${String(context.name)}" is not supported; the decorator works on instance fields only.`);
   }
   if (context.private) {
-    throw new Error(`@Validator: приватное поле "${String(context.name)}" не поддерживается — движок читает значения через обычный доступ к свойству.`);
+    throw new Error(`@Validator: private field "${String(context.name)}" is not supported; values are read through ordinary property access.`);
   }
 
   const metadata = context.metadata as RulesMetadata;

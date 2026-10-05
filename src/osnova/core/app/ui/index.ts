@@ -1,6 +1,9 @@
 export {
+  EN_UI_LABELS,
   resolveUiProfileAuthoringV1,
+  RU_UI_LABELS,
   type ResolveUiProfileAuthoringV1Options,
+  type UiLabels,
   type ResolveUiProfileAuthoringV1Result,
 } from "./uiProfileResolver";
 export type {

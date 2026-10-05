@@ -140,7 +140,7 @@ export class AppModule {}
     const agent = await readFile(path.join(moduleDir, "ai/agents/CatalogAnalystAgent.ts"), "utf8");
     expect(agent).toContain("@Agent");
     expect(agent).toContain("@Task");
-    expect(agent).toContain('role: "Аналитик catalogs"');
+    expect(agent).toContain('role: "catalogs analyst"');
     expect(await Bun.file(path.join(moduleDir, "ai/prompts/CatalogAnalystPrompt.ts")).exists()).toBe(false);
 
     const module = await readFile(path.join(moduleDir, "Catalog.module.ts"), "utf8");

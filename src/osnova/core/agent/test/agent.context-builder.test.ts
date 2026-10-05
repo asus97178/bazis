@@ -83,14 +83,14 @@ describe("agent context builder", () => {
     });
 
     expect(context.messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(textOf(context.messages[0])).toContain("Роль: Старший продуктовый аналитик");
-    expect(textOf(context.messages[0])).toContain("Роль промпта: Продуктовый аналитик");
-    expect(textOf(context.messages[0])).toContain("Цель: Превратить продуктовые идеи в понятный план поставки.");
+    expect(textOf(context.messages[0])).toContain("Role: Старший продуктовый аналитик");
+    expect(textOf(context.messages[0])).toContain("Prompt role: Продуктовый аналитик");
+    expect(textOf(context.messages[0])).toContain("Goal: Превратить продуктовые идеи в понятный план поставки.");
     expect(textOf(context.messages[0])).toContain("- Предпочитай явные критерии приемки.");
     expect(textOf(context.messages[0])).toContain("- Не выдумывай регуляторные утверждения.");
     expect(textOf(context.messages[0])).toContain("Правила домена:");
     expect(textOf(context.messages[0])).toContain("- Сохраняй enterprise-процессы аудируемыми.");
-    expect(textOf(context.messages[0])).toContain("Политика инструментов:");
+    expect(textOf(context.messages[0])).toContain("Tool policy:");
     expect(textOf(context.messages[0])).toContain("Используй read-инструменты перед предложением write-действий.");
     expect(context.trace[0]).toMatchObject({ section: "prompt", role: "system", included: true });
     expect(context.trace[0]?.tokens).toBeGreaterThan(0);
@@ -113,11 +113,11 @@ describe("agent context builder", () => {
 
     const system = textOf(context.messages[0]);
     expect(context.messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(system).toContain("Роль: Оператор каталога");
-    expect(system).toContain("Цель: Помочь пользователю управлять каталогом товаров.");
+    expect(system).toContain("Role: Оператор каталога");
+    expect(system).toContain("Goal: Помочь пользователю управлять каталогом товаров.");
     expect(system).toContain("- Отвечай кратко.");
     expect(system).toContain("- Используй только данные из tools.");
-    expect(system).toContain("Политика инструментов:");
+    expect(system).toContain("Tool policy:");
     expect(system).toContain("Перед ответом по товарам вызови read-инструмент.");
     expect(agent.prompt).toBeUndefined();
   });
