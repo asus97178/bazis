@@ -318,10 +318,6 @@ async function runConfiguredTargets(): Promise<void> {
   const configStartedAt = performance.now();
   const config = await readCodegenConfig();
   await planStaleGeneratedTargetRemoval(Object.keys(config.targets));
-  // This generator no longer emits the removed Workflow channel. Delete only its
-  // known generated artifacts through the same transactional write mechanism.
-  stageRemove(`${APP_GENERATED_DIR}/workflowActionManifest.ts`);
-  for (const name of Object.keys(config.targets)) stageRemove(`${APP_GENERATED_DIR}/targets/${name}/workflowActionManifest.ts`);
   // Test sources remain excluded from the broad candidate scan. A test-only
   // target can still opt a single fixture in explicitly through its declared
   // entrypoint/application part, and receives the same isolated descriptor as
