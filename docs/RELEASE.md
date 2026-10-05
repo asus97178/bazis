@@ -246,6 +246,14 @@ CLI 0.96.1: все команды вызываются как `osnv` (`bunx osnv
   подключает их при старте. Ошибки конфигурации и заголовки промпта агента
   только английские.
 
+В корне `src/` осталась только точка входа `index.ts`. Вспомогательные скрипты
+перенесены к модулям-владельцам (команды `bun run …` прежние):
+`admin:token` → `src/app/modules/auth/AdminToken.cli.ts`, `agent:run` →
+`src/app/modules/agent-chat/client/AgentRun.cli.ts`, `config:check`/`config:inspect`
+→ `src/app/config/ConfigCheck.cli.ts`, `admin:backend` →
+`src/app/modules/AdminUiDev.server.ts`. Удалена заглушка снятой фичи Workflow
+(`src/system-workflow-producer.ts`).
+
 Миграция: сообщения валидации, ошибки конфигурации, тексты Codex и подписи UI
 по умолчанию стали английскими — для прежнего поведения подключите русские
 наборы; тесты, сравнивающие эти тексты, нужно обновить. `RequestModelFieldShape`
