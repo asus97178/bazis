@@ -57,13 +57,13 @@ describe("agent metadata codegen", () => {
           @Agent({
             name: "product-agent",
             description: "Creates product artifacts.",
-            goal: "Помочь оператору управлять каталогом.",
-            instructions: ["Отвечай кратко.", "Не выдумывай данные."],
-            constraints: ["Используй только зарегистрированные tools."],
+            goal: "Help the operator manage the catalog.",
+            instructions: ["Answer briefly.", "Do not invent data."],
+            constraints: ["Use only registered tools."],
             sections: [
               {
                 kind: "tool-policy",
-                content: "Перед финальным ответом вызывай read tools.",
+                content: "Call read tools before the final answer.",
               },
             ],
             prompt: ProductPrompt,
@@ -94,9 +94,9 @@ describe("agent metadata codegen", () => {
     expect(result.schemaNames).toEqual(["SearchInput", "SearchOutput"]);
     expect(result.output).toContain('from "../../../../app/agents/product"');
     expect(result.output).toContain('[ProductAgent, Object.freeze({ name: "product-agent"');
-    expect(result.output).toContain('goal: "Помочь оператору управлять каталогом."');
-    expect(result.output).toContain('instructions: Object.freeze(["Отвечай кратко.", "Не выдумывай данные."])');
-    expect(result.output).toContain('constraints: Object.freeze(["Используй только зарегистрированные tools."])');
+    expect(result.output).toContain('goal: "Help the operator manage the catalog."');
+    expect(result.output).toContain('instructions: Object.freeze(["Answer briefly.", "Do not invent data."])');
+    expect(result.output).toContain('constraints: Object.freeze(["Use only registered tools."])');
     expect(result.output).toContain('sections: Object.freeze([Object.freeze({ kind: "tool-policy"');
     expect(result.output).toContain('tools: Object.freeze([SearchTool, ReindexTool])');
     expect(result.output).toContain('tasks: Object.freeze([Object.freeze({ name: "prepare-requirements"');

@@ -5,7 +5,7 @@ import { CreateAgentSessionRequestV1, ReadAgentSessionEventsRequestV1, ReadAgent
 const id = "11111111-1111-4111-8111-111111111111";
 describe("Session v1 DTO validation", () => {
   test("accepts declared DTO instances", async () => {
-    const request = Object.assign(new CreateAgentSessionRequestV1(), { sessionId: id, requestId: id, agentName: "catalog", input: { question: "остаток" }, maxSteps: 8, maxToolCallsPerStep: 8, runTimeoutMs: 300000 });
+    const request = Object.assign(new CreateAgentSessionRequestV1(), { sessionId: id, requestId: id, agentName: "catalog", input: { question: "stock" }, maxSteps: 8, maxToolCallsPerStep: 8, runTimeoutMs: 300000 });
     expect((await Validator.validateAsync(request)).isValid).toBe(true);
   });
   test("accepts null as JsonValue input but rejects absent and non-JSON input", async () => {

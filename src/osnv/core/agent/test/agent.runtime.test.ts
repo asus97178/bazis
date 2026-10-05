@@ -96,15 +96,15 @@ class ProfiledAgent {}
 
 @Prompt({
   name: "runtime.prompt",
-  role: "Рантайм-промпт",
-  goal: "Сохранять runtime-запросы явными.",
-  instructions: ["Сохраняй последний запрос пользователя."],
+  role: "Runtime prompt",
+  goal: "Keep runtime requests explicit.",
+  instructions: ["Keep the user's last request."],
 })
 class RuntimePrompt {}
 
 @Agent({
   name: "prompted-runtime-agent",
-  role: "Рантайм-агент",
+  role: "Runtime agent",
   prompt: RuntimePrompt,
 })
 class PromptedRuntimeAgent {}
@@ -123,7 +123,7 @@ class RequirementsDocument {
 class TaskRuntimeAgent {
   @Task({
     name: "prepare-requirements",
-    description: "Подготовить требования.",
+    description: "Prepare the requirements.",
     input: RequirementsRequest,
     output: RequirementsDocument,
     modelProfile: "reasoning",
@@ -368,7 +368,7 @@ describe("agent runtime", () => {
     try {
       const result = await runtime.invoke("prompted-runtime-agent", {
         id: "inv-1",
-        input: "Собери контекст",
+        input: "Gather the context",
         contextLimits: { maxMessages: 3 },
       });
 
@@ -377,7 +377,7 @@ describe("agent runtime", () => {
       expect(provider.requests[0]?.messages.map((message) => message.role)).toEqual(["system", "user"]);
       expect(provider.requests[0]?.messages[0]?.content[0]).toMatchObject({
         kind: "text",
-        text: expect.stringContaining("Prompt role: Рантайм-промпт"),
+        text: expect.stringContaining("Prompt role: Runtime prompt"),
       });
       const contextMetadata = provider.requests[0]?.metadata.agentContext as JsonObject | undefined;
       expect(contextMetadata?.messageCount).toBe(2);

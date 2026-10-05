@@ -31,18 +31,18 @@ afterAll(async () => {
   await container.dispose();
 });
 
-describe("конвенции привязки (codegen, по сигнатуре)", () => {
-  test("route-параметр по имени с конверсией ограничения", async () => {
+describe("binding conventions (codegen, by signature)", () => {
+  test("route parameter by name with constraint conversion", async () => {
     const response = await fetch(`${base}/conv/items/42`);
     expect(await response.json()).toEqual({ code: 42, flag: false, codeType: "number" });
   });
 
-  test("query bool с default-значением без аннотации типа", async () => {
+  test("query bool with a default value and no type annotation", async () => {
     const response = await fetch(`${base}/conv/items/42?flag=true`);
     expect(await response.json()).toEqual({ code: 42, flag: true, codeType: "number" });
   });
 
-  test("обязательный query-примитив: отсутствие -> 400", async () => {
+  test("required query primitive: missing -> 400", async () => {
     const ok = await fetch(`${base}/conv/search?q=phone&page=2`);
     expect(await ok.json()).toEqual({ q: "phone", page: 2 });
 
@@ -53,7 +53,7 @@ describe("конвенции привязки (codegen, по сигнатуре)
     expect(missing.status).toBe(400);
   });
 
-  test("класс с @RequestModel -> тело запроса + валидация -> 400", async () => {
+  test("class with @RequestModel -> request body + validation -> 400", async () => {
     const created = await fetch(`${base}/conv/orders`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -72,7 +72,7 @@ describe("конвенции привязки (codegen, по сигнатуре)
     expect(payload.details.map((d) => d.property).sort()).toEqual(["product", "quantity"]);
   });
 
-  test("HttpContext и ResponseBuilder распознаются по типу параметра", async () => {
+  test("HttpContext and ResponseBuilder are recognized by parameter type", async () => {
     const response = await fetch(`${base}/conv/special/world`);
     expect(response.headers.get("x-conv")).toBe("yes");
     expect(await response.json()).toEqual({ name: "world", path: "/conv/special/world" });
