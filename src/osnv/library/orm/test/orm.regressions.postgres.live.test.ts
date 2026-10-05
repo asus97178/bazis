@@ -5,9 +5,9 @@ import {
 } from "../index";
 
 // Explicitly opt in on an owner-approved disposable database. This suite
-// creates and drops only its own random schema; ENV_OFF performs no SQL.
+// creates and drops only its own random schema; without the opt-in env it runs no SQL.
 const url = process.env.OSNV_PG_URL;
-const enabled = !!url && process.env.OSNV_ORM_AUDIT_LIVE === "1";
+const enabled = !!url && process.env.OSNV_ORM_REGRESSIONS_LIVE === "1";
 class Context extends DbContext {}
 
 async function withFixture(work: (fixture: Awaited<ReturnType<typeof createFixture>>) => Promise<void>): Promise<void> {
