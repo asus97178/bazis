@@ -47,6 +47,11 @@ test.skipIf(!enabled)("projects, tasks and the report work together", async () =
   const project = await json<Item>(created);
   expect((await send("POST", "/projects", { name })).status).toBe(409);
 
+  // The unique index decides under concurrency: exactly one request wins.
+  const racing = `Race ${crypto.randomUUID()}`;
+  const statuses = await Promise.all([1, 2, 3].map(() => send("POST", "/projects", { name: racing }).then((response) => response.status)));
+  expect(statuses.sort()).toEqual([201, 409, 409]);
+
   const first = await json<Item>(send("POST", "/tasks", { projectId: project.id, title: "Write landing copy" }));
   const second = await json<Item>(send("POST", "/tasks", { projectId: project.id, title: "Ship it" }));
   expect((await json<Item>(send("PUT", `/tasks/${second.id}`, { done: true }))).done).toBe(true);
@@ -59,7 +64,7 @@ test.skipIf(!enabled)("projects, tasks and the report work together", async () =
   expect((await send("PUT", `/tasks/${first.id}`, { done: "yes" })).status).toBe(400);
 
   expect(await json<Report>(send("GET", "/report"))).toEqual({
-    projects: before.projects + 1,
+    projects: before.projects + 2,
     tasks: before.tasks + 2,
     done: before.done + 1,
   });

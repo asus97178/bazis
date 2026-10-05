@@ -125,6 +125,12 @@ The additive migration paths are separate from PostgreSQL exact admission.
 `transactionScope()` с savepoint. Автоматический повтор сохранения внутри
 действующей транзакции отключён.
 
+Нарушение уникального ограничения (SQLSTATE 23505) в `saveChanges()` приходит
+как `UniqueViolationError` (наследник `DbUpdateError`) с полями `constraint`,
+`table` и исходной ошибкой драйвера в `cause`; изменения этого сохранения
+откатываются. Поймайте её, чтобы ответить 409 без предварительной проверки:
+решает индекс, поэтому гонка невозможна. Прочие ошибки драйвера не оборачиваются.
+
 Если после отправки COMMIT нет достоверного ответа, ORM бросает `DbUpdateError`
 с `code: "ORM_TRANSACTION_OUTCOME_UNKNOWN"`. `ExecutionStrategy` и `withRetry`
 не повторяют такую операцию, включая пользовательский `isTransient`.

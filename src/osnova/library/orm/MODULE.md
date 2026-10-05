@@ -130,6 +130,7 @@ await db.transactionScope(async (tx) => {
 | OrmTransactionScopeError | Сигнал уже отменён | Callback и BEGIN не выполняются |
 | OrmTransactionScopeError | Сигнал во время callback / закрытия операций | Запрет новых операций, откат; незавершённый SQL отменяется с подтверждённым откатом физического владельца |
 | ORM_TRANSACTION_OUTCOME_UNKNOWN | Нет доказательства отмены или подтверждения COMMIT в бюджет | DbUpdateError, phase=cancellation/commit; запрет повторов, фиктивных callbacks и SQL затронутых контекстов |
+| UniqueViolationError | SQLSTATE 23505 в saveChanges | DbUpdateError с constraint/table/cause; собственные errno/code драйвера сохранены для классификации исхода |
 | Существующие ошибки scope | Чужой provider, stale scope, конкурирующие дочерние scopes | Прежнее поведение |
 
 Сигнал передаётся в reserve({ signal }); поздняя выдача соединения после отмены

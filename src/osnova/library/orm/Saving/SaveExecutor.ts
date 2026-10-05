@@ -1,5 +1,5 @@
 import { Validator } from "../../validation";
-import { DbUpdateError, isCommittedOutcome, OrmValidationError } from "../errors";
+import { DbUpdateError, isCommittedOutcome, OrmValidationError, UniqueViolationError } from "../errors";
 import type { EntityModel } from "../Metadata/types";
 import { maxRowsPerInsert } from "../Providers/limits";
 import { decodeProperty } from "../Providers/propertyConversion";
@@ -160,6 +160,7 @@ export class SaveExecutor {
         // idempotent fallback also protects custom/top-level providers.
         this.restoreGeneratedKeys(generatedKeys);
         for (const token of tokens) this.restoreRollbackToken(token);
+        throw UniqueViolationError.from(error);
       }
       throw error;
     }
