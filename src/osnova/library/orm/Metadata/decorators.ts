@@ -17,13 +17,6 @@ export interface EntityOptions {
   /** Имя таблицы (по умолчанию — множественное число от имени класса). */
   readonly table?: string;
   /**
-   * Включить авто-миграцию схемы для этой сущности. При `migrate()` (или
-   * `migrateOnStart`) фреймворк сам доводит схему БД до модели в аддитивном
-   * режиме: создаёт таблицу, добавляет недостающие колонки/индексы.
-   * Деструктивные изменения (drop/смена типа) не выполняются автоматически.
-   */
-  readonly migrate?: boolean;
-  /**
    * Имя свойства soft-delete (`datetime`, nullable). Эквивалент `@SoftDelete()`
    * на колонке. `remove()` ставит метку времени вместо DELETE; запросы фильтруют
    * `IS NULL`, если не вызван `ignoreQueryFilters()`.
@@ -114,7 +107,6 @@ export interface RawEntity {
   isEntity: boolean;
   table?: string;
   schema?: string;
-  migrate?: boolean;
   properties: Map<string, RawProperty>;
   relations: RawRelation[];
   queryFilters?: Condition[];
@@ -193,7 +185,6 @@ export function Entity(options: EntityOptions = {}) {
     const raw = ownRaw(context.metadata);
     raw.isEntity = true;
     raw.table = options.table;
-    raw.migrate = options.migrate;
     if (options.softDelete) {
       raw.softDeleteProperty = options.softDelete;
     }

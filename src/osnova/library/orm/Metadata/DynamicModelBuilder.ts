@@ -231,7 +231,6 @@ function buildDynamicModelWithCtor(
     ctor,
     name: def.name,
     tableName,
-    autoMigrate: true,
     properties,
     key: primaryKey as [PropertyModel, ...PropertyModel[]],
     keyName: def.primaryKey?.name,

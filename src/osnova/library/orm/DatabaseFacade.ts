@@ -48,8 +48,8 @@ export class DatabaseFacade {
   }
 
   /**
-   * Аддитивная авто-миграция схемы для сущностей с `@Entity({ migrate: true })`:
-   * интроспектит БД, сравнивает с моделью и применяет недостающие
+   * Аддитивная авто-миграция схемы для всех сущностей контекста (включается
+   * в модуле: `ormOsnova: { migrateOnStart: true }`): интроспектит БД, сравнивает с моделью и применяет недостающие
    * таблицы/колонки/индексы в одной транзакции. Деструктивные расхождения не
    * выполняются — возвращаются как `warnings`.
    */
@@ -67,7 +67,7 @@ export class DatabaseFacade {
 
   private async migrateCore(): Promise<MigrationResult> {
     // Дифф упорядочивает createTable по FK-зависимостям (referenced -> dependent).
-    const targets = this.orderByDependencies(this.models.entities.filter((model) => model.autoMigrate));
+    const targets = this.orderByDependencies(this.models.entities);
     const types = this.provider.dialect.name === "postgres" ? physicalColumnTypes(this.models.entities) : undefined;
     const foreignKeys = new Map(targets.map((model) => [model, this.foreignKeysFor(model, types)]));
     const schema = await this.provider.introspect();

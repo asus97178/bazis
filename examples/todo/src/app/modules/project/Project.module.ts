@@ -9,7 +9,7 @@ import { ProjectService } from "./services/Project.service";
   ormOsnova: {
     context: ProjectDbContext,
     entities: [Project],
-    // Creates or extends the `projects` table on start (`@Entity({ migrate: true })`).
+    // The module decides schema creation: additive migration of its tables on start.
     migrateOnStart: true,
   },
   controllers: [ProjectController],

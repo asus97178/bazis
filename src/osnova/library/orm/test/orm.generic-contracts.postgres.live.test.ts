@@ -34,9 +34,6 @@ const canonicalExactFive = Object.freeze([
 ] as const);
 const exactFivePaths = Object.freeze([...canonicalExactFive]);
 
-@Entity({ migrate: false, table: `${prefix}mig02_excluded` })
-class MigrateFalseVector { @Key() id = 0; @Column({ type: "text" }) value = ""; }
-
 function registerTable(name: string): string {
   if (!ownedName.test(name) || ownedTables.has(name)) throw new Error("Invalid or duplicate owned table.");
   ownedTables.add(name);
@@ -312,17 +309,16 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect((await v2.database.migrate()).applied).toBe(0);
     } finally { await provider.close(); }
   });
-  test("GC-MIG-02 excludes migrate-false entities and reports extra columns non-destructively", async () => {
+  test("GC-MIG-02 reports extra columns non-destructively", async () => {
     const provider = postgres({ url: url! }); const table = physical("mig02_vectors");
     try {
       const model = buildDynamicModel({ name: `Migrated${run}`, tableName: table, fields: [{ name: "id", type: "int", isKey: true }, { name: "name", type: "string" }] });
-      const options = new DbContextOptions({ provider, entities: [MigrateFalseVector], validateOnSave: false }); options.model.registerModel(model); const db = new DynamicContext(options, model);
+      const options = new DbContextOptions({ provider, entities: [], validateOnSave: false }); options.model.registerModel(model); const db = new DynamicContext(options, model);
       await db.database.migrate();
       await provider.execute(`ALTER TABLE ${quotedOwnedTable(table)} ADD COLUMN "extra" text`, []);
       const result = await db.database.migrate();
       expect(result.warnings.some((warning) => warning.includes("extra"))).toBe(true);
       expect((await provider.query("SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='extra'", [table])).length).toBe(1);
-      expect(await provider.query("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1", [`${prefix}mig02_excluded`])).toEqual([]);
     } finally { await provider.close(); }
   });
   test("GC-MIG-03 serializes concurrent migration with two providers", async () => {
