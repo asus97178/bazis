@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.96.3 — 2026-10-06
+
+### Fixed
+
+- A binary built with `bazis build --bin` (or `bun build --compile`) ran in
+  `development` mode when `BAZIS_ENV` was not set: Bun inlines the literal
+  `process.env.NODE_ENV` as `"development"` at bundle time, and a runtime
+  `NODE_ENV=production` was ignored. In that mode `debug` is on, so 500
+  responses included error details, the OpenAPI page was served and
+  production-only configuration checks were skipped. The environment is now
+  read at runtime: without `BAZIS_ENV`/`NODE_ENV` a binary runs as
+  `production`. Rebuild existing binaries; until then set
+  `BAZIS_ENV=production` explicitly.
+
 ## 0.96.2 — 2026-10-06
 
 ### Changed
