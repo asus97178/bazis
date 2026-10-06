@@ -20,7 +20,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 ## 2. Обзор: строительные блоки
 
 - ✅ [Модули](overview/modules.md) — `@Module`, `imports` / `exports`, корневой `AppModule`
-- ⏳ Провайдеры и DI — `scoped`, `singleton`, `transient`, внедрение через конструктор
+- ✅ [Провайдеры и DI](overview/providers.md) — `scoped`, `singleton`, `transient`, внедрение через конструктор
 - ⏳ Контроллеры — `@Controller`, `@Get` / `@Post`, параметры маршрута
 - ⏳ Модели запросов и валидация — `@RequestModel`, `@Validator`
 - ⏳ Ответы — `Ok`, `Created`, `NotFound`, файлы
