@@ -75,7 +75,7 @@ function drift(connector: Record<string, unknown>, field: FingerprintedField): v
   connector[field] = replacement[field];
 }
 
-describe("TEST-003 strict-schema private identity", () => {
+describe("strict-schema private identity", () => {
   test("starts canonical LLM and protector after DB/exact ORM, then reverses disposal", async () => {
     const events: string[] = [];
     const coordinator = new LifecycleCoordinator(resolver([
