@@ -14,7 +14,7 @@
     },
     "src/bazis": {
       "name": "bazis",
-      "version": "0.96.4",
+      "version": "0.96.5",
       "bin": {
         "bazis": "./cli/main.ts",
       },
