@@ -1,47 +1,47 @@
 # From a new project to a binary
 
-osnv uses TypeScript, Bun, DI, DbContext and controllers with decorators.
+bazis uses TypeScript, Bun, DI, DbContext and controllers with decorators.
 Codegen infers constructor dependencies and HTTP parameter bindings before the run.
 For a C# developer the closest familiar concepts are the DI scope, EF DbContext and
-ASP.NET controllers. ORM conditions in osnv are built with methods, without LINQ expression trees.
+ASP.NET controllers. ORM conditions in bazis are built with methods, without LINQ expression trees.
 
 ## 1. Create an application
 
 In the framework checkout, use the qualified Bun from the
-[toolchain](../toolchain/bun.json). The commands below assume OSNV_BUN_BIN already
+[toolchain](../toolchain/bun.json). The commands below assume BAZIS_BUN_BIN already
 points to the verified executable.
 
 ```sh
-./scripts/osnv-bun run toolchain:check
-./scripts/osnv-bun run osnv new MyApp --path ../my-app
+./scripts/bazis-bun run toolchain:check
+./scripts/bazis-bun run bazis new MyApp --path ../my-app
 cd ../my-app
-"$OSNV_BUN_BIN" install
-"$OSNV_BUN_BIN" run dev
+"$BAZIS_BUN_BIN" install
+"$BAZIS_BUN_BIN" run dev
 ```
 
 The empty backend listens on `http://127.0.0.1:3000`; GET `/health` checks that it runs.
 If the port is busy, set `PORT=3100`. This project needs no database and no LLM.
 The sample application in the source checkout has its own infrastructure requirements.
 
-The CLI copies the package into `vendor/osnv`. Commit this directory together with the
+The CLI copies the package into `vendor/bazis`. Commit this directory together with the
 application: after that the source checkout is not needed. It is a snapshot of the
 version; framework changes are not pulled in automatically. `--link-framework` keeps
 a live link to an external checkout for joint development. The built CLI outside
-the checkout accepts `--framework /absolute/path/to/src/osnv`.
+the checkout accepts `--framework /absolute/path/to/src/bazis`.
 
 ## 2. Add a feature
 
 From the root of the new application:
 
 ```sh
-"$OSNV_BUN_BIN" x osnv g module Task --empty
+"$BAZIS_BUN_BIN" x bazis g module Task --empty
 ```
 
 The CLI creates `Task.module.ts` and `MODULE.md` and wires the module into `AppModule`.
 Fill in the responsibility and the inputs in the passport before implementing. One
 feature may hold a model, a service, a controller and background handlers. A composite
 module is for independent features: `g pack Catalog --parts items,categories`.
-A full controller example without a database: [HTTP README](../src/osnv/core/http/README.md).
+A full controller example without a database: [HTTP README](../src/bazis/core/http/README.md).
 
 For a learning CRUD there is `g module Guest --minimal`: ten files, including the
 model, DbContext, service, controller, ListQuery and passport. Running it needs a
@@ -65,16 +65,16 @@ auth/cache/background/AI infrastructure; it is an extended example, not a start 
 ## 4. Check and build
 
 ```sh
-"$OSNV_BUN_BIN" run di:generate
-"$OSNV_BUN_BIN" run build
-"$OSNV_BUN_BIN" run build:bin
+"$BAZIS_BUN_BIN" run di:generate
+"$BAZIS_BUN_BIN" run build
+"$BAZIS_BUN_BIN" run build:bin
 ./bin/my-app
 ```
 
 `dev` and `build` run codegen themselves. Do not edit its files in `src/generated`
-by hand. The `OSNV_HTTP_BINDING_UNRESOLVED` error means the action signature does
+by hand. The `BAZIS_HTTP_BINDING_UNRESOLVED` error means the action signature does
 not tell where an argument comes from: make the type precise; use `HttpContext` for headers and raw bodies.
-On `OSNV_ORM_PREDICATE_LOGIC` replace the JS logic with the `.and/.or/.not` methods.
+On `BAZIS_ORM_PREDICATE_LOGIC` replace the JS logic with the `.and/.or/.not` methods.
 A generation error keeps the previous outputs and stops the regular command.
 
 The application binary contains the code and the generated metadata. External

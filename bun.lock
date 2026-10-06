@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "osnv-workspace",
+      "name": "bazis-workspace",
       "devDependencies": {
         "@types/bun": "1.4.0",
         "typescript": "^5",
@@ -12,11 +12,11 @@
         "typescript": "^5",
       },
     },
-    "src/osnv": {
-      "name": "osnv",
+    "src/bazis": {
+      "name": "bazis",
       "version": "0.96.1",
       "bin": {
-        "osnv": "./cli/main.ts",
+        "bazis": "./cli/main.ts",
       },
       "peerDependencies": {
         "typescript": "^5.9.3",
@@ -30,7 +30,7 @@
 
     "bun-types": ["bun-types@1.4.0", "", { "dependencies": { "@types/node": "*" } }, "sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q=="],
 
-    "osnv": ["osnv@workspace:src/osnv"],
+    "bazis": ["bazis@workspace:src/bazis"],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

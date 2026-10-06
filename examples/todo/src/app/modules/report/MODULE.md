@@ -2,7 +2,7 @@
 
 Passport 1.0. Type: atomic. CLI profile: empty.
 Created with (from `examples/todo`):
-`../../scripts/osnv-bun node_modules/osnv/cli/main.ts g module Report --empty`
+`../../scripts/bazis-bun node_modules/bazis/cli/main.ts g module Report --empty`
 Entry: [Report.module.ts](Report.module.ts), class `ReportModule`.
 
 ## Responsibility

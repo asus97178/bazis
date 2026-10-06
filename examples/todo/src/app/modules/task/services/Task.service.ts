@@ -1,5 +1,5 @@
-import { paginate, type PageResult } from "osnv/core/orm";
-import type { ListQuery } from "osnv/library/jsonapi";
+import { paginate, type PageResult } from "bazis/core/orm";
+import type { ListQuery } from "bazis/library/jsonapi";
 import type { IProjectService } from "../../project/services/IProject.service";
 import type { CreateTaskRequest, UpdateTaskRequest } from "../http/contracts/Task.requests";
 import { toTaskResponse, type TaskResponse } from "../http/contracts/Task.responses";

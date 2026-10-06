@@ -1,4 +1,4 @@
-import { Filterable, ListOptions, ListRequest, Sortable } from "osnv/core/http";
+import { Filterable, ListOptions, ListRequest, Sortable } from "bazis/core/http";
 import type { Project } from "../../model/Project.model";
 
 @ListOptions({ defaultSize: 20, maxSize: 100 })

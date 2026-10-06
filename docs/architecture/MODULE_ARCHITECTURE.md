@@ -1,4 +1,4 @@
-# osnv module architecture and directory structure
+# bazis module architecture and directory structure
 
 Identifier: **MOD-ARCH-001**. Version: **1.11**. Date: **2026-10-06**.
 Status: **mandatory repository rule**.
@@ -123,11 +123,11 @@ The current build targets of this repository are defined in [package.json](../..
 
 | Script | Artifact |
 | --- | --- |
-| `build:bin` | `bin/osnv`: the CLI built from `src/osnv/cli/main.ts` |
+| `build:bin` | `bin/bazis`: the CLI built from `src/bazis/cli/main.ts` |
 | — | Application binaries are built by the application repository (for example osnova) |
 | — | Codegen runs as a separate step before an application build |
 
-Use the qualified Bun through `scripts/osnv-bun`. When checking a single target,
+Use the qualified Bun through `scripts/bazis-bun`. When checking a single target,
 first refresh the required codegen results.
 A change that affects the binary build or execution is checked by building the
 affected target and a control run of the matching scenario in a controlled
@@ -146,13 +146,13 @@ running the application, load measurements and binary builds are not needed for 
 
 ## 3. Dependency direction and owners
 
-1. `src/osnv/library` contains library mechanisms; it does not depend on the
+1. `src/bazis/library` contains library mechanisms; it does not depend on the
    application or on the `core` integration layer.
-2. `src/osnv/core` integrates library mechanisms, DI, HTTP, ORM and lifecycle;
+2. `src/bazis/core` integrates library mechanisms, DI, HTTP, ORM and lifecycle;
    it does not import application code (`src/app`, `admin-ui` in osnova). The lower DI layer does not import ORM/HTTP:
    extensions are registered by the upper layer through existing mechanisms.
 3. The application (`src/app` in osnova) defines features, configuration and composition. Consumers
-   use the public osnv entry points (`osnv/core/di`, `osnv/core/orm` and so on),
+   use the public bazis entry points (`bazis/core/di`, `bazis/core/orm` and so on),
    not internal framework implementation files.
 4. `admin-ui` and `client-ui` in osnova are client adapters. Domain services do not
    depend on Vue, UI components or browser state.
@@ -179,14 +179,14 @@ tasks; one does not replace the other.
 AGENTS.md                          mandatory entry point for the agent
 docs/architecture/                 the shared specification and the passport template
 src/
-  osnv/
+  bazis/
     index.ts                       the framework's public entry
     library/<capability>/          library implementation
     core/<capability>/             runtime and DI integration
     cli/                           the generator and templates
   generated/                       codegen results; do not edit by hand
 
-An application on osnv (the osnova layout):
+An application on bazis (the osnova layout):
 src/
   index.ts                         startup and publishing of the application surfaces
   app/
@@ -209,7 +209,7 @@ Existing additional entry points and directories are kept.
 ### 4.2. A new atomic module
 
 A new module is created only by a CLI command per §8.1. The base layout matches
-the [CLI template](../../src/osnv/cli/templates/module.ts).
+the [CLI template](../../src/bazis/cli/templates/module.ts).
 The `task/` example below is a template for a future module, not an existing implementation.
 
 ```text
@@ -276,7 +276,7 @@ classes are in the [code appendix](MODULE_CODE_EXAMPLES.md).
 
 ```ts
 // file: src/app/modules/task/Task.module.ts
-import { Module, scoped } from "osnv/core/di";
+import { Module, scoped } from "bazis/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { Task } from "./model/Task.model";
 import { TaskDbContext } from "./model/TaskDbContext";
@@ -286,7 +286,7 @@ import { TaskController } from "./http/TaskController";
 
 @Module({
   imports: [AuthModule],
-  ormOsnv: { context: TaskDbContext, entities: [Task] },
+  ormBazis: { context: TaskDbContext, entities: [Task] },
   providers: [scoped(ITaskService, TaskService)],
   controllers: [TaskController],
   exports: [ITaskService],
@@ -314,7 +314,7 @@ datamanager_modules/
 The pack root and every new atomic part are created through the CLI per §8.1.
 Each part uses its own layout from §4.2 and its own passport.
 The pack root has no domain `providers`, `controllers`, `config`,
-`ormOsnv`, `background`, `uiProfiles` or executable AI handlers of its own.
+`ormBazis`, `background`, `uiProfiles` or executable AI handlers of its own.
 If orchestration of several parts is needed, it gets an explicit atomic
 owner; it is not placed as a hidden business service in the pack root.
 
@@ -327,7 +327,7 @@ A code example of an existing composite module (DataManager in osnova):
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
-import { Module } from "osnv/core/di";
+import { Module } from "bazis/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { DataManagerTablesModule } from "./tables_module/DataManagerTables.module";
 import { DataManagerFieldsModule } from "./fields_module/DataManagerFields.module";
@@ -354,13 +354,13 @@ dependencies between parts are shown in the [code appendix](MODULE_CODE_EXAMPLES
 
 ### 5.1. Base `@Module` metadata
 
-Type source: [OsnvModuleMetadata](../../src/osnv/core/di/module/types/OsnvModule.ts).
+Type source: [BazisModuleMetadata](../../src/bazis/core/di/module/types/BazisModule.ts).
 All listed fields are optional in TypeScript. Project rules may require an explicit
 value, for example `exports` on a new feature module.
 
 | Field | Input type / value | Purpose and rule |
 | --- | --- | --- |
-| `imports` | `readonly OsnvModuleRef[]` | Connected dependencies; for a pack also its atomic parts |
+| `imports` | `readonly BazisModuleRef[]` | Connected dependencies; for a pack also its atomic parts |
 | `config` | `ModuleConfig` or a readonly array | Declarations and validators; the kernel resolves the values and checks them before clients are created per [§5.4](#kernel-config-isolation) |
 | `providers` | `readonly ProviderDefinition[]` | Own DI registrations; the token, implementation, dependencies and lifetime are described in the passport |
 | `controllers` | `readonly Class<object>[]` | HTTP controller classes; registered as scoped automatically |
@@ -371,7 +371,7 @@ value, for example `exports` on a new feature module.
 | `configure` | `(di: DiRegistrar) => void` | Programmatic registration when needed; regular registrations are declarative |
 
 The module name comes from the class with `@Module`; this metadata has no separate
-`name` field. `OsnvModuleRef` also allows plain metadata for internal/compatibility
+`name` field. `BazisModuleRef` also allows plain metadata for internal/compatibility
 scenarios; a new application module uses a named class.
 
 The semantics of `exports` matter:
@@ -388,14 +388,14 @@ The semantics of `exports` matter:
 New feature modules and packs set `exports` explicitly. The existing application
 root does not have to change because of this rule.
 
-### 5.2. ORM: `ormOsnv`
+### 5.2. ORM: `ormBazis`
 
-This is a metadata extension from `osnv/core/orm`, not a field of the lower DI layer.
+This is a metadata extension from `bazis/core/orm`, not a field of the lower DI layer.
 It takes one `OrmModuleConfig<DbContext>` or a readonly array of configurations.
 A regular atomic module uses `context` and `entities` on the shared connection.
 Several ORM contexts do not automatically mean several atomic modules.
 
-Source and the exact combination checks: [ormModule.ts](../../src/osnv/core/orm/ormModule.ts).
+Source and the exact combination checks: [ormModule.ts](../../src/bazis/core/orm/ormModule.ts).
 
 | Field | Input type | Value / condition |
 | --- | --- | --- |
@@ -410,7 +410,7 @@ Source and the exact combination checks: [ormModule.ts](../../src/osnv/core/orm/
 | `executionStrategy` | `DbContextOptionsConfig["executionStrategy"]` | Retry settings for transient save errors |
 | `healthCheck` | `boolean` | On by default for connection/standalone and off for feature |
 | `registerRepositories` | `boolean` | `true` by default; scoped `IRepository<T>` |
-| `imports` | `readonly OsnvModuleRef[]` | Extra dependencies of the context |
+| `imports` | `readonly BazisModuleRef[]` | Extra dependencies of the context |
 | `ownedStore` | `OrmOwnedStoreDefinitionV1` | A special contract of a managed PostgreSQL store and its lifecycle |
 
 Do not combine `ensureCreated` with active startup migrations or a non-empty
@@ -423,15 +423,15 @@ readiness is provided by the host composition.
 
 ### 5.3. AI and other extensions
 
-gRPC is connected by importing `osnv/core/grpc`: the field
+gRPC is connected by importing `bazis/core/grpc`: the field
 `grpcControllers?: readonly Class<object>[]` registers classes with
 `@GrpcController` as scoped per RPC through the existing owner-bound DI
 extension. A feature module can own both `controllers`
 and `grpcControllers`; splitting into submodules by transport is not needed.
 The server is enabled through `runApp(..., { grpc: ... })` or `grpcModule(options)`.
-Contracts and checks are in the [gRPC passport](../../src/osnv/core/grpc/MODULE.md).
+Contracts and checks are in the [gRPC passport](../../src/bazis/core/grpc/MODULE.md).
 
-Source of the current AI fields: [agent/index.ts](../../src/osnv/core/agent/index.ts).
+Source of the current AI fields: [agent/index.ts](../../src/bazis/core/agent/index.ts).
 The table describes the current implementation. The decision of 2026-09-20 separates
 agents from modules; the migration follows [AGENT-ARCH-001](AGENT_ARCHITECTURE.md).
 
@@ -447,14 +447,14 @@ In an `agentToolHooks` entry the `kind`, `id`, `version` and `handler` fields ar
 `observer`; `id` is 1–128 printable ASCII characters; `version` is a positive safe
 integer; `order` is a safe integer; `timeoutMs` is a positive safe integer.
 The handler implements the matching `enforce`, `settle` or `observe`. The exact
-event contracts come from [AgentToolHooks.ts](../../src/osnv/core/agent/AgentToolHooks.ts).
+event contracts come from [AgentToolHooks.ts](../../src/bazis/core/agent/AgentToolHooks.ts).
 
 `tools` automatically creates a regular scoped provider of the class in the declaring
 module. An exact existing scoped registration of the same owner is reused;
 a different lifetime, a factory, a duplicate name or an owner conflict fail the
 container build. Repeating a Tool in `providers` for a regular connection is not needed.
 A hook is still registered as the owner's private contribution. Source:
-[moduleContributions-v1.ts](../../src/osnv/core/agent/moduleContributions-v1.ts).
+[moduleContributions-v1.ts](../../src/bazis/core/agent/moduleContributions-v1.ts).
 
 Linking a Tool implementation to a DI owner does not put the agent into the module.
 Assigning Tools to an agent and the actual permissions to act are defined separately.
@@ -502,12 +502,12 @@ Required properties of the target model:
    one kernel uses its already resolved view.
 3. The environment is chosen at the host composition boundary. The
    `defineConfig` rules are kept: `default` → the selected environment section → the snapshot
-   of the kernel's configured sources, including `OSNV_*`; typed conversion
+   of the kernel's configured sources, including `BAZIS_*`; typed conversion
    and `Secret` are kept. Source values
    are fixed for this kernel's resolution; a later change of `process.env`
    does not change a ready result. Switching `process.env` to pick a context
    while reading is not allowed. The source order is set in the
-   [configuration contract](../../src/osnv/core/kernel/config/README.md).
+   [configuration contract](../../src/bazis/core/kernel/config/README.md).
 4. Services get their kernel's view through the existing DI;
    host factories may get it as an explicit argument. A shared declaration import
    alone does not define which kernel's values to read. A global
@@ -543,7 +543,7 @@ forbid use in another environment. The built-in connectors, JWT and the session
 protection adapter get the kernel view. A ready view stays
 immutable; for another kernel the declaration is reused.
 The state and boundaries are recorded in the
-[kernel passport](../../src/osnv/core/kernel/MODULE.md#config-isolation-decision).
+[kernel passport](../../src/bazis/core/kernel/MODULE.md#config-isolation-decision).
 
 ## 6. Components of an atomic module and their inputs
 
@@ -585,7 +585,7 @@ dependency and its availability through `exports`. Describing dependencies in th
 does not require repeating them as an array in the registration.
 
 The regular path is `scoped`, `singleton`, `transient` and the existing factory/value
-shortcuts from [shortcuts.ts](../../src/osnv/core/di/module/shortcuts.ts).
+shortcuts from [shortcuts.ts](../../src/bazis/core/di/module/shortcuts.ts).
 A regular class uses `scoped(IService, Service)` or `scoped(Service)`.
 Dependencies are declared in the constructor; codegen extracts their types, including
 `IRepository<Entity>`, and DI uses the generated binding.
@@ -692,7 +692,7 @@ that is no reason to stop an allowed fix: use the general rules and the code.
 ### 8.1. Creating modules only through the CLI
 
 All new architectural modules of the application and the framework are created **only
-by osnv CLI commands**. The rule covers atomic modules, composite roots and
+by bazis CLI commands**. The rule covers atomic modules, composite roots and
 atomic parts, including those added to an existing pack. Creating the scaffold by hand,
 copying a neighbouring module and creating files from documentation examples
 instead of running the CLI are forbidden.
@@ -705,9 +705,9 @@ instead of running the CLI are forbidden.
 | Composite | `g pack <Name> --parts <part-a,part-b,...>` | The composition root and empty atomic parts with their own passports |
 
 Commands run from the repository root through
-`./scripts/osnv-bun run osnv <command>` with a qualified `OSNV_BUN_BIN`.
+`./scripts/bazis-bun run bazis <command>` with a qualified `BAZIS_BUN_BIN`.
 Path, connection and codegen parameters are described in the
-[CLI passport](../../src/osnv/cli/MODULE.md). `--dry-run` shows the
+[CLI passport](../../src/bazis/cli/MODULE.md). `--dry-run` shows the
 plan; it does not replace actually creating the module.
 
 After a successful generation the author fills in the domain responsibility, the input
