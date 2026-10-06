@@ -17,9 +17,15 @@ contain breaking changes, a patch version does not.
   read at runtime: without `BAZIS_ENV`/`NODE_ENV` a binary runs as
   `production`. Rebuild existing binaries; until then set
   `BAZIS_ENV=production` explicitly.
-- The README install steps for an existing project now pin
-  `typescript@^5.9`: a bare `bun add -d typescript` installs TypeScript 7,
-  whose API the code generator does not support yet.
+- TypeScript 6 is supported: the peer dependency is now
+  `^5.9.3 || ^6.0.0`, new projects from `bazis new` get `"typescript": "^6"`,
+  and the framework itself is built and tested with TypeScript 6.0.3.
+  TypeScript 7 is not supported yet: it removed the JavaScript compiler API
+  that the code generator uses. The README install steps for an existing
+  project pin `typescript@^6`, because a bare `bun add -d typescript`
+  installs TypeScript 7. With TypeScript 6 the project `tsconfig.json`
+  must list `"types": ["bun"]` (TypeScript 6 no longer loads every
+  `@types/*` package by default); projects from `bazis new` already do.
 
 ## 0.96.2 — 2026-10-06
 

@@ -28,7 +28,7 @@ test("codegen preserves class identity, private same-name dependencies and expor
   try {
     await symlink(path.join(repo, "node_modules"), path.join(root, "node_modules"), "dir");
     const files: Record<string, string> = {
-      "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true, noEmit: true, paths: { "bazis/*": [path.join(repo, "src/bazis/*")], "@/*": [path.join(repo, "src/bazis/*")] } }, include: ["src/**/*.ts"] }),
+      "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true, noEmit: true, types: ["bun"], paths: { "bazis/*": [path.join(repo, "src/bazis/*")], "@/*": [path.join(repo, "src/bazis/*")] } }, include: ["src/**/*.ts"] }),
       "bazis.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
       "src/a/Dependency.ts": 'export class Dependency { readonly value = "A"; }',
       "src/b/Dependency.ts": 'export class Dependency { readonly value = "B"; }',

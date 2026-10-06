@@ -12,7 +12,7 @@ async function project(files: Record<string, string>): Promise<string> {
   const config = {
     compilerOptions: {
       target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, skipLibCheck: true,
-      noEmit: true,
+      noEmit: true, types: ["bun"],
       paths: { "bazis/*": [path.join(repo, "src/bazis/*")], "@/*": [path.join(repo, "src/bazis/*")] },
     },
     include: ["src/**/*.ts"],
