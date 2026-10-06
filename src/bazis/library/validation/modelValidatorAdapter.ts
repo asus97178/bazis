@@ -1,5 +1,7 @@
 import { Validator } from "./Validator";
 import { rulesOf } from "./metadata";
+import { MessageRegistry } from "./MessageRegistry";
+import type { ValidationResult } from "./ValidationResult";
 
 interface AdapterValidationIssue {
   readonly property: string;
@@ -27,11 +29,31 @@ interface AdapterValidationIssue {
  * kernel unaware of the concrete validation engine (dependency inversion).
  */
 export const modelValidatorAdapter = {
-  validate(instance: object): {
-    readonly isValid: boolean;
-    readonly errors: readonly { readonly property: string; readonly message: string; readonly code?: string }[];
-  } {
-    const result = Validator.validate(instance);
+  validate(instance: object): AdapterValidationResult {
+    return toAdapterResult(instance, Validator.validate(instance));
+  },
+
+  /** Runs async `custom` rules too; HTTP request binding uses this. */
+  async validateAsync(instance: object): Promise<AdapterValidationResult> {
+    return toAdapterResult(instance, await Validator.validateAsync(instance));
+  },
+
+  /** A JSON value of the wrong type, in the current `MessageRegistry` language. */
+  typeMismatchMessage(property: string, expected: string, actual: string): string {
+    return MessageRegistry.format("type", undefined, { property, expected, actual });
+  },
+
+  failureTitle(): string {
+    return MessageRegistry.format("validationFailed", undefined, {});
+  },
+};
+
+interface AdapterValidationResult {
+  readonly isValid: boolean;
+  readonly errors: readonly AdapterValidationIssue[];
+}
+
+function toAdapterResult(instance: object, result: ValidationResult): AdapterValidationResult {
     const nestedInstanceErrors = validateExplicitNestedInstances(instance);
     const errors: AdapterValidationIssue[] = result.errors.map((error) => ({
       property: error.property,
@@ -43,8 +65,7 @@ export const modelValidatorAdapter = {
       isValid: errors.length === 0,
       errors,
     };
-  },
-};
+}
 
 /**
  * `nested: true` must never silently validate a plain object with no class

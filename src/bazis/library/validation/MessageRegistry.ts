@@ -6,6 +6,8 @@ export type MessageParams = Readonly<Record<string, unknown>>;
 
 /** Built-in default messages (English). */
 const BUILT_IN: Readonly<Record<string, string>> = {
+  validationFailed: "Validation failed",
+  invalid: 'Field "{property}" is invalid ({code})',
   required: 'Field "{property}" is required',
   notEmpty: 'Field "{property}" must not be empty',
   minLength: 'Field "{property}" must be at least {min} characters long',
@@ -41,6 +43,8 @@ const BUILT_IN: Readonly<Record<string, string>> = {
  * `MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES)`.
  */
 export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  validationFailed: "Проверка данных не пройдена",
+  invalid: 'Поле "{property}" не прошло проверку ({code})',
   required: 'Поле "{property}" обязательно для заполнения',
   notEmpty: 'Поле "{property}" не должно быть пустым',
   minLength: 'Поле "{property}" должно содержать не менее {min} символов',
@@ -118,7 +122,7 @@ export class MessageRegistry {
       localMessage ??
       (Object.prototype.hasOwnProperty.call(MessageRegistry.defaults, code)
         ? MessageRegistry.defaults[code]!
-        : 'Поле "{property}" не прошло проверку ({code})');
+        : MessageRegistry.defaults.invalid ?? BUILT_IN.invalid!);
     return MessageRegistry.interpolate(template, params);
   }
 

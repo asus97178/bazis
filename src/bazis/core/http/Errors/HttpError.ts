@@ -72,9 +72,9 @@ export class TooManyRequestsError extends HttpError {
  * of validation problems.
  */
 export class ModelValidationError extends BadRequestError {
-  constructor(readonly errors: readonly ModelValidationIssue[]) {
+  constructor(readonly errors: readonly ModelValidationIssue[], title = "Validation failed") {
     super(
-      "Validation failed",
+      title,
       errors.map((error) => ({ property: error.property, message: error.message, code: error.code })),
     );
   }

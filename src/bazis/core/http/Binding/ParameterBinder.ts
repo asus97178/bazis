@@ -3,7 +3,7 @@ import { BadRequestError, UnsupportedMediaTypeError } from "../Errors/HttpError"
 import type { HttpContext } from "../HttpContext/HttpContext";
 import type { ParameterBinding } from "./bindings";
 import { convertOr400 } from "./convert";
-import { bindModel } from "./modelBinder";
+import { bindModelAsync } from "./modelBinder";
 
 /** Per-action constraints affecting binding (from decorators). */
 export interface BindingDefaults {
@@ -67,7 +67,7 @@ export async function bindArguments(
           throw new UnsupportedMediaTypeError("application/json");
         }
         const data = await ctx.json();
-        args[index] = binding.model ? bindModel(binding.model, data, ctx.modelValidator, { primitiveTypes: true }) : data;
+        args[index] = binding.model ? await bindModelAsync(binding.model, data, ctx.modelValidator, { primitiveTypes: true }) : data;
         break;
       }
       case "request":
