@@ -4,6 +4,29 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.96.3 — 2026-10-06
+
+### Fixed
+
+- A binary built with `bazis build --bin` (or `bun build --compile`) ran in
+  `development` mode when `BAZIS_ENV` was not set: Bun inlines the literal
+  `process.env.NODE_ENV` as `"development"` at bundle time, and a runtime
+  `NODE_ENV=production` was ignored. In that mode `debug` is on, so 500
+  responses included error details, the OpenAPI page was served and
+  production-only configuration checks were skipped. The environment is now
+  read at runtime: without `BAZIS_ENV`/`NODE_ENV` a binary runs as
+  `production`. Rebuild existing binaries; until then set
+  `BAZIS_ENV=production` explicitly.
+- TypeScript 6 is supported: the peer dependency is now
+  `^5.9.3 || ^6.0.0`, new projects from `bazis new` get `"typescript": "^6"`,
+  and the framework itself is built and tested with TypeScript 6.0.3.
+  TypeScript 7 is not supported yet: it removed the JavaScript compiler API
+  that the code generator uses. The README install steps for an existing
+  project pin `typescript@^6`, because a bare `bun add -d typescript`
+  installs TypeScript 7. With TypeScript 6 the project `tsconfig.json`
+  must list `"types": ["bun"]` (TypeScript 6 no longer loads every
+  `@types/*` package by default); projects from `bazis new` already do.
+
 ## 0.96.2 — 2026-10-06
 
 ### Changed

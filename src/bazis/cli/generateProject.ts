@@ -149,7 +149,7 @@ function buildProjectFiles(name: string, dependency: string, frameworkMode: Fram
       "start": `./bin/${name}`,
     },
     dependencies: { bazis: dependency },
-    devDependencies: { "@types/bun": "1.4.0", typescript: "^5" },
+    devDependencies: { "@types/bun": "1.4.0", typescript: "^6" },
   };
   const tsconfig = {
     compilerOptions: {

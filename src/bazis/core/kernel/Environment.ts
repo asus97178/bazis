@@ -29,7 +29,11 @@ export class Environment {
     // A missing deployment setting must fail closed. Development is always an
     // explicit choice made by the dev scripts, never an accidental production
     // fallback.
-    const raw = process.env.BAZIS_ENV ?? process.env.NODE_ENV ?? "production";
+    // Read through an alias: `bun build` replaces the literal
+    // `process.env.NODE_ENV` with "development" at bundle time, which would bake
+    // development mode into every compiled binary.
+    const env = process.env;
+    const raw = env.BAZIS_ENV ?? env.NODE_ENV ?? "production";
     const name = parseEnvironmentName(raw);
     return new Environment(name, debugOverride ?? name !== "production");
   }
