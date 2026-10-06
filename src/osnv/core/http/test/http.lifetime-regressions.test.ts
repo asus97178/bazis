@@ -56,7 +56,7 @@ async function start(produce: (ctx: HttpContext, resource: Resource) => unknown,
   };
 }
 
-describe("HTTP-03: scope lives with the response producer", () => {
+describe("scope lives with the response producer", () => {
   test.each([false, true])("live delayed stream retains scoped services (middleware response=%s)", async shortCircuit => {
     const gate = deferred();
     const app = await start((_ctx, resource) => new Response(new ReadableStream({
@@ -131,6 +131,8 @@ describe("HTTP-03: scope lives with the response producer", () => {
       expect(response.headers.get("content-range")).toBe(`bytes 0-9/${Bun.file(path).size}`);
       expect(response.headers.get("content-length")).toBe("10");
       expect(await response.text()).toBe((await Bun.file(path).text()).slice(0, 10));
+      // The scope is released after the response is sent, not when the body is read.
+      await bounded(app.resource().done.promise);
       expect(app.resource().disposed).toBe(1);
     } finally { await app.close(); }
   });
@@ -299,7 +301,7 @@ describe("raw file responses preserve native Bun behavior", () => {
   });
 });
 
-describe("HTTP-04: HEAD does not wait for producer cancellation", () => {
+describe("HEAD does not wait for producer cancellation", () => {
   test.each(["pending", "rejecting"] as const)("HEAD 200 with %s cancel", async kind => {
     const gate = deferred();
     let canceled = 0;
@@ -313,6 +315,7 @@ describe("HTTP-04: HEAD does not wait for producer cancellation", () => {
       expect(response.headers.get("x-preserved")).toBe("yes");
       expect(await response.text()).toBe("");
       expect(canceled).toBe(1);
+      await bounded(app.resource().done.promise);
       expect(app.resource().disposed).toBe(1);
     } finally { gate.resolve(); await app.close(); }
   });
