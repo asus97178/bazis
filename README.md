@@ -44,7 +44,7 @@ bunx bazis dev            # GET http://127.0.0.1:3000/health
 
 ```sh
 bun add bazis             # or a fixed version: bun add bazis@0.96.2
-bun add -d typescript @types/bun
+bun add -d typescript@^5.9 @types/bun   # TypeScript 7 is not supported yet
 ```
 
 Then take `tsconfig.json`, `bazis.config.json` and `src/index.ts` from a

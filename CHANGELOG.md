@@ -17,6 +17,9 @@ contain breaking changes, a patch version does not.
   read at runtime: without `BAZIS_ENV`/`NODE_ENV` a binary runs as
   `production`. Rebuild existing binaries; until then set
   `BAZIS_ENV=production` explicitly.
+- The README install steps for an existing project now pin
+  `typescript@^5.9`: a bare `bun add -d typescript` installs TypeScript 7,
+  whose API the code generator does not support yet.
 
 ## 0.96.2 — 2026-10-06
 
