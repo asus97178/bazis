@@ -2,7 +2,7 @@
 
 Passport 1.0. Type: atomic. CLI profile: minimal.
 Created with (from `examples/todo`):
-`../../scripts/osnv-bun node_modules/osnv/cli/main.ts g module Task --minimal`
+`../../scripts/bazis-bun node_modules/bazis/cli/main.ts g module Task --minimal`
 File names were renamed to `<Module>.<role>.ts` after the 0.96.1 CLI naming
 change (the command above generated `TaskController.ts`-style names).
 Entry: [Task.module.ts](Task.module.ts), class `TaskModule`.
@@ -31,4 +31,4 @@ imports: `ProjectModule`. exports: `ITaskService` (used by `report`).
 
 ## Checks
 
-`src/app/test/api.test.ts` (end-to-end with PostgreSQL), `osnv build`.
+`src/app/test/api.test.ts` (end-to-end with PostgreSQL), `bazis build`.

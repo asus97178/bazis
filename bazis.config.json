@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "defaultTarget": "production",
+  "targets": {
+    "production": {
+      "entrypoints": [
+        "src/bazis/index.ts"
+      ]
+    },
+    "test": {
+      "entrypoints": [
+        "src/bazis/core/http/test/fixtures/conventionControllers.ts"
+      ]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 # Release history and the former Osnova candidate procedure
 
 This document is a history from the time when the framework and the osnova application
-lived in one repository; the commands and paths below refer to that layout. Current osnv
+lived in one repository; the commands and paths below refer to that layout. Current bazis
 releases follow [CHANGELOG.md](../CHANGELOG.md) and the tag-triggered `publish` job in
 [ci.yml](../.github/workflows/ci.yml). The procedure was recorded on 2026-10-02 while
 preparing **0.95.0**. That is the SemVer number of the requested version "0.95", not a
@@ -48,7 +48,7 @@ the lockfile by hand. The `pm version` behavior is described in the
 ## Check sequence
 
 Before running, check that the commands exist in `package.json`. All commands run with
-an explicit `OSNV_BUN_BIN`, without working env and provider credentials. The shared
+an explicit `BAZIS_BUN_BIN`, without working env and provider credentials. The shared
 codegen and the test servers have one owner; do not run them concurrently.
 
 1. `toolchain:check` and `di:generate --target all`.
@@ -58,7 +58,7 @@ codegen and the test servers have one owner; do not run them concurrently.
 4. `admin:ui:check`, `admin:ui:build`, `client:ui:build`. Both UI builds run the
    installed `vue-tsc --noEmit` through a real Node ≥22.12 and only then Vite. Bun 1.4.0
    bypasses the needed hook and may let Vue SFCs through without an error.
-   If needed, the Node path is set through `OSNV_VUE_NODE_BIN`.
+   If needed, the Node path is set through `BAZIS_VUE_NODE_BIN`.
 5. `build:bin` creates `bin/osnova-app` and `bin/osnova`. Run both outside the checkout:
    the app with `config check --environment=test`, the CLI with `--help`, and check the
    affected runtime paths with a separate controlled compiled fixture.
@@ -90,7 +90,7 @@ of the specific candidate. Historical PASS results are not carried over as new o
   trusted. Local HTTP uses development/test or a deliberate operator setting:
   [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
 - The launcher allows 15 seconds for shutdown by default. With a larger kernel budget,
-  align `OSNV_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
+  align `BAZIS_BUN_SHUTDOWN_TIMEOUT_MS`: [toolchain](../toolchain/README.md).
 - The SMS endpoint must accept a final POST without redirects. Redirects end with an
   error: [SMS](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/sms/MODULE.md).
 - Admin UI and OpenAPI ship together: the UI takes the allowed sorts from
@@ -102,7 +102,7 @@ of the specific candidate. Historical PASS results are not carried over as new o
   and [ClientAuth](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/client-auth/MODULE.md).
 - After the upper length bound is exceeded, the framework skips the content checks of
   the same decorator, so the error array is shorter. Separate pattern/custom checks
-  stay the author's responsibility: [validation](../src/osnv/library/validation/SPEC.md).
+  stay the author's responsibility: [validation](../src/bazis/library/validation/SPEC.md).
 
 ## Readiness decision
 
@@ -158,7 +158,7 @@ durable server configuration (`appendonly yes`, `appendfsync always`,
 
 Behavior changes:
 
-- A new key `db.tlsCa` (`OSNV_DB__TLS_CA`): the PEM of an extra CA for
+- A new key `db.tlsCa` (`BAZIS_DB__TLS_CA`): the PEM of an extra CA for
   `db.tls=verify-full`; empty means system trust only. In the ORM connector an empty
   `tlsCa` now means "no CA set" instead of a configuration error.
 - The Kernel, `Application` and the hosted helpers start a singleton that several
@@ -173,7 +173,7 @@ An incremental release on top of the 0.95.0 candidate. The version is aligned in
 
 Changes since 0.95.0:
 
-- `db.tlsCa` / `OSNV_DB__TLS_CA` for production `verify-full` with a private CA;
+- `db.tlsCa` / `BAZIS_DB__TLS_CA` for production `verify-full` with a private CA;
   an empty `tlsCa` in the ORM connector means "no CA set".
 - A singleton with several `HOSTED_SERVICE` registrations starts once;
   a module with several `ownedStore` contexts starts in the kernel.
@@ -184,55 +184,55 @@ Changes since 0.95.0:
   of the Access, DeveloperTools, Observability parts.
 - Physical qualification: `ops/live-postgres/runner.py`.
 
-Migration: no action needed; `OSNV_DB__TLS_CA` is optional.
+Migration: no action needed; `BAZIS_DB__TLS_CA` is optional.
 
-## Release 0.96.1 (2026-10-04): the `osnv` package
+## Release 0.96.1 (2026-10-04): the `bazis` package
 
 The framework was turned into a publishable npm package for Bun. It ships TypeScript
 sources, no JavaScript build is needed; it runs only on Bun ≥ 1.4.0.
 
-- The package name `osnova` was replaced with `osnv`: on npm `osnova` is taken by another package.
+- The package name `osnova` was replaced with `bazis`: on npm `osnova` is taken by another package.
   Generated code and CLI templates import the framework by the package name
-  (`osnv/core/di`), not through the `@osnova/*` and `@/*` aliases. A new project from
-  `osnv new` has no `paths` in `tsconfig.json`; the snapshot lives in `vendor/osnv`.
-- Manifest: `private` removed; `license: MIT`, `bin: osnv`, `engines.bun >= 1.4.0`,
+  (`bazis/core/di`), not through the `@osnova/*` and `@/*` aliases. A new project from
+  `bazis new` has no `paths` in `tsconfig.json`; the snapshot lives in `vendor/bazis`.
+- Manifest: `private` removed; `license: MIT`, `bin: bazis`, `engines.bun >= 1.4.0`,
   `peerDependencies.typescript` added (needed only by codegen and the CLI; the runtime
   has no external dependencies). Tests and fixtures are excluded from the package
   (537 files, 0.92 MB instead of 792 and 1.47 MB).
 - The `@/…` self-imports in `core/agent/session` were replaced with relative ones.
 - `scripts/package-check.ts` (part of `run ci`): pack → install into an empty project →
-  `osnv new` → codegen → module → typecheck → `/health`.
+  `bazis new` → codegen → module → typecheck → `/health`.
 
-Migrating an existing application: the dependency `osnova` → `osnv`, the `tsconfig`
-paths `osnova/*` → `osnv/*` (the `@osnova/*` aliases may stay for your own code), then
-`di:generate --target all`: the generated files import `osnv/...`.
+Migrating an existing application: the dependency `osnova` → `bazis`, the `tsconfig`
+paths `osnova/*` → `bazis/*` (the `@osnova/*` aliases may stay for your own code), then
+`di:generate --target all`: the generated files import `bazis/...`.
 
-CLI 0.96.1: all commands are called as `osnv` (`bunx osnv …`; in this repository
-`./scripts/osnv-bun run osnv …`, the CLI binary is `bin/osnv`). New commands:
-`osnv dev`, `osnv build`, `osnv build --bin [--outfile]`; the scripts of a created
+CLI 0.96.1: all commands are called as `bazis` (`bunx bazis …`; in this repository
+`./scripts/bazis-bun run bazis …`, the CLI binary is `bin/bazis`). New commands:
+`bazis dev`, `bazis build`, `bazis build --bin [--outfile]`; the scripts of a created
 project wrap them. `g module --full` no longer needs an application auth module:
 without it the routes are generated public with a warning.
 `agent run` moved into the application (`bun run agent:run`).
 
-Also in 0.96.1: `osnv codegen` calls the framework generator directly (the project no
-longer needs a `di:generate` script); `osnv dev --watch`; `osnv test`; a warning at
-startup from sources changed after codegen (`src/generated/osnv/fingerprint.ts`). A new
+Also in 0.96.1: `bazis codegen` calls the framework generator directly (the project no
+longer needs a `di:generate` script); `bazis dev --watch`; `bazis test`; a warning at
+startup from sources changed after codegen (`src/generated/bazis/fingerprint.ts`). A new
 project gets the `test` and `start` scripts, `.env.example`, a `/health` test and `HOST`;
-the `vendor/osnv` copy matches the npm package contents.
+the `vendor/bazis` copy matches the npm package contents.
 
-`osnv dev` starts the application with `OSNV_ENV=development` if the variable is not set
+`bazis dev` starts the application with `BAZIS_ENV=development` if the variable is not set
 in the shell (before, without `.env` the application started as `production` and
 required production secrets). The package README was rewritten in English.
 The `examples/todo` example was added (project, task, report modules; PostgreSQL with
 auto-migration, cross-module DI, validation, JSON:API, an e2e test, a binary);
 `run ci` builds it as a user would (`example install/build/test`), and the e2e test runs
-when `OSNV_DB__HOST` is set, otherwise it is marked skip.
+when `BAZIS_DB__HOST` is set, otherwise it is marked skip.
 
 Finished before the release:
 - ORM: a unique index violation in `saveChanges()` arrives as `UniqueViolationError`
   (`constraint`, `table`, `cause`) instead of a raw driver error and HTTP 500.
 - ORM: only the module decides table creation and migration (`ensureCreated` or
-  `migrateOnStart` in `ormOsnv`). The `@Entity({ migrate: true })` flag was removed:
+  `migrateOnStart` in `ormBazis`). The `@Entity({ migrate: true })` flag was removed:
   `migrateOnStart` now migrates all entities of the module's context.
 - HTTP: request body fields declared as `string`/`number`/`boolean` are checked
   against the JSON type without `@Validator` (400, code `type`). gRPC and agents are
@@ -255,19 +255,19 @@ owner modules (the `bun run …` commands are the same):
 `src/app/modules/agent-chat/client/AgentRun.cli.ts`, `config:check`/`config:inspect`
 → `src/app/config/ConfigCheck.cli.ts`. Removed: the stub of the dropped Workflow feature
 (`src/system-workflow-producer.ts`) and the separate admin dev backend (`admin:backend`,
-`AdminUiDevModule`, the `http.admin*` settings and the `OSNV_ADMIN_*` variables): it
+`AdminUiDevModule`, the `http.admin*` settings and the `BAZIS_ADMIN_*` variables): it
 started an outdated set of modules without DataManager.
 The Admin UI is developed with the regular `bun run dev` + `bun run admin:ui`.
 
-Names: the framework is called `osnv` everywhere (the application stays `osnova`).
-Renamed: the public API (`OsnovaModuleRef` → `OsnvModuleRef`, `ormOsnova` → `ormOsnv`,
-`ormOsnovaConnect` → `ormOsnvConnect`, `registerOsnovaGeneratedRuntime` →
-`registerOsnvGeneratedRuntime`, `OsnovaSocket` → `OsnvSocket`, the kernel class
-`Osnova` → `Osnv` and so on), the package folder `src/osnova` → `src/osnv`, the alias
-`@osnova/*` → `osnv/*` imports, `scripts/osnova-bun` → `scripts/osnv-bun`, the toolchain
-schema `osnv.bun-toolchain/v1`. Data identifiers: the tables
-`__osnv_orm_owned_stores_v1`, `__OsnvMigrations`, the contracts `osnv.orm-owned-store/v1`,
-`osnv.agent-execution-state/v1`, `osnv.websocket.publication/v1` and others; the
+Names: the framework is called `bazis` everywhere (the application stays `osnova`).
+Renamed: the public API (`OsnovaModuleRef` → `BazisModuleRef`, `ormOsnova` → `ormBazis`,
+`ormOsnovaConnect` → `ormBazisConnect`, `registerOsnovaGeneratedRuntime` →
+`registerBazisGeneratedRuntime`, `OsnovaSocket` → `BazisSocket`, the kernel class
+`Osnova` → `Bazis` and so on), the package folder `src/osnova` → `src/bazis`, the alias
+`@osnova/*` → `bazis/*` imports, `scripts/osnova-bun` → `scripts/bazis-bun`, the toolchain
+schema `bazis.bun-toolchain/v1`. Data identifiers: the tables
+`__bazis_orm_owned_stores_v1`, `__BazisMigrations`, the contracts `bazis.orm-owned-store/v1`,
+`bazis.agent-execution-state/v1`, `bazis.websocket.publication/v1` and others; the
 owned-store golden bytes were recomputed and provably differ only in the domain.
 Databases that already have `__osnova_*` tables must be migrated by hand (the osnova
 application has none).

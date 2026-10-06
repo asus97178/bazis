@@ -1,6 +1,6 @@
 # Module passport template
 
-For a new module, first run the osnv CLI command. Then extend the generated
+For a new module, first run the bazis CLI command. Then extend the generated
 `<module directory>/MODULE.md` with the sections below before the domain implementation.
 For an existing module, use this template when creating or updating the passport
 before changing the architecture/public inputs.

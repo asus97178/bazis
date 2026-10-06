@@ -1,4 +1,4 @@
-# osnv agents, modules and tools
+# bazis agents, modules and tools
 
 Identifier: **AGENT-ARCH-001**. Version: **1.2**. Date: **2026-09-21**.
 Status: **the catalog, Admin UI, shared runs from chat/CLI and the first allowed tool are implemented; long-running execution is the next stage**.
@@ -23,7 +23,7 @@ added. The earlier declarations are not fully migrated.
 | Agent Runtime | Executes the definition: context, limits, work state and error boundary | Runs all agents through one shared Tool call mechanism |
 
 In the target model an agent is not part of `@Module.agents`, a submodule or a new
-DI container. Creating a concrete agent does not require creating an osnv module or
+DI container. Creating a concrete agent does not require creating an bazis module or
 adding it to `imports`.
 
 A Tool implementation may use a module's services through the existing DI and stay
@@ -77,11 +77,11 @@ policies. Agent metadata cannot grant new rights on its own, inject secrets or t
 off mandatory checks.
 
 Execution uses the existing DI, DTO/schema contracts and the
-[AgentToolExecutor](../../src/osnv/core/agent/AgentToolExecutor.ts).
+[AgentToolExecutor](../../src/bazis/core/agent/AgentToolExecutor.ts).
 No parallel ORM, container or second runtime is created for dynamic agents.
 Working with a service directly outside the executor is not a protected Tool call.
 
-The [Tool hooks](../../src/osnv/core/agent/AgentToolHooks.ts) split is kept:
+The [Tool hooks](../../src/bazis/core/agent/AgentToolHooks.ts) split is kept:
 enforcement checks admission, settlement records the outcome, observer observes.
 Arbitrary agent metadata does not select mandatory platform hooks.
 Behavior on timeout, cancellation, a recording failure and an unknown action outcome
@@ -97,13 +97,13 @@ a DI scope is not process, file or network isolation.
 | Area | What exists | What has to change |
 | --- | --- | --- |
 | [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md) | Definitions in PostgreSQL, protected Admin CRUD, versions, Main, RunService and agents.getAll | Main creating other agents through a Tool with a separate permission check |
-| [Module AI metadata](../../src/osnv/core/agent/index.ts) | `agents/tools/prompts/agentToolHooks` extend the module metadata | Remove the dependency of agent execution on the module declaration; keep the current path during the migration |
-| [AgentRegistry](../../src/osnv/core/agent/AgentRegistry.ts) | fromDefinition resolves toolNames from the host's explicit list; an immutable snapshot without an agent class | Storing a versioned snapshot together with a long-running session |
-| [Agent metadata](../../src/osnv/core/agent/metadata.ts) | Dynamic definitions are data; classes/decorators stay for Tools/DTOs and compatibility | Align the old examples and generation without changing the old API without a migration |
-| [CLI full template](../../src/osnv/cli/templates/module.ts) | Creates an AnalystAgent inside the module and writes `agents` into `@Module` | Separate module and agent generation, align codegen and checks |
-| [Agent Runtime](../../src/osnv/core/agent/MODULE.md) | The working Agent → model → Tool loop and the checked limits of local fixes | Put the current contracts and registration in order before adding new capabilities |
-| [Chat](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/osnv/cli/MODULE.md) | The shared RunService, saved answers, cancellation, text and tool progress in Vue; the CLI gets the final answer | CLI streaming/resume and a transport-independent session |
-| [Session contracts](../../src/osnv/core/agent/session/contracts.ts) | Session contracts; entities, a codec and checkpoint protection exist next to them | Finish the executing service separately; having contracts does not prove recovery works |
+| [Module AI metadata](../../src/bazis/core/agent/index.ts) | `agents/tools/prompts/agentToolHooks` extend the module metadata | Remove the dependency of agent execution on the module declaration; keep the current path during the migration |
+| [AgentRegistry](../../src/bazis/core/agent/AgentRegistry.ts) | fromDefinition resolves toolNames from the host's explicit list; an immutable snapshot without an agent class | Storing a versioned snapshot together with a long-running session |
+| [Agent metadata](../../src/bazis/core/agent/metadata.ts) | Dynamic definitions are data; classes/decorators stay for Tools/DTOs and compatibility | Align the old examples and generation without changing the old API without a migration |
+| [CLI full template](../../src/bazis/cli/templates/module.ts) | Creates an AnalystAgent inside the module and writes `agents` into `@Module` | Separate module and agent generation, align codegen and checks |
+| [Agent Runtime](../../src/bazis/core/agent/MODULE.md) | The working Agent → model → Tool loop and the checked limits of local fixes | Put the current contracts and registration in order before adding new capabilities |
+| [Chat](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/bazis/cli/MODULE.md) | The shared RunService, saved answers, cancellation, text and tool progress in Vue; the CLI gets the final answer | CLI streaming/resume and a transport-independent session |
+| [Session contracts](../../src/bazis/core/agent/session/contracts.ts) | Session contracts; entities, a codec and checkpoint protection exist next to them | Finish the executing service separately; having contracts does not prove recovery works |
 
 The current code with `@Module.agents` is compatibility during the transition, not a
 model for new agents. `extras` already allows passing separate declarations, but it

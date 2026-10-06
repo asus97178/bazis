@@ -1,6 +1,6 @@
-import { createToken } from "osnv/core/di";
-import type { PageResult } from "osnv/core/orm";
-import type { ListQuery } from "osnv/library/jsonapi";
+import { createToken } from "bazis/core/di";
+import type { PageResult } from "bazis/core/orm";
+import type { ListQuery } from "bazis/library/jsonapi";
 import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/Project.requests";
 import type { ProjectResponse } from "../http/contracts/Project.responses";
 

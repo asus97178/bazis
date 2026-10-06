@@ -33,4 +33,4 @@ blob-report/
 *.db-*
 
 # Local codegen fingerprint for the startup freshness check (changes with every source edit)
-src/generated/osnv/fingerprint.ts
+src/generated/bazis/fingerprint.ts

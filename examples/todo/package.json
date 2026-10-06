@@ -4,15 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "codegen": "osnv codegen",
-    "dev": "osnv dev",
-    "test": "osnv test",
-    "build": "osnv build",
-    "build:bin": "osnv build --bin",
+    "codegen": "bazis codegen",
+    "dev": "bazis dev",
+    "test": "bazis test",
+    "build": "bazis build",
+    "build:bin": "bazis build --bin",
     "start": "./bin/todo"
   },
   "dependencies": {
-    "osnv": "file:../../src/osnv"
+    "bazis": "file:../../src/bazis"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",

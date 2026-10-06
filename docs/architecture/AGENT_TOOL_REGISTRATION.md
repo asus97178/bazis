@@ -2,7 +2,7 @@
 
 Identifier: **AGENT-TOOLS-001**. Version: **1.0**. Date: **2026-10-02**.
 Status: implemented; isolated checks and the binary probe PASS.
-Scope: native Tools from osnv code and their assignment to meta-agents through the catalog.
+Scope: native Tools from bazis code and their assignment to meta-agents through the catalog.
 
 ## 1. Placement and registration
 
@@ -34,7 +34,7 @@ src/app/modules/agents/
 The current registration:
 
 ```ts
-import { Module, singleton } from "osnv/core/di";
+import { Module, singleton } from "bazis/core/di";
 import { AuthModule } from "../../auth/Auth.module";
 import { AgentsModule } from "../Agents.module";
 import { AgentsTool } from "./Agents.tool";
@@ -65,7 +65,7 @@ second DI container, defineTools or RunAppOptions.tools is introduced.
 
 ## 2. Shared catalog and dependencies
 
-[AgentRegistry.fromContainer](../../src/osnv/core/agent/AgentRegistry.ts)
+[AgentRegistry.fromContainer](../../src/bazis/core/agent/AgentRegistry.ts)
 builds an immutable snapshot from the actual Tools contributions in DI. The catalog
 is cached per container; regular providers without tools do not get into it. Tool
 constructors are not called. Different containers have independent catalogs.
@@ -135,10 +135,10 @@ A regular OpenAI-compatible adapter passes the descriptions in the tools field o
 the API request. The model returns the name and arguments; our executor runs the
 call and returns the result through the same adapter. Codex gets dynamicTools with
 safe wire names and calls the same executor. DTOs, DI, identity and secrets stay
-with osnv. The transport adapters and strict settings were not changed.
+with bazis. The transport adapters and strict settings were not changed.
 
 The contract stays standard: parameters are described with JSON Schema, and the
-exchange with the model is the provider's function/tool calling. An osnv output
+exchange with the model is the provider's function/tool calling. An bazis output
 schema can be declared in addition.
 Protocol overviews: [OpenAI](https://developers.openai.com/api/docs/guides/function-calling),
 [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools).

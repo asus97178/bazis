@@ -16,97 +16,97 @@
     "noEmit": true,
     "paths": {
       "@/*": [
-        "./src/osnv/*"
+        "./src/bazis/*"
       ],
-      "osnv": [
-        "./src/osnv/index.ts"
+      "bazis": [
+        "./src/bazis/index.ts"
       ],
-      "osnv/core/agent": [
-        "./src/osnv/core/agent/index.ts"
+      "bazis/core/agent": [
+        "./src/bazis/core/agent/index.ts"
       ],
-      "osnv/core/app": [
-        "./src/osnv/core/app/index.ts"
+      "bazis/core/app": [
+        "./src/bazis/core/app/index.ts"
       ],
-      "osnv/core/background": [
-        "./src/osnv/core/background/index.ts"
+      "bazis/core/background": [
+        "./src/bazis/core/background/index.ts"
       ],
-      "osnv/core/cache": [
-        "./src/osnv/core/cache/index.ts"
+      "bazis/core/cache": [
+        "./src/bazis/core/cache/index.ts"
       ],
-      "osnv/core/di": [
-        "./src/osnv/core/di/index.ts"
+      "bazis/core/di": [
+        "./src/bazis/core/di/index.ts"
       ],
-      "osnv/core/generatedRuntime": [
-        "./src/osnv/core/generatedRuntime.ts"
+      "bazis/core/generatedRuntime": [
+        "./src/bazis/core/generatedRuntime.ts"
       ],
-      "osnv/core/grpc": [
-        "./src/osnv/core/grpc/index.ts"
+      "bazis/core/grpc": [
+        "./src/bazis/core/grpc/index.ts"
       ],
-      "osnv/core/http-client": [
-        "./src/osnv/core/http-client/index.ts"
+      "bazis/core/http-client": [
+        "./src/bazis/core/http-client/index.ts"
       ],
-      "osnv/core/http": [
-        "./src/osnv/core/http/index.ts"
+      "bazis/core/http": [
+        "./src/bazis/core/http/index.ts"
       ],
-      "osnv/core/http/Binding/listModelRegistry": [
-        "./src/osnv/core/http/Binding/listModelRegistry.ts"
+      "bazis/core/http/Binding/listModelRegistry": [
+        "./src/bazis/core/http/Binding/listModelRegistry.ts"
       ],
-      "osnv/core/http/Binding/requestModelRegistry": [
-        "./src/osnv/core/http/Binding/requestModelRegistry.ts"
+      "bazis/core/http/Binding/requestModelRegistry": [
+        "./src/bazis/core/http/Binding/requestModelRegistry.ts"
       ],
-      "osnv/core/http/OpenApi/generatedOpenApiRegistry": [
-        "./src/osnv/core/http/OpenApi/generatedOpenApiRegistry.ts"
+      "bazis/core/http/OpenApi/generatedOpenApiRegistry": [
+        "./src/bazis/core/http/OpenApi/generatedOpenApiRegistry.ts"
       ],
-      "osnv/core/http/OpenApi/openApiDocument": [
-        "./src/osnv/core/http/OpenApi/openApiDocument.ts"
+      "bazis/core/http/OpenApi/openApiDocument": [
+        "./src/bazis/core/http/OpenApi/openApiDocument.ts"
       ],
-      "osnv/core/infra": [
-        "./src/osnv/core/infra/index.ts"
+      "bazis/core/infra": [
+        "./src/bazis/core/infra/index.ts"
       ],
-      "osnv/core/kernel": [
-        "./src/osnv/core/kernel/index.ts"
+      "bazis/core/kernel": [
+        "./src/bazis/core/kernel/index.ts"
       ],
-      "osnv/core/orm": [
-        "./src/osnv/core/orm/index.ts"
+      "bazis/core/orm": [
+        "./src/bazis/core/orm/index.ts"
       ],
-      "osnv/core/websocket": [
-        "./src/osnv/core/websocket/index.ts"
+      "bazis/core/websocket": [
+        "./src/bazis/core/websocket/index.ts"
       ],
-      "osnv/library/boundary": [
-        "./src/osnv/library/boundary/index.ts"
+      "bazis/library/boundary": [
+        "./src/bazis/library/boundary/index.ts"
       ],
-      "osnv/library/http-client": [
-        "./src/osnv/library/http-client/index.ts"
+      "bazis/library/http-client": [
+        "./src/bazis/library/http-client/index.ts"
       ],
-      "osnv/library/jsonapi": [
-        "./src/osnv/library/jsonapi/index.ts"
+      "bazis/library/jsonapi": [
+        "./src/bazis/library/jsonapi/index.ts"
       ],
-      "osnv/library/jwt": [
-        "./src/osnv/library/jwt/index.ts"
+      "bazis/library/jwt": [
+        "./src/bazis/library/jwt/index.ts"
       ],
-      "osnv/library/openapi": [
-        "./src/osnv/library/openapi/index.ts"
+      "bazis/library/openapi": [
+        "./src/bazis/library/openapi/index.ts"
       ],
-      "osnv/library/orm": [
-        "./src/osnv/library/orm/index.ts"
+      "bazis/library/orm": [
+        "./src/bazis/library/orm/index.ts"
       ],
-      "osnv/library/redaction": [
-        "./src/osnv/library/redaction/index.ts"
+      "bazis/library/redaction": [
+        "./src/bazis/library/redaction/index.ts"
       ],
-      "osnv/library/ui": [
-        "./src/osnv/library/ui/index.ts"
+      "bazis/library/ui": [
+        "./src/bazis/library/ui/index.ts"
       ],
-      "osnv/library/ui/UiProfile": [
-        "./src/osnv/library/ui/UiProfile.ts"
+      "bazis/library/ui/UiProfile": [
+        "./src/bazis/library/ui/UiProfile.ts"
       ],
-      "osnv/library/validation": [
-        "./src/osnv/library/validation/index.ts"
+      "bazis/library/validation": [
+        "./src/bazis/library/validation/index.ts"
       ],
-      "osnv/core/*": [
-        "./src/osnv/core/*"
+      "bazis/core/*": [
+        "./src/bazis/core/*"
       ],
-      "osnv/library/*": [
-        "./src/osnv/library/*"
+      "bazis/library/*": [
+        "./src/bazis/library/*"
       ]
     }
   },

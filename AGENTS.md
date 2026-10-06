@@ -1,4 +1,4 @@
-# Working rules for the osnv repository
+# Working rules for the bazis repository
 
 These instructions apply to the whole repository.
 
@@ -42,7 +42,7 @@ Then read the `MODULE.md` of the affected module, if it exists, and its actual
 change of its architecture/public inputs use the
 [passport template](docs/architecture/MODULE_SPEC_TEMPLATE.md).
 The [examples/todo](examples/todo/README.md) example shows how to apply the rules in
-an osnv application; check the code before using the example.
+an bazis application; check the code before using the example.
 When implementing a module use the [per-file code examples](docs/architecture/MODULE_CODE_EXAMPLES.md):
 an atomic feature, a composite module, DTO, ORM, DI, HTTP and extra adapters.
 
@@ -123,7 +123,7 @@ not call for a mass rename of existing code.
 - The root of a composite module is responsible for composition. Implementation
   registrations belong to atomic modules. This rule does not turn every atomic module
   into an empty root with submodules.
-- Use the existing osnv ORM, DI, contracts and extension points.
+- Use the existing bazis ORM, DI, contracts and extension points.
   Do not create parallel implementations of them and do not change public APIs for the sake of layout.
 - Declare class dependencies in constructors; codegen does the regular wiring.
   Use `scoped(IService, Service)` or `scoped(Service)` without a manual dependency
@@ -140,16 +140,16 @@ not call for a mass rename of existing code.
 ## Create new modules only through the CLI
 
 All new atomic and composite modules, including new parts of existing packs,
-**must be created with osnv CLI commands**. This rule applies to application and
+**must be created with bazis CLI commands**. This rule applies to application and
 framework modules. It is forbidden to create a module scaffold by hand, copy a
 neighboring module or lay out files from the documentation instead of running the CLI.
 
 - Atomic module: `g module <Name>` with the fitting profile `--empty`, `--minimal`
   or `--full`.
 - Composite module with parts: `g pack <Name> --parts <part-a,part-b,...>`.
-- Run from the repository root: `./scripts/osnv-bun run osnv <command>`
-  with a qualified `OSNV_BUN_BIN`. For directory parameters and the other flags see
-  the [CLI passport](src/osnv/cli/MODULE.md).
+- Run from the repository root: `./scripts/bazis-bun run bazis <command>`
+  with a qualified `BAZIS_BUN_BIN`. For directory parameters and the other flags see
+  the [CLI passport](src/bazis/cli/MODULE.md).
 
 Before generating, define the responsibility, type, composition and input contracts.
 After a successful creation, fill in the generated `MODULE.md` and adapt the sources

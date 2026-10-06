@@ -1,5 +1,5 @@
-import { RequestModel } from "osnv/core/http";
-import { Validator } from "osnv/library/validation";
+import { RequestModel } from "bazis/core/http";
+import { Validator } from "bazis/library/validation";
 
 @RequestModel()
 export class CreateProjectRequest {
