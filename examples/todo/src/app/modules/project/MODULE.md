@@ -2,7 +2,7 @@
 
 Passport 1.0. Type: atomic. CLI profile: minimal.
 Created with (from `examples/todo`):
-`../../scripts/osnv-bun node_modules/osnv/cli/main.ts g module Project --minimal`
+`../../scripts/bazis-bun node_modules/bazis/cli/main.ts g module Project --minimal`
 File names were renamed to `<Module>.<role>.ts` after the 0.96.1 CLI naming
 change (the command above generated `ProjectController.ts`-style names).
 Entry: [Project.module.ts](Project.module.ts), class `ProjectModule`.
@@ -27,11 +27,11 @@ imports: none. exports: `IProjectService` (DI token + interface,
 | `DELETE /projects/:id` | `id` uuid | 204 | 404 |
 
 `IProjectService.create/update` return `"conflict"` for a taken name: the
-unique index rejects the save with `UniqueViolationError` from `osnv/core/orm`,
+unique index rejects the save with `UniqueViolationError` from `bazis/core/orm`,
 so concurrent requests cannot both succeed. Deleting a project does not touch
 its tasks.
 
 ## Checks
 
-`src/app/test/api.test.ts` (end-to-end with PostgreSQL), `osnv build`
-(codegen + typecheck), `osnv build --bin`.
+`src/app/test/api.test.ts` (end-to-end with PostgreSQL), `bazis build`
+(codegen + typecheck), `bazis build --bin`.

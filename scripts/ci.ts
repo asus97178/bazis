@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-// One CI entry point for any host: run through scripts/osnv-bun so every step
+// One CI entry point for any host: run through scripts/bazis-bun so every step
 // uses the qualified Bun (process.execPath). Steps stop at the first failure.
 // `--live <evidence-dir>` adds the disposable PostgreSQL qualification (Docker).
 const usage = "Usage: bun scripts/ci.ts [--live <evidence-dir>]";
@@ -42,19 +42,19 @@ run("tests", [bun, "run", "test"]);
 run("cli binary build", [bun, "run", "build:bin"]);
 
 // Binaries must work without the source tree: run them from an empty directory.
-const outside = mkdtempSync(join(tmpdir(), "osnv-ci-bin-"));
+const outside = mkdtempSync(join(tmpdir(), "bazis-ci-bin-"));
 try {
-  run("cli binary", [join(root, "bin/osnv"), "--help"], outside);
+  run("cli binary", [join(root, "bin/bazis"), "--help"], outside);
 } finally {
   rmSync(outside, { recursive: true, force: true });
 }
 
 run("package", [bun, "run", "scripts/package-check.ts"]);
 
-// examples/todo as a user would build it (its e2e test needs OSNV_DB__HOST, else it is skipped).
+// examples/todo as a user would build it (its e2e test needs BAZIS_DB__HOST, else it is skipped).
 const example = join(root, "examples/todo");
-const exampleEnv = { ...process.env, OSNV_BUN_BIN: bun };
-const exampleCli = join(example, "node_modules/osnv/cli/main.ts");
+const exampleEnv = { ...process.env, BAZIS_BUN_BIN: bun };
+const exampleCli = join(example, "node_modules/bazis/cli/main.ts");
 run("example install", [bun, "install", "--frozen-lockfile"], example, exampleEnv);
 run("example build", [bun, exampleCli, "build", "--bin"], example, exampleEnv);
 run("example test", [bun, exampleCli, "test"], example, exampleEnv);

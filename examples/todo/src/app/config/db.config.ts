@@ -1,5 +1,5 @@
-import { configEnum, defineConfig, secret, type Secret } from "osnv/core/kernel";
-import type { PostgresSslMode } from "osnv/core/infra";
+import { configEnum, defineConfig, secret, type Secret } from "bazis/core/kernel";
+import type { PostgresSslMode } from "bazis/core/infra";
 
 export interface DbConfig {
   host: string;
@@ -12,7 +12,7 @@ export interface DbConfig {
 
 /**
  * PostgreSQL connection. Every key can be overridden from the environment:
- * `OSNV_DB__HOST`, `OSNV_DB__PASSWORD`, ... In `production` the password has
+ * `BAZIS_DB__HOST`, `BAZIS_DB__PASSWORD`, ... In `production` the password has
  * no default and must come from the environment, otherwise startup fails.
  */
 export const dbConfig = defineConfig<DbConfig>("db", {

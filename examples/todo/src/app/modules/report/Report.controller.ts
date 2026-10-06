@@ -1,4 +1,4 @@
-import { Controller, Get } from "osnv/core/http";
+import { Controller, Get } from "bazis/core/http";
 import type { IProjectService } from "../project/services/IProject.service";
 import type { ITaskService } from "../task/services/ITask.service";
 

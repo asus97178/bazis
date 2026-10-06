@@ -19,29 +19,29 @@ was not verified. Linux qualification (2026-10-05): the full test suite in
 Set the absolute path to an existing executable of this version. It must be the
 binary itself, not a symbolic link:
 
-The recommended permanent location is `~/.osnv/toolchain/bun-1.4.0/bun` (mode 0755:
+The recommended permanent location is `~/.bazis/toolchain/bun-1.4.0/bun` (mode 0755:
 with a read-only binary `bun build --compile` leaves `.bun-build` in the directory),
 and the variable goes into `~/.zshenv` so non-interactive shells see it too. Do not
 keep the binary in `/private/tmp`: macOS clears it on reboot.
 
 ```sh
-export OSNV_BUN_BIN=/absolute/path/to/bun
-./scripts/osnv-bun run toolchain:check
-./scripts/osnv-bun run di:generate --target all
-./scripts/osnv-bun test --isolate src/osnv/core/di/test
-./scripts/osnv-bun node_modules/typescript/bin/tsc --noEmit
+export BAZIS_BUN_BIN=/absolute/path/to/bun
+./scripts/bazis-bun run toolchain:check
+./scripts/bazis-bun run di:generate --target all
+./scripts/bazis-bun test --isolate src/bazis/core/di/test
+./scripts/bazis-bun node_modules/typescript/bin/tsc --noEmit
 ```
 
 Run the commands from the project root. The launcher checks the binary before
 running, creates a temporary copy and uses it for child `bun` commands as well.
-A version, hash or macOS mismatch stops the run with an `OSNV_BUN_*` diagnostic.
+A version, hash or macOS mismatch stops the run with an `BAZIS_BUN_*` diagnostic.
 A plain `bun run` uses the Bun from PATH, which may differ from the pinned one.
 
 The copy gets the `uchg` flag. `bun build --compile` clones the executable into a
 temporary `.<hash>.bun-build` in the current directory; the clone inherits the flag,
 and Bun cannot delete it. So `build:bin:*` compile through
 [scripts/build-bin.ts](../scripts/build-bin.ts) from a temporary directory and remove it.
-A direct `./scripts/osnv-bun build --compile` in the checkout leaves about 60 MB of
+A direct `./scripts/bazis-bun build --compile` in the checkout leaves about 60 MB of
 garbage; remove it with `chflags nouchg .*.bun-build && rm .*.bun-build`.
 
 On `SIGINT`, `SIGTERM`, `SIGHUP` or `SIGQUIT` the launcher forwards the first signal
@@ -53,12 +53,12 @@ The exit code after a signal is preserved: for example 143 for `SIGTERM`.
 If the application sets a longer shutdown timeout, raise the launcher budget too:
 
 ```sh
-OSNV_BUN_SHUTDOWN_TIMEOUT_MS=35000 ./scripts/osnv-bun run start
+BAZIS_BUN_SHUTDOWN_TIMEOUT_MS=35000 ./scripts/bazis-bun run start
 ```
 
-`OSNV_BUN_SHUTDOWN_TIMEOUT_MS` is an optional string of decimal digits: an integer
+`BAZIS_BUN_SHUTDOWN_TIMEOUT_MS` is an optional string of decimal digits: an integer
 from 1 to 2147483647 milliseconds without leading zeros; the default is `15000`.
-An invalid value stops the run with `OSNV_BUN_SHUTDOWN_TIMEOUT_INVALID` before
+An invalid value stops the run with `BAZIS_BUN_SHUTDOWN_TIMEOUT_INVALID` before
 the child process is created. The wait is checked in 100 ms steps, and the value
 is rounded up to that step. Choose a value above the kernel budget; the launcher
 does not read the application configuration. `shutdownTimeoutMs = 0` disables the

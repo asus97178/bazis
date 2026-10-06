@@ -1,0 +1,176 @@
+#!/bin/sh
+# Exact Bun bootstrap. This file deliberately uses only the fixed utility set
+# below until the caller-owned candidate has been copied into private storage.
+set -eu
+umask 077
+PATH=/usr/bin:/bin
+export PATH
+unset DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH DYLD_FRAMEWORK_PATH DYLD_FALLBACK_LIBRARY_PATH DYLD_FALLBACK_FRAMEWORK_PATH BUN_OPTIONS NODE_OPTIONS BAZIS_BUN_TOOLCHAIN_RECEIPT BAZIS_BUN_TOOLCHAIN_RECEIPT_SHA256
+
+fail() { printf '%s\n' "$1" >&2; exit 1; }
+repo_dir=$(CDPATH= cd -- "$(/usr/bin/dirname -- "$0")/.." && pwd -P)
+authority="$repo_dir/toolchain/bun.json"
+candidate=${BAZIS_BUN_BIN-}
+[ -n "$candidate" ] || fail BAZIS_BUN_BINARY_REQUIRED
+case "$candidate" in /*) ;; *) fail BAZIS_BUN_BINARY_REQUIRED ;; esac
+[ ! -L "$candidate" ] && [ -f "$candidate" ] && [ -x "$candidate" ] || fail BAZIS_BUN_BINARY_UNREADABLE
+# Leave headroom above Kernel's default 10-second graceful shutdown. Hosts with
+# a longer budget can extend the wrapper's independent, still bounded deadline.
+shutdown_timeout_ms=${BAZIS_BUN_SHUTDOWN_TIMEOUT_MS-15000}
+case "$shutdown_timeout_ms" in ''|*[!0-9]*|0*) fail BAZIS_BUN_SHUTDOWN_TIMEOUT_INVALID ;; esac
+[ "${#shutdown_timeout_ms}" -le 10 ] && [ "$shutdown_timeout_ms" -le 2147483647 ] || fail BAZIS_BUN_SHUTDOWN_TIMEOUT_INVALID
+shutdown_polls=$(((shutdown_timeout_ms + 99) / 100))
+[ -f "$authority" ] || fail BAZIS_BUN_AUTHORITY_INVALID
+# Qualified hosts: macOS (uchg-locked copy) and glibc Linux (0500 copy in a
+# 0700 directory; Linux has no user-settable immutable flag).
+case "$(uname -s)" in
+  Darwin) host_platform=darwin; tmp_root=/private/tmp; can_lock=1 ;;
+  Linux) host_platform=linux; tmp_root=/tmp; can_lock=0 ;;
+  *) fail BAZIS_BUN_PLATFORM_NOT_QUALIFIED ;;
+esac
+case "$(uname -m)" in
+  arm64|aarch64) host_arch=arm64 ;;
+  x86_64|amd64) host_arch=x64 ;;
+  *) fail BAZIS_BUN_PLATFORM_NOT_QUALIFIED ;;
+esac
+# Every qualified host entry for this platform and architecture must name the
+# same executable; the full host check (OS version/libc) runs in
+# bun-toolchain-check.ts below.
+expected_sha=$(LC_ALL=C /usr/bin/awk -v want_platform="$host_platform" -v want_arch="$host_arch" '
+  function value(line) { sub(/^[^:]*:[[:space:]]*"/, "", line); sub(/".*$/, "", line); return line }
+  /^[[:space:]]*\{/ { platform = ""; arch = "" }
+  /"platform"[[:space:]]*:/ { platform = value($0) }
+  /"arch"[[:space:]]*:/ { arch = value($0) }
+  /"executableSha256"[[:space:]]*:/ { if (platform == want_platform && arch == want_arch) { sha = value($0); if (found != "" && sha != found) conflict = 1; found = sha } }
+  END { if (found != "" && !conflict) print found }' "$authority")
+[ -n "$expected_sha" ] || fail BAZIS_BUN_PLATFORM_NOT_QUALIFIED
+[ "${#expected_sha}" = 64 ] || fail BAZIS_BUN_AUTHORITY_INVALID
+
+sha256_of() {
+  if [ "$can_lock" = 1 ]; then /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; else /usr/bin/sha256sum "$1" | /usr/bin/awk '{print $1}'; fi
+}
+private_dir=$(/usr/bin/mktemp -d "$tmp_root/bazis-bun-launch.XXXXXX") || fail BAZIS_BUN_BINARY_UNREADABLE
+copy="$private_dir/bun"
+docker="$private_dir/docker"
+immutable=0
+docker_immutable=0
+docker_created=0
+child_pid=""
+first_signal=""
+first_signal_status=""
+settlement_unconfirmed=0
+cleanup() {
+  cleanup_failed=0
+  if [ "$docker_created" = 1 ]; then
+    if [ "$docker_immutable" = 1 ]; then /usr/bin/chflags nouchg "$docker" >/dev/null 2>&1 || cleanup_failed=1; fi
+    /bin/chmod 0700 "$docker" >/dev/null 2>&1 || cleanup_failed=1
+    /bin/rm -f "$docker" >/dev/null 2>&1 || cleanup_failed=1
+  fi
+  if [ "$immutable" = 1 ]; then /usr/bin/chflags nouchg "$copy" >/dev/null 2>&1 || cleanup_failed=1; fi
+  /bin/chmod 0700 "$copy" >/dev/null 2>&1 || cleanup_failed=1
+  /bin/rm -f "$copy" >/dev/null 2>&1 || cleanup_failed=1
+  /bin/rmdir "$private_dir" >/dev/null 2>&1 || cleanup_failed=1
+  return "$cleanup_failed"
+}
+abort_after_copy() {
+  code=$1
+  if ! cleanup; then printf '%s\n' BAZIS_BUN_CLEANUP_UNCONFIRMED >&2; fi
+  fail "$code"
+}
+forward_signal() {
+  [ -z "$first_signal" ] || return 0
+  first_signal=$1
+  case "$first_signal" in HUP) first_signal_status=129 ;; INT) first_signal_status=130 ;; QUIT) first_signal_status=131 ;; TERM) first_signal_status=143 ;; esac
+  [ -n "$child_pid" ] && kill -"$first_signal" "$child_pid" 2>/dev/null || true
+}
+trap 'forward_signal HUP' HUP
+trap 'forward_signal INT' INT
+trap 'forward_signal TERM' TERM
+trap 'forward_signal QUIT' QUIT
+
+/bin/cp "$candidate" "$copy" >/dev/null 2>&1 || abort_after_copy BAZIS_BUN_BINARY_UNREADABLE
+/bin/chmod 0500 "$copy" >/dev/null 2>&1 || abort_after_copy BAZIS_BUN_BINARY_UNREADABLE
+copy_sha=$(sha256_of "$copy")
+[ "$copy_sha" = "$expected_sha" ] || abort_after_copy BAZIS_BUN_SHA256_MISMATCH
+if [ "$can_lock" = 1 ]; then
+  /usr/bin/chflags uchg "$copy" >/dev/null 2>&1 || abort_after_copy BAZIS_BUN_BINARY_UNREADABLE
+  immutable=1
+fi
+copy_sha=$(sha256_of "$copy")
+[ "$copy_sha" = "$expected_sha" ] || abort_after_copy BAZIS_BUN_SHA256_MISMATCH
+
+PATH="$private_dir:/usr/bin:/bin"
+export PATH
+"$copy" run "$repo_dir/scripts/bun-toolchain-check.ts" --receipt >/dev/null || abort_after_copy BAZIS_BUN_AUTHORITY_INVALID
+
+docker_link=/usr/local/bin/docker
+docker_target=/Applications/Docker.app/Contents/Resources/bin/docker
+expected_docker_link_uid=0
+expected_docker_target_uid=$(/usr/bin/id -u)
+docker_route_safe() {
+  [ -L "$docker_link" ] || return 1
+  [ "$(/usr/bin/readlink "$docker_link" 2>/dev/null)" = "$docker_target" ] || return 1
+  [ "$(/usr/bin/stat -f %u "$docker_link" 2>/dev/null)" = "$expected_docker_link_uid" ] || return 1
+  [ -f "$docker_target" ] && [ ! -L "$docker_target" ] && [ -x "$docker_target" ] && [ -r "$docker_target" ] || return 1
+  docker_target_uid=$(/usr/bin/stat -f %u "$docker_target" 2>/dev/null) || return 1
+  [ "$docker_target_uid" = 0 ] || [ "$docker_target_uid" = "$expected_docker_target_uid" ] || return 1
+  docker_mode=$(/usr/bin/stat -f %Lp "$docker_target" 2>/dev/null) || return 1
+  case "$docker_mode" in *[!0-7]*|'') return 1 ;; esac
+  [ $((0$docker_mode & 022)) -eq 0 ] || return 1
+  docker_captured_sha=$(/usr/bin/shasum -a 256 "$docker_target" 2>/dev/null | /usr/bin/awk '{print $1}')
+  case "$docker_captured_sha" in *[!0-9a-f]*|'') return 1 ;; esac
+  [ "${#docker_captured_sha}" = 64 ] || return 1
+  return 0
+}
+write_docker_stub() {
+  /usr/bin/printf '%s\n' '#!/bin/sh' 'printf "%s\\n" BAZIS_DOCKER_CAPABILITY_UNAVAILABLE >&2' 'exit 127' > "$docker" || return 1
+}
+write_docker_wrapper() {
+  /usr/bin/printf '%s\n' '#!/bin/sh' 'set -eu' 'PATH=/usr/bin:/bin' 'export PATH' "docker_link=$docker_link" "docker_target=$docker_target" "expected_docker_link_uid=$expected_docker_link_uid" "expected_docker_target_uid=$expected_docker_target_uid" "expected_docker_sha=$docker_captured_sha" 'unavailable() { printf "%s\\n" BAZIS_DOCKER_CAPABILITY_UNAVAILABLE >&2; exit 127; }' '[ -L "$docker_link" ] || unavailable' '[ "$(/usr/bin/readlink "$docker_link" 2>/dev/null)" = "$docker_target" ] || unavailable' '[ "$(/usr/bin/stat -f %u "$docker_link" 2>/dev/null)" = "$expected_docker_link_uid" ] || unavailable' '[ -f "$docker_target" ] && [ ! -L "$docker_target" ] && [ -x "$docker_target" ] && [ -r "$docker_target" ] || unavailable' 'docker_target_uid=$(/usr/bin/stat -f %u "$docker_target" 2>/dev/null) || unavailable' '[ "$docker_target_uid" = 0 ] || [ "$docker_target_uid" = "$expected_docker_target_uid" ] || unavailable' 'docker_mode=$(/usr/bin/stat -f %Lp "$docker_target" 2>/dev/null) || unavailable' 'case "$docker_mode" in *[!0-7]*|"" ) unavailable ;; esac' '[ $((0$docker_mode & 022)) -eq 0 ] || unavailable' 'docker_current_sha=$(/usr/bin/shasum -a 256 "$docker_target" 2>/dev/null | /usr/bin/awk "{print \$1}")' '[ "$docker_current_sha" = "$expected_docker_sha" ] || unavailable' 'exec "$docker_target" "$@"' > "$docker" || return 1
+}
+# The verified Docker route is Docker Desktop on macOS; elsewhere docker is a stub.
+if [ "$can_lock" = 1 ] && docker_route_safe; then write_docker_wrapper || abort_after_copy BAZIS_DOCKER_ROUTE_SETUP_FAILED; else write_docker_stub || abort_after_copy BAZIS_DOCKER_ROUTE_SETUP_FAILED; fi
+docker_created=1
+/bin/chmod 0500 "$docker" >/dev/null 2>&1 || abort_after_copy BAZIS_DOCKER_ROUTE_SETUP_FAILED
+if [ "$can_lock" = 1 ]; then
+  /usr/bin/chflags uchg "$docker" >/dev/null 2>&1 || abort_after_copy BAZIS_DOCKER_ROUTE_SETUP_FAILED
+  docker_immutable=1
+fi
+
+"$copy" "$@" &
+child_pid=$!
+while :; do
+  set +e
+  wait "$child_pid"
+  child_status=$?
+  set -e
+  [ -n "$first_signal" ] || {
+    kill -0 "$child_pid" 2>/dev/null || break
+    continue
+  }
+  poll=0
+  while kill -0 "$child_pid" 2>/dev/null && [ "$poll" -lt "$shutdown_polls" ]; do
+    /bin/sleep 0.1
+    poll=$((poll + 1))
+  done
+  if kill -0 "$child_pid" 2>/dev/null; then
+    kill -KILL "$child_pid" 2>/dev/null || true
+    set +e
+    wait "$child_pid"
+    reap_status=$?
+    set -e
+    if kill -0 "$child_pid" 2>/dev/null || [ "$reap_status" -eq 127 ]; then
+      settlement_unconfirmed=1
+      printf '%s\n' BAZIS_BUN_CHILD_SETTLEMENT_UNCONFIRMED >&2
+    fi
+  fi
+  child_status=$first_signal_status
+  break
+done
+child_pid=""
+if ! cleanup; then
+  printf '%s\n' BAZIS_BUN_CLEANUP_UNCONFIRMED >&2
+  [ "$child_status" -eq 0 ] && exit 1
+fi
+[ "$settlement_unconfirmed" -eq 0 ] || exit 1
+exit "$child_status"

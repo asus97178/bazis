@@ -1,12 +1,12 @@
-# osnv module code examples
+# bazis module code examples
 
 An appendix to [MOD-ARCH-001](MODULE_ARCHITECTURE.md), version 1.3.
-The examples use the public osnv APIs. Task is a learning feature that creates and
+The examples use the public bazis APIs. Task is a learning feature that creates and
 reads tasks. The code is given for the named files of an application's
 `src/app/modules`; this document does not create or connect the module.
 DataManager below reproduces a composition from the osnova application.
 
-To implement a new module, first create it with the osnv CLI command per §8.1 of
+To implement a new module, first create it with the bazis CLI command per §8.1 of
 the specification. For Task, `g module Task --empty` fits; after generation fill
 in `MODULE.md` and adapt the sources to the examples below.
 Copying these examples does not replace the mandatory CLI scaffold generation.
@@ -43,7 +43,7 @@ The shared input model does not depend on HTTP: the service and any of its adapt
 
 ```ts
 // file: src/app/modules/task/contracts/CreateTaskInput.ts
-import { Validator } from "osnv/library/validation";
+import { Validator } from "bazis/library/validation";
 
 export class CreateTaskInput {
   @Validator({ required: true, type: "string", minLength: 2, maxLength: 200 })
@@ -59,7 +59,7 @@ for binding by name; regular codegen builds the route and DI metadata.
 
 ```ts
 // file: src/app/modules/task/http/contracts/TaskRequests.ts
-import { RequestModel } from "osnv/core/http";
+import { RequestModel } from "bazis/core/http";
 import { CreateTaskInput } from "../../contracts/CreateTaskInput";
 
 @RequestModel()
@@ -88,7 +88,7 @@ The storage model is separate from the input. The ORM sets `id` and `createdAt`,
 
 ```ts
 // file: src/app/modules/task/model/Task.model.ts
-import { Column, Entity, Key } from "osnv/core/orm";
+import { Column, Entity, Key } from "bazis/core/orm";
 
 @Entity({ table: "Tasks" })
 export class Task {
@@ -108,7 +108,7 @@ export class Task {
 
 ```ts
 // file: src/app/modules/task/model/TaskDbContext.ts
-import { DbContext } from "osnv/core/orm";
+import { DbContext } from "bazis/core/orm";
 import { Task } from "./Task.model";
 
 export class TaskDbContext extends DbContext {
@@ -146,7 +146,7 @@ export function toTaskResponse(task: Task): TaskResponse {
 
 ```ts
 // file: src/app/modules/task/services/ITask.service.ts
-import { createToken } from "osnv/core/di";
+import { createToken } from "bazis/core/di";
 import type { CreateTaskInput } from "../contracts/CreateTaskInput";
 import type { TaskResponse } from "../contracts/TaskResponse";
 
@@ -161,7 +161,7 @@ export const ITaskService = createToken<ITaskService>("ITaskService");
 
 ```ts
 // file: src/app/modules/task/errors/TaskInputError.ts
-import type { ValidationError } from "osnv/library/validation";
+import type { ValidationError } from "bazis/library/validation";
 
 export class TaskInputError extends Error {
   constructor(readonly errors: readonly ValidationError[]) {
@@ -179,7 +179,7 @@ DI call does not depend on whether the request went through the HTTP validator.
 ```ts
 // file: src/app/modules/task/services/Task.service.ts
 import { TaskDbContext } from "../model/TaskDbContext";
-import { Validator } from "osnv/library/validation";
+import { Validator } from "bazis/library/validation";
 import { CreateTaskInput } from "../contracts/CreateTaskInput";
 import { toTaskResponse, type TaskResponse } from "../contracts/TaskResponse";
 import { TaskInputError } from "../errors/TaskInputError";
@@ -231,7 +231,7 @@ saving. The application's existing authorization is used here.
 import {
   Authorize, Controller, Created, Get, HttpContext,
   ModelValidationError, NotFound, Ok, Post,
-} from "osnv/core/http";
+} from "bazis/core/http";
 import { requireTokenKind } from "../../auth/jwtAuth";
 import { TokenKind } from "../../auth/tokenKinds";
 import { TaskInputError } from "../errors/TaskInputError";
@@ -273,7 +273,7 @@ the actual prefix in Location.
 
 ```ts
 // file: src/app/modules/task/Task.module.ts
-import { Module, scoped } from "osnv/core/di";
+import { Module, scoped } from "bazis/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { Task } from "./model/Task.model";
 import { TaskDbContext } from "./model/TaskDbContext";
@@ -283,7 +283,7 @@ import { TaskController } from "./http/TaskController";
 
 @Module({
   imports: [AuthModule],
-  ormOsnv: { context: TaskDbContext, entities: [Task] },
+  ormBazis: { context: TaskDbContext, entities: [Task] },
   providers: [scoped(ITaskService, TaskService)],
   controllers: [TaskController],
   exports: [ITaskService],
@@ -309,9 +309,9 @@ Inputs: the `ServiceProvider` and `Logger` constructor arguments and the
 
 ```ts
 // file: src/app/modules/task/background/TaskStatsReporter.ts
-import { Background, PeriodicBackgroundService } from "osnv/core/background";
-import type { ServiceProvider } from "osnv/core/di";
-import type { Logger } from "osnv/core/kernel";
+import { Background, PeriodicBackgroundService } from "bazis/core/background";
+import type { ServiceProvider } from "bazis/core/di";
+import type { Logger } from "bazis/core/kernel";
 import { ITaskService } from "../services/ITask.service";
 
 @Background({ intervalMs: 60_000, runImmediately: false })
@@ -344,7 +344,7 @@ SQL that was already sent.
 
 ```ts
 // file: src/app/modules/task/ui/TasksAdminUiProfile.ts
-import { UiProfile } from "osnv";
+import { UiProfile } from "bazis";
 import { TaskResponse } from "../contracts/TaskResponse";
 import { TaskController } from "../http/TaskController";
 
@@ -368,8 +368,8 @@ integer `id`; the output is a `TaskResponse` or `null` in the `task` field.
 
 ```ts
 // file: src/app/modules/task/ai/tools/TaskLookupTool.ts
-import { Tool, type AgentToolExecutionContext } from "osnv/core/agent";
-import { Validator } from "osnv/library/validation";
+import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
+import { Validator } from "bazis/library/validation";
 import { TaskResponse } from "../../contracts/TaskResponse";
 import type { ITaskService } from "../../services/ITask.service";
 
@@ -447,7 +447,7 @@ Source: [DataManager.module.ts](https://github.com/asus97178/osnova/blob/d01528a
 
 ```ts
 // file: src/app/modules/datamanager_modules/DataManager.module.ts
-import { Module } from "osnv/core/di";
+import { Module } from "bazis/core/di";
 import { AuthModule } from "../auth/Auth.module";
 import { DataManagerTablesModule } from "./tables_module/DataManagerTables.module";
 import { DataManagerFieldsModule } from "./fields_module/DataManagerFields.module";
@@ -473,7 +473,7 @@ Source: [DataManagerRecords.module.ts](https://github.com/asus97178/osnova/blob/
 
 ```ts
 // file: src/app/modules/datamanager_modules/records_module/DataManagerRecords.module.ts
-import { Module, scoped } from "osnv/core/di";
+import { Module, scoped } from "bazis/core/di";
 import { DataManagerTablesModule } from "../tables_module/DataManagerTables.module";
 import { DataManagerValidatorsModule } from "../validators_module/DataManagerValidators.module";
 import { DataController } from "./http/DataController";
@@ -502,7 +502,7 @@ App.module.ts with this code and lose the application's other features.
 
 ```ts
 // file: src/app/modules/TaskExampleApp.module.ts
-import { Module } from "osnv/core/di";
+import { Module } from "bazis/core/di";
 import { TaskModule } from "./task/Task.module";
 import { DataManagerModule } from "./datamanager_modules/DataManager.module";
 
@@ -512,7 +512,7 @@ export class TaskExampleAppModule {}
 
 ```ts
 // file: src/task-example.ts
-import { runApp } from "osnv";
+import { runApp } from "bazis";
 import { AppInfra } from "./app/infra/App.infra";
 import { TaskExampleAppModule } from "./app/modules/TaskExampleApp.module";
 
@@ -525,7 +525,7 @@ await runApp(TaskExampleAppModule, {
 This connects through the existing infrastructure; running it needs that
 infrastructure's settings and a prepared schema. When moving the code into an
 application, first connect it to the chosen entry point and target in
-`osnv.config.json`, then run the regular `di:generate` with the pinned Bun.
+`bazis.config.json`, then run the regular `di:generate` with the pinned Bun.
 Documenting these examples does not run the application, a server, external
 connectors or migrations.
 

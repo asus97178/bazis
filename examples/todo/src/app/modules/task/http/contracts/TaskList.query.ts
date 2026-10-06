@@ -1,4 +1,4 @@
-import { Filterable, ListOptions, ListRequest, Sortable } from "osnv/core/http";
+import { Filterable, ListOptions, ListRequest, Sortable } from "bazis/core/http";
 import type { Task } from "../../model/Task.model";
 
 /** `GET /tasks?filter[projectId]=<id>&filter[done]=false&sort=-createdAt` */

@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 
 // End-to-end: starts the app from source against a real PostgreSQL and drives
-// it over HTTP. Needs a database: OSNV_DB__HOST (and OSNV_DB__PORT/... if not
+// it over HTTP. Needs a database: BAZIS_DB__HOST (and BAZIS_DB__PORT/... if not
 // default). Without it the test is reported as skipped, not passed.
-const enabled = Boolean(process.env.OSNV_DB__HOST);
+const enabled = Boolean(process.env.BAZIS_DB__HOST);
 const port = String(20000 + Math.floor(Math.random() * 20000));
 const base = `http://127.0.0.1:${port}`;
 let app: ReturnType<typeof Bun.spawn> | undefined;
@@ -11,7 +11,7 @@ let app: ReturnType<typeof Bun.spawn> | undefined;
 beforeAll(async () => {
   if (!enabled) return;
   app = Bun.spawn([process.execPath, "run", "src/index.ts"], {
-    env: { ...process.env, OSNV_ENV: "development", HOST: "127.0.0.1", PORT: port },
+    env: { ...process.env, BAZIS_ENV: "development", HOST: "127.0.0.1", PORT: port },
     stdout: "ignore",
     stderr: "inherit",
   });
