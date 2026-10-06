@@ -54,19 +54,21 @@ curl http://127.0.0.1:3000/health
 
 ```sh
 bun add bazis
-bun add -d typescript@^5.9 @types/bun
+bun add -d typescript@^6 @types/bun
 ```
 
 > [!WARNING]
-> Указывайте версию TypeScript: `typescript@^5.9`. Без версии
-> `bun add -d typescript` поставит TypeScript 7 — у него другой программный
-> API, и кодогенерация bazis на нём падает (`ts.sys` is undefined). Проект,
-> созданный `bazis new`, уже содержит `"typescript": "^5"`.
+> Указывайте версию TypeScript: `typescript@^6`. Без версии
+> `bun add -d typescript` поставит TypeScript 7 — в нём нет программного API,
+> которым пользуется кодогенерация bazis, и она падает (`ts.sys` is
+> undefined). bazis поддерживает TypeScript 5.9 и 6. Проект, созданный
+> `bazis new`, уже содержит `"typescript": "^6"`.
 
 Дальше проекту нужны четыре файла. Проще всего взять их из проекта,
 созданного `bazis new`, — ниже их минимальное содержимое.
 
-`tsconfig.json`:
+`tsconfig.json` — строка `"types": ["bun"]` обязательна: TypeScript 6 не
+подключает типы Bun сам:
 
 ```json
 {
