@@ -160,4 +160,4 @@ export class ReportWriter {
 ## Дальше
 
 - [Модули](modules.md)
-- Контроллеры *(в работе)*
+- [Контроллеры](controllers.md)
