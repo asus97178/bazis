@@ -52,7 +52,7 @@ Instead there are ASP.NET-style conventions that codegen infers from the signatu
 
 | Method parameter | Binding |
 |---|---|
-| the name matches the route `:name` | the route value (converted by the constraint/type) |
+| the name matches a route parameter: `:name` in the method or `@Controller` template, or a wildcard `*name` (a bare `*` is `rest`) | the route value (converted by the constraint/type) |
 | a DTO class from the application sources | the request body + `@Validator` validation (errors -> 400) |
 | `HttpContext` / `Request` / `ResponseBuilder` | context / raw request / response builder |
 | a primitive (`string`/`number`/`boolean` or inferred from the default) | a query parameter; `?` and a default -> optional |
