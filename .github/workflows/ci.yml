@@ -67,14 +67,21 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write   # GitHub Release
-      id-token: write   # npm provenance
+      id-token: write   # npm trusted publishing (OIDC) and provenance
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
+
+      # npm trusted publishing needs npm 11.5.1 or newer; no token is stored.
+      - name: npm with trusted publishing
+        run: |
+          npm install -g npm@11
+          npm --version
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)"
 
       - name: Qualified Bun (hash-pinned in toolchain/bun.json)
         run: |
@@ -98,8 +105,6 @@ jobs:
 
       - name: Publish to npm with provenance
         run: npm publish "$RUNNER_TEMP"/pkg/bazis-*.tgz --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: GitHub Release
         run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/pkg/bazis-*.tgz --title "bazis $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
