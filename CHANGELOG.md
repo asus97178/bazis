@@ -4,6 +4,19 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.96.5 — 2026-10-06
+
+### Added
+
+- A service can take its configuration by type:
+  `constructor(private readonly config: ConfigView<GreetingConfig>)` with
+  `scoped(GreetingService)`. Codegen binds the parameter to the token of the
+  one `defineConfig<GreetingConfig>(...)` declaration, so the explicit
+  `[greetingConfig.token]` deps list is no longer needed. The declaration must
+  pass the type argument. A type without a declaration stops codegen with
+  `BAZIS_DI_CONFIG_UNKNOWN`; a type shared by several declarations with
+  `BAZIS_DI_CONFIG_AMBIGUOUS`.
+
 ## 0.96.4 — 2026-10-06
 
 ### Fixed

@@ -162,6 +162,9 @@ let inferredDiClasses = new Set<ts.ClassDeclaration>();
 let explicitlyBoundDiClasses = new Set<ts.ClassDeclaration>();
 // Known runtime token names: createToken descriptions + class names usable as class-tokens.
 let tokenDescriptions = new Set<string>();
+// defineConfig<T>("prefix") declarations by the name of T: a ConfigView<T>
+// constructor parameter binds to the token of that declaration.
+let configPrefixesByType = new Map<string, Set<string>>();
 let knownClassNames = new Set<string>();
 let warnings: string[] = [];
 let fatalErrors: string[] = [];
@@ -446,7 +449,7 @@ function collectDynamicImportDiagnostics(source: ts.SourceFile, target: string, 
 function resetTargetAnalysis(files: Set<string>, generatedDir: string): void {
   activeGeneratedDir = generatedDir;
   classDeps = new Map(); inferredDiClasses = new Set(); explicitlyBoundDiClasses = new Set();
-  tokenDescriptions = new Set(); knownClassNames = new Set(); warnings = []; fatalErrors = [];
+  tokenDescriptions = new Set(); configPrefixesByType = new Map(); knownClassNames = new Set(); warnings = []; fatalErrors = [];
   httpBindings = {}; httpControllerFiles = {}; openApiSchemas = {}; openApiOperations = {};
   grpcBindings = new Map();
   uiProfileResponseModels = new Map(); openApiSchemaModels = new Map(); requestModelClassNames = new Set(); listRequestClassNames = new Set();
@@ -476,6 +479,7 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
     }
     collectHttpBindings(source); collectOpenApiSchemas(source); collectUiProfileResponseModels(source);
   }
+  resolveConfigViewDeps();
   validateDepsAgainstKnownTokens();
   const requestModelImports = resolveRequestModelImports();
   const requestModelHydration = resolveRequestModelHydration(requestModelImports);
@@ -711,6 +715,13 @@ function collectTokenDescriptions(source: ts.SourceFile): void {
         if (node.expression.text === "createToken" || node.expression.text === "createOpenGenericTokenFamily") {
           tokenDescriptions.add(firstArg.text);
         }
+        if (node.expression.text === "defineConfig") {
+          // The same description defineConfig gives its token.
+          const prefix = firstArg.text || "default";
+          tokenDescriptions.add(`Config:${prefix}`);
+          const typeName = node.typeArguments?.[0] && getDependencyTypeName(node.typeArguments[0]);
+          if (typeName) configPrefixesByType.set(typeName, (configPrefixesByType.get(typeName) ?? new Set()).add(prefix));
+        }
       }
     }
     if (ts.isClassDeclaration(node) && node.name) {
@@ -720,6 +731,39 @@ function collectTokenDescriptions(source: ts.SourceFile): void {
   };
 
   ts.forEachChild(source, visit);
+}
+
+/**
+ * Replaces each `ConfigView<T>` placeholder with the token of the one
+ * `defineConfig<T>(...)` declaration. Runs after every source was read, because
+ * a service may come before the file that declares its configuration.
+ */
+function resolveConfigViewDeps(): void {
+  for (const [declaration, deps] of classDeps) {
+    let changed = false;
+    const resolved: CollectedDependency[] = [];
+    for (const [index, dep] of deps.entries()) {
+      const typeName = /^ConfigView<(.+)>$/.exec(dep.name)?.[1];
+      if (typeName === undefined) {
+        resolved.push(dep);
+        continue;
+      }
+      const prefixes = [...(configPrefixesByType.get(typeName) ?? [])];
+      if (prefixes.length !== 1) {
+        classDeps.delete(declaration);
+        if (needsInferredDiDeps(declaration)) {
+          fatalErrors.push(prefixes.length === 0
+            ? `BAZIS_DI_CONFIG_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", but no defineConfig<${typeName}>(...) declaration was found. Declare the configuration with an explicit type argument, for example defineConfig<${typeName}>("name", { default: {...} }).`
+            : `BAZIS_DI_CONFIG_AMBIGUOUS: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", which matches several declarations: ${prefixes.map((prefix) => `"${prefix}"`).join(", ")}. Give each declaration its own type, or pass the token explicitly: scoped(Service, Service, [config.token]).`);
+        }
+        changed = false;
+        break;
+      }
+      resolved.push({ name: `Config:${prefixes[0]}` });
+      changed = true;
+    }
+    if (changed && classDeps.has(declaration)) classDeps.set(declaration, resolved);
+  }
 }
 
 function validateDepsAgainstKnownTokens(): void {
@@ -910,6 +954,11 @@ function dependencyFromType(type: ts.Type): CollectedDependency | undefined {
   const name = declaration?.name?.text ?? type.aliasSymbol?.name ?? symbol?.name;
   if (!name || BUILTIN_DEPENDENCY_NAMES.has(name)) return undefined;
   const arguments_ = type.flags & ts.TypeFlags.Object ? checker.getTypeArguments(type as ts.TypeReference) : [];
+  if (name === "ConfigView") {
+    const configType = arguments_[0];
+    const configTypeName = configType && (configType.aliasSymbol?.name ?? configType.getSymbol()?.name);
+    return configTypeName ? { name: `ConfigView<${configTypeName}>` } : undefined;
+  }
   if (name === "Lazy" || name === "IRepository") {
     const inner = arguments_[0] && dependencyFromType(arguments_[0]);
     if (!inner) return undefined;
@@ -948,6 +997,15 @@ function readConstructorTypeNames(node: ts.ClassDeclaration): ConstructorDepende
       }
       deps.push({ name: `lazy:${innerName}`, target: dependencyClass(innerType!), lazy: true });
       continue;
+    }
+
+    if (refName === "ConfigView" && paramType && ts.isTypeReferenceNode(paramType)) {
+      const configType = paramType.typeArguments?.[0];
+      const configTypeName = configType ? getDependencyTypeName(configType) : undefined;
+      if (configTypeName) {
+        deps.push({ name: `ConfigView<${configTypeName}>` });
+        continue;
+      }
     }
 
     if (refName === "IRepository" && paramType && ts.isTypeReferenceNode(paramType)) {

@@ -29,8 +29,10 @@ empty or whitespace value. TypeScript forbids unsupported object types.
 
 A declaration stores no chosen environment, values or cache. `get/has/ensureValid`
 stay for standalone reading of the process env, but `ensureValid` no longer
-switches later reads. Host code gets `resolve`, a service injects
-`definition.token`, a connector gets `ConfigRegistry` as the create argument.
+switches later reads. Host code gets `resolve`, a service declares
+`ConfigView<T>` in its constructor (codegen binds it to the token of the one
+`defineConfig<T>(...)` declaration; the type argument is required) or injects
+`definition.token` explicitly, a connector gets `ConfigRegistry` as the create argument.
 All built-in connectors use this argument; a custom connector reads
 `configs?.get(config) ?? config`. A direct global get inside a service does not
 read the settings of its kernel.
