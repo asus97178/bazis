@@ -1,4 +1,4 @@
-# bazis — framework repository fot BunJS
+# bazis — framework repository for BunJS
 
 Source of the [`bazis`](src/bazis/README.md) npm package: a modular backend
 framework for Bun with DI wired by codegen, HTTP, a PostgreSQL ORM, WebSocket,
