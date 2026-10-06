@@ -8,8 +8,10 @@ export interface GenerateProjectOptions {
   readonly outputPath?: string;
   /** Local Bazis package source; defaults to this checkout's src/bazis. */
   readonly frameworkPath?: string;
-  /** Opt into a live link to the source checkout instead of a portable snapshot. */
+  /** Opt into a live link to the source checkout instead of the npm dependency. */
   readonly linkFramework?: boolean;
+  /** Copy the package into vendor/bazis instead of depending on npm (offline projects). */
+  readonly vendor?: boolean;
   readonly dryRun?: boolean;
 }
 
@@ -18,8 +20,11 @@ export interface GenerateProjectResult {
   /** Application scaffold files; framework sources are summarized separately. */
   readonly files: readonly string[];
   readonly dryRun: boolean;
-  readonly frameworkMode: "snapshot" | "link";
+  /** registry: `"bazis": "^<version>"` from npm; snapshot: vendor/bazis copy; link: `file:` to a checkout. */
+  readonly frameworkMode: FrameworkMode;
   readonly frameworkFileCount: number;
+  /** The dependency written to package.json. */
+  readonly dependency: string;
 }
 
 /** Create a separate application without mutating the framework checkout. */
@@ -35,16 +40,17 @@ export async function generateProject(options: GenerateProjectOptions): Promise<
   const projectDir = path.join(parent, path.basename(requested));
   if (await exists(projectDir)) throw new Error(`Project path already exists: ${projectDir}`);
 
+  if (options.linkFramework && options.vendor) throw new Error("--link-framework and --vendor cannot be combined.");
   const frameworkDir = await resolveFramework(options.frameworkPath);
   if (projectDir.startsWith(`${frameworkDir}${path.sep}`)) {
     throw new Error("Project directory must be outside the Bazis package.");
   }
   const dependencyPath = path.relative(projectDir, frameworkDir).replaceAll("\\", "/");
-  const frameworkMode = options.linkFramework ? "link" : "snapshot";
-  const frameworkFiles = options.linkFramework ? [] : await collectFrameworkFiles(frameworkDir);
-  const dependency = options.linkFramework
+  const frameworkMode: FrameworkMode = options.linkFramework ? "link" : options.vendor ? "snapshot" : "registry";
+  const frameworkFiles = frameworkMode === "snapshot" ? await collectFrameworkFiles(frameworkDir) : [];
+  const dependency = frameworkMode === "link"
     ? `file:${dependencyPath.startsWith(".") ? dependencyPath : `./${dependencyPath}`}`
-    : "file:./vendor/bazis";
+    : frameworkMode === "snapshot" ? "file:./vendor/bazis" : `^${await frameworkVersion(frameworkDir)}`;
   const files = buildProjectFiles(name, dependency, frameworkMode);
   if (!options.dryRun) {
     const staged = await mkdtemp(path.join(parent, `.${name}.bazis-`));
@@ -67,7 +73,16 @@ export async function generateProject(options: GenerateProjectOptions): Promise<
     }
   }
   return { projectDir, files: files.map(([relative]) => path.join(projectDir, relative)), dryRun: options.dryRun === true,
-    frameworkMode, frameworkFileCount: frameworkFiles.length };
+    frameworkMode, frameworkFileCount: frameworkFiles.length, dependency };
+}
+
+export type FrameworkMode = "registry" | "snapshot" | "link";
+
+/** The version the CLI belongs to; a new project depends on the same release line. */
+async function frameworkVersion(directory: string): Promise<string> {
+  const version = JSON.parse(await readFile(path.join(directory, "package.json"), "utf8")).version;
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`Bazis package has no release version: ${String(version)}`);
+  return version;
 }
 
 /** Package sources only: do not carry checkout state, dependencies or test fixtures. */
@@ -122,7 +137,7 @@ async function exists(file: string): Promise<boolean> {
   }
 }
 
-function buildProjectFiles(name: string, dependency: string, frameworkMode: "snapshot" | "link"): readonly (readonly [string, string])[] {
+function buildProjectFiles(name: string, dependency: string, frameworkMode: FrameworkMode): readonly (readonly [string, string])[] {
   const manifest = {
     name, version: "0.1.0", private: true, type: "module",
     scripts: {
@@ -156,7 +171,9 @@ function buildProjectFiles(name: string, dependency: string, frameworkMode: "sna
     ["docs/architecture/MODULE_ARCHITECTURE.md", "# Application module architecture\n\n`src/index.ts` calls `runApp`; `src/app/modules/App.module.ts` composes feature modules through `imports`. The application root owns no domain logic.\n\nOne self-contained function is an atomic module. It owns its data, services, HTTP and background handlers. A composite module is only for several independent functions; its root does composition. Layers and file counts alone do not create submodules.\n\nCreate new modules only with `bunx bazis g module <Name> --empty|--minimal|--full` or `bunx bazis g pack <Name> --parts <a,b>`. Before implementing, define the responsibility and public entries, then fill in the generated `MODULE.md`: fields, errors, dependencies, exports and checks. Use the public APIs of the `bazis` package and its DI and ORM. Do not edit `src/generated/` by hand; run `bunx bazis codegen`.\n\n`--minimal` creates a sample CRUD with the ORM. To run it the application needs a database provider and a ready schema. For a first function without a database use `--empty`. Check types and the binary build after changes that affect startup.\n"],
     ["src/app/modules/App.module.ts", 'import { Module } from "bazis/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class AppModule {}\n'],
     ["src/index.ts", 'import { runApp } from "bazis/core/app";\nimport { AppModule } from "./app/modules/App.module";\nimport { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";\n\nawait registerBazisGeneratedRuntime();\nawait runApp(AppModule, { http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });\n'],
-    ["README.md", `# ${name}\n\nAn [bazis](https://www.npmjs.com/package/bazis) application. ${frameworkMode === "snapshot"
+    ["README.md", `# ${name}\n\nA [bazis](https://www.npmjs.com/package/bazis) application. ${frameworkMode === "registry"
+      ? "The framework comes from npm as the `bazis` dependency; update it with `bun update bazis`."
+      : frameworkMode === "snapshot"
       ? "The framework package is copied to `vendor/bazis`; keep it in Git and move it with the project. The framework checkout is no longer needed. Framework updates do not reach this copy automatically."
       : "The `bazis` dependency links an external local checkout (`--link-framework`). Moving the project needs the same package and an updated path in `package.json`."}\nRead the [local architecture](docs/architecture/MODULE_ARCHITECTURE.md) before changing modules.\n\nNeeds Bun ≥ 1.4.0. Settings go to \`.env\` (example: \`.env.example\`).\n\n\`\`\`sh\nbun install\nbunx bazis dev\n# GET http://127.0.0.1:3000/health\n# If the port is busy: PORT=3100 bunx bazis dev\n\`\`\`\n\nAdd an atomic module from the project root: \`bunx bazis g module Task --empty\`.\nAfter filling in its passport and implementation, run \`bunx bazis codegen\`.\nTests: \`bunx bazis test\`. Typecheck: \`bunx bazis build\`. Binary: \`bunx bazis build --bin\`, run it with \`bun run start\`.\n\n\`--minimal\` creates a sample CRUD with paging (20 records by default, at most 100 over HTTP); it needs a database provider and a schema to run. The service returns \`PageResult\`; the HTTP controller builds JSON:API. \`DbContext.saveChanges()\` saves every change of its context. In ORM predicates combine conditions with \`.and()\` and \`.or()\`; codegen rejects \`&&\` and \`||\` between predicates.\n`],
   ];

@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.96.2 — 2026-10-06
+
+### Changed
+
+- `bazis new` makes the project depend on `bazis` from npm
+  (`"bazis": "^<version>"`) instead of copying the package into
+  `vendor/bazis`; `bun update bazis` now updates the framework. The previous
+  behavior is available with `bazis new <Name> --vendor`.
+- README: how to install from npm, a module map with links to the specs, and
+  an explicit note that bazis runs on Bun only (Node.js refuses to load the
+  package: `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`).
+- Releases are published through npm Trusted Publishing; no npm token is
+  stored in the repository settings.
+
 ## 0.96.1 — 2026-10-06
 
 First public release on npm. The framework was developed as Osnova and

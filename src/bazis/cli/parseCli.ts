@@ -18,7 +18,7 @@ export interface ParsedGenerateArgs {
 
 export type ParseCliResult =
   | { readonly kind: "help"; readonly help: boolean }
-  | { readonly kind: "new"; readonly name: string; readonly outputPath?: string; readonly frameworkPath?: string; readonly linkFramework: boolean; readonly dryRun: boolean }
+  | { readonly kind: "new"; readonly name: string; readonly outputPath?: string; readonly frameworkPath?: string; readonly linkFramework: boolean; readonly vendor: boolean; readonly dryRun: boolean }
   | { readonly kind: "generate"; readonly args: ParsedGenerateArgs }
   | { readonly kind: "codegen"; readonly target?: string }
   | { readonly kind: "dev"; readonly watch: boolean }
@@ -31,7 +31,7 @@ const GENERATOR_ALIASES = new Map<string, "module" | "pack">([
   ["pack", "pack"], ["p", "pack"], ["module-pack", "pack"],
 ]);
 const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--parts", "--target", "--path", "--framework", "--outfile"]);
-const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--bin", "--watch"]);
+const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--vendor", "--bin", "--watch"]);
 
 /** Parsing is pure: help and invalid input can never start generation. */
 export function parseCliArgs(argv: readonly string[]): ParseCliResult {
@@ -64,18 +64,19 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   const [command, generatorToken, name] = positional;
   const target = options.get("--target");
   if (command === "new") {
-    if (positional.length !== 2) return error("Use: bazis new <Name> [--path <directory>] [--framework <directory>] [--link-framework] [--dry-run]");
+    if (positional.length !== 2) return error("Use: bazis new <Name> [--path <directory>] [--framework <directory>] [--vendor | --link-framework] [--dry-run]");
     for (const option of options.keys()) {
-      if (option !== "--path" && option !== "--framework" && option !== "--link-framework" && option !== "--dry-run") {
+      if (option !== "--path" && option !== "--framework" && option !== "--link-framework" && option !== "--vendor" && option !== "--dry-run") {
         return error(`Option ${option} is not supported by new.`);
       }
     }
+    if (options.has("--vendor") && options.has("--link-framework")) return error("--vendor and --link-framework cannot be combined.");
     try {
       parseModuleName(generatorToken!);
     } catch (cause) {
       return error(cause instanceof Error ? cause.message : String(cause));
     }
-    return { kind: "new", name: generatorToken!, outputPath: options.get("--path"), frameworkPath: options.get("--framework"), linkFramework: options.has("--link-framework"), dryRun: options.has("--dry-run") };
+    return { kind: "new", name: generatorToken!, outputPath: options.get("--path"), frameworkPath: options.get("--framework"), linkFramework: options.has("--link-framework"), vendor: options.has("--vendor"), dryRun: options.has("--dry-run") };
   }
   if (target !== undefined && !/^[a-z][a-z0-9-]*$/.test(target)) {
     return error("Target must be a codegen target name or all.");
@@ -105,7 +106,7 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
     return error(`Unknown command: ${command ?? "(missing)"}. Use: bazis --help`);
   }
   if (generatorToken === undefined) return error("Generator is required: module (m) or pack (p).");
-  if (options.has("--path") || options.has("--framework") || options.has("--link-framework")) return error("--path, --framework and --link-framework are only supported by new.");
+  if (options.has("--path") || options.has("--framework") || options.has("--link-framework") || options.has("--vendor")) return error("--path, --framework, --link-framework and --vendor are only supported by new.");
   const generator = GENERATOR_ALIASES.get(generatorToken);
   if (generator === undefined) return error(`Unknown generator: ${generatorToken}. Supported: module (m), pack (p)`);
   if (name === undefined) return error("Module name is required.");

@@ -1,6 +1,7 @@
 # From a new project to a binary
 
 bazis uses TypeScript, Bun, DI, DbContext and controllers with decorators.
+It runs on Bun 1.4.0 or newer only; Node.js and Deno are not supported.
 Codegen infers constructor dependencies and HTTP parameter bindings before the run.
 For a C# developer the closest familiar concepts are the DI scope, EF DbContext and
 ASP.NET controllers. ORM conditions in bazis are built with methods, without LINQ expression trees.
@@ -23,11 +24,13 @@ The empty backend listens on `http://127.0.0.1:3000`; GET `/health` checks that 
 If the port is busy, set `PORT=3100`. This project needs no database and no LLM.
 The sample application in the source checkout has its own infrastructure requirements.
 
-The CLI copies the package into `vendor/bazis`. Commit this directory together with the
-application: after that the source checkout is not needed. It is a snapshot of the
-version; framework changes are not pulled in automatically. `--link-framework` keeps
-a live link to an external checkout for joint development. The built CLI outside
-the checkout accepts `--framework /absolute/path/to/src/bazis`.
+The new project depends on `bazis` from npm (`"bazis": "^<version>"`); `bun install`
+downloads it and `bun update bazis` updates it. Outside the framework checkout the
+same project comes from `bunx bazis new MyApp`. `--vendor` copies the package into
+`vendor/bazis` instead, for projects that must build without npm access; commit that
+directory, it is not updated automatically. `--link-framework` keeps a live link to
+an external checkout for joint development. The built CLI outside the checkout
+accepts `--framework /absolute/path/to/src/bazis`.
 
 ## 2. Add a feature
 

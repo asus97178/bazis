@@ -7,17 +7,57 @@ per-environment defaults, JWT, WebSocket, gRPC, background services, AI agents
 and a CLI that scaffolds, runs, tests and compiles your app into a single
 executable.
 
-The package ships TypeScript sources and runs on Bun only (≥ 1.4.0). There is
-no build step and no separate type package.
+## Requirements
 
-## Quick start
+- **Bun 1.4.0 or newer. Node.js and Deno are not supported.** The package
+  ships TypeScript sources with standard decorators and no build step; Bun
+  runs them directly. Node.js refuses to load TypeScript from `node_modules`
+  (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), and the runtime uses Bun
+  APIs throughout: `Bun.serve`, `Bun.SQL`, the built-in Redis client,
+  `bun:test`, `bun build --compile`.
+- TypeScript 5.9 or newer as a peer dependency: the code generator reads
+  your sources through the TypeScript compiler API. Nothing is compiled to
+  JavaScript.
+- PostgreSQL for the ORM.
+- Qualified platforms: macOS arm64, Linux x64 and arm64.
+
+## Install
+
+The package is `bazis` on npm. Install
+it with Bun; `npm install` would download it too, but the code only runs on Bun.
+
+**A new project** (recommended): the CLI creates the app and adds the
+dependency `"bazis": "^<current version>"`:
 
 ```sh
-bunx bazis new MyApp
+bunx bazis new MyApp      # creates ./my-app; nothing is copied, the package comes from npm
 cd my-app
-bun install
+bun install               # downloads bazis and its peer dependency typescript
 bunx bazis dev            # GET http://127.0.0.1:3000/health
 ```
+
+**An existing Bun project:**
+
+```sh
+bun add bazis             # or a fixed version: bun add bazis@0.96.2
+bun add -d typescript @types/bun
+```
+
+Then take `tsconfig.json`, `bazis.config.json` and `src/index.ts` from a
+project made by `bazis new` as the starting point, and run `bunx bazis codegen`.
+
+| Task | Command |
+| --- | --- |
+| Show the installed version | `bun pm ls \| grep bazis` |
+| Update within the version range | `bun update bazis` |
+| Move to the latest release | `bun add bazis@latest` |
+| A project that must build without npm access | `bunx bazis new MyApp --vendor` (copies the package into `vendor/bazis`) |
+
+Every release is published from GitHub Actions with
+[npm provenance](https://docs.npmjs.com/generating-provenance-statements): the
+npm page shows the source commit and the workflow that built it. The release
+tarball is also attached to each
+[GitHub Release](https://github.com/asus97178/bazis/releases).
 
 `bazis new` creates a project with `src/index.ts`, a root `AppModule`,
 `bazis.config.json`, scripts, a `/health` test and an `.env.example`.
@@ -26,7 +66,7 @@ bunx bazis dev            # GET http://127.0.0.1:3000/health
 
 | Command | What it does |
 | --- | --- |
-| `bazis new <Name>` | Create a project in `./<name>` |
+| `bazis new <Name> [--vendor]` | Create a project in `./<name>` that depends on `bazis` from npm; `--vendor` copies the package into `vendor/bazis` instead |
 | `bazis g module <Name> --empty\|--minimal\|--full` | Add a module: empty; CRUD with ORM, validation and paging; or the same with auth guards |
 | `bazis g pack <Name> --parts a,b` | Add a composite module made of several atomic ones |
 | `bazis codegen` | Regenerate dependency wiring into `src/generated/bazis` |

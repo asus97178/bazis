@@ -23,15 +23,31 @@ describe("new project", () => {
     expect(parseCliArgs(["new", "../escape"]).kind).toBe("error");
     expect(parseCliArgs(["new", "App", "--force"]).kind).toBe("error");
     expect(parseCliArgs(["g", "module", "App", "--framework", frameworkPath]).kind).toBe("error");
+    expect(parseCliArgs(["new", "App"])).toMatchObject({ kind: "new", linkFramework: false, vendor: false });
     expect(parseCliArgs(["new", "App", "--link-framework"])).toMatchObject({ kind: "new", linkFramework: true });
+    expect(parseCliArgs(["new", "App", "--vendor"])).toMatchObject({ kind: "new", vendor: true });
+    expect(parseCliArgs(["new", "App", "--vendor", "--link-framework"]).kind).toBe("error");
+    expect(parseCliArgs(["g", "module", "App", "--vendor"]).kind).toBe("error");
     expect(parseCliArgs(["g", "module", "App", "--link-framework"]).kind).toBe("error");
     expect(parseCliArgs(["codegen", "--link-framework"]).kind).toBe("error");
   });
 
-  test("dry-run has no effects; creation produces an independent app and refuses overwrite", async () => {
+  test("by default the project depends on the npm package of the same version and copies nothing", async () => {
+    const root = await fixture();
+    const result = await generateProject({ name: "FromNpm", outputPath: path.join(root, "from-npm"), frameworkPath });
+    const version = (await Bun.file(path.join(frameworkPath, "package.json")).json()).version;
+    const manifest = await Bun.file(path.join(result.projectDir, "package.json")).json();
+    expect(manifest.dependencies.bazis).toBe(`^${version}`);
+    expect(result).toMatchObject({ frameworkMode: "registry", frameworkFileCount: 0, dependency: `^${version}` });
+    expect(await readdir(result.projectDir)).not.toContain("vendor");
+    expect(await readFile(path.join(result.projectDir, "README.md"), "utf8")).toContain("bun update bazis");
+    await expect(generateProject({ name: "Both", outputPath: path.join(root, "both"), frameworkPath, vendor: true, linkFramework: true })).rejects.toThrow("cannot be combined");
+  });
+
+  test("dry-run has no effects; a vendor snapshot produces an independent app and refuses overwrite", async () => {
     const root = await fixture();
     const outputPath = path.join(root, "hello-app");
-    const options = { name: "HelloApp", outputPath, frameworkPath };
+    const options = { name: "HelloApp", outputPath, frameworkPath, vendor: true };
     const planned = await generateProject({ ...options, dryRun: true });
     expect(planned.files).toHaveLength(11);
     expect(await readdir(root)).toEqual([]);
@@ -73,12 +89,13 @@ describe("new project", () => {
     const runtime: CliRuntime = { log: (message) => logs.push(message), error: (message) => logs.push(message), codegen: async () => { throw new Error("unexpected codegen"); } };
     expect(await runCli(["new", "Demo", "--path", path.join(root, "demo"), "--framework", frameworkPath], runtime)).toBe(0);
     expect(logs.join("\n")).toContain("created project:");
+    expect(logs.join("\n")).toContain('Framework dependency: "bazis": "^');
     expect(logs.join("\n")).toContain("bun install");
   });
 
   test("relocated snapshot runs codegen without the original framework source tree", async () => {
     const root = await fixture();
-    const result = await generateProject({ name: "Standalone", outputPath: path.join(root, "standalone"), frameworkPath });
+    const result = await generateProject({ name: "Standalone", outputPath: path.join(root, "standalone"), frameworkPath, vendor: true });
     const relocated = path.join(root, "relocated");
     await rename(result.projectDir, relocated);
     await mkdir(path.join(relocated, "node_modules"));

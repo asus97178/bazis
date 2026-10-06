@@ -22,7 +22,8 @@ export const USAGE = `Usage:
 Generation options:
   --path <directory>    Exact project directory (new only; default: ./<name>)
   --framework <path>    Local bazis package directory (new only)
-  --link-framework      Link that checkout instead of copying vendor/bazis (new only)
+  --vendor              Copy the package into vendor/bazis instead of the npm dependency (new only)
+  --link-framework      Depend on that local checkout through a file: link (new only)
   --modules-root <path>  Modules root (default: src/app/modules)
   --app-module <path>    Host module (default: {modules-root}/App.module.ts)
   --empty               Module entry and MODULE.md only
@@ -83,10 +84,12 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
     if (parsed.kind === "test") return await runTest(process.cwd(), parsed.args, runtime.codegen);
     if (parsed.kind === "build") return await runBuild(process.cwd(), { bin: parsed.bin, outfile: parsed.outfile }, runtime.codegen, runtime.log);
     if (parsed.kind === "new") {
-      const result = await generateProject({ name: parsed.name, outputPath: parsed.outputPath, frameworkPath: parsed.frameworkPath, linkFramework: parsed.linkFramework, dryRun: parsed.dryRun });
+      const result = await generateProject({ name: parsed.name, outputPath: parsed.outputPath, frameworkPath: parsed.frameworkPath, linkFramework: parsed.linkFramework, vendor: parsed.vendor, dryRun: parsed.dryRun });
       runtime.log(`[bazis] ${result.dryRun ? "planned" : "created"} project: ${result.projectDir}`);
       for (const file of result.files) runtime.log(`  + ${file}`);
-      runtime.log(result.frameworkMode === "snapshot"
+      runtime.log(result.frameworkMode === "registry"
+        ? `[bazis] Framework dependency: "bazis": "${result.dependency}" from npm.`
+        : result.frameworkMode === "snapshot"
         ? `[bazis] vendor/bazis: ${result.frameworkFileCount} package files${result.dryRun ? " planned" : " copied"}. Keep this directory in version control.`
         : "[bazis] Framework is linked to an external checkout (--link-framework).");
       if (!result.dryRun) runtime.log(`[bazis] Next: cd ${result.projectDir} && bun install && bunx bazis dev`);

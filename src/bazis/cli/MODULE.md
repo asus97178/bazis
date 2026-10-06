@@ -1,6 +1,6 @@
 # bazis CLI
 
-Passport version: 1.9. Check date: 2026-10-05. Type: atomic technical module.
+Passport version: 1.10. Check date: 2026-10-06. Type: atomic technical module.
 Scope: command parsing, project and module generation, host registration, codegen,
 running the application and building (`bazis dev`, `bazis build`, `bazis build --bin`).
 Entry point: [main.ts](main.ts), the `runCli(argv, runtime)` function.
@@ -139,8 +139,9 @@ In a created project the `dev`, `build`, `build:bin`, `codegen` scripts wrap
 | command | positional string | Required | `g` / `generate`, `codegen` |
 | `new <Name>` | positional string | For a new project | Creates a separate folder with a kebab-case name; name rules as for modules |
 | `--path` | path string | Only `new`, default `./<kebab-name>` | The exact path of the new directory; the parent must exist, an existing directory is never overwritten |
-| `--framework` | path string | Only `new`, default `./src/bazis` or the package next to the source CLI | The local `bazis` package with the CLI and codegen; copied into `vendor/bazis` by default |
-| `--link-framework` | flag | Only `new`, false | Keep a relative `file:` link to the external checkout instead of a copy; the project needs it when moved |
+| `--framework` | path string | Only `new`, default `./src/bazis` or the package next to the source CLI | The local `bazis` package: its version sets the npm dependency; `--vendor` copies it, `--link-framework` links it |
+| `--vendor` | flag | Only `new`, false | Copy the package into `vendor/bazis` and depend on `file:./vendor/bazis` instead of npm; for offline projects |
+| `--link-framework` | flag | Only `new`, false | Keep a relative `file:` link to the external checkout; the project needs it when moved. Incompatible with `--vendor` |
 | generator | positional string | For `g` | `module` / `m`; `pack` / `p` / `module-pack` |
 | name | positional string | For `g` | A Latin letter, then letters/digits; parts joined by a single hyphen |
 | `--parts` | CSV string | Only pack, required | At least 2 non-empty distinct parts, names as for a module |
@@ -162,7 +163,7 @@ arguments and conflicting profiles are rejected before writing.
 The target name follows project codegen: a lowercase Latin letter, then lowercase
 letters, digits and hyphens. `all` selects all configured targets.
 
-`new` accepts only `--path`, `--framework`, `--link-framework`, `--dry-run` and `--help`.
+`new` accepts only `--path`, `--framework`, `--vendor`, `--link-framework`, `--dry-run` and `--help`.
 It does not install packages, run codegen or start the application. It creates
 `package.json`, `tsconfig.json`, `bazis.config.json`, `.gitignore`, `AGENTS.md`, a local
 architecture note, `README.md`, `src/index.ts` and the root `App.module.ts`. The
@@ -172,12 +173,17 @@ Modules are still generated with `bunx bazis g module ...` in the new project; f
 first feature without a ready database, `--empty` fits. The root's DI exports: `[]`;
 the TypeScript entry: `src/index.ts`; the published HTTP entry: `/health`.
 
-By default a new project gets a snapshot of the package in `vendor/bazis` and the
+By default (since 0.96.2) a new project depends on the npm package of the CLI's own
+version, `"bazis": "^<version>"`, and copies nothing; `bun install` downloads it and
+`bun update bazis` updates it. Before 0.96.2 the default was the vendor snapshot below.
+
+With `--vendor` the project gets a snapshot of the package in `vendor/bazis` and the
 dependency `file:./vendor/bazis`. The whole project moves, including vendor; the source
 checkout is no longer needed. The snapshot holds index.ts, package.json, core, library,
 cli, LICENSE and README.md; node_modules, tests, hidden files and compile scratch are
 excluded. A symlink inside the copied sources is an explicit error before the project
-is published. The snapshot is not updated automatically. The `--link-framework` mode
+is published. The snapshot is not updated automatically. The CI package check uses `--vendor` so the
+app runs on the package it has just packed, not on the npm release. The `--link-framework` mode
 keeps the live link to a checkout for joint development. Since 0.96.1 the package is
 called `bazis` and is prepared for npm: the project imports the framework by the package
 name (`bazis/core/di`), so the generated `tsconfig.json` has no `@/*` and `bazis/*`
