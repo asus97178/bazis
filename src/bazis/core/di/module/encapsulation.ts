@@ -176,7 +176,7 @@ export function validateModuleEncapsulation(
     const owner = records.find((record) => record !== consumer && record.providedTokens.has(token));
     if (owner === undefined) return "which is provided by another module but not exported.";
     return exportedTokens(owner).has(token)
-      ? `which module "${owner.name}" exports, but "${consumer.name}" does not import "${owner.name}". Add "${owner.name}" to the imports of "${consumer.name}".`
+      ? `which module "${owner.name}" exports, but "${consumer.name}" does not list "${owner.name}" in its imports. Add "${owner.name}" to the imports of "${consumer.name}".`
       : `which module "${owner.name}" provides but does not export. Add it to the exports of "${owner.name}".`;
   };
 

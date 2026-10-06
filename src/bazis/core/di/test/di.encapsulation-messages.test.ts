@@ -25,7 +25,7 @@ test("exported by its owner, but the owner is not imported", () => {
   @Module({ imports: [ClockModule, ReportModule], exports: [] })
   class AppModule {}
   expect(messageOf(() => createContainer(AppModule))).toContain(
-    `Module "ReportModule": "Report" depends on "Clock", which module "ClockModule" exports, but "ReportModule" does not import "ClockModule". Add "ClockModule" to the imports of "ReportModule".`,
+    `Module "ReportModule": "Report" depends on "Clock", which module "ClockModule" exports, but "ReportModule" does not list "ClockModule" in its imports. Add "ClockModule" to the imports of "ReportModule".`,
   );
 });
 
