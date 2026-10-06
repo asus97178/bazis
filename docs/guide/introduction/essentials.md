@@ -132,11 +132,11 @@ bazis перед запуском читает исходники и запис�
 `bazis dev`, `bazis test` и `bazis build` запускают её сами; вручную —
 `bunx bazis codegen`. Папку `src/generated` не правят руками и не хранят в
 Git. Если кодогенерация не может что-то понять, она останавливается и
-говорит, что именно:
+говорит, что именно. Например, у интерфейса `IMailer` забыли создать токен:
 
 ```text
-BAZIS_DI_DEPENDENCY_UNKNOWN: src/app/modules/lab/Configured.service.ts:4:
-constructor parameter 1 of "ConfiguredService" has type "ConfigView", which is
+BAZIS_DI_DEPENDENCY_UNKNOWN: src/app/modules/mail/Mail.service.ts:4:
+constructor parameter 1 of "MailService" has type "IMailer", which is
 neither a DI token (createToken) nor a class known to codegen.
 ```
 
@@ -155,18 +155,22 @@ export const greetingConfig = defineConfig<GreetingConfig>("greeting", {
 });
 ```
 
-Модуль подключает объявление через `config: greetingConfig`. Сервис получает
-настройки по токену объявления — его указывают явно третьим аргументом
-провайдера:
+Модуль подключает объявление через `config: greetingConfig`, а сервис просит
+настройки в конструкторе по типу:
 
 ```ts
 // в модуле
-scoped(GreetingService, GreetingService, [greetingConfig.token] as const)
+@Module({ config: greetingConfig, providers: [scoped(GreetingService)], ... })
 
 // в сервисе
 constructor(private readonly config: ConfigView<GreetingConfig>) {}
 greet(name: string) { return `${this.config.get("prefix")}, ${name}!`; }
 ```
+
+Кодогенерация находит объявление `defineConfig<GreetingConfig>(...)` по типу,
+поэтому тип в угловых скобках у `defineConfig` обязателен. Это работает с
+версии 0.96.5; в более ранних токен указывали вручную:
+`scoped(GreetingService, GreetingService, [greetingConfig.token] as const)`.
 
 Любое значение переопределяется переменной окружения вида
 `BAZIS_<ИМЯ>__<КЛЮЧ>`: `BAZIS_GREETING__PREFIX=Hey`. Значение неверного типа
