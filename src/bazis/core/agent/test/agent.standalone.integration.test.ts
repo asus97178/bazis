@@ -32,7 +32,7 @@ test("standalone Agent API and exact generated DTO schemas work in source and bi
   const write = (name: string, content: string) => Bun.write(path.join(project, name), content);
   const compiler = path.join(repository, "node_modules/typescript/bin/tsc");
   try {
-    await generateProject({ name: "AgentSchemaFixture", outputPath: project, frameworkPath: path.join(repository, "src/bazis") });
+    await generateProject({ name: "AgentSchemaFixture", outputPath: project, frameworkPath: path.join(repository, "src/bazis"), vendor: true });
     await mkdir(path.join(project, "node_modules"));
     await symlink("../vendor/bazis", path.join(project, "node_modules/bazis"), "dir");
     for (const name of ["@types", "typescript"]) await symlink(path.join(repository, "node_modules", name), path.join(project, "node_modules", name), "dir");

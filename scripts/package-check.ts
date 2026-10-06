@@ -34,7 +34,8 @@ try {
   writeFileSync(join(consumer, "package.json"), '{ "name": "consumer", "private": true, "type": "module" }\n');
   run("install tarball", [bun, "add", join(work, tarball)], consumer);
   run("import bazis", [bun, "-e", 'const m = await import("bazis/core/di"); if (typeof m.createContainer !== "function") process.exit(1);'], consumer);
-  run("bazis new", [join(consumer, "node_modules/.bin/bazis"), "new", "Demo"], consumer);
+  // --vendor: the app must use the package packed above, not the npm release.
+  run("bazis new", [join(consumer, "node_modules/.bin/bazis"), "new", "Demo", "--vendor"], consumer);
 
   const app = join(consumer, "demo");
   run("app install", [bun, "install"], app);
@@ -106,7 +107,7 @@ try {
     server = undefined;
   }
   // --full needs a cache and a database to run, so it is built, not started.
-  run("bazis new Full", [join(consumer, "node_modules/.bin/bazis"), "new", "Full"], consumer);
+  run("bazis new Full", [join(consumer, "node_modules/.bin/bazis"), "new", "Full", "--vendor"], consumer);
   const full = join(consumer, "full");
   run("full install", [bun, "install"], full);
   run("bazis g module --full (no host auth)", [join(full, "node_modules/.bin/bazis"), "g", "module", "Report", "--full"], full);

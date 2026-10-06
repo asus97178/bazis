@@ -32,7 +32,7 @@ test("compiled CLI creates an independent app with exact late DI and cached acti
   };
   try {
     await run([process.execPath, "build", "--compile", path.join(repository, "src/bazis/cli/main.ts"), "--outfile", cli]);
-    await run([cli, "new", "StandaloneAudit", "--path", project, "--framework", path.join(repository, "src/bazis")]);
+    await run([cli, "new", "StandaloneAudit", "--path", project, "--framework", path.join(repository, "src/bazis"), "--vendor"]);
     // Relocation must not depend on the old absolute location or framework checkout.
     await rename(project, `${project}-moved`);
     await mkdir(project);
