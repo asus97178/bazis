@@ -14,7 +14,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Почему только Bun](introduction/why-bun.md)
 - ✅ [Установка](introduction/installation.md)
 - ✅ [Первые шаги](introduction/first-steps.md)
-- ⏳ Основные понятия — модуль, DI, контроллер, кодогенерация, конфигурация
+- ✅ [Основные понятия](introduction/essentials.md) — модуль, DI, контроллер, кодогенерация, конфигурация
 - ⏳ Учебный проект: Todo API — по шагам на основе `examples/todo`
 
 ## 2. Обзор: строительные блоки
