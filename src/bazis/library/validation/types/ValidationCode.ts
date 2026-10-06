@@ -8,7 +8,7 @@
 export const ValidationCodes = {
   /** The value is missing (`undefined` or `null`) but the field is required. */
   required: "required",
-  /** The string is empty but the rule requires a non-empty one. */
+  /** The string or array is empty but the rule requires a non-empty one. */
   notEmpty: "notEmpty",
   /** The string is shorter than the minimum. */
   minLength: "minLength",
@@ -16,6 +16,12 @@ export const ValidationCodes = {
   maxLength: "maxLength",
   /** The string length is outside `length: [min, max]`. */
   length: "length",
+  /** The array has fewer items than `minLength`. */
+  minItems: "minItems",
+  /** The array has more items than `maxLength`. */
+  maxItems: "maxItems",
+  /** The array item count is outside `length: [min, max]`. */
+  itemCount: "itemCount",
   /** The string does not contain the required substring. */
   contains: "contains",
   /** The string contains a forbidden substring. */

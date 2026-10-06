@@ -88,13 +88,13 @@ export interface ValidatorOptions {
 
   // ── Strings ──────────────────────────────────────────────────────────────
 
-  /** The string must not be empty (`""`). */
+  /** The string (`""`) or array (`[]`) must not be empty. */
   notEmpty?: boolean;
-  /** Minimum string length (inclusive). */
+  /** Minimum string length or array item count (inclusive). */
   minLength?: number;
-  /** Maximum string length (inclusive); exceeding it skips this decorator's content checks. */
+  /** Maximum string length or array item count (inclusive); for a string, exceeding it skips this decorator's content checks. */
   maxLength?: number;
-  /** String length range `[min, max]` (inclusive); exceeding max skips this decorator's content checks. */
+  /** String length or array item count range `[min, max]` (inclusive); for a string, exceeding max skips this decorator's content checks. */
   length?: readonly [number, number];
   /** The string must contain the substring. */
   contains?: string;
