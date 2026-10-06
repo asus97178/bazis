@@ -2,19 +2,19 @@ import { createOpenGenericTokenFamily, type Class, type InjectionToken } from ".
 import type { ChangeTracker, DatabaseFacade, DbSet, EntityState } from "../../library/orm";
 
 /**
- * Контракт репозитория одной сущности: CRUD-трекинг, Unit of Work и доступ
- * к LINQ-подобным запросам через {@link IRepository.query} / {@link IRepository.dbSet}.
+ * Repository contract for one entity: change tracking, Unit of Work and access
+ * to LINQ-like queries through {@link IRepository.query} / {@link IRepository.dbSet}.
  *
- * Живёт в слое интеграции, потому что DI-токен и контракт публикуются вместе
- * (как `IRepository<T>` тип + `IRepository.of(T)` токен). Чистый движок
- * (`@/library/orm`) от этого контракта не зависит — `Repository<T>`
- * совместим с ним структурно.
+ * Lives in the integration layer because the DI token and the contract are
+ * published together (the `IRepository<T>` type plus the `IRepository.of(T)`
+ * token). The pure engine (`@/library/orm`) does not depend on this contract:
+ * `Repository<T>` is structurally compatible with it.
  */
 export interface IRepository<T extends object> {
-  /** Набор сущности — полный API запросов и трекинга ORM. */
+  /** The entity set: the full ORM query and tracking API. */
   readonly dbSet: DbSet<T>;
 
-  /** Алиас {@link dbSet} для читаемости в сервисном слое. */
+  /** Alias of {@link dbSet} for readability in the service layer. */
   query(): DbSet<T>;
 
   find(key: unknown): Promise<T | null>;
@@ -26,9 +26,9 @@ export interface IRepository<T extends object> {
   stateOf(entity: T): EntityState;
 
   /**
-   * Сохраняет ВСЕ изменения общего DbContext, включая другие его сущности.
-   * Для явной границы операции с несколькими сущностями внедряйте свой
-   * DbContext и вызывайте context.saveChanges(). Семантика этого alias сохранена.
+   * Saves ALL changes of the shared DbContext, including its other entities.
+   * For an explicit boundary of an operation over several entities, inject
+   * your DbContext and call context.saveChanges().
    */
   saveChanges(): Promise<number>;
 
@@ -36,10 +36,10 @@ export interface IRepository<T extends object> {
   readonly database: DatabaseFacade;
 }
 
-/** Open generic DI-токен: `repositoryFor(User)` или `IRepository.of(User)`. */
+/** Open generic DI token: `repositoryFor(User)` or `IRepository.of(User)`. */
 export const IRepository = createOpenGenericTokenFamily<object, IRepository<object>>("IRepository");
 
-/** Типизированный DI-токен репозитория для класса сущности. */
+/** Typed repository DI token for an entity class. */
 export function repositoryFor<T extends object>(entity: Class<T>): InjectionToken<IRepository<T>> {
   return IRepository.of(entity) as InjectionToken<IRepository<T>>;
 }

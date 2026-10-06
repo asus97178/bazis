@@ -31,7 +31,7 @@ def complete(thread, turn, status, answer=''):
 def generate(thread, turn, message, stop):
     if message == 'early': return
     time.sleep(.02)
-    answer = 'Ответ: '+message
+    answer = 'Reply: '+message
     if message.startswith('tool'):
         request_id = 'tool-request-'+turn
         received = threading.Event(); tool_results[request_id] = {'event':received}
@@ -50,7 +50,7 @@ def generate(thread, turn, message, stop):
         result = tool_results[request_id].get('result', {})
         if not result.get('success'):
             complete(thread,turn,'failed'); return
-        answer = 'Данные: '+result['contentItems'][0]['text']
+        answer = 'Data: '+result['contentItems'][0]['text']
         if message == 'tool-duplicate':
             output({'id':request_id+'-again','method':'item/tool/call','params':params})
             stop.wait(3); complete(thread,turn,'interrupted'); return
@@ -123,8 +123,8 @@ for line in sys.stdin:
     elif method=='turn/start':
         thread=params['threadId']; turn='turn-'+thread; value=json.loads(params['input'][0]['text'])['message']; stop=threading.Event(); turns[turn]=stop
         if value=='early':
-            notification('item/agentMessage/delta',{'threadId':thread,'turnId':turn,'itemId':'message-'+turn,'delta':'Ранний ответ'})
-            complete(thread,turn,'completed','Ранний ответ')
+            notification('item/agentMessage/delta',{'threadId':thread,'turnId':turn,'itemId':'message-'+turn,'delta':'Early answer'})
+            complete(thread,turn,'completed','Early answer')
         respond(message,{'turn':{'id':turn,'status':'inProgress'}})
         threading.Thread(target=generate,args=(thread,turn,value,stop),daemon=True).start()
     elif method=='turn/interrupt':

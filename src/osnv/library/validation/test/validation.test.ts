@@ -9,7 +9,7 @@ function codesOf(result: { errors: readonly ValidationError[] }): string[] {
   return result.errors.map((error) => error.code ?? "");
 }
 
-describe("строковые правила", () => {
+describe("string rules", () => {
   class StringDto {
     @Validator({ required: true, minLength: 3, maxLength: 5 })
     name!: string;
@@ -30,7 +30,7 @@ describe("строковые правила", () => {
     pin?: string;
   }
 
-  test("валидный объект", () => {
+  test("a valid object", () => {
     const dto = new StringDto();
     dto.name = "abcd";
     dto.title = "x";
@@ -41,14 +41,14 @@ describe("строковые правила", () => {
     expect(Validator.validate(dto).isValid).toBe(true);
   });
 
-  test("required: undefined и null", () => {
+  test("required: undefined and null", () => {
     const dto = new StringDto();
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.required]);
     dto.name = null as unknown as string;
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.required]);
   });
 
-  test("опциональные поля пропускаются, если отсутствуют", () => {
+  test("optional fields are skipped when missing", () => {
     const dto = new StringDto();
     dto.name = "abc";
     expect(Validator.validate(dto).isValid).toBe(true);
@@ -73,7 +73,7 @@ describe("строковые правила", () => {
     expect(codesOf(result).sort()).toEqual([ValidationCodes.contains, ValidationCodes.notContains].sort());
   });
 
-  test("pattern: RegExp и строка-источник", () => {
+  test("pattern: RegExp and a source string", () => {
     const dto = new StringDto();
     dto.name = "abc";
     dto.slug = "ABC";
@@ -82,7 +82,7 @@ describe("строковые правила", () => {
     expect(codesOf(result)).toEqual([ValidationCodes.pattern, ValidationCodes.pattern]);
   });
 
-  test("строковое правило на не-строке -> ошибка типа", () => {
+  test("a string rule on a non-string -> type error", () => {
     const dto = new StringDto();
     dto.name = 42 as unknown as string;
     const result = Validator.validate(dto);
@@ -112,7 +112,7 @@ describe("email, url, uuid, json, phone, date", () => {
     bornAt?: Date | string;
   }
 
-  test("валидные форматы", () => {
+  test("valid formats", () => {
     const dto = new FormatsDto();
     dto.email = "user@example.com";
     dto.site = "https://bun.sh/docs";
@@ -123,43 +123,43 @@ describe("email, url, uuid, json, phone, date", () => {
     expect(Validator.validate(dto).isValid).toBe(true);
   });
 
-  test("невалидные форматы", () => {
+  test("invalid formats", () => {
     const dto = new FormatsDto();
     dto.email = "not-an-email";
     dto.site = "::not a url::";
     dto.id = "not-a-uuid";
     dto.payload = "{broken";
     dto.phone = "12-34";
-    dto.bornAt = "не дата";
+    dto.bornAt = "not a date";
     const result = Validator.validate(dto);
     expect(codesOf(result).sort()).toEqual(
       [ValidationCodes.email, ValidationCodes.url, ValidationCodes.uuid, ValidationCodes.json, ValidationCodes.phone, ValidationCodes.date].sort(),
     );
   });
 
-  test("uuid: версии 4 и 7, верхний регистр, nil; битые варианты — ошибка", () => {
+  test("uuid: versions 4 and 7, upper case, nil; broken variants are errors", () => {
     const dto = new FormatsDto();
     for (const valid of [
       crypto.randomUUID(),                            // v4
       Bun.randomUUIDv7(),                             // v7
-      "550E8400-E29B-41D4-A716-446655440000",         // верхний регистр
+      "550E8400-E29B-41D4-A716-446655440000",         // upper case
       "00000000-0000-0000-0000-000000000000",         // nil
     ]) {
       dto.id = valid;
       expect(Validator.validate(dto).isValid).toBe(true);
     }
     for (const invalid of [
-      "550e8400e29b41d4a716446655440000",             // без дефисов
-      "550e8400-e29b-91d4-a716-446655440000",         // версия 9
-      "550e8400-e29b-41d4-c716-446655440000",         // неверный вариант
-      "550e8400-e29b-41d4-a716-44665544000",          // короче на символ
+      "550e8400e29b41d4a716446655440000",             // no hyphens
+      "550e8400-e29b-91d4-a716-446655440000",         // version 9
+      "550e8400-e29b-41d4-c716-446655440000",         // wrong variant
+      "550e8400-e29b-41d4-a716-44665544000",          // one character short
     ]) {
       dto.id = invalid;
       expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.uuid]);
     }
   });
 
-  test("date принимает Date, строку и timestamp; Invalid Date — ошибка", () => {
+  test("date accepts a Date, a string and a timestamp; Invalid Date is an error", () => {
     const dto = new FormatsDto();
     dto.bornAt = new Date("invalid");
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.date]);
@@ -168,7 +168,7 @@ describe("email, url, uuid, json, phone, date", () => {
   });
 });
 
-describe("числовые правила", () => {
+describe("number rules", () => {
   class NumberDto {
     @Validator({ required: true, min: 18, max: 100 })
     age!: number;
@@ -183,7 +183,7 @@ describe("числовые правила", () => {
     debt?: number;
   }
 
-  test("валидные значения", () => {
+  test("valid values", () => {
     const dto = new NumberDto();
     dto.age = 30;
     dto.rating = 10;
@@ -204,7 +204,7 @@ describe("числовые правила", () => {
     );
   });
 
-  test("NaN и не-число -> ошибка типа", () => {
+  test("NaN and a non-number -> type error", () => {
     const dto = new NumberDto();
     dto.age = Number.NaN;
     let result = Validator.validate(dto);
@@ -217,7 +217,7 @@ describe("числовые правила", () => {
   });
 });
 
-describe("boolean и enum", () => {
+describe("boolean and enum", () => {
   enum Role {
     Admin = "admin",
     User = "user",
@@ -242,7 +242,7 @@ describe("boolean и enum", () => {
     level?: number;
   }
 
-  test("валидные значения", () => {
+  test("valid values", () => {
     const dto = new FlagsDto();
     dto.accepted = true;
     dto.banned = false;
@@ -259,7 +259,7 @@ describe("boolean и enum", () => {
     expect(codesOf(result).sort()).toEqual([ValidationCodes.mustBeTrue, ValidationCodes.mustBeFalse].sort());
   });
 
-  test("строковый enum: чужое значение", () => {
+  test("string enum: a foreign value", () => {
     const dto = new FlagsDto();
     dto.accepted = true;
     dto.role = "root";
@@ -268,25 +268,25 @@ describe("boolean и enum", () => {
     expect(result.errors[0]!.message).toContain("admin, user");
   });
 
-  test("числовой enum: обратные ключи не считаются значениями", () => {
+  test("numeric enum: reverse keys are not values", () => {
     const dto = new FlagsDto();
     dto.accepted = true;
     dto.level = 99;
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.enum]);
-    // Имя члена enum ("Low") — не допустимое значение, допустимы только 0 и 1.
+    // The enum member name ("Low") is not an allowed value; only 0 and 1 are.
     dto.level = "Low" as unknown as number;
     expect(codesOf(Validator.validate(dto))).toEqual([ValidationCodes.enum]);
   });
 });
 
-describe("custom и validateIf: сложные условия", () => {
+describe("custom and validateIf: complex conditions", () => {
   class SignupDto {
     @Validator({ required: true, min: 18 })
     @Validator({
       custom: (value, instance) => {
         const dto = instance as SignupDto;
         if ((value as number) < 21 && dto.guardianConsent !== true) {
-          return "Для регистрации до 21 года необходимо согласие опекуна";
+          return "Registration under 21 requires guardian consent";
         }
         return true;
       },
@@ -297,39 +297,39 @@ describe("custom и validateIf: сложные условия", () => {
     guardianConsent?: boolean;
   }
 
-  test("перекрёстная проверка полей: до 21 года нужно согласие", () => {
+  test("cross-field check: consent is required under 21", () => {
     const dto = new SignupDto();
     dto.age = 19;
     const result = Validator.validate(dto);
     expect(result.hasErrorsFor("age")).toBe(true);
-    expect(result.getErrorsFor("age")[0]!.message).toContain("согласие опекуна");
+    expect(result.getErrorsFor("age")[0]!.message).toContain("guardian consent");
     expect(result.hasErrorsFor("guardianConsent")).toBe(true);
 
     dto.guardianConsent = true;
     expect(Validator.validate(dto).isValid).toBe(true);
   });
 
-  test("validateIf=false отключает остальные правила декоратора", () => {
+  test("validateIf=false turns off the other rules of the decorator", () => {
     const dto = new SignupDto();
     dto.age = 30;
     expect(Validator.validate(dto).isValid).toBe(true);
   });
 
-  test("custom: false -> стандартное сообщение, ValidationError -> как есть", () => {
+  test("custom: false -> the standard message, ValidationError -> as is", () => {
     class Dto {
       @Validator({ custom: () => false })
       a = 1;
 
-      @Validator({ custom: (value) => new ValidationError("b", value, "своя ошибка", "myCode") })
+      @Validator({ custom: (value) => new ValidationError("b", value, "own error", "myCode") })
       b = 2;
     }
     const result = Validator.validate(new Dto());
     expect(result.getErrorsFor("a")[0]!.code).toBe(ValidationCodes.custom);
     expect(result.getErrorsFor("b")[0]!.code).toBe("myCode");
-    expect(result.getErrorsFor("b")[0]!.message).toBe("своя ошибка");
+    expect(result.getErrorsFor("b")[0]!.message).toBe("own error");
   });
 
-  test("исключение в custom перехватывается, валидация продолжается", () => {
+  test("an exception in custom is caught and validation continues", () => {
     class Dto {
       @Validator({
         custom: () => {
@@ -347,7 +347,7 @@ describe("custom и validateIf: сложные условия", () => {
     expect(result.hasErrorsFor("b")).toBe(true);
   });
 
-  test("исключение в validateIf перехватывается", () => {
+  test("an exception in validateIf is caught", () => {
     class Dto {
       @Validator({
         validateIf: () => {
@@ -361,7 +361,7 @@ describe("custom и validateIf: сложные условия", () => {
     expect(result.getErrorsFor("a")[0]!.code).toBe(ValidationCodes.customError);
   });
 
-  test("несколько декораторов на одном поле — выполняются все", () => {
+  test("several decorators on one field all run", () => {
     class Dto {
       @Validator({ minLength: 5 })
       @Validator({ contains: "x" })
@@ -372,12 +372,12 @@ describe("custom и validateIf: сложные условия", () => {
   });
 });
 
-describe("асинхронная валидация", () => {
+describe("asynchronous validation", () => {
   class AsyncDto {
     @Validator({
       custom: async (value) => {
         await Bun.sleep(1);
-        return value === "taken" ? "Имя уже занято" : true;
+        return value === "taken" ? "The name is taken" : true;
       },
     })
     username = "taken";
@@ -386,18 +386,18 @@ describe("асинхронная валидация", () => {
     email?: string;
   }
 
-  test("validateAsync ждёт асинхронные custom-функции", async () => {
+  test("validateAsync awaits async custom functions", async () => {
     const result = await Validator.validateAsync(new AsyncDto());
-    expect(result.getErrorsFor("username")[0]!.message).toBe("Имя уже занято");
+    expect(result.getErrorsFor("username")[0]!.message).toBe("The name is taken");
     expect(result.hasErrorsFor("email")).toBe(true);
   });
 
-  test("асинхронный custom в синхронном validate -> ошибка использования", () => {
+  test("an async custom in the synchronous validate -> usage error", () => {
     const result = Validator.validate(new AsyncDto());
     expect(result.getErrorsFor("username")[0]!.code).toBe(ValidationCodes.asyncCustomInSyncCall);
   });
 
-  test("reject в асинхронном custom -> customError", async () => {
+  test("a reject in an async custom -> customError", async () => {
     class Dto {
       @Validator({ custom: async () => Promise.reject(new Error("db down")) })
       a = 1;
@@ -408,7 +408,7 @@ describe("асинхронная валидация", () => {
   });
 });
 
-describe("вложенная валидация", () => {
+describe("nested validation", () => {
   class AddressDto {
     @Validator({ required: true, notEmpty: true })
     city!: string;
@@ -422,7 +422,7 @@ describe("вложенная валидация", () => {
     address!: AddressDto;
   }
 
-  test("явный nested: ошибки с путём через точку", () => {
+  test("explicit nested: errors with a dotted path", () => {
     const profile = new ProfileDto();
     profile.address = new AddressDto();
     profile.address.zip = "12";
@@ -432,7 +432,7 @@ describe("вложенная валидация", () => {
     expect(result.getErrorsFor("address.city")[0]!.code).toBe(ValidationCodes.required);
   });
 
-  test("автоопределение nested по декораторам на классе значения", () => {
+  test("nested is auto-detected from decorators on the value class", () => {
     class AutoDto {
       @Validator({ required: true })
       address!: AddressDto;
@@ -443,7 +443,7 @@ describe("вложенная валидация", () => {
     expect(result.hasErrorsFor("address.city")).toBe(true);
   });
 
-  test("nested: false отключает автоопределение", () => {
+  test("nested: false turns off auto-detection", () => {
     class OptOutDto {
       @Validator({ required: true, nested: false })
       address!: AddressDto;
@@ -453,21 +453,21 @@ describe("вложенная валидация", () => {
     expect(Validator.validate(dto).isValid).toBe(true);
   });
 
-  test("массивы: поэлементная проверка с индексами в пути", () => {
+  test("arrays: element checks with indexes in the path", () => {
     class OrderDto {
       @Validator({ nested: true })
       addresses: AddressDto[] = [];
     }
     const order = new OrderDto();
     const valid = new AddressDto();
-    valid.city = "Москва";
+    valid.city = "Moscow";
     order.addresses = [valid, new AddressDto()];
     const result = Validator.validate(order);
     expect(result.hasErrorsFor("addresses[0].city")).toBe(false);
     expect(result.hasErrorsFor("addresses[1].city")).toBe(true);
   });
 
-  test("циклические ссылки не зацикливают валидацию", () => {
+  test("circular references do not loop the validation", () => {
     class NodeDto {
       @Validator({ required: true, notEmpty: true })
       name!: string;
@@ -479,13 +479,13 @@ describe("вложенная валидация", () => {
     const b = new NodeDto();
     a.name = "a";
     a.next = b;
-    b.next = a; // цикл; b.name отсутствует
+    b.next = a; // a cycle; b.name is missing
     const result = Validator.validate(a);
     expect(result.hasErrorsFor("next.name")).toBe(true);
     expect(result.errors).toHaveLength(1);
   });
 
-  test("несколько декораторов на поле не дублируют вложенные ошибки", () => {
+  test("several decorators on a field do not duplicate nested errors", () => {
     class TwiceDto {
       @Validator({ required: true })
       @Validator({ nested: true })
@@ -497,7 +497,7 @@ describe("вложенная валидация", () => {
     expect(result.getErrorsFor("address.city")).toHaveLength(1);
   });
 
-  test("асинхронные custom внутри вложенных объектов", async () => {
+  test("async custom checks inside nested objects", async () => {
     class InnerDto {
       @Validator({ custom: async () => "async inner fail" })
       flag = true;
@@ -511,22 +511,22 @@ describe("вложенная валидация", () => {
   });
 });
 
-describe("сообщения и кастомизация", () => {
-  test("локальный message приоритетнее глобального и встроенного", () => {
-    Validator.setDefaultMessages({ minLength: "глобально: минимум {min}" });
+describe("messages and customization", () => {
+  test("a local message wins over the global and built-in ones", () => {
+    Validator.setDefaultMessages({ minLength: "global: at least {min}" });
     class Dto {
-      @Validator({ minLength: 5, message: "локально: {property} короче {min}" })
+      @Validator({ minLength: 5, message: "local: {property} is shorter than {min}" })
       a = "ab";
 
       @Validator({ minLength: 5 })
       b = "ab";
     }
     const result = Validator.validate(new Dto());
-    expect(result.getErrorsFor("a")[0]!.message).toBe("локально: a короче 5");
-    expect(result.getErrorsFor("b")[0]!.message).toBe("глобально: минимум 5");
+    expect(result.getErrorsFor("a")[0]!.message).toBe("local: a is shorter than 5");
+    expect(result.getErrorsFor("b")[0]!.message).toBe("global: at least 5");
   });
 
-  test("встроенные сообщения с плейсхолдерами {property} и {value}", () => {
+  test("built-in messages with {property} and {value} placeholders", () => {
     class Dto {
       @Validator({ required: true })
       username?: string;
@@ -549,18 +549,18 @@ describe("сообщения и кастомизация", () => {
     expect(Validator.validate(new Dto()).errors[0]!.message).toBe('Field "username" is required');
   });
 
-  test("reset возвращает встроенные сообщения", () => {
-    Validator.setDefaultMessages({ required: "ОБЯЗАТЕЛЬНО!" });
+  test("reset restores the built-in messages", () => {
+    Validator.setDefaultMessages({ required: "REQUIRED!" });
     class Dto {
       @Validator({ required: true })
       a?: string;
     }
-    expect(Validator.validate(new Dto()).errors[0]!.message).toBe("ОБЯЗАТЕЛЬНО!");
+    expect(Validator.validate(new Dto()).errors[0]!.message).toBe("REQUIRED!");
     Validator.resetDefaultMessages();
     expect(Validator.validate(new Dto()).errors[0]!.message).toBe('Field "a" is required');
   });
 
-  test("неизвестные плейсхолдеры остаются как есть", () => {
+  test("unknown placeholders stay as is", () => {
     class Dto {
       @Validator({ required: true, message: "{property} {nope}" })
       a?: string;
@@ -569,7 +569,7 @@ describe("сообщения и кастомизация", () => {
   });
 });
 
-describe("ValidationResult и устойчивость", () => {
+describe("ValidationResult and resilience", () => {
   test("getErrorsFor / hasErrorsFor / isValid", () => {
     class Dto {
       @Validator({ required: true })
@@ -587,12 +587,12 @@ describe("ValidationResult и устойчивость", () => {
     expect(result.hasErrorsFor("missing")).toBe(false);
   });
 
-  test("объект без декораторов валиден", () => {
+  test("an object without decorators is valid", () => {
     expect(Validator.validate({ anything: 1 }).isValid).toBe(true);
     expect(Validator.validate(Object.create(null) as object).isValid).toBe(true);
   });
 
-  test("наследование: правила родителя работают в потомке", () => {
+  test("inheritance: parent rules work in a subclass", () => {
     class BaseDto {
       @Validator({ required: true })
       id?: string;
@@ -604,12 +604,12 @@ describe("ValidationResult и устойчивость", () => {
     const result = Validator.validate(new ChildDto());
     expect(result.hasErrorsFor("id")).toBe(true);
     expect(result.hasErrorsFor("extra")).toBe(true);
-    // Правила потомка не «протекли» в родителя.
+    // The subclass rules did not leak into the parent.
     const baseResult = Validator.validate(new BaseDto());
     expect(baseResult.errors).toHaveLength(1);
   });
 
-  test("подсказка type без других правил", () => {
+  test("the type hint without other rules", () => {
     class Dto {
       @Validator({ type: "string" })
       a: unknown = 42;

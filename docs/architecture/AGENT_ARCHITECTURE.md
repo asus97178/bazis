@@ -1,174 +1,175 @@
-# Агенты, модули и инструменты osnv
+# osnv agents, modules and tools
 
-Идентификатор: **AGENT-ARCH-001**. Версия: **1.2**. Дата: **2026-09-21**.
-Статус: **каталог, Admin UI, общий запуск из чата/CLI и первый разрешённый инструмент реализованы; долговременное исполнение — следующий этап**.
-Основание: пользователь определил порядок — сначала привести в порядок существующие
-Agent Runtime и Tools, отделить агентов от модулей, затем развивать эту основу.
+Identifier: **AGENT-ARCH-001**. Version: **1.2**. Date: **2026-09-21**.
+Status: **the catalog, Admin UI, shared runs from chat/CLI and the first allowed tool are implemented; long-running execution is the next stage**.
+Basis: the user set the order: first put the existing Agent Runtime and Tools in
+order and separate agents from modules, then build on that base.
 
-Документ дополняет [MOD-ARCH-001](MODULE_ARCHITECTURE.md). По следующему поручению
-пользователя создан атомарный [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md)
-для управления определениями из админки. Далее добавлен путь запуска определения
-как данных и отдельный пользовательский Vue-чат. Полный перенос прежних объявлений
-не выполняется.
+This document extends [MOD-ARCH-001](MODULE_ARCHITECTURE.md). By the user's next
+request, an atomic [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md)
+was created in the osnova application to manage definitions from the admin panel.
+Then a path to run a definition as data and a separate user-facing Vue chat were
+added. The earlier declarations are not fully migrated.
 
-## 1. Принятое разделение
+## 1. The accepted separation
 
-**В приложении есть модули и отдельно агенты. У агентов есть инструменты.**
+**An application has modules and, separately, agents. Agents have tools.**
 
-| Сущность | Ответственность | Связь с остальными |
+| Entity | Responsibility | Relation to the others |
 | --- | --- | --- |
-| Модуль | Прикладные сервисы, данные, инварианты и DI-контракты | Предоставляет операции, которыми может пользоваться реализация Tool |
-| Агент | Инструкции, входной и выходной контракты, профиль модели, ограничения и назначенный набор Tools | Объявляется и создаётся независимо от состава модулей |
-| Tool | Проверяемый контракт действия и привязка к реализации | Назначается агенту; один инструмент может использоваться несколькими агентами |
-| Agent Runtime | Исполнение определения, контекст, ограничения, состояние работы и граница ошибок | Выполняет всех агентов через общий механизм вызова Tools |
+| Module | Application services, data, invariants and DI contracts | Provides operations a Tool implementation may use |
+| Agent | Instructions, input and output contracts, model profile, limits and the assigned set of Tools | Declared and created independently of the module composition |
+| Tool | A verifiable action contract and its binding to an implementation | Assigned to an agent; one tool may be used by several agents |
+| Agent Runtime | Executes the definition: context, limits, work state and error boundary | Runs all agents through one shared Tool call mechanism |
 
-Агент не является частью `@Module.agents` в целевой модели, подмодулем или
-новым DI-контейнером. Для создания конкретного агента не требуется создавать
-модуль osnv либо добавлять его в `imports`.
+In the target model an agent is not part of `@Module.agents`, a submodule or a new
+DI container. Creating a concrete agent does not require creating an osnv module or
+adding it to `imports`.
 
-Реализация Tool может использовать сервисы модуля через существующий DI и
-оставаться рядом с их владельцем. Это не включает агента в состав модуля.
-Назначенный агенту набор Tools не передаёт ему владение данными или сервисами.
-Публикация инструмента и предоставление агенту доступа к нему — разные действия.
+A Tool implementation may use a module's services through the existing DI and stay
+next to their owner. That does not make the agent part of the module.
+The set of Tools assigned to an agent does not transfer ownership of data or services.
+Publishing a tool and granting an agent access to it are different actions.
 
-Сервис каталога агентов или сам runtime могут подключаться как технические
-функции фреймворка. Такой способ регистрации сервисов не определяет состав
-конкретных агентов приложения.
+The agent catalog service or the runtime itself may be connected as technical
+framework features. This way of registering services does not define the set of
+concrete application agents.
 
-## 2. Объявления и создание агентов
+## 2. Declaring and creating agents
 
-Самостоятельные объявления в исходниках размещаются в `src/app/agents/`,
-отдельно от `src/app/modules/`. Это целевой путь для новых объявлений, если
-агенты поставляются в исходниках; каталог без содержимого создавать не требуется.
-Для определений из БД отдельные исходные файлы каждого агента не нужны.
-Общую реализацию Tool не следует копировать в каталог каждого использующего её агента.
+Standalone declarations in the sources go into `src/app/agents/`, separate from
+`src/app/modules/`. This is the target path for new declarations when agents ship in
+the sources; there is no need to create the directory empty. Definitions from the
+database need no separate source files per agent.
+Do not copy a shared Tool implementation into the directory of every agent that uses it.
 
-Целевое развитие: определение агента — сериализуемые метаданные. Объявление
-разработчиком и определение из хранилища проходят общую проверку и разрешение
-ссылок, затем исполняются одним runtime. Существующие декораторы могут оставаться
-способом авторства; класс не должен быть обязательной сущностью для определения из БД.
+Target direction: an agent definition is serializable metadata. A developer
+declaration and a definition from storage go through the same check and reference
+resolution, then run in one runtime. The existing decorators may stay as an authoring
+method; a class must not be mandatory for a definition from the database.
 
-Для базового определения фиксируются идентичность, версия, имя, инструкции и
-состояние; список Tools и профиль модели могут оставаться пустыми. Отдельная схема
-входа/выхода нужна структурированным операциям, а общий диалог не требует от автора
-агента её задавать. Лимиты исполнения и общие настройки модели принадлежат runtime
-и Infra; допустимые переопределения будут определяться контрактом исполнения.
-Полные поля, defaults и ошибки описываются перед реализацией по
-[правилам входных контрактов](MODULE_ARCHITECTURE.md#7-контракты-входа-и-выхода).
-Текущий CRUD API описан в паспорте AgentsModule. Отдельной CLI-команды создания
-определения пока нет; создание через Admin UI не требует генерации исходников.
+A basic definition records identity, version, name, instructions and state; the list
+of Tools and the model profile may stay empty. A separate input/output schema is
+needed for structured operations, while a general dialog does not require the agent
+author to set one. Execution limits and general model settings belong to the runtime
+and Infra; the allowed overrides will be defined by the execution contract.
+The full fields, defaults and errors are described before implementation per the
+[input contract rules](MODULE_ARCHITECTURE.md#7-input-and-output-contracts).
+The current CRUD API is described in the AgentsModule passport. There is no separate
+CLI command to create a definition yet; creating one through the Admin UI needs no
+source generation.
 
-Определение агента, его версия, сессия и отдельный запуск имеют разные
-жизненные циклы. Создание постоянного агента в каталоге отделяется от запуска
-временного помощника. Рабочее состояние не хранится в общих метаданных.
+An agent definition, its version, a session and a single run have different
+lifecycles. Creating a permanent agent in the catalog is separate from running a
+temporary helper. Work state is not kept in the shared metadata.
 
-Приложение может знать только стартовое определение Main или ссылку на него.
-Main — обычный агент с разрешёнными Tools управления каталогом. Создание им
-другого агента проходит тот же сервис, проверку и авторизацию, что создание
-через прикладной API. Особых полномочий обхода платформенных правил у Main нет.
-Наличие единственного Main не является обязательным устройством всех приложений.
+An application may know only the starting Main definition or a reference to it.
+Main is a regular agent with allowed catalog management Tools. When it creates another
+agent, the same service, check and authorization apply as for creation through the
+application API. Main has no special powers to bypass platform rules.
+A single Main is not a mandatory setup for every application.
 
-## 3. Исполнение Tools и hooks
+## 3. Executing Tools and hooks
 
-Назначение Tool агенту не заменяет проверку полномочий вызывающего на конкретное
-действие. Реальные разрешения ограничиваются политиками платформы и предметных
-сервисов. Метаданные агента не могут самостоятельно выдать новые права,
-подставить секреты или отключить обязательные проверки.
+Assigning a Tool to an agent does not replace checking the caller's permission for
+the concrete action. Real permissions are limited by the platform and domain service
+policies. Agent metadata cannot grant new rights on its own, inject secrets or turn
+off mandatory checks.
 
-Исполнение использует существующие DI, контракты DTO/схем и
+Execution uses the existing DI, DTO/schema contracts and the
 [AgentToolExecutor](../../src/osnv/core/agent/AgentToolExecutor.ts).
-Не создаются параллельные ORM, контейнер или второй runtime для динамических агентов.
-Прямая работа с сервисом вне исполнителя не считается защищённым вызовом Tool.
+No parallel ORM, container or second runtime is created for dynamic agents.
+Working with a service directly outside the executor is not a protected Tool call.
 
-Сохраняется разделение [Tool hooks](../../src/osnv/core/agent/AgentToolHooks.ts):
-enforcement проверяет допуск, settlement фиксирует исход, observer наблюдает.
-Обязательные платформенные hooks не выбираются произвольными метаданными агента.
-Поведение при timeout, отмене, сбое фиксации и неизвестном исходе действия
-проверяется независимо от способа объявления агента.
+The [Tool hooks](../../src/osnv/core/agent/AgentToolHooks.ts) split is kept:
+enforcement checks admission, settlement records the outcome, observer observes.
+Arbitrary agent metadata does not select mandatory platform hooks.
+Behavior on timeout, cancellation, a recording failure and an unknown action outcome
+is checked regardless of how the agent was declared.
 
-Tool исполняет действие; hook участвует в его жизненном цикле; skill содержит
-инструкции и материалы. Skills не требуются для первого этапа. Для будущего
-исполнения команд и недоверенного кода нужен отдельный адаптер изоляции;
-DI scope не является изоляцией процессов, файлов или сети.
+A Tool performs an action; a hook takes part in its lifecycle; a skill holds
+instructions and materials. Skills are not needed for the first stage. Future
+execution of commands and untrusted code needs a separate isolation adapter;
+a DI scope is not process, file or network isolation.
 
-## 4. Проверенное текущее состояние
+## 4. The checked current state
 
-| Участок | Что существует | Что предстоит изменить |
+| Area | What exists | What has to change |
 | --- | --- | --- |
-| [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md) | Определения в PostgreSQL, защищённый Admin CRUD, версии, Main, RunService и agents.getAll | Создание Main других агентов через Tool с отдельной проверкой полномочий |
-| [Module AI metadata](../../src/osnv/core/agent/index.ts) | `agents/tools/prompts/agentToolHooks` расширяют метаданные модуля | Убрать зависимость исполнения агента от модульного объявления; действующий путь сохранить на время миграции |
-| [AgentRegistry](../../src/osnv/core/agent/AgentRegistry.ts) | fromDefinition разрешает toolNames из явного списка хоста; immutable snapshot без класса агента | Сохранение версионированного снимка вместе с длительной сессией |
-| [Agent metadata](../../src/osnv/core/agent/metadata.ts) | Динамические определения — данные; классы/decorators остаются для Tools/DTO и совместимости | Согласовать старые примеры и генерацию, не меняя старый API без миграции |
-| [CLI full template](../../src/osnv/cli/templates/module.ts) | Создаёт AnalystAgent внутри модуля и записывает `agents` в `@Module` | Разделить генерацию модуля и агента, согласовать codegen и проверки |
-| [Agent Runtime](../../src/osnv/core/agent/MODULE.md) | Рабочий цикл Agent → model → Tool и проверенные границы локальных исправлений | Упорядочить текущие контракты и регистрацию до добавления новых возможностей |
-| [Chat](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/osnv/cli/MODULE.md) | Общий RunService, сохранение ответов, отмена, текст и прогресс инструментов в Vue; CLI получает итоговый ответ | CLI streaming/resume и транспортно-независимая сессия |
-| [Session contracts](../../src/osnv/core/agent/session/contracts.ts) | Контракты сессий; рядом есть сущности, codec и защита checkpoints | Довести исполняющий сервис отдельно; наличие контрактов не доказывает готовое восстановление |
+| [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md) | Definitions in PostgreSQL, protected Admin CRUD, versions, Main, RunService and agents.getAll | Main creating other agents through a Tool with a separate permission check |
+| [Module AI metadata](../../src/osnv/core/agent/index.ts) | `agents/tools/prompts/agentToolHooks` extend the module metadata | Remove the dependency of agent execution on the module declaration; keep the current path during the migration |
+| [AgentRegistry](../../src/osnv/core/agent/AgentRegistry.ts) | fromDefinition resolves toolNames from the host's explicit list; an immutable snapshot without an agent class | Storing a versioned snapshot together with a long-running session |
+| [Agent metadata](../../src/osnv/core/agent/metadata.ts) | Dynamic definitions are data; classes/decorators stay for Tools/DTOs and compatibility | Align the old examples and generation without changing the old API without a migration |
+| [CLI full template](../../src/osnv/cli/templates/module.ts) | Creates an AnalystAgent inside the module and writes `agents` into `@Module` | Separate module and agent generation, align codegen and checks |
+| [Agent Runtime](../../src/osnv/core/agent/MODULE.md) | The working Agent → model → Tool loop and the checked limits of local fixes | Put the current contracts and registration in order before adding new capabilities |
+| [Chat](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/osnv/cli/MODULE.md) | The shared RunService, saved answers, cancellation, text and tool progress in Vue; the CLI gets the final answer | CLI streaming/resume and a transport-independent session |
+| [Session contracts](../../src/osnv/core/agent/session/contracts.ts) | Session contracts; entities, a codec and checkpoint protection exist next to them | Finish the executing service separately; having contracts does not prove recovery works |
 
-Текущий код с `@Module.agents` — совместимость на время перехода, а не образец
-для новых агентов. Наличие `extras` уже позволяет передавать отдельные
-объявления, но само по себе не завершает независимый lifecycle и динамический каталог.
-Существующие тесты модульного пути остаются доказательством совместимости до миграции.
+The current code with `@Module.agents` is compatibility during the transition, not a
+model for new agents. `extras` already allows passing separate declarations, but it
+does not by itself complete an independent lifecycle and a dynamic catalog.
+The existing tests of the module path stay the evidence of compatibility until the migration.
 
-## 5. Порядок доработки
+## 5. Order of work
 
-1. **Привести существующее к принятой модели.** Уточнить публичные входы,
-   владельцев состояния и регистрацию Agent/Tool/Prompt; отделить регистрацию
-   агентов от `@Module`, используя действующие registry, DI и executor.
-   Согласовать CLI, codegen и примеры. Исправлять выявленные дефекты на этом пути.
-   Существующие потребители переводятся контролируемо; удаление старого входа
-   выполняется после замены его использований и проверки совместимости.
-2. **Добавить определения как данные.** Единый контракт, проверка ссылок,
-   версии и каталог через существующий ORM. Создание определения не требует
-   нового класса, модуля или пересборки приложения. Main использует обычный API каталога.
-3. **Развивать длительное исполнение.** На упорядоченной основе довести сессии,
-   журнал, checkpoints, события, остановку, продолжение и безопасную координацию.
-   Проверять отказ и восстановление без повторения действий с неизвестным исходом.
+1. **Bring what exists to the accepted model.** Clarify the public inputs, state
+   owners and Agent/Tool/Prompt registration; separate agent registration from
+   `@Module` using the current registry, DI and executor.
+   Align the CLI, codegen and examples. Fix the defects found along the way.
+   Existing consumers are moved in a controlled way; the old input is removed after
+   its uses are replaced and compatibility is checked.
+2. **Add definitions as data.** One contract, reference checks, versions and a
+   catalog through the existing ORM. Creating a definition needs no new class, module
+   or application rebuild. Main uses the regular catalog API.
+3. **Develop long-running execution.** On the ordered base, finish sessions, the
+   log, checkpoints, events, stopping, resuming and safe coordination.
+   Check failure and recovery without repeating actions with an unknown outcome.
 
-Первые проверки разделения: агент регистрируется без `@Module.agents`;
-ему доступны только назначенные и разрешённые Tools; два агента используют
-одну реализацию инструмента без общего изменяемого состояния запуска; старый
-путь сохраняет проверенную семантику на время перехода. Для изменений CLI/codegen
-проверяются генерация и исполнение затронутого бинарника.
+The first separation checks: an agent registers without `@Module.agents`; it has
+access only to the assigned and allowed Tools; two agents use one tool
+implementation without shared mutable run state; the old path keeps its checked
+semantics during the transition. For CLI/codegen changes, the generation and
+execution of the affected binary are checked.
 
-По отдельному поручению каталог и его Admin UI реализованы до полной миграции
-регистрации runtime. Теперь Chat передаёт исполнение в RunService модуля Agents;
-CLI использует тот же серверный путь. Определение фиксируется до pending,
-ссылки разрешаются только из списка инструментов хоста. Первый `agents.getAll`
-вызывает существующий сервис каталога через AgentToolExecutor и DI scope.
-Codex App Server использует тот же executor через explicit dynamicTools;
-собственные shell/MCP/прочие инструменты Codex остаются отключёнными.
+By a separate request the catalog and its Admin UI were implemented before the full
+migration of runtime registration. Chat now hands execution to the RunService of the
+Agents module; the CLI uses the same server path. The definition is fixed before
+pending, and references are resolved only from the host's tool list. The first
+`agents.getAll` calls the existing catalog service through AgentToolExecutor and a
+DI scope. Codex App Server uses the same executor through explicit dynamicTools;
+Codex's own shell/MCP/other tools stay disabled.
 
-Это завершает первый практический проход «определение → модель → разрешённый
-инструмент → ответ». Следующие работы выполняются в таком порядке:
+This completes the first practical pass "definition → model → allowed tool →
+answer". The next work goes in this order:
 
-1. Долговременная сессия и журнал событий: одинаковое состояние независимо от
-   транспорта и перезапуска процесса, с явными terminal/неопределёнными исходами.
-2. Продолжение и восстановление: сохранять снимок агента и контекст, не повторять
-   действия с неизвестным результатом, проверять отмену на границе зависимости.
-3. Инструменты записи и Main, создающий агентов: предметные права, подтверждение
-   при необходимости, версии и аудит. Рядовой клиент не получает Admin через модель.
+1. A long-running session and an event log: the same state regardless of the
+   transport and process restarts, with explicit terminal/undetermined outcomes.
+2. Resume and recovery: keep the agent snapshot and context, do not repeat actions
+   with an unknown result, check cancellation at the dependency boundary.
+3. Write tools and a Main that creates agents: domain permissions, confirmation when
+   needed, versions and audit. A regular client never gets Admin through the model.
 
-Старая генерация `--full` с классом агента пока сохраняется для совместимости;
-данный шаг её не мигрирует. Результаты первого прохода и воспроизведение:
-[проверка общего запуска](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agent-run-2026-09-21.md).
+The old `--full` generation with an agent class is kept for compatibility for now;
+this step does not migrate it. Results of the first pass and how to reproduce them:
+[shared run check](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agent-run-2026-09-21.md).
 
-Точные проверки выбираются по изменению. Выполненные проверки предыдущего
-[аудита](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md) не подтверждают
-ещё не выполненное разделение. Результаты каталога, PostgreSQL, бинарника и
-браузера приведены в [отчёте](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agents-module-2026-09-20.md).
+The exact checks are chosen per change. The checks of the earlier
+[audit](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md) do not confirm
+the separation that is not done yet. The catalog, PostgreSQL, binary and browser
+results are in the [report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agents-module-2026-09-20.md).
 
-## 6. Границы текущего решения
+## 6. Limits of the current solution
 
-Речь идёт об основе фреймворка. Для проверки модели определения пользователь
-дополнительно запросил управление из существующей админки — этот адаптер добавлен.
-Следующим отдельным поручением добавлен Vue-клиент и атомарные модули ClientAuth
-и Chat. Chat использует RunService, который исполняет снимок через
-`AgentRegistry.fromDefinition`, существующий AgentRuntime либо CodexClient. Это прикладной запуск;
-framework checkpoint/replay, дополнительные каналы и marketplace остаются
-отдельной областью. События и команды управления относятся к контракту runtime.
+This is about the framework base. To check the definition model, the user also asked
+for management from the existing admin panel; that adapter was added.
+A separate later request added the Vue client and the atomic ClientAuth and Chat
+modules. Chat uses RunService, which runs the snapshot through
+`AgentRegistry.fromDefinition`, the existing AgentRuntime or CodexClient. This is an
+application run; framework checkpoint/replay, extra channels and a marketplace stay a
+separate area. Events and control commands belong to the runtime contract.
 
-Правила ООП/SOLID, производительности, отказоустойчивости, бинарного исполнения
-и выбора атомарности сохраняются. Новые модули инфраструктуры создаются через
-CLI по MOD-ARCH-001; конкретное определение агента модулем не является.
-Предстоящая отдельная генерация агента сначала реализуется и проверяется в CLI.
-Этот документ не вводит несуществующую команду и не поручает массовый перенос файлов.
+The OOP/SOLID, performance, resilience, binary execution and atomicity rules still
+apply. New infrastructure modules are created through the CLI per MOD-ARCH-001; a
+concrete agent definition is not a module. The upcoming separate agent generation is
+implemented and checked in the CLI first. This document introduces no nonexistent
+command and does not order a mass move of files.

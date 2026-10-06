@@ -417,7 +417,10 @@ export class SessionManager {
     return this.getSession(sid)?.outboundQueue.slice() ?? [];
   }
 
-  /** Upgrade an owned legacy queue before issuing stable replay identities. */
+  /**
+   * Switches the session to client-acknowledged replay: assigns a delivery id to
+   * every queued packet (within the queue byte limit) so the client can ack them.
+   */
   enableReplayAcknowledgements(sid: string): void {
     const state = this.sessions.get(sid);
     if (!state || state.replayDelivery === "client-ack") return;

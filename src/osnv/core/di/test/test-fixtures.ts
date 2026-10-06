@@ -90,7 +90,7 @@ export function tokenToName(token: unknown): string {
   return "unknown";
 }
 
-/** Модуль с именем класса для диагностики (encapsulation и т.п.). */
+/** Module with a class name for diagnostics (encapsulation and the like). */
 export function testModule(className: string, metadata: OsnvModuleMetadata): OsnvModule {
   const moduleClass = { [className]: class {} }[className] as abstract new (...args: never) => unknown;
   Object.assign(moduleClass, metadata);

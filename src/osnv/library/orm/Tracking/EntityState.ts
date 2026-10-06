@@ -1,13 +1,13 @@
-/** Состояние сущности в трекере (как в EF Core). */
+/** Entity state in the tracker (as in EF Core). */
 export enum EntityState {
-  /** Не отслеживается. */
+  /** Not tracked. */
   Detached = "Detached",
-  /** Загружена/прикреплена, изменений нет. */
+  /** Loaded/attached, no changes. */
   Unchanged = "Unchanged",
-  /** Новая, будет вставлена. */
+  /** New, will be inserted. */
   Added = "Added",
-  /** Изменена, будет обновлена. */
+  /** Changed, will be updated. */
   Modified = "Modified",
-  /** Будет удалена. */
+  /** Will be deleted. */
   Deleted = "Deleted",
 }

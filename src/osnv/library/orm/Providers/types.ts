@@ -3,9 +3,9 @@ import type { IntrospectedSchema } from "../Schema/introspection";
 import type { OrmExpectedSchema } from "../Schema/ExpectedSchema";
 
 /**
- * Значение, которое можно связать как параметр запроса. Широкий union, т.к.
- * PostgreSQL принимает нативные `boolean`, `Date` и `jsonb`-объекты. Конкретный
- * провайдер получает значения уже после `SqlDialect.encode`.
+ * A value that can be bound as a query parameter. A wide union, because
+ * PostgreSQL accepts native `boolean`, `Date` and `jsonb` objects. A concrete
+ * provider receives values after `SqlDialect.encode`.
  */
 export type SqlParam =
   | string
@@ -18,14 +18,14 @@ export type SqlParam =
   | readonly unknown[]
   | Record<string, unknown>;
 
-/** Строка результата запроса. */
+/** A query result row. */
 export type Row = Record<string, unknown>;
 
 /**
- * Минимальный исполнитель SQL. Провайдер реализует его напрямую (вне
- * транзакции), а внутри транзакции `transaction()` передаёт scoped-executor —
- * это нужно для провайдеров с пулом соединений (PostgreSQL), где транзакция
- * привязана к зарезервированному соединению.
+ * Minimal SQL executor. The provider implements it directly (outside a
+ * transaction), and inside a transaction `transaction()` passes a scoped
+ * executor; this is needed for pooled providers (PostgreSQL), where a
+ * transaction is bound to a reserved connection.
  */
 export interface DbExecutor {
   query(sql: string, params: readonly SqlParam[]): Promise<Row[]>;
@@ -41,25 +41,25 @@ export type AfterCommitCallback = TransactionCallback;
 /** Row-level lock requested by a SELECT query. */
 export type RowLockMode = "update";
 
-/** Результат изменяющей команды. */
+/** Result of a modifying command. */
 export interface ExecuteResult {
-  /** Число затронутых строк. */
+  /** Number of affected rows. */
   readonly changes: number;
-  /** Идентификатор последней вставленной строки (для identity-ключей). */
+  /** Id of the last inserted row (for identity keys). */
   readonly lastInsertId: number | bigint;
 }
 
-/** Ограничения SQL-провайдера, влияющие на размер batch-команд. */
+/** SQL provider limits that affect the size of batch commands. */
 export interface DatabaseProviderLimits {
-  /** Максимум связываемых параметров в одной SQL-команде. */
+  /** Maximum number of bound parameters in one SQL command. */
   readonly maxParametersPerCommand: number;
-  /** Дополнительный верхний предел строк в одном multi-row INSERT. */
+  /** Optional upper limit of rows in one multi-row INSERT. */
   readonly maxRowsPerInsert?: number;
-  /** Верхний предел значений в одном `WHERE ... IN (...)`. */
+  /** Upper limit of values in one `WHERE ... IN (...)`. */
   readonly maxParametersPerInList?: number;
 }
 
-/** Диагностический сигнал провайдера для health-check и startup warnings. */
+/** Provider diagnostic signal for the health check and startup warnings. */
 export interface DatabaseProviderDiagnostic {
   readonly code: string;
   readonly severity: "warning" | "error";
@@ -78,45 +78,45 @@ export interface SchemaAdmissionCapabilityV1 {
 export interface SchemaAdmissionScope extends DbExecutor { introspectExpected(expected: OrmExpectedSchema): Promise<IntrospectedSchema> }
 
 /**
- * Диалект SQL: всё, что отличается между СУБД (кавычки, плейсхолдеры
- * параметров, типы колонок, автоинкремент). Архитектура позволяет добавить
- * новый провайдер, реализовав диалект + транспорт.
+ * SQL dialect: everything that differs between DBMSs (quoting, parameter
+ * placeholders, column types, auto-increment). A new provider can be added by
+ * implementing a dialect + a transport.
  */
 export interface SqlDialect {
   readonly name: string;
-  /** Экранирование одного идентификатора; точка внутри имени сохраняется буквально. */
+  /** Quotes one identifier; a dot inside the name is kept literally. */
   quoteId(name: string): string;
-  /** Квалифицированное имя таблицы с учётом `EntityModel.schema`. */
+  /** Qualified table name, taking `EntityModel.schema` into account. */
   qualifyTable(model: EntityModel): string;
-  /** Плейсхолдер параметра PostgreSQL по индексу (0-based): `$1`, `$2`, …. */
+  /** PostgreSQL parameter placeholder by index (0-based): `$1`, `$2`, …. */
   parameter(index: number): string;
-  /** Тип колонки в DDL. */
+  /** Column type in DDL. */
   columnType(type: ColumnType): string;
-  /** Поддерживает ли `INSERT ... RETURNING`. */
+  /** Whether `INSERT ... RETURNING` is supported. */
   readonly supportsReturning: boolean;
-  /** Кодирует значение свойства в параметр запроса для этой СУБД. */
+  /** Encodes a property value into a query parameter for this DBMS. */
   encode(value: unknown, type: ColumnType): SqlParam;
-  /** Декодирует значение колонки в значение свойства. */
+  /** Decodes a column value into a property value. */
   decode(value: unknown, type: ColumnType): unknown;
   /** SQL suffix for a row-locking SELECT; empty when the dialect has no such clause. */
   rowLockClause(mode: RowLockMode): string;
-  /** DDL создания таблицы (`CREATE TABLE IF NOT EXISTS ...`) с FK-ограничениями. */
+  /** DDL that creates the table (`CREATE TABLE IF NOT EXISTS ...`) with FK constraints. */
   createTableSql(model: EntityModel, foreignKeys: readonly ForeignKeyConstraint[]): string;
-  /** DDL создания всех индексов сущности. */
+  /** DDL that creates all indexes of the entity. */
   createIndexSql(model: EntityModel): readonly string[];
-  /** DDL создания одного индекса. */
+  /** DDL that creates one index. */
   createIndexSqlOne(model: EntityModel, index: IndexModel): string;
-  /** DDL добавления колонки (`ALTER TABLE ... ADD COLUMN ...`). */
+  /** DDL that adds a column (`ALTER TABLE ... ADD COLUMN ...`). */
   addColumnSql(model: EntityModel, property: PropertyModel, foreignKey?: ForeignKeyConstraint): string;
   /**
-   * DDL удаления колонки (`ALTER TABLE ... DROP COLUMN ...`). Деструктивная
-   * операция: авто-миграция её не вызывает (см. `SchemaDiffer`) — только явные
-   * сценарии управления схемой.
+   * DDL that drops a column (`ALTER TABLE ... DROP COLUMN ...`). A destructive
+   * operation: the auto-migration never calls it (see `SchemaDiffer`); only
+   * explicit schema management scenarios do.
    */
   dropColumnSql(model: EntityModel, columnName: string): string;
 }
 
-/** Описание FK-ограничения для DDL (уже разрешённое в имена колонок/таблиц). */
+/** FK constraint description for DDL (already resolved into column/table names). */
 export interface ForeignKeyConstraint {
   readonly column: string;
   readonly columns?: readonly string[];
@@ -126,31 +126,30 @@ export interface ForeignKeyConstraint {
   readonly referencedColumns?: readonly string[];
   readonly onDelete?: "noAction" | "restrict" | "cascade" | "setNull";
   readonly onUpdate?: "noAction" | "restrict" | "cascade" | "setNull";
-  /** Физический тип FK-колонки, когда он точнее общего `PropertyModel.type` (например native PostgreSQL UUID). */
+  /** Physical type of the FK column when it is more precise than the general `PropertyModel.type` (for example native PostgreSQL UUID). */
   readonly columnType?: ColumnType | "uuid";
 }
 
 /**
- * Транспорт к конкретной СУБД. Методы асинхронны ради провайдеров с сетевым
- * I/O (PostgreSQL).
- * Везде используются только параметризованные запросы.
+ * Transport to a concrete DBMS. The methods are async for providers with
+ * network I/O (PostgreSQL). Only parameterized queries are used everywhere.
  */
 export interface DatabaseProvider {
   readonly name: string;
   readonly dialect: SqlDialect;
   readonly schemaAdmissionCapability?: SchemaAdmissionCapabilityV1;
-  /** Лимиты batch-команд конкретного провайдера. */
+  /** Batch command limits of the concrete provider. */
   readonly limits?: DatabaseProviderLimits;
-  /** Диагностика capabilities провайдера (например, degraded migration lock). */
+  /** Diagnostics of provider capabilities (for example a degraded migration lock). */
   diagnostics?(): readonly DatabaseProviderDiagnostic[];
-  /** SELECT: возвращает строки. */
+  /** SELECT: returns rows. */
   query(sql: string, params: readonly SqlParam[]): Promise<Row[]>;
-  /** INSERT/UPDATE/DELETE/DDL: возвращает число изменений и lastInsertId. */
+  /** INSERT/UPDATE/DELETE/DDL: returns the number of changes and lastInsertId. */
   execute(sql: string, params: readonly SqlParam[]): Promise<ExecuteResult>;
   /**
-   * Выполняет работу в транзакции (BEGIN/COMMIT, ROLLBACK при исключении).
-   * В callback передаётся исполнитель, привязанный к соединению транзакции —
-   * все запросы внутри должны идти через него.
+   * Runs work in a transaction (BEGIN/COMMIT, ROLLBACK on exception).
+   * The callback gets an executor bound to the transaction's connection;
+   * all queries inside must go through it.
    */
   transaction<T>(work: (tx: DbExecutor) => Promise<T>): Promise<T>;
   /**
@@ -177,32 +176,32 @@ export interface DatabaseProvider {
    * while SQL was executing. Outside a transaction the callback is ignored.
    */
   afterRollback?(callback: TransactionCallback): void;
-  /** Проверка соединения для health-check. */
+  /** Connection check for the health check. */
   ping(signal?: AbortSignal): Promise<boolean>;
-  /** Интроспекция фактической схемы БД (для авто-миграции). */
+  /** Introspection of the actual database schema (for the auto-migration). */
   introspect(): Promise<IntrospectedSchema>;
   /**
-   * Выполняет `work` под межпроцессной блокировкой миграций (опционально).
-   * PostgreSQL использует advisory lock, чтобы два инстанса, стартующие
-   * одновременно, не применяли миграции наперегонки.
+   * Runs `work` under a cross-process migration lock (optional).
+   * PostgreSQL uses an advisory lock so that two instances starting at the
+   * same time do not race to apply migrations.
    */
   withMigrationLock?<T>(work: () => Promise<T>): Promise<T>;
   /**
-   * Подписка на канал асинхронных уведомлений (PostgreSQL `LISTEN`). Опционально:
-   * провайдеры без поддержки push метод не реализуют — подписчик деградирует к
-   * поллингу. `handler` вызывается на каждое
-   * входящее уведомление с его payload.
+   * Subscribes to an async notification channel (PostgreSQL `LISTEN`). Optional:
+   * providers without push support do not implement it, and the subscriber falls
+   * back to polling. `handler` is called for every incoming notification with
+   * its payload.
    */
   listen?(channel: string, handler: (payload: string) => void | Promise<void>): Promise<NotificationSubscription>;
   /**
-   * Шлёт уведомление в канал (PostgreSQL `NOTIFY` через `pg_notify`). Опционально.
-   * Доставляется всем подписчикам канала, включая отправителя.
+   * Sends a notification to a channel (PostgreSQL `NOTIFY` through `pg_notify`). Optional.
+   * Delivered to all channel subscribers, including the sender.
    */
   notify?(channel: string, payload?: string): Promise<void>;
   close(): Promise<void>;
 }
 
-/** Активная подписка на канал уведомлений; `close()` снимает её. */
+/** Active notification channel subscription; `close()` removes it. */
 export interface NotificationSubscription {
   close(): Promise<void> | void;
 }

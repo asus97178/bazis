@@ -459,7 +459,6 @@ function validateExpected(tables: readonly ExpectedTable[], owners: ReadonlyMap<
         column.generation === "uuidDefault" && (pk.length !== 1 || !isPk || column.physicalType !== "uuid" || def.kind !== "uuidV4") ||
         column.generation === "none" && isPk && def.kind !== "none" ||
         def.kind === "uuidV4" && !(column.generation === "uuidDefault" && pk.length === 1 && isPk && column.physicalType === "uuid") ||
-        column.physicalType === "uuid" && column.generation !== "uuidDefault" ||
         def.kind === "currentTimestamp" ||
         def.kind === "null" && !column.nullable ||
         def.kind === "boolean" && !["boolean", "json"].includes(column.physicalType) ||

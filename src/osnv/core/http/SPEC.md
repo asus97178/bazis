@@ -1,58 +1,57 @@
-# HTTP Middleware и `@Middleware` — спецификация
+# HTTP middleware and `@Middleware`: specification
 
-Per-request конвейер middleware в стиле ASP.NET Core / Koa: функции `(ctx, next)`,
-скомпилированные **один раз на маршрут** при старте сервера. Декоратор `@Middleware`
-— декларативный способ повесить middleware на контроллер или action.
+A per-request middleware pipeline in the style of ASP.NET Core / Koa: `(ctx, next)`
+functions compiled **once per route** when the server starts. The `@Middleware`
+decorator is the declarative way to attach middleware to a controller or an action.
 
-Быстрая навигация:
-- [1. Что это и зачем](#1-что-это-и-зачем)
-- [2. Архитектура pipeline](#2-архитектура-pipeline)
-- [3. Быстрый старт](#3-быстрый-старт)
-- [4. `@Middleware` — справочник](#4-middleware--справочник)
-- [5. Контракт `HttpMiddleware`](#5-контракт-httpmiddleware)
-- [6. Способы подключения middleware](#6-способы-подключения-middleware)
-- [7. Встроенные фабрики middleware](#7-встроенные-фабрики-middleware)
-- [8. `HttpContext` в middleware](#8-httpcontext-в-middleware)
-- [9. Сценарии и примеры](#9-сценарии-и-примеры)
-- [10. Порядок выполнения и нюансы](#10-порядок-выполнения-и-нюансы)
-- [11. Интеграция с auth и cache](#11-интеграция-с-auth-и-cache)
+Quick navigation:
+- [1. What it is and why](#1-what-it-is-and-why)
+- [2. Pipeline architecture](#2-pipeline-architecture)
+- [3. Quick start](#3-quick-start)
+- [4. `@Middleware` reference](#4-middleware-reference)
+- [5. The `HttpMiddleware` contract](#5-the-httpmiddleware-contract)
+- [6. Ways to connect middleware](#6-ways-to-connect-middleware)
+- [7. Built-in middleware](#7-built-in-middleware)
+- [8. `HttpContext` in middleware](#8-httpcontext-in-middleware)
+- [9. Scenarios and examples](#9-scenarios-and-examples)
+- [10. Execution order and details](#10-execution-order-and-details)
+- [11. Authorization and output cache](#11-authorization-and-output-cache)
 - [12. Middleware vs ActionFilter vs `@Catch`](#12-middleware-vs-actionfilter-vs-catch)
-- [13. Хорошие и плохие практики](#13-хорошие-и-плохие-практики)
-- [14. Ограничения и анти-паттерны](#14-ограничения-и-анти-паттерны)
+- [13. Good and bad practices](#13-good-and-bad-practices)
+- [14. Limits](#14-limits)
 - [15. FAQ](#15-faq)
-- [16. Карта папки](#16-карта-папки)
+- [16. Folder map](#16-folder-map)
 
 ---
 
-## 1. Что это и зачем
+## 1. What it is and why
 
-**Middleware** — функция, которая выполняется **до** (и/или **после**) action
-контроллера в рамках одного HTTP-запроса. Типичные задачи:
+**Middleware** is a function that runs **before** (and/or **after**) a controller action
+within one HTTP request. Typical tasks:
 
-| Задача | Пример |
+| Task | Example |
 | --- | --- |
-| Аутентификация | `jwtBearer()` — разбор Bearer JWT |
-| Авторизация | `authorize()` — из `@Authorize` (см. `@/auth`) |
-| Кэш ответа | `outputCacheMiddleware()` — из `@OutputCache` |
-| CORS | `cors({ origin: "..." })` |
+| Authorization | `@Authorize(check)` compiles into a built-in middleware (see §11) |
+| Response cache | `@OutputCache` compiles into a route middleware of the cache module |
+| CORS | `httpModule({ cors: { origin: "..." } })` or `cors({ ... })` |
 | Rate limiting | `rateLimit({ windowMs, max })` |
-| Логирование / трассировка | кастомный middleware с заголовком `x-request-id` |
-| Проверка API key | middleware до action, без binding body |
+| Correlation / tracing | `createCorrelationIdMiddleware()` with the `x-request-id` header |
+| API key check | a middleware before the action, without body binding |
 
-**`@Middleware`** — TC39-декоратор, который записывает одну или несколько
-middleware-функций в metadata контроллера или метода. На старте `RouterBuilder`
-собирает из metadata **готовый массив** — на горячем пути metadata не читается.
+**`@Middleware`** is a TC39 decorator that writes one or more middleware functions into
+the metadata of a controller or a method. At startup `RouterBuilder` builds a **ready
+array** from the metadata; the hot path never reads metadata.
 
-Зачем декоратор, а не только `httpModule({ middleware })`:
+Why a decorator and not only `httpModule({ middleware })`:
 
-| Критерий | Глобальный middleware | `@Middleware` |
+| Criterion | Global middleware | `@Middleware` |
 | --- | --- | --- |
-| Область | все маршруты | один controller / один action |
-| Декларативность | конфиг модуля | рядом с `@Get` / `@Post` |
-| Переиспользование | одна функция на всё приложение | разные цепочки per controller |
-| Compile-time | массив в `httpModule` | metadata → pipeline на старте |
+| Scope | all routes | one controller / one action |
+| Declarativeness | module configuration | next to `@Get` / `@Post` |
+| Reuse | one function for the whole application | different chains per controller |
+| Build time | an array in `httpModule` | metadata → pipeline at startup |
 
-Импорт:
+Import:
 
 ```ts
 import {
@@ -62,66 +61,76 @@ import {
   cors,
   HttpContext,
   UnauthorizedError,
-} from "@/core/http";
+} from "osnv/core/http";
 ```
 
 ---
 
-## 2. Архитектура pipeline
+## 2. Pipeline architecture
 
-### Полная цепочка одного маршрута
+### The full chain of one route
 
 ```
 HTTP Request
     │
     ▼
-[1] correlationId + accessLog  ← LoggingModule.forRoot().httpIntegration
-[2] cors?                           ← httpModule({ cors })
-[3] errorHandler                    ← всегда (глобальная граница ошибок)
-[4] httpModule.middleware           ← глобальные hook'и (jwtBearer, …)
-[5] @Middleware (класс)     ← декоратор на контроллере
-[6] routeMiddlewareComposer ← @Authorize, @OutputCache, … (compile-time)
-[7] @Middleware (метод)     ← декоратор или RouteOptions.middleware
-[8] terminal                ← bind → ActionFilter → action → @Catch
+[1] accessLog?                ← httpModule({ accessLog })
+[2] cors?                     ← httpModule({ cors })
+[3] securityHeaders           ← on by default; httpModule({ securityHeaders: false }) turns it off
+[4] errorHandler              ← always (the global error boundary)
+[5] server middleware         ← httpModule({ middleware }) + DI SERVER_MIDDLEWARE, by order
+[6] authorization             ← @Authorize / @AllowAnonymous (built-in, compiled per route)
+[7] @Middleware (class)       ← decorator on the controller
+[8] @Middleware (method)      ← decorator or RouteOptions.middleware
+[9] action boundary           ← binding + ActionFilter.before
+[10] route composers          ← httpModule({ routeMiddlewareComposer }) + DI ROUTE_MIDDLEWARE_COMPOSER (e.g. output cache)
+[11] terminal                 ← action + ActionFilter.after; @Catch handles errors of [9]–[11]
     │
     ▼
 HTTP Response
 ```
 
-Сборка в `RouterBuilder`:
+Assembly in `RouterBuilder`:
 
 ```ts
 const chain = [
-  ...serverChain,           // [1]–[4]
-  ...meta.middleware,       // [5]
-  ...composed,              // [6]
-  ...action.middleware,     // [7]
-  terminal,                 // [8]
+  ...serverChain,       // [1]–[5]
+  ...authorization,     // [6]
+  ...meta.middleware,   // [7]
+  ...action.middleware, // [8]
+  pipeline.boundary,    // [9]
+  ...composed,          // [10]
+  pipeline.terminal,    // [11]
 ];
 ```
 
-### Что **не** проходит через pipeline
+Authorization comes before controller middleware, so an unauthorized request cannot
+trigger controller-level work. The output cache runs after the action boundary, so a
+cache hit still passes authorization, binding and `ActionFilter.before`, but skips the
+controller and the action.
 
-| Ситуация | Поведение |
+### What does **not** go through the pipeline
+
+| Situation | Behavior |
 | --- | --- |
-| CORS preflight (`OPTIONS` + `Access-Control-Request-Method`) | ответ до routing |
-| 404 Not Found | JSON без pipeline |
-| 405 Method Not Allowed | JSON без pipeline |
-| Malformed path (`..`, `%zz`) | 400 без pipeline |
+| CORS preflight (`OPTIONS` + `Access-Control-Request-Method`) | answered before routing |
+| 404 Not Found | JSON without the pipeline |
+| 405 Method Not Allowed | JSON without the pipeline |
+| Malformed path (`..`, `%zz`) | 400 without the pipeline |
 
-### Lifetime и DI
+### Lifetime and DI
 
-Каждый запрос создаёт **новый DI scope** (`ctx.services`). Middleware и action
-разделяют один scope на время запроса; после ответа scope dispose'ится.
+Each request creates a **new DI scope** (`ctx.services`). Middleware and the action share
+one scope for the request; the scope is disposed after the response.
 
 ---
 
-## 3. Быстрый старт
+## 3. Quick start
 
-### Middleware на контроллере
+### Middleware on a controller
 
 ```ts
-import { Controller, Get, Middleware, type HttpMiddleware } from "@/core/http";
+import { Controller, Get, Middleware, type HttpMiddleware } from "osnv/core/http";
 
 const requestId: HttpMiddleware = async (ctx, next) => {
   const id = crypto.randomUUID();
@@ -140,7 +149,7 @@ class UsersController {
 }
 ```
 
-### Middleware на одном action
+### Middleware on one action
 
 ```ts
 @Controller("webhooks")
@@ -153,67 +162,61 @@ class WebhooksController {
 }
 ```
 
-### Глобально через `httpModule`
+### Globally through `httpModule`
 
 ```ts
-import { Module } from "@/core";
-import { httpModule } from "@/core/http";
-import { jwtModule } from "@/auth";
+import { createCorrelationIdMiddleware, httpModule, rateLimit } from "osnv/core/http";
 
-const jwt = jwtModule({ options: { /* … */ } });
-
-@Module({
-  imports: [
-    httpModule({
-      imports: [FeatureModule],
-      middleware: [...jwt.httpIntegration.serverMiddleware],
-      routeMiddlewareComposer: jwt.httpIntegration.routeMiddlewareComposer,
-    }),
+httpModule({
+  imports: [FeatureModule],
+  accessLog: true,
+  middleware: [
+    createCorrelationIdMiddleware(),
+    rateLimit({ windowMs: 60_000, max: 600 }),
   ],
-})
-class AppModule {}
+});
 ```
 
 ---
 
-## 4. `@Middleware` — справочник
+## 4. `@Middleware` reference
 
-### Сигнатура
+### Signature
 
 ```ts
 function Middleware(...middleware: HttpMiddleware[]): ClassOrMethodDecorator;
 ```
 
-| Параметр | Тип | Обязательно | Описание |
+| Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `...middleware` | `HttpMiddleware[]` | ✅ (≥1) | Одна или несколько функций в порядке выполнения |
+| `...middleware` | `HttpMiddleware[]` | yes (≥1) | One or more functions in execution order |
 
-**У `@Middleware` нет объекта опций** — только variadic список функций.
-Настройки передаются через замыкание фабрики (`rateLimit({ max: 100 })`).
+**`@Middleware` has no options object**, only a variadic list of functions.
+Settings go through the factory closure (`rateLimit({ max: 100 })`).
 
-### Где можно использовать
+### Where it can be used
 
-| Место | Область действия | Metadata |
+| Place | Scope | Metadata |
 | --- | --- | --- |
-| Класс контроллера | все actions контроллера | `ControllerMeta.middleware` |
-| Метод с `@Get`/`@Post`/… | только этот action | `ActionMeta.middleware` |
+| A controller class | all actions of the controller | `ControllerMeta.middleware` |
+| A method with `@Get`/`@Post`/… | only this action | `ActionMeta.middleware` |
 
-### Накопление
+### Accumulation
 
-Несколько декораторов **добавляют** middleware в массив (не перезаписывают):
+Several decorators **add** middleware to the array (they do not overwrite it):
 
 ```ts
 @Controller("api")
 @Middleware(mwA)
 @Middleware(mwB)
 class ApiController {}
-// порядок на маршруте: mwA → mwB → …
+// order on the route: mwA → mwB → …
 ```
 
-### Наследование (copy-on-write)
+### Inheritance (copy-on-write)
 
-Metadata контроллера наследуется от базового класса через TC39 `Symbol.metadata`.
-При первой записи в подклассе выполняется **clone** — базовый класс не мутируется.
+Controller metadata is inherited from the base class through TC39 `Symbol.metadata`.
+The first write in a subclass **clones** it, so the base class is not mutated.
 
 ```ts
 @Controller("base")
@@ -222,29 +225,29 @@ class BaseController {}
 
 @Controller("derived")
 class DerivedController extends BaseController {}
-// DerivedController наследует sharedMiddleware
+// DerivedController inherits sharedMiddleware
 ```
 
-### Эквивалент через inline-опции маршрута
+### The equivalent through inline route options
 
-`RouteOptions.middleware` на `@Get`/`@Post` пишет в тот же `ActionMeta.middleware`:
+`RouteOptions.middleware` on `@Get`/`@Post` writes into the same `ActionMeta.middleware`:
 
 ```ts
 @Get("export", { middleware: [exportOnlyMiddleware] })
 export() { ... }
 
-// эквивалентно:
+// equivalent:
 @Get("export")
 @Middleware(exportOnlyMiddleware)
 export() { ... }
 ```
 
-При нескольких route-декораторах на одном методе поле `middleware`
-**накапливается** (как push), скалярные поля (`code`, `produces`) перезаписываются.
+With several route decorators on one method the `middleware` field **accumulates**
+(like push), while scalar fields (`code`, `produces`) are overwritten.
 
 ---
 
-## 5. Контракт `HttpMiddleware`
+## 5. The `HttpMiddleware` contract
 
 ```ts
 type HttpMiddleware = (
@@ -253,17 +256,17 @@ type HttpMiddleware = (
 ) => void | Promise<void>;
 ```
 
-### Правила
+### Rules
 
-| Правило | Описание |
+| Rule | Description |
 | --- | --- |
-| Вызов `next()` | передаёт управление следующему звену цепочки |
-| Без `next()` | **short-circuit** — pipeline останавливается; нужен `ctx.response` |
-| Повторный `next()` | **ошибка** — `next() called multiple times` |
-| Исключение | перехватывается `errorHandler` (если middleware внутри его `try`) |
-| Синхронный / async | оба варианта допустимы |
+| Calling `next()` | passes control to the next link of the chain |
+| No `next()` | **short-circuit**: the pipeline stops; set `ctx.response` |
+| A second `next()` | **an error**: `next() called multiple times` |
+| An exception | caught by `errorHandler` (middleware runs inside it) |
+| Sync / async | both are allowed |
 
-### Short-circuit (ответ без action)
+### Short-circuit (a response without the action)
 
 ```ts
 const maintenanceMode: HttpMiddleware = async (ctx, next) => {
@@ -272,13 +275,13 @@ const maintenanceMode: HttpMiddleware = async (ctx, next) => {
       status: 503,
       headers: { "content-type": "application/json" },
     });
-    return; // next() не вызываем
+    return; // next() is not called
   }
   await next();
 };
 ```
 
-### «Around» middleware (до и после action)
+### "Around" middleware (before and after the action)
 
 ```ts
 const timing: HttpMiddleware = async (ctx, next) => {
@@ -289,7 +292,7 @@ const timing: HttpMiddleware = async (ctx, next) => {
 };
 ```
 
-### Middleware с DI
+### Middleware with DI
 
 ```ts
 import { IAuditLog } from "./tokens";
@@ -301,37 +304,54 @@ const audit: HttpMiddleware = async (ctx, next) => {
 };
 ```
 
-> Middleware — **функция**, не DI-класс. Зависимости резолвятся из `ctx.services`
-> внутри функции. Для переиспользуемых guard-подобных классов см. раздел
-> [13. Хорошие и плохие практики](#13-хорошие-и-плохие-практики).
+> Middleware is a **function**, not a DI class. Dependencies are resolved from
+> `ctx.services` inside the function. For reusable guard-like classes see
+> [13. Good and bad practices](#13-good-and-bad-practices).
 
 ---
 
-## 6. Способы подключения middleware
+## 6. Ways to connect middleware
 
-| # | Способ | Когда | Где в pipeline |
+| # | Way | When | Place in the pipeline |
 | --- | --- | --- | --- |
-| 1 | `httpModule({ requestLogging, cors })` | встроенные cross-cutting | [1]–[2] |
-| 2 | `httpModule({ middleware })` | глобально на всё API | [4] |
-| 3 | `@Middleware` на классе | все actions контроллера | [5] |
-| 4 | `routeMiddlewareComposer` | compile-time per route (auth, cache) | [6] |
-| 5 | `@Middleware` на методе | один action | [7] |
-| 6 | `RouteOptions.middleware` | inline на `@Get`/… | [7] |
+| 1 | `httpModule({ accessLog, cors, securityHeaders })` | built-in cross-cutting concerns | [1]–[3] |
+| 2 | `httpModule({ middleware })` | globally for the whole API | [5] |
+| 3 | DI `SERVER_MIDDLEWARE` | a module wires its own global middleware | [5] |
+| 4 | `@Authorize` / `@AllowAnonymous` | authorization per controller/action | [6] |
+| 5 | `@Middleware` on a class | all actions of the controller | [7] |
+| 6 | `@Middleware` on a method, `RouteOptions.middleware` | one action | [8] |
+| 7 | `routeMiddlewareComposer`, DI `ROUTE_MIDDLEWARE_COMPOSER` | build-time per route (output cache) | [10] |
 
 ### `HttpModuleOptions.middleware`
 
 ```ts
 interface HttpModuleOptions {
-  /** Global middleware after errorHandler, before controller ones. */
+  /** Global middleware after errorHandler, before route middleware. */
   readonly middleware?: readonly HttpMiddleware[];
 }
 ```
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `middleware` | `readonly HttpMiddleware[]` | `[]` | Глобальные middleware приложения |
+| `middleware` | `readonly HttpMiddleware[]` | `[]` | Global application middleware (order 0) |
 
-Типичное содержимое: `jwtBearer()`, custom headers, metrics.
+Typical content: correlation id, metrics, custom headers.
+
+### DI `SERVER_MIDDLEWARE`
+
+A module can contribute global middleware without threading it through
+`httpModule`. Registrations are collected with `resolveAll` and sorted by `order`
+(lower runs further out; explicit `httpModule({ middleware })` has order 0):
+
+```ts
+import { singletonValue } from "osnv/core/di";
+import { SERVER_MIDDLEWARE } from "osnv/core/http";
+
+@Module({
+  providers: [singletonValue(SERVER_MIDDLEWARE, { order: -10, middleware: httpMetrics })],
+})
+class MetricsModule {}
+```
 
 ### `RouteMiddlewareComposer`
 
@@ -344,21 +364,18 @@ type RouteMiddlewareComposer = (
 ) => readonly HttpMiddleware[];
 ```
 
-| Поле | Тип | Описание |
+| Field | Type | Description |
 | --- | --- | --- |
-| return | `readonly HttpMiddleware[]` | Middleware для **конкретного** action |
+| return | `readonly HttpMiddleware[]` | Middleware for a **specific** action |
 
-Вызывается **один раз** при `HttpServer.start()`. Модули (`@/auth`, `@/core/cache`)
-регистрируют composer через `httpIntegration.routeMiddlewareComposer`.
-Несколько composer'ов объединяются:
+It is called **once** per route when `HttpServer` starts. Modules usually self-wire
+through the `ROUTE_MIDDLEWARE_COMPOSER` DI token (the cache module does this for
+`@OutputCache`). Several explicit composers can be combined:
 
 ```ts
-import { composeRouteMiddlewareComposers } from "@/core/http";
+import { composeRouteMiddlewareComposers } from "osnv/core/http";
 
-routeMiddlewareComposer: composeRouteMiddlewareComposers(
-  jwt.httpIntegration.routeMiddlewareComposer,
-  cache.httpIntegration.routeMiddlewareComposer,
-),
+routeMiddlewareComposer: composeRouteMiddlewareComposers(auditComposer, metricsComposer),
 ```
 
 ### `RouteOptions.middleware`
@@ -366,159 +383,145 @@ routeMiddlewareComposer: composeRouteMiddlewareComposers(
 ```ts
 interface RouteOptions {
   readonly middleware?: readonly HttpMiddleware[];
-  // также: code, produces, consumes, version
+  // also: code, produces, consumes, version, maxBodyBytes
 }
 ```
 
-| Поле | Тип | Описание |
+| Field | Type | Description |
 | --- | --- | --- |
-| `middleware` | `readonly HttpMiddleware[]` | Middleware только для actions с этим route-декоратором |
+| `middleware` | `readonly HttpMiddleware[]` | Middleware only for actions with this route decorator |
 
 ---
 
-## 7. Встроенные фабрики middleware
+## 7. Built-in middleware
 
-Экспорт из `@/core/http`. Подключаются через `@Middleware(...)`, `httpModule({ middleware })`
-или встроенные опции модуля.
+Exported from `osnv/core/http`. They are connected through `@Middleware(...)`,
+`httpModule({ middleware })` or the built-in module options.
 
 ### `errorHandler(options?)`
 
-**Всегда** в `serverChain` (позиция [3]). Вручную на маршрут не вешать.
+**Always** in the server chain (position [4]). Configure it through
+`httpModule({ errorHandler })`; do not attach it to a route by hand.
 
-| Поле `ErrorHandlerOptions` | Тип | Default | Описание |
+| `ErrorHandlerOptions` field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `exposeDetails` | `boolean` | `Environment.debug` | message/stack в 500 |
-| `sink` | `LogSink` | resolve `LOG_SINK` | structured error log (`http.error`) |
-| `logError` | `(error) => void` | `console.error` | fallback без `LOG_SINK` |
+| `exposeDetails` | `boolean` | `httpModule({ exposeErrorDetails })` / environment | message/stack in 500 responses; never enable in production |
+| `onUnexpectedError` | `(ctx, error) => void` | DI `HTTP_ERROR_HOOK` hooks | called for non-`HttpError` failures |
+| `logError` | `(error) => void` | `console.error` | fallback when no hook handles the error |
 
-Unexpected errors (не `HttpError`) пишутся в {@link LOG_SINK} как `category:
-http.error` с `requestId` из `ctx.state`. `HttpError` → JSON с `error.status`;
-прочие → 500.
+`HttpError` → JSON with its status; anything else → 500.
 
-### `accessLogMiddleware(options?)`
+### `accessLog(options?)`
 
-В `@/logging/http/accessLogMiddleware`. Включается через `LoggingModule.forRoot().httpIntegration`
-(второй middleware после correlation ID) или напрямую для тестов.
+Enabled with `httpModule({ accessLog: true })` or `httpModule({ accessLog: { ... } })`
+at position [1]. With a `LOGGER` in DI it writes structured entries, otherwise one
+line per request: `[http] GET /api/users 200 12.3ms <request-id>`.
 
-| Поле | Тип | Default | Описание |
+| `AccessLogOptions` field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `sink` | `LogSink` | resolve `LOG_SINK` | Куда писать access {@link LogRecord} |
-| `sanitizer` | `LogSanitizer` | resolve `LOG_SANITIZER` | Redaction полей access metadata |
-| `includeQuery` | `boolean` | из `LOGGING_OPTIONS` | query object (sanitized) |
-| `log` | `(line: string) => void` | `console.log` | fallback без `LOG_SINK` |
+| `log` | `(entry: AccessLogEntry) => void` | — | Sink for entries (highest precedence) |
+| `logger` | `Logger` | the `LOGGER` from DI | Structured sink: `logger.info` per request |
+| `skip` | `(ctx) => boolean` | — | Return `true` to skip a request (e.g. noisy probes) |
 
-Lazy-resolvит `LOGGING_OPTIONS` из request scope: при `accessLog.enabled: false`
-middleware no-op (correlation ID уже установлен предыдущим middleware).
+### `createCorrelationIdMiddleware(options?)`
 
-Без `LOG_SINK`: текст `[http] GET /api/users 200 12.3ms req=<uuid>`.
-
-С `LOG_SINK`: запись `type: "access"` с top-level `requestId` → composite sink.
-
-Подробнее: `@/logging` SPEC (HTTP integration, correlation).
+Reads `x-request-id` or generates a UUID, stores it in `ctx.state`, echoes it on the
+response and binds it to async local storage for application logs. The keys
+`REQUEST_ID_HEADER` and `REQUEST_ID_STATE_KEY` are exported from `osnv/core/kernel`.
 
 ### `cors(options?)`
 
-Глобально: `httpModule({ cors: { origin: "..." } })` — **и** preflight, **и** headers.
+Globally: `httpModule({ cors: { origin: "..." } })` handles **both** preflight **and**
+response headers.
 
-Per-route: `@Middleware(cors({ origin: "https://admin.example.com" }))` — только headers
-на ответ (preflight по-прежнему обрабатывается глобально, если `cors` в `httpModule`).
+Per route: `@Middleware(cors({ origin: "https://admin.example.com" }))` adds only the
+response headers (preflight is still handled globally if `cors` is set in `httpModule`).
 
-| Поле `CorsOptions` | Тип | Default | Описание |
+| `CorsOptions` field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `origin` | `string \| string[] \| fn \| "*"` | `"*"` | allowed origins |
-| `methods` | `readonly string[]` | GET, POST, … | для preflight |
-| `allowedHeaders` | `readonly string[]` | echo request | для preflight |
+| `origin` | `string \| string[] \| (origin) => boolean \| "*"` | `"*"` | allowed origins |
+| `methods` | `readonly string[]` | common verbs | for preflight |
+| `allowedHeaders` | `readonly string[]` | echo the request | for preflight |
 | `exposedHeaders` | `readonly string[]` | — | `Access-Control-Expose-Headers` |
-| `credentials` | `boolean` | `false` | cookies; требует явный origin allow-list или predicate |
+| `credentials` | `boolean` | `false` | cookies; needs an explicit origin allow list or predicate |
 | `maxAgeSeconds` | `number` | — | preflight cache |
 
-`credentials: true` нельзя сочетать с omitted origin, `"*"` или `["*"]`:
-сервер падает на старте, чтобы не открыть credentialed allow-any-origin.
+`credentials: true` cannot be combined with an omitted origin, `"*"` or `["*"]`: the
+server fails at startup so it never opens credentialed allow-any-origin.
 
 ### `rateLimit(options)`
 
-| Поле `RateLimitOptions` | Тип | Default | Описание |
+| `RateLimitOptions` field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `windowMs` | `number` | — | размер окна (мс) |
-| `max` | `number` | — | max запросов на key за окно |
-| `keyOf` | `(ctx) => string` | `x-forwarded-for` или `"*"` | ключ bucket'а |
+| `windowMs` | `number` | — | window size (ms) |
+| `max` | `number` | — | max requests per key per window |
+| `keyOf` | `(ctx) => string` | the direct peer IP, else one shared bucket | the bucket key |
+| `trustProxy` | `boolean` | `false` | trust the first forwarded hop |
+| `proxyHeader` | `string` | `x-forwarded-for` | the forwarded address header, only with `trustProxy` |
+| `maxBuckets` | `number` | `10000` | hard cap of in-process buckets; new keys get 429 when full |
 
-Превышение → `TooManyRequestsError` (429 + `Retry-After`).
+Exceeding the limit → `TooManyRequestsError` (429 + `Retry-After`).
 
-> In-memory, per-process. Для кластера — свой middleware с Redis или
-> `keyOf` по user id после `jwtBearer`.
+> In-memory, per process. For a cluster write your own middleware on shared storage,
+> or key by user id after authorization.
 
 ---
 
-## 8. `HttpContext` в middleware
+## 8. `HttpContext` in middleware
 
-| API | Описание |
+| API | Description |
 | --- | --- |
-| `ctx.request` | нативный Bun `Request` |
-| `ctx.url` | parsed URL (query: `ctx.url.searchParams`) |
-| `ctx.params` | route params после конверсии (`:id(int)` → `number`) |
+| `ctx.request` | the native Bun `Request` |
+| `ctx.url` | the parsed URL (query: `ctx.url.searchParams`) |
+| `ctx.params` | route params after conversion (`:id(int)` → `number`) |
 | `ctx.method`, `ctx.path` | shortcuts |
-| `ctx.header(name)` | заголовок (case-insensitive) |
-| `ctx.query(name)` | query-параметр |
-| `ctx.services` | request-scoped DI (`resolve`, `tryResolve`) |
-| `ctx.state` | `Map<string, unknown>` — данные между middleware |
-| `ctx.response` | итоговый `Response` (read/write) |
-| `ctx.json()` | body JSON (кэшируется на запрос) |
-| `ctx.text()`, `ctx.formData()` | альтернативные body |
-| `ctx.apiVersion` | версия API, если включено versioning |
+| `ctx.header(name)` | a header (case-insensitive) |
+| `ctx.query(name)` | a query parameter |
+| `ctx.services` | the request-scoped DI (`resolve`, `tryResolve`) |
+| `ctx.state` | `Map<string, unknown>`: data shared between middleware |
+| `ctx.response` | the final `Response` (read/write) |
+| `ctx.res` | the `ResponseBuilder` for status and headers of a plain result |
+| `ctx.json()` | the JSON body (cached per request) |
+| `ctx.text()`, `ctx.formData()` | alternative bodies |
+| `ctx.apiVersion` | the API version when versioning is on |
+| `ctx.clientIp` | the direct peer IP, when available |
 
-### Передача данных между middleware
+### Passing data between middleware
 
 ```ts
 // middleware A
 ctx.state.set("tenantId", tenantId);
 
-// middleware B или action
+// middleware B or the action
 const tenantId = ctx.state.get("tenantId");
 ```
 
-Auth-модуль кладёт principal в `ctx.state` (`AUTH_PRINCIPAL_STATE_KEY`) и в
-scoped `ICurrentUser` — см. `@/auth` SPEC §7.
+An authorization check may store the request subject under `PRINCIPAL_STATE_KEY`
+(a `RequestPrincipal` with `subject` and an optional `claim(type)`); the output cache
+uses it for `varyByUser`/`varyByClaim`.
 
 ---
 
-## 9. Сценарии и примеры
+## 9. Scenarios and examples
 
-### 9.1. Request ID на всех маршрутах (глобально)
-
-Используйте `LoggingModule.forRoot()` — correlation middleware уже в
-`httpIntegration.serverMiddleware`:
+### 9.1. Request ID on all routes (globally)
 
 ```ts
-import { LoggingModule } from "@/logging";
-
-const logging = LoggingModule.forRoot({ bindFromConfig: true });
+import { createCorrelationIdMiddleware, httpModule } from "osnv/core/http";
 
 httpModule({
-  imports: [logging.module],
-  middleware: [...logging.httpIntegration.serverMiddleware],
-});
-```
-
-Ключи: `REQUEST_ID_HEADER` (`x-request-id`), `REQUEST_ID_STATE_KEY` в
-`ctx.state`. App logs в том же запросе получают `requestId` через
-`AsyncLocalStorage` — см. `@/kernel` (`runWithRequestContext`).
-
-Кастомный middleware (если logging module не подключён):
-
-```ts
-import { createCorrelationIdMiddleware } from "@/core/http";
-
-httpModule({
+  accessLog: true,
   middleware: [createCorrelationIdMiddleware()],
 });
 ```
 
-### 9.2. Rate limit только на публичных endpoint'ах
+Application logs in the same request get the `requestId` through
+`AsyncLocalStorage` (`runWithRequestContext` in `osnv/core/kernel`).
+
+### 9.2. Rate limit only on public endpoints
 
 ```ts
-import { AllowAnonymous, Authorize } from "@/auth";
-import { rateLimit, Middleware } from "@/core/http";
+import { AllowAnonymous, Authorize, Controller, Get, Middleware, rateLimit } from "osnv/core/http";
 
 const publicLimiter = rateLimit({ windowMs: 60_000, max: 30 });
 
@@ -531,16 +534,16 @@ class SearchController {
 }
 
 @Controller("admin")
-@Authorize({ roles: "Admin" })
+@Authorize(isAdmin)
 class AdminController {
-  // publicLimiter не применяется
+  // publicLimiter does not apply
 }
 ```
 
-### 9.3. API key на webhook (один action)
+### 9.3. API key on a webhook (one action)
 
 ```ts
-import { UnauthorizedError } from "@/core/http";
+import { UnauthorizedError } from "osnv/core/http";
 
 function requireApiKey(expected: string): HttpMiddleware {
   return async (ctx, next) => {
@@ -562,10 +565,10 @@ class IntegrationsController {
 }
 ```
 
-### 9.4. Проверка Content-Type до binding
+### 9.4. Content-Type check before binding
 
 ```ts
-import { UnsupportedMediaTypeError } from "@/core/http";
+import { UnsupportedMediaTypeError } from "osnv/core/http";
 
 const requireJson: HttpMiddleware = async (ctx, next) => {
   const ct = ctx.header("content-type") ?? "";
@@ -581,10 +584,10 @@ const requireJson: HttpMiddleware = async (ctx, next) => {
 bulkImport(dto: BulkDto) { /* body binding + validation */ }
 ```
 
-> `@Consumes` проверяет Content-Type **в terminal** (при binding). Middleware
-> даёт ранний отказ до парсинга body — полезно для больших upload'ов.
+> `@Consumes` checks Content-Type **at binding** ([9]). A middleware rejects earlier,
+> before the body is parsed, which helps with large uploads.
 
-### 9.5. CORS только для admin-контроллера
+### 9.5. CORS only for the admin controller
 
 ```ts
 @Controller("admin")
@@ -598,10 +601,9 @@ class AdminController {
 }
 ```
 
-Для browser preflight всё равно нужен глобальный `httpModule({ cors })` или
-отдельная обработка OPTIONS.
+Browser preflight still needs the global `httpModule({ cors })` or separate OPTIONS handling.
 
-### 9.6. Tenant из subdomain
+### 9.6. Tenant from the subdomain
 
 ```ts
 const resolveTenant: HttpMiddleware = async (ctx, next) => {
@@ -619,7 +621,7 @@ const resolveTenant: HttpMiddleware = async (ctx, next) => {
 class AppController {}
 ```
 
-### 9.7. Логирование тела (осторожно — PII)
+### 9.7. Logging the body (careful: PII)
 
 ```ts
 const logBody: HttpMiddleware = async (ctx, next) => {
@@ -632,7 +634,7 @@ const logBody: HttpMiddleware = async (ctx, next) => {
 };
 ```
 
-### 9.8. Несколько middleware в одном декораторе
+### 9.8. Several middleware in one decorator
 
 ```ts
 @Post("submit")
@@ -640,7 +642,7 @@ const logBody: HttpMiddleware = async (ctx, next) => {
 submit(dto: SubmitDto) { /* … */ }
 ```
 
-### 9.9. Inline + декоратор на одном методе
+### 9.9. Inline options + a decorator on one method
 
 ```ts
 @Get("report", { middleware: [cacheBustHeaders] })
@@ -648,61 +650,48 @@ submit(dto: SubmitDto) { /* … */ }
 report() { /* … */ }
 ```
 
-Оба попадают в `ActionMeta.middleware` [7]. Если порядок критичен — объединяйте
-в один декоратор: `@Middleware(cacheBustHeaders, requireReportAccess)`.
+Both go into `ActionMeta.middleware` [8]. If the order matters, combine them in one
+decorator: `@Middleware(cacheBustHeaders, requireReportAccess)`.
 
 ### 9.10. Middleware + `@Authorize` + `@OutputCache`
 
 ```ts
-import { Authorize } from "@/auth";
-import { OutputCache } from "@/core/cache";
+import { Authorize, Controller, Get, Middleware, rateLimit } from "osnv/core/http";
+import { OutputCache } from "osnv/core/cache";
 
 @Controller("catalog")
-@Authorize()
+@Authorize(isSignedIn)
 @Middleware(rateLimit({ windowMs: 60_000, max: 120 }))
 class CatalogController {
   @Get()
-  @OutputCache({ policy: "catalog", varyByUser: true })
+  @OutputCache({ seconds: 60, varyByUser: true })
   list() {
     return this.service.list();
   }
 }
 ```
 
-Pipeline для `list`:
+The pipeline for `list`:
 
 ```
-jwtBearer → authorize → rateLimit → outputCache → action
+authorize → rateLimit → binding/ActionFilter.before → outputCache → action
 ```
 
-(auth и cache — через `routeMiddlewareComposer`, rate limit — `@Middleware` на классе)
+(authorization is built in [6], rate limit is a class `@Middleware` [7], the output
+cache is a route composer [10])
 
-### 9.11. Ownership check (guard-like без отдельного `@Guard`)
+### 9.11. Ownership check (guard-like, without a separate `@Guard`)
 
 ```ts
-import { ForbiddenError, Param } from "@/core/http";
-import { ICurrentUser } from "@/auth";
+import { ForbiddenError, PRINCIPAL_STATE_KEY, type RequestPrincipal } from "osnv/core/http";
 
-function requirePostOwner(store: IPostStore): HttpMiddleware {
-  return async (ctx, next) => {
-    const id = ctx.params.id as number;
-    const user = ctx.services.resolve(ICurrentUser);
-    const post = await store.byId(id);
-    if (!post || post.authorId !== user.principal?.subject) {
-      throw new ForbiddenError("Not your post");
-    }
-    await next();
-  };
-}
-
-// фабрика с closure на store — store в middleware резолвится из DI:
 function postOwnerGuard(): HttpMiddleware {
   return async (ctx, next) => {
     const store = ctx.services.resolve(IPostStore);
     const id = ctx.params.id as number;
-    const user = ctx.services.resolve(ICurrentUser);
+    const principal = ctx.state.get(PRINCIPAL_STATE_KEY) as RequestPrincipal | undefined;
     const post = await store.byId(id);
-    if (!post || post.authorId !== user.principal?.subject) {
+    if (!post || post.authorId !== principal?.subject) {
       throw new ForbiddenError("Not your post");
     }
     await next();
@@ -710,7 +699,7 @@ function postOwnerGuard(): HttpMiddleware {
 }
 
 @Controller("posts")
-@Authorize()
+@Authorize(isSignedIn)
 class PostsController {
   @Patch(":id(int)")
   @Middleware(postOwnerGuard())
@@ -718,7 +707,8 @@ class PostsController {
 }
 ```
 
-Для JWT/roles предпочитайте `@Authorize` / `@Policy`, не дублируйте auth в middleware.
+For "who may call this at all" prefer `@Authorize` checks; keep middleware for
+per-resource rules like ownership.
 
 ### 9.12. Metrics / Prometheus
 
@@ -737,162 +727,162 @@ httpModule({ middleware: [httpMetrics] });
 
 ---
 
-## 10. Порядок выполнения и нюансы
+## 10. Execution order and details
 
-### Направление «внутрь» и «наружу»
+### "Inward" and "outward"
 
-Middleware с `await next()` выполняют код **до** `next` на входе и **после**
-`next` на выходе (как onion):
+Middleware with `await next()` runs the code **before** `next` on the way in and
+**after** `next` on the way out (like an onion):
 
 ```
-global BEFORE → controller BEFORE → composed BEFORE → action BEFORE
+global BEFORE → controller BEFORE → action BEFORE
     → action
-action AFTER ← composed AFTER ← controller AFTER ← global AFTER
+action AFTER ← controller AFTER ← global AFTER
 ```
 
-E2E-тест фиксирует порядок заголовков при append **после** `next()`:
+The e2e test records the header order when appending **after** `next()`:
 
 ```
 GET /api/users/1  →  x-trace: controller, global
 ```
 
-`controller` ближе к action (append первым), `global` — снаружи.
+`controller` is closer to the action (it appends first), `global` is outside.
 
-### `@Middleware` класс vs метод vs composer
+### Authorization vs class/method middleware vs composers
 
-На одном маршруте:
+On one route:
 
 ```
-[5] controller @Middleware  →  раньше
-[6] routeMiddlewareComposer →  authorize, output cache
-[7] method @Middleware      →  позже
+[6] authorization            →  first among route links
+[7] controller @Middleware
+[8] method @Middleware
+[9] binding + ActionFilter.before
+[10] route composers         →  output cache
 ```
 
-**Auth (`authorize`) выполняется после controller middleware и до method middleware.**
-Если controller middleware должен видеть уже аутентифицированного пользователя —
-вешайте его **ниже** auth: на метод или через отдельный composer, не на класс
-**выше** `@Authorize` в pipeline… На практике `@Authorize` в [6], class `@Middleware` в [5] —
-**до** auth. Для проверок, требующих `ICurrentUser`, используйте method-level
-`@Middleware` или policy.
+**Authorization runs before controller and method middleware**, so every `@Middleware`
+already sees the principal an `@Authorize` check stored in `ctx.state`. A route with
+`@AllowAnonymous` has no authorization link.
 
-### Short-circuit и CORS
+### Short-circuit and CORS
 
-`cors()` middleware добавляет headers **после** `next()`, когда `ctx.response` уже есть.
-При short-circuit без `next()` CORS headers не добавятся — задайте headers вручную
-или вызывайте `next()` до установки response (или используйте глобальный `cors`).
+The `cors()` middleware adds headers **after** `next()`, when `ctx.response` exists.
+On a short-circuit without `next()` the per-route CORS headers are not added: set the
+headers by hand, or rely on the global `httpModule({ cors })`, which sits outside.
 
-### Ошибки в middleware
+### Errors in middleware
 
-| Источник ошибки | Кто обрабатывает |
+| Error source | Who handles it |
 | --- | --- |
-| throw `HttpError` в middleware | `errorHandler` → JSON + status |
-| throw `Error` в middleware | `errorHandler` → 500 |
-| throw в action | `@Catch` на контроллере, затем `errorHandler` |
+| `HttpError` thrown in middleware | `errorHandler` → JSON + status |
+| `Error` thrown in middleware | `errorHandler` → 500 |
+| thrown in binding, `ActionFilter` or the action | `@Catch` on the controller, then `errorHandler` |
 
-`@Catch` **не** перехватывает ошибки из middleware [5]–[7] — только из terminal [8].
+`@Catch` does **not** catch errors from middleware [5]–[8]; only from [9]–[11].
 
-### Парсинг body
+### Body parsing
 
-`ctx.json()` кэшируется. Первый вызов (middleware или binding) парсит body;
-повторные вызовы — тот же promise. Битый JSON → `BadRequestError` (400).
+`ctx.json()` is cached. The first call (middleware or binding) parses the body; repeated
+calls get the same promise. Broken JSON → `BadRequestError` (400).
 
-### Состояние в closure
+### State in a closure
 
 ```ts
-const buckets = new Map(); // в rateLimit — OK для singleton factory
+const buckets = new Map(); // inside rateLimit: fine for a factory called once
 
-@Middleware(createOnce()) // createOnce() вызывается при загрузке модуля — OK
+@Middleware(createOnce()) // createOnce() runs when the module loads: fine
 ```
 
-Не создавайте **новую** middleware-функцию на каждый запрос — только на load/startup.
+Do not create a **new** middleware function per request, only at load/startup.
 
 ---
 
-## 11. Интеграция с auth и cache
+## 11. Authorization and output cache
 
-### Auth (`@/auth`)
+### Authorization (`@Authorize`)
 
-| Компонент | Тип подключения | Pipeline |
-| --- | --- | --- |
-| `jwtBearer()` | `httpModule({ middleware })` | [4] — authentication |
-| `authorize()` / `requireAuthenticated()` | `routeMiddlewareComposer` | [6] — authorization |
-
-`@Authorize` / `@AllowAnonymous` **не** используют `@Middleware` — отдельный
-metadata-слой и composer. Не смешивайте ручной `jwtBearer` на action с
-глобальным — достаточно одного в `serverMiddleware`.
-
-Подробности: `@/auth` SPEC §2, §7, §8.
-
-### Cache (`@/core/cache`)
-
-`@OutputCache` / `@OutputRedisCache` → middleware через
-`cache.httpIntegration.routeMiddlewareComposer` ([6]).
-
-Рекомендуемый порядок composer'ов:
+`@Authorize(check, ...checks)` on a controller or a method compiles into the built-in
+authorization link [6]. A check is `(ctx) => boolean | Promise<boolean>`: `true` lets the
+request through, `false` gives `403`, and a thrown `HttpError` defines the response
+itself (for example `UnauthorizedError` → `401`). A method-level `@Authorize` or
+`@AllowAnonymous` overrides the controller's.
 
 ```ts
-composeRouteMiddlewareComposers(
-  jwt.httpIntegration.routeMiddlewareComposer,   // authorize first
-  cache.httpIntegration.routeMiddlewareComposer, // then cache
-)
+const isSignedIn: AuthorizeCheck = (ctx) => {
+  const token = ctx.header("authorization");
+  if (!token) throw new UnauthorizedError();
+  const principal = ctx.services.resolve(ITokenReader).read(token); // your service
+  ctx.state.set(PRINCIPAL_STATE_KEY, principal);
+  return true;
+};
 ```
 
-Output cache должен стоять **после** auth, чтобы не отдавать чужой кэш
-(см. `varyByUser` в cache SPEC §17).
+The kernel does not know what a check verifies (JWT, a session, an API key): that stays
+inside the function. `@Authorize` does not use `@Middleware`; it has its own metadata layer.
+
+### Output cache (`osnv/core/cache`)
+
+`@OutputCache` / `@OutputRedisCache` turn into a route middleware through the cache
+module's `ROUTE_MIDDLEWARE_COMPOSER` registration ([10]). Connecting the cache module
+(`memory()` or `buildCacheModule(...)`) is enough; no manual composer wiring is needed.
+
+The output cache runs **after** authorization and the action boundary, so a cached
+response is never served to a caller who fails `@Authorize`. For per-user data use
+`varyByUser`/`varyByClaim` (see the [cache SPEC](../cache/SPEC.md)).
 
 ---
 
 ## 12. Middleware vs ActionFilter vs `@Catch`
 
-| Механизм | Когда выполняется | Доступ к args action | Типичное использование |
+| Mechanism | When it runs | Access to action args | Typical use |
 | --- | --- | --- | --- |
-| **Middleware** | до terminal | нет (только `ctx.params`) | auth adjacency, rate limit, CORS, cache |
-| **`@ActionFilter`** | в terminal, после bind | да (`before` без args, result в `after`) | обёртка результата, audit после bind |
-| **`@Catch`** | при throw из action | error + ctx | доменные 404/409 |
+| **Middleware** | before the action boundary | no (only `ctx.params`) | rate limit, CORS, tenant, ownership |
+| **`@ActionFilter`** | `before` after binding, `after` around the result | `before` without args, the result in `after` | wrapping the result, audit after binding |
+| **`@Catch`** | on a throw from binding/filters/the action | error + ctx | domain 404/409 |
 
 ```ts
 @ActionFilter({
-  before: (ctx) => { /* ctx уже с bound state, но args ещё не в filter API */ },
+  before: (ctx) => { /* runs after binding; args are not in the filter API */ },
   after: (ctx, result) => ({ ...result, meta: { version: "1" } }),
 })
 ```
 
-Для «не пускать на endpoint» — **middleware**, не filter.
+To "not let the request reach the endpoint", use **middleware** or `@Authorize`, not a filter.
 
 ---
 
-## 13. Хорошие и плохие практики
+## 13. Good and bad practices
 
-### Хорошие практики
+### Good practices
 
-| Практика | Почему |
+| Practice | Why |
 | --- | --- |
-| JWT / roles через `@Authorize`, не custom middleware | единая модель auth, compile-time composer |
-| Глобальные cross-cutting (metrics, request id) в `httpModule({ middleware })` | один раз, все маршруты |
-| Per-route limits через `@Middleware` на controller/action | явная область |
-| `throw new UnauthorizedError()` / `ForbiddenError` | корректные статусы через errorHandler |
-| `ctx.services.resolve()` для DI | scoped сервисы, тестируемость |
-| `ctx.state` для данных между middleware | без глобальных переменных |
-| Фабрики `rateLimit({ ... })`, `cors({ ... })` | переиспользуемые конфиги |
-| Ownership / API key через method-level `@Middleware` | узкая область |
+| Access rules through `@Authorize` checks, not custom middleware | one authorization model, compiled per route |
+| Global cross-cutting concerns (metrics, request id) in `httpModule({ middleware })` | once, all routes |
+| Per-route limits through `@Middleware` on a controller/action | an explicit scope |
+| `throw new UnauthorizedError()` / `ForbiddenError` | correct statuses through errorHandler |
+| `ctx.services.resolve()` for DI | scoped services, testability |
+| `ctx.state` for data between middleware | no global variables |
+| The `rateLimit({ ... })`, `cors({ ... })` factories | reusable configurations |
+| Ownership / API key through method-level `@Middleware` | a narrow scope |
 
-### Плохие практики
+### Bad practices
 
-| Анти-паттерн | Проблема | Вместо |
+| Anti-pattern | Problem | Instead |
 | --- | --- | --- |
-| Дублировать JWT-парсинг в своём middleware | расхождение с `ICurrentUser` | `jwtBearer()` + `@Authorize` |
-| Тяжёлая бизнес-логика в middleware | сложно тестировать | service + policy или action |
-| `@Middleware` на классе для проверки, нужной одному action | лишние DB round-trip | method-level |
-| `await ctx.json()` в middleware «на всякий случай» | лишний parse больших body | `@Consumes` + binding |
-| Mutable global state без синхронизации | гонки в cluster | Redis / external store |
-| Ловить ошибки в middleware без rethrow | проглатывание багов | throw или `HttpError` |
-| Вешать `errorHandler` через `@Middleware` | второй boundary, путаница | только built-in [3] |
-| Output cache до auth | утечка данных между пользователями | порядок composer'ов + `varyByUser` |
-| Логировать secrets / body с паролями | утечка PII | redaction, sampling |
+| Re-checking access in every middleware | duplicated, divergent rules | one `@Authorize` check |
+| Heavy business logic in middleware | hard to test | a service or the action |
+| A class `@Middleware` for a check one action needs | extra database round trips | method level |
+| `await ctx.json()` in middleware "just in case" | an extra parse of large bodies | `@Consumes` + binding |
+| Mutable global state without synchronization | races in a cluster | shared external storage |
+| Catching errors in middleware without rethrowing | swallowed bugs | throw or `HttpError` |
+| Attaching `errorHandler` through `@Middleware` | a second boundary, confusion | only the built-in [4] |
+| Caching per-user data without `varyByUser` | data leaks between users | `varyByUser` / `varyByClaim` |
+| Logging secrets / bodies with passwords | a PII leak | redaction, sampling |
 
-### Guard-like классы (если нужен NestJS-стиль)
+### Guard-like classes (if you want the NestJS style)
 
-osnv **не** имеет `@UseGuards(GuardClass)`. Паттерн-замена:
+osnv has **no** `@UseGuards(GuardClass)`. The replacement pattern:
 
 ```ts
 interface CanActivate {
@@ -914,74 +904,78 @@ function useGuard(GuardClass: Class<CanActivate>): HttpMiddleware {
 update(id: number) { /* … */ }
 ```
 
-Guard-класс регистрируется в DI как обычный `scoped`/`singleton` provider.
+The guard class is registered in DI as a regular `scoped`/`singleton` provider.
 
 ---
 
-## 14. Ограничения и анти-паттерны
+## 14. Limits
 
-| Ограничение | Детали |
+| Limit | Details |
 | --- | --- |
-| Нет `@Inject` в middleware | только `ctx.services.resolve(token)` |
-| Middleware не async-фабрика DI | функция захватывается при сборке route |
-| `rateLimit` — in-memory | не shared между процессами |
-| Preflight без глобального `cors` | per-route `cors()` не регистрирует OPTIONS handler |
-| Несколько `@Controller` на классе | не поддерживается — один controller class |
-| Parameter decorators | источники аргументов выводит codegen по сигнатуре |
-| Middleware на abstract/private methods | route decorators только public instance methods |
+| No `@Inject` in middleware | only `ctx.services.resolve(token)` |
+| Middleware is not an async DI factory | the function is captured when the route is built |
+| `rateLimit` is in-memory | not shared between processes |
+| Preflight without the global `cors` | a per-route `cors()` registers no OPTIONS handler |
+| Several `@Controller` on a class | not supported: one controller class |
+| Parameter decorators | codegen infers argument sources from the signature |
+| Middleware on abstract/private methods | route decorators apply only to public instance methods |
 
 ---
 
 ## 15. FAQ
 
-**Чем `@Middleware` отличается от `httpModule({ middleware })`?**
+**How does `@Middleware` differ from `httpModule({ middleware })`?**
 
-Область: глобально vs controller/action. Оба используют один тип `HttpMiddleware`.
+The scope: global vs controller/action. Both use the same `HttpMiddleware` type.
 
-**Можно ли вернуть результат из middleware без action?**
+**Can middleware return a result without the action?**
 
-Да: установите `ctx.response` и не вызывайте `next()`.
+Yes: set `ctx.response` and do not call `next()`.
 
-**Выполняется ли middleware для 404?**
+**Does middleware run for a 404?**
 
-Нет. 404/405 отвечаются до `runPipeline`.
+No. 404/405 are answered before the pipeline runs.
 
-**Сколько раз создаётся цепочка?**
+**How many times is the chain created?**
 
-Один раз при `HttpServer.start()` на каждый зарегистрированный маршрут.
+Once per registered route when `HttpServer` starts.
 
-**Работает ли с `bun build --compile`?**
+**Does it work with `bun build --compile`?**
 
-Да. Metadata через TC39 decorators, без `reflect-metadata`.
+Yes. Metadata goes through TC39 decorators, without `reflect-metadata`.
 
-**Нужен ли `@Middleware` для auth?**
+**Do I need `@Middleware` for authorization?**
 
-Нет. Используйте `@Authorize` + `jwtModule().httpIntegration`.
+No. Use `@Authorize(check)`; it is compiled into the route automatically.
 
-**`@Middleware` vs `RouteOptions.middleware` — что выбрать?**
+**`@Middleware` vs `RouteOptions.middleware`: which one?**
 
-Эквивалентны для action. `@Middleware` читается при нескольких декораторах;
-inline удобен, когда опции маршрута уже в одном объекте `{ code: 201, middleware: [...] }`.
+They are equivalent for an action. `@Middleware` reads well with several decorators;
+inline is handy when the route options are already one object `{ code: 201, middleware: [...] }`.
 
 ---
 
-## 16. Карта папки
+## 16. Folder map
 
-| Файл | Назначение |
+| File | Purpose |
 | --- | --- |
 | `Decorators/attributes.ts` | `@Middleware`, `@ActionFilter`, … |
 | `Decorators/routes.ts` | `RouteOptions.middleware` |
 | `Decorators/metadata.ts` | `ControllerMeta.middleware`, `ActionMeta.middleware` |
+| `Authorization/` | `@Authorize`, `@AllowAnonymous` and the built-in authorization composer |
 | `Middleware/types.ts` | `HttpMiddleware`, `ActionFilterHooks` |
 | `Middleware/pipeline.ts` | `runPipeline` |
-| `Middleware/errorHandler.ts` | глобальная граница ошибок |
+| `Middleware/errorHandler.ts` | the global error boundary |
+| `Middleware/accessLog.ts` | the access log |
+| `Middleware/securityHeaders.ts` | default security headers |
 | `Middleware/cors.ts` | CORS + preflight helpers |
-| `Middleware/rateLimit.ts` | in-memory rate limiter |
-| `@/logging/http/accessLogMiddleware` | access log (via logging module) |
-| `Routing/RouterBuilder.ts` | сборка chain на старте |
-| `HttpServer.ts` | `serverChain` + dispatch |
-| `options.ts` | `HttpModuleOptions.middleware`, `RouteMiddlewareComposer` |
-| `composeRouteMiddlewareComposers.ts` | объединение composer'ов модулей |
-| `test/http.e2e.test.ts` | порядок middleware, inline, global |
+| `Middleware/rateLimit.ts` | the in-memory rate limiter |
+| `correlation/` | `createCorrelationIdMiddleware` |
+| `middlewareTokens.ts` | `SERVER_MIDDLEWARE`, `ROUTE_MIDDLEWARE_COMPOSER`, `HTTP_ERROR_HOOK` |
+| `Routing/RouterBuilder.ts` | builds the chain at startup |
+| `HttpServer.ts` | the server chain + dispatch |
+| `options.ts` | `HttpModuleOptions`, `RouteMiddlewareComposer` |
+| `composeRouteMiddlewareComposers.ts` | combining explicit composers |
+| `test/http.e2e.test.ts` | middleware order, inline, global |
 
-Связанные спецификации: `@/auth` SPEC (§2, §7, §8), `@/core/cache` SPEC (§15).
+Related specifications: [cache SPEC](../cache/SPEC.md).

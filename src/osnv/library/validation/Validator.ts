@@ -5,10 +5,10 @@ import { registerFieldRule } from "./metadata";
 import type { ValidatorOptions } from "./types/ValidatorOptions";
 
 /**
- * Декоратор поля: регистрирует правила валидации в метаданных класса.
- * Используются стандартные TC39-декораторы (нативно выполняются Bun) —
- * без `experimentalDecorators`, `emitDecoratorMetadata` и `reflect-metadata`,
- * поэтому модуль свободно компилируется в бинарник (`bun build --compile`).
+ * Field decorator: registers validation rules in the class metadata.
+ * Uses standard TC39 decorators (run natively by Bun), without
+ * `experimentalDecorators`, `emitDecoratorMetadata` or `reflect-metadata`,
+ * so the module compiles into a binary (`bun build --compile`).
  */
 type FieldDecorator = (value: undefined, context: ClassFieldDecoratorContext) => void;
 
@@ -19,9 +19,9 @@ function createFieldDecorator(options: ValidatorOptions): FieldDecorator {
 }
 
 /**
- * Единая точка входа модуля валидации.
+ * The single entry point of the validation module.
  *
- * Одновременно и декоратор, и «статический класс»:
+ * Both a decorator and a "static class":
  *
  * ```ts
  * class CreateUserDto {
@@ -36,57 +36,56 @@ function createFieldDecorator(options: ValidatorOptions): FieldDecorator {
  * if (!result.isValid) console.log(result.errors);
  * ```
  *
- * Гарантии:
- * - правила класса собираются и компилируются один раз (WeakMap-кэш),
- *   повторные вызовы `validate` ничего не пересобирают;
- * - все ошибки собираются за один проход — валидация не останавливается
- *   на первой;
- * - исключения в `custom`/`validateIf` перехватываются (код `customError`),
- *   валидация продолжается;
- * - значения читаются только по именам полей, объявленным декораторами,
- *   служебные ключи (`__proto__` и т.п.) не обходятся — защита от
+ * Guarantees:
+ * - class rules are collected and compiled once (WeakMap cache), repeated
+ *   `validate` calls rebuild nothing;
+ * - all errors are collected in one pass; validation does not stop at the first;
+ * - exceptions in `custom`/`validateIf` are caught (code `customError`) and
+ *   validation continues;
+ * - values are read only by the field names declared by decorators; service
+ *   keys (`__proto__` and so on) are never traversed, which protects against
  *   prototype pollution.
  */
 export const Validator = Object.assign(
   /**
-   * `@Validator(options)` — вешается на поле класса. На одно поле можно
-   * повесить несколько декораторов, выполняются все.
+   * `@Validator(options)` goes on a class field. A field may have several
+   * decorators; all of them run.
    */
   (options: ValidatorOptions): FieldDecorator => createFieldDecorator(options),
   {
     /**
-     * Синхронная валидация экземпляра.
+     * Synchronous validation of an instance.
      *
-     * Асинхронные `custom`-функции здесь не поддерживаются: если функция
-     * вернула Promise, в результат добавляется ошибка с кодом
-     * `asyncCustomInSyncCall` (используйте {@link Validator.validateAsync}).
+     * Async `custom` functions are not supported here: if a function returns a
+     * Promise, an error with the `asyncCustomInSyncCall` code is added to the
+     * result (use {@link Validator.validateAsync}).
      *
-     * @param instance Экземпляр класса с декораторами `@Validator`.
-     *   Объект без декораторов считается валидным.
+     * @param instance Instance of a class with `@Validator` decorators.
+     *   An object without decorators is valid.
      */
     validate(instance: object): ValidationResult {
       return RuleEngine.validate(instance);
     },
 
     /**
-     * Асинхронная валидация: ждёт все асинхронные `custom`-функции.
-     * Синхронные правила выполняются немедленно, порядок ошибок детерминирован.
+     * Asynchronous validation: awaits all async `custom` functions.
+     * Synchronous rules run immediately; the error order is deterministic.
      */
     validateAsync(instance: object): Promise<ValidationResult> {
       return RuleEngine.validateAsync(instance);
     },
 
     /**
-     * Глобально переопределяет стандартные сообщения об ошибках.
-     * Поддерживаются плейсхолдеры `{property}`, `{value}`, `{min}`, `{max}`,
+     * Globally overrides the standard error messages.
+     * Supported placeholders: `{property}`, `{value}`, `{min}`, `{max}`,
      * `{pattern}`, `{contains}`, `{allowed}`, `{expected}`, `{actual}`.
      *
-     * Приоритет: локальный `message` декоратора > заданные здесь > встроенные.
+     * Priority: the decorator's local `message` > the ones set here > built-in.
      *
      * ```ts
      * Validator.setDefaultMessages({
-     *   required: "Поле {property} обязательно для заполнения",
-     *   minLength: "Минимальная длина {min} символов",
+     *   required: "{property} is required",
+     *   minLength: "At least {min} characters",
      * });
      * ```
      */
@@ -94,7 +93,7 @@ export const Validator = Object.assign(
       MessageRegistry.setDefaults(messages);
     },
 
-    /** Сбрасывает глобальные сообщения к встроенным (удобно в тестах). */
+    /** Resets global messages to the built-in ones (handy in tests). */
     resetDefaultMessages(): void {
       MessageRegistry.reset();
     },

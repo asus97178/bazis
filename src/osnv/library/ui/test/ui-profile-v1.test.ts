@@ -53,7 +53,7 @@ describe("UiProfileV1", () => {
           id: "products",
           actions: [{
             id: "delete",
-            title: "Удалить",
+            title: "Delete",
             operation: { operationId: "products.delete" },
             placements: ["list.row"],
             intent: "danger",
@@ -168,10 +168,10 @@ function productProfile(): UiProfileV1 {
     spec: {
       resources: [{
         id: "products",
-        title: "Продукты",
-        singularTitle: "Продукт",
+        title: "Products",
+        singularTitle: "Product",
         navigation: {
-          group: "Каталог",
+          group: "Catalog",
           icon: "package",
           order: 50,
         },
@@ -196,13 +196,13 @@ function productProfile(): UiProfileV1 {
         detail: {
           titleField: "name",
           sections: [
-            { id: "main", title: "Основное", fields: ["id", "name", "email"] },
-            { id: "system", title: "Служебные поля", fields: ["createdAt", "updatedAt"] },
+            { id: "main", title: "Main", fields: ["id", "name", "email"] },
+            { id: "system", title: "System fields", fields: ["createdAt", "updatedAt"] },
           ],
         },
         forms: {
           create: {
-            title: "Создать продукт",
+            title: "Create product",
             uiSchema: {
               type: "VerticalLayout",
               elements: [
@@ -212,7 +212,7 @@ function productProfile(): UiProfileV1 {
             },
           },
           edit: {
-            title: "Редактировать продукт",
+            title: "Edit product",
             uiSchema: {
               type: "VerticalLayout",
               elements: [
@@ -224,11 +224,11 @@ function productProfile(): UiProfileV1 {
         },
         actions: [{
           id: "delete",
-          title: "Удалить",
+          title: "Delete",
           operation: { operationId: "products.delete" },
           placements: ["list.row", "detail.header"],
           intent: "danger",
-          confirm: "Удалить продукт?",
+          confirm: "Delete the product?",
           refresh: "resource",
         }],
       }],

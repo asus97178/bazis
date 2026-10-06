@@ -1,6 +1,6 @@
 import { Validator } from "../../validation";
 import { DbUpdateError, isCommittedOutcome, OrmValidationError, UniqueViolationError } from "../errors";
-import type { EntityModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel } from "../Metadata/types";
 import { maxRowsPerInsert } from "../Providers/limits";
 import { decodeProperty } from "../Providers/propertyConversion";
 import type { DatabaseProvider, DbExecutor } from "../Providers/types";
@@ -38,19 +38,19 @@ const rollbackTokens = new WeakMap<ChangeTracker, WeakMap<object, RollbackToken>
 const uncertainTrackers = new WeakSet<ChangeTracker>();
 
 export interface SaveOptions {
-  /** Валидировать Added/Modified сущности перед сохранением (по умолчанию true). */
+  /** Validate Added/Modified entities before saving (default true). */
   readonly validateOnSave: boolean;
-  /** Повторы при transient-ошибках (по умолчанию выключены). */
+  /** Retries on transient errors (off by default). */
   readonly executionStrategy?: ExecutionStrategyOptions;
 }
 
 /**
- * Применяет накопленные в трекере изменения в одной транзакции:
- * DetectChanges -> (опц.) валидация -> упорядочивание -> параметризованные
- * INSERT/UPDATE/DELETE -> чтение сгенерированных ключей -> AcceptChanges.
+ * Applies the changes pending in the tracker in one transaction:
+ * DetectChanges -> (optional) validation -> ordering -> parameterized
+ * INSERT/UPDATE/DELETE -> reading generated keys -> AcceptChanges.
  *
- * После подтверждённого отката изменения можно повторить. При неизвестном
- * исходе COMMIT трекер блокируется до сверки данных в новом контексте.
+ * After a confirmed rollback the changes can be retried. If the COMMIT outcome
+ * is unknown, the tracker is locked until the data is reconciled in a new context.
  */
 export class SaveExecutor {
   private readonly commands: CommandBuilder;
@@ -120,7 +120,7 @@ export class SaveExecutor {
         let i = 0;
         while (i < ordered.length) {
           const entry = ordered[i]!;
-          // Подряд идущие вставки одной модели объединяем в multi-row INSERT.
+          // Consecutive inserts of one model are merged into a multi-row INSERT.
           if (entry.state === EntityState.Added) {
             const group: TrackedEntry[] = [];
             while (i < ordered.length && ordered[i]!.state === EntityState.Added && ordered[i]!.model === entry.model) {
@@ -179,7 +179,7 @@ export class SaveExecutor {
 
   private captureGeneratedKeys(entries: readonly TrackedEntry[]): GeneratedKeySnapshot[] {
     return entries
-      .filter((entry) => entry.state === EntityState.Added && entry.model.key.length === 1 && entry.model.key[0].generation !== "none")
+      .filter((entry) => entry.state === EntityState.Added && entry.model.key.length === 1 && isDatabaseGenerated(entry.model.key[0].generation))
       .map((entry) => ({
         entry,
         value: entry.model.key.length === 1 ? (entry.entity as Record<string, unknown>)[entry.model.key[0].propertyName] : undefined,
@@ -355,10 +355,10 @@ export class SaveExecutor {
     return orderedModels.flatMap((model) => byModel.get(model) ?? []);
   }
 
-  /** Пакетная вставка группы Added одной модели (с чанкованием по лимиту параметров). */
+  /** Batch insert of an Added group of one model (chunked by the parameter limit). */
   private async insertBatch(tx: DbExecutor, model: EntityModel, group: TrackedEntry[]): Promise<void> {
     const columnsPerRow =
-      model.properties.filter((property) => property.generation !== "identity" && property.generation !== "uuid")
+      model.properties.filter((property) => !isDatabaseGenerated(property.generation))
         .length;
     // PostgreSQL DEFAULT VALUES inserts exactly one row per statement.
     const maxRows = columnsPerRow === 0 ? 1 : maxRowsPerInsert(this.provider, columnsPerRow);
@@ -370,7 +370,7 @@ export class SaveExecutor {
       );
       const generated = command.returnsGeneratedKey;
       if (generated) {
-        // RETURNING возвращает строки в порядке VALUES — сопоставляем по индексу.
+        // RETURNING returns rows in VALUES order, so match them by index.
         const rows = await tx.query(command.sql, command.params);
         for (let k = 0; k < chunk.length; k += 1) {
           const raw = rows[k]?.[generated.column];
@@ -387,9 +387,9 @@ export class SaveExecutor {
     const command = this.commands.build(entry);
     const generated = command.returnsGeneratedKey;
     if (generated) {
-      // identity INSERT через RETURNING: ключ читаем из возвращённой строки.
-      // Декодируем через диалект — PG отдаёт bigint-идентити строкой/bigint,
-      // приводим к типу свойства ключа (integer -> number).
+      // Identity INSERT through RETURNING: read the key from the returned row.
+      // Decode through the dialect: PG returns a bigint identity as a string/bigint;
+      // convert it to the key property type (integer -> number).
       const rows = await tx.query(command.sql, command.params);
       const raw = rows.length > 0 ? rows[0]![generated.column] : undefined;
       (entry.entity as Record<string, unknown>)[generated.property] =

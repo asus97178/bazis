@@ -1,15 +1,15 @@
-# От нового проекта до бинарника
+# From a new project to a binary
 
-osnv использует TypeScript, Bun, DI, DbContext и контроллеры с декораторами.
-Зависимости конструкторов и привязки HTTP-параметров выводит codegen перед запуском.
-Для разработчика C# ближайшие знакомые понятия — DI scope, EF DbContext и
-контроллеры ASP.NET. ORM-условия в osnv строятся методами, без LINQ expression trees.
+osnv uses TypeScript, Bun, DI, DbContext and controllers with decorators.
+Codegen infers constructor dependencies and HTTP parameter bindings before the run.
+For a C# developer the closest familiar concepts are the DI scope, EF DbContext and
+ASP.NET controllers. ORM conditions in osnv are built with methods, without LINQ expression trees.
 
-## 1. Создать приложение
+## 1. Create an application
 
-В checkout фреймворка используйте квалифицированный Bun из
-[toolchain](../toolchain/bun.json). Команды ниже предполагают, что OSNV_BUN_BIN
-уже указывает на проверенный исполняемый файл.
+In the framework checkout, use the qualified Bun from the
+[toolchain](../toolchain/bun.json). The commands below assume OSNV_BUN_BIN already
+points to the verified executable.
 
 ```sh
 ./scripts/osnv-bun run toolchain:check
@@ -19,50 +19,50 @@ cd ../my-app
 "$OSNV_BUN_BIN" run dev
 ```
 
-Пустой backend слушает `http://127.0.0.1:3000`; GET `/health` проверяет запуск.
-При занятом порте задайте `PORT=3100`. Для этого проекта БД и LLM не нужны.
-Пример приложения в исходном checkout имеет отдельные требования к инфраструктуре.
+The empty backend listens on `http://127.0.0.1:3000`; GET `/health` checks that it runs.
+If the port is busy, set `PORT=3100`. This project needs no database and no LLM.
+The sample application in the source checkout has its own infrastructure requirements.
 
-CLI копирует пакет в `vendor/osnv`. Добавьте этот каталог в Git вместе с
-приложением: после переноса исходный checkout не требуется. Это снимок версии;
-изменения фреймворка автоматически не подтягиваются. `--link-framework` оставляет
-живую связь с внешним checkout для совместной разработки. Собранный CLI вне
-checkout принимает `--framework /absolute/path/to/src/osnv`.
+The CLI copies the package into `vendor/osnv`. Commit this directory together with the
+application: after that the source checkout is not needed. It is a snapshot of the
+version; framework changes are not pulled in automatically. `--link-framework` keeps
+a live link to an external checkout for joint development. The built CLI outside
+the checkout accepts `--framework /absolute/path/to/src/osnv`.
 
-## 2. Добавить функцию
+## 2. Add a feature
 
-Из корня нового приложения:
+From the root of the new application:
 
 ```sh
 "$OSNV_BUN_BIN" x osnv g module Task --empty
 ```
 
-CLI создаст `Task.module.ts`, `MODULE.md` и подключит модуль в `AppModule`.
-До реализации заполните ответственность и входы в паспорте. Одна функция может
-содержать модель, сервис, контроллер и фоновые обработчики. Составной модуль
-нужен для самостоятельных функций: `g pack Catalog --parts items,categories`.
-Полный пример контроллера без БД: [HTTP README](../src/osnv/core/http/README.md).
+The CLI creates `Task.module.ts` and `MODULE.md` and wires the module into `AppModule`.
+Fill in the responsibility and the inputs in the passport before implementing. One
+feature may hold a model, a service, a controller and background handlers. A composite
+module is for independent features: `g pack Catalog --parts items,categories`.
+A full controller example without a database: [HTTP README](../src/osnv/core/http/README.md).
 
-Для учебного CRUD есть `g module Guest --minimal`: десять файлов, включая
-модель, DbContext, сервис, контроллер, ListQuery и паспорт. Его запуск требует
-provider БД и готовой схемы. `--full` дополнительно требует auth/cache/background/AI
-инфраструктуру host; это расширенный пример, а не старт без зависимостей.
+For a learning CRUD there is `g module Guest --minimal`: ten files, including the
+model, DbContext, service, controller, ListQuery and passport. Running it needs a
+database provider and a ready schema. `--full` additionally needs host
+auth/cache/background/AI infrastructure; it is an extended example, not a start without dependencies.
 
-## 3. Границы API
+## 3. API boundaries
 
-- Сервис объявляет зависимости в конструкторе; обычная регистрация —
-  `scoped(IService, Service)`. Codegen выводит зависимости без ручного массива.
-- Сервис списка возвращает `PageResult<T>`: `items` и `total`. Контроллер формирует
-  JSON:API `data/meta/links` и берёт путь из `HttpContext.path`.
-- CLI-списки через HTTP возвращают 20 записей по умолчанию, максимум 100;
-  `summary()` возвращает полный count и не более 20 имён.
-- `DbContext.saveChanges()` сохраняет все накопленные изменения своего контекста.
-  `IRepository.saveChanges()` имеет ту же область сохранения.
-- ORM: `u => u.age.gte(18).and(u.name.startsWith("A"))`. `&&`, `||`, `!` над
-  Predicate останавливают codegen; неверный тип сравнения отклоняет TypeScript.
-  Ручной запуск JS/any без этих проверок не даёт такой защиты.
+- A service declares its dependencies in the constructor; the usual registration is
+  `scoped(IService, Service)`. Codegen infers the dependencies without a manual array.
+- A list service returns `PageResult<T>`: `items` and `total`. The controller builds
+  the JSON:API `data/meta/links` and takes the path from `HttpContext.path`.
+- CLI lists over HTTP return 20 records by default, at most 100;
+  `summary()` returns the full count and at most 20 names.
+- `DbContext.saveChanges()` saves all pending changes of its context.
+  `IRepository.saveChanges()` has the same save scope.
+- ORM: `u => u.age.gte(18).and(u.name.startsWith("A"))`. `&&`, `||`, `!` over a
+  Predicate stop codegen; TypeScript rejects a wrong comparison type.
+  Running JS/any by hand without these checks gives no such protection.
 
-## 4. Проверить и собрать
+## 4. Check and build
 
 ```sh
 "$OSNV_BUN_BIN" run di:generate
@@ -71,13 +71,14 @@ provider БД и готовой схемы. `--full` дополнительно 
 ./bin/my-app
 ```
 
-`dev` и `build` сами запускают codegen. Его файлы в `src/generated` не редактируют
-вручную. Ошибка `OSNV_HTTP_BINDING_UNRESOLVED` означает, что сигнатура action
-не позволяет определить источник аргумента: уточните тип; для заголовков и сырых тел используйте `HttpContext`.
-При `OSNV_ORM_PREDICATE_LOGIC` замените JS-логику методами `.and/.or/.not`.
-Ошибка генерации сохраняет предыдущие outputs и останавливает штатную команду.
+`dev` and `build` run codegen themselves. Do not edit its files in `src/generated`
+by hand. The `OSNV_HTTP_BINDING_UNRESOLVED` error means the action signature does
+not tell where an argument comes from: make the type precise; use `HttpContext` for headers and raw bodies.
+On `OSNV_ORM_PREDICATE_LOGIC` replace the JS logic with the `.and/.or/.not` methods.
+A generation error keeps the previous outputs and stops the regular command.
 
-Бинарник приложения содержит код и generated metadata. Внешние БД, конфигурация
-и явно используемые файлы остаются обязанностью host. Проверяйте запуск бинарника
-из другого каталога. Текущая квалификация runtime относится к macOS arm64;
-другие платформы требуют отдельной проверки.
+The application binary contains the code and the generated metadata. External
+databases, configuration and explicitly used files remain the host's job. Check
+the binary by running it from another directory. The runtime is qualified on macOS
+arm64 and Linux arm64/x64 (see the [toolchain notes](../toolchain/README.md));
+other platforms need their own check.

@@ -1,37 +1,37 @@
-# Регистрация Tools и назначение агентам
+# Registering Tools and assigning them to agents
 
-Идентификатор: **AGENT-TOOLS-001**. Версия: **1.0**. Дата: **2026-10-02**.
-Статус: реализовано; изолированные проверки и бинарная проба — PASS.
-Область: native Tools из кода osnv и назначение метаагентам через каталог.
+Identifier: **AGENT-TOOLS-001**. Version: **1.0**. Date: **2026-10-02**.
+Status: implemented; isolated checks and the binary probe PASS.
+Scope: native Tools from osnv code and their assignment to meta-agents through the catalog.
 
-## 1. Размещение и регистрация
+## 1. Placement and registration
 
-Общий атомарный [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
-расположен внутри существующей области агентов. Один инструмент — класс с
-методом execute. Он может пользоваться публичными сервисами нескольких модулей.
-Метаагенты остаются определениями в БД, инструмент не копируется для каждого агента.
+The shared atomic [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
+of the osnova application lives inside its existing agents area. One tool is a
+class with an execute method. It may use the public services of several modules.
+Meta-agents stay definitions in the database; a tool is not copied per agent.
 
 ```text
 src/app/modules/agents/
-  Agents.module.ts                  определения метаагентов, ORM, запуск и Admin UI
+  Agents.module.ts                  meta-agent definitions, ORM, runs and Admin UI
   services/
     Agents.service.ts
     Run.service.ts
   tools/
-    Tools.module.ts                единый список зарегистрированных Tools
-    Tools.service.ts               административный каталог
-    Tools.controller.ts            защищённые HTTP-входы
-    Tools.initializer.ts           проверка схем при старте
+    Tools.module.ts                the single list of registered Tools
+    Tools.service.ts               the administrative catalog
+    Tools.controller.ts            protected HTTP inputs
+    Tools.initializer.ts           schema check at startup
     Agents.tool.ts                 agents.getAll
     contracts/
-      Agents.input.ts              входной DTO инструмента
-      Tools.contracts.ts           поля каталога
+      Agents.input.ts              the tool's input DTO
+      Tools.contracts.ts           catalog fields
     index.ts
     MODULE.md
     test/
 ```
 
-Действующая регистрация:
+The current registration:
 
 ```ts
 import { Module, singleton } from "osnv/core/di";
@@ -53,108 +53,110 @@ import { ToolsService } from "./Tools.service";
 export class ToolsModule {}
 ```
 
-Новый инструмент добавляется в `tools` один раз. Его зависимости объявляются
-в конструкторе; необходимые предметные модули подключаются через imports и
-публичные DI exports. ToolsModule подключён к AppModule.
+A new tool is added to `tools` once. Its dependencies are declared in the
+constructor; the required domain modules are connected through imports and public
+DI exports. ToolsModule is connected to AppModule.
 
-`tools` автоматически регистрирует класс как scoped. Прежняя точная регистрация
-`scoped(ToolClass)` того же владельца остаётся совместимой и переиспользуется.
-Несовместимый lifetime/factory/key, повторное имя и конфликт владельцев приводят
-к ошибке сборки контейнера до создания Tool. Дополнительного декоратора регистрации,
-второго DI-контейнера, defineTools и RunAppOptions.tools не вводится.
+`tools` registers the class as scoped automatically. An earlier exact registration
+`scoped(ToolClass)` by the same owner stays compatible and is reused.
+An incompatible lifetime/factory/key, a repeated name and an owner conflict fail
+the container build before a Tool is created. No extra registration decorator,
+second DI container, defineTools or RunAppOptions.tools is introduced.
 
-## 2. Общий каталог и зависимости
+## 2. Shared catalog and dependencies
 
 [AgentRegistry.fromContainer](../../src/osnv/core/agent/AgentRegistry.ts)
-строит неизменяемый снимок из фактических вкладов Tools в DI. Каталог кэшируется
-на контейнер; обычные providers без tools в него не попадают. Конструкторы
-инструментов не вызываются. Разные контейнеры имеют независимые каталоги.
-Горячего поиска исходников или исполнения кода из БД нет.
+builds an immutable snapshot from the actual Tools contributions in DI. The catalog
+is cached per container; regular providers without tools do not get into it. Tool
+constructors are not called. Different containers have independent catalogs.
+There is no hot source lookup and no execution of code from the database.
 
-ToolsModule импортирует AgentsModule для публичного IAgentsService. AgentsModule
-использует каталог ядра, поэтому обратного импорта ToolsModule и цикла DI нет.
-Общая папка не делает каждый инструмент отдельным модулем и не превращает
-AgentsModule в пустой составной корень. Его публичные IAgentsService/RunService,
-таблица agents и существующие HTTP-входы сохраняются.
+ToolsModule imports AgentsModule for the public IAgentsService. AgentsModule uses
+the core catalog, so there is no reverse import of ToolsModule and no DI cycle.
+The shared folder does not make each tool a separate module and does not turn
+AgentsModule into an empty composite root. Its public IAgentsService/RunService,
+the agents table and the existing HTTP inputs are kept.
 
-## 3. Объявление и контракты Tool
+## 3. Tool declaration and contracts
 
-[AgentsTool](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/Agents.tool.ts) объявляет имя,
-описание, входной DTO, sideEffect, approval и timeout через существующий @Tool.
+[AgentsTool](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/Agents.tool.ts) declares the name,
+description, input DTO, sideEffect, approval and timeout through the existing @Tool.
 [AgentsToolInput](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/contracts/Agents.input.ts)
-содержит page: целое 1–10000, default 1. Штатный codegen получает JSON Schema
-из класса и его валидаторов. Объявленный output DTO необязателен.
-Если input/output объявлен, но generated schema отсутствует, ToolsInitializer
-останавливает startup до HTTP. Та же проверка выполняется при prepare запуска.
-Ограничения существующего resolver вложенных generated refs не расширялись.
+holds page: an integer 1–10000, default 1. Regular codegen gets the JSON Schema
+from the class and its validators. A declared output DTO is optional.
+If an input/output is declared but the generated schema is missing, ToolsInitializer
+stops startup before HTTP. The same check runs when a run is prepared.
+The limits of the existing resolver of nested generated refs were not extended.
 
-Tool использует IAgentsService и доверенный clientUserId из контекста хоста.
-Выход: до 20 включённых агентов с id, name и description до 240 символов,
-номер страницы и hasMore. Инструкции и настройки модели не выдаются.
-Исполнение по-прежнему проходит через AgentToolExecutor: проверка назначения,
-входа, прав/policies, approval, hooks, timeout/abort, output и освобождение scope.
-Назначение Tool не отменяет предметные проверки и не изолирует native код в sandbox.
+The Tool uses IAgentsService and the trusted clientUserId from the host context.
+Output: up to 20 enabled agents with id, name and a description of up to 240
+characters, the page number and hasMore. Instructions and model settings are not
+returned. Execution still goes through AgentToolExecutor: the assignment check,
+input, permissions/policies, approval, hooks, timeout/abort, output and scope release.
+Assigning a Tool does not cancel domain checks and does not sandbox native code.
 
-## 4. Каталог и назначение
+## 4. Catalog and assignment
 
-[ToolsService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/Tools.service.ts) предоставляет:
+[ToolsService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/Tools.service.ts) provides:
 
-| Операция | HTTP | Вход | Результат |
+| Operation | HTTP | Input | Result |
 | --- | --- | --- | --- |
-| getAll(query?) | GET /api/agent-tools | search до 120 символов; page 1–10000; size 1–100; defaults "", 1, 20 | items, page, size, total |
-| getById(name) | GET /api/agent-tools/:name | имя длиной 1–128 | описание и inputSchema/outputSchema; DI null или HTTP 404 при отсутствии |
+| getAll(query?) | GET /api/agent-tools | search up to 120 characters; page 1–10000; size 1–100; defaults "", 1, 20 | items, page, size, total |
+| getById(name) | GET /api/agent-tools/:name | a name of length 1–128 | the description and inputSchema/outputSchema; DI null or HTTP 404 when missing |
 
-Все HTTP-входы требуют Admin; ответы 200 и 404 возвращают no-store. Числовые query-параметры
-преобразует HTTP binder, границы проверяет сервис также для прямого DI-вызова.
-null запрещён; неверный ввод — 400. Поиск без учёта регистра по имени и описанию,
-порядок по имени. Элемент списка содержит name, description, tags, sideEffect,
-approval, timeoutMs; исполняемые классы и зависимости наружу не выходят.
-Схемы выдаются только в детальном ответе; null означает необъявленный контракт.
+All HTTP inputs require Admin; 200 and 404 responses return no-store. The HTTP
+binder converts numeric query parameters; the service checks the bounds for a direct
+DI call too. null is forbidden; invalid input is 400. The search is case-insensitive
+over the name and description, ordered by name. A list item holds name, description,
+tags, sideEffect, approval, timeoutMs; executable classes and dependencies never leave.
+Schemas are returned only in the detailed response; null means an undeclared contract.
 
-В форме агента widget `agent-tools` показывает постраничный каталог с описаниями,
-поиском и выбором до 128 инструментов. Назначенные имена отображаются отдельно;
-смена страницы, поиск и ошибка загрузки не очищают выбор. Сохраняется прежнее
-поле Agent.toolNames, новая таблица или миграция не нужны.
+In the agent form the `agent-tools` widget shows a paged catalog with descriptions,
+search and selection of up to 128 tools. Assigned names are shown separately;
+changing the page, searching and a load error do not clear the selection. The
+existing Agent.toolNames field is kept; no new table or migration is needed.
 
-[AgentsService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/services/Agents.service.ts) проверяет
-все новые назначения по общему каталогу до записи. При update под row lock сначала
-проверяется revision, затем новые имена. Историческое отсутствующее имя можно
-сохранить или удалить; новое неизвестное имя отклоняется с issue toolNames.
-Main при старте не перезаписывается. Уже подготовленный запуск сохраняет свой снимок.
+[AgentsService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/services/Agents.service.ts) checks
+all new assignments against the shared catalog before writing. On update under a row
+lock the revision is checked first, then the new names. A historical missing name
+can be kept or removed; a new unknown name is rejected with a toolNames issue.
+Main is not overwritten at startup. A run that is already prepared keeps its snapshot.
 
-## 5. Как инструменты получает модель
+## 5. How the model gets the tools
 
-[RunService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/services/Run.service.ts) берёт toolNames
-из определения, разрешает их через общий каталог и создаёт AgentRegistry.fromDefinition
-только с назначенным набором. Ручного списка hostTools в сервисе больше нет.
-Неизвестное назначение или недоступная объявленная схема дают 409 до pending-хода
-и обращения к модели. Попытка модели вызвать неназначенный инструмент отклоняется.
+[RunService](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/services/Run.service.ts) takes toolNames
+from the definition, resolves them through the shared catalog and creates
+AgentRegistry.fromDefinition with only the assigned set. The service no longer has
+a manual hostTools list. An unknown assignment or an unavailable declared schema
+gives 409 before the pending turn and before calling the model. A model attempt to
+call an unassigned tool is rejected.
 
-Обычный OpenAI-compatible адаптер передаёт описания через поле tools в API-запросе.
-Модель возвращает имя и аргументы; наш executor выполняет вызов и возвращает
-результат через тот же адаптер. Codex получает dynamicTools с безопасными wire-именами
-и вызывает тот же executor. DTO, DI, идентичность и секреты остаются у osnv.
-Транспортные адаптеры и настройки strict этим изменением не менялись.
+A regular OpenAI-compatible adapter passes the descriptions in the tools field of
+the API request. The model returns the name and arguments; our executor runs the
+call and returns the result through the same adapter. Codex gets dynamicTools with
+safe wire names and calls the same executor. DTOs, DI, identity and secrets stay
+with osnv. The transport adapters and strict settings were not changed.
 
-Контракт остаётся стандартным: параметры описываются JSON Schema, обмен с моделью —
-function/tool calling провайдера. Выходную схему osnv можно объявить дополнительно.
-Обзоры протокола: [OpenAI](https://developers.openai.com/api/docs/guides/function-calling),
+The contract stays standard: parameters are described with JSON Schema, and the
+exchange with the model is the provider's function/tool calling. An osnv output
+schema can be declared in addition.
+Protocol overviews: [OpenAI](https://developers.openai.com/api/docs/guides/function-calling),
 [Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools).
-Интеграция Anthropic, MCP и поиск инструментов моделью в этот модуль не добавляются.
+Anthropic integration, MCP and tool search by the model are not added to this module.
 
-## 6. Проверка и поставка
+## 6. Checks and delivery
 
-Команда создания CLI и подробные поля закреплены в
-[паспорте ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md).
-Статические импорты и штатный codegen поддерживают исходники и бинарную сборку.
-Каталог собирается один раз; сортировка O(N log N), поиск O(N), выдача ограничена size.
-Дополнительных запросов к БД для чтения каталога нет; замеры ускорения не заявлены.
+The CLI creation command and detailed fields are recorded in the
+[ToolsModule passport](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md).
+Static imports and regular codegen support the sources and the binary build.
+The catalog is built once; sorting is O(N log N), search O(N), output bounded by size.
+Reading the catalog makes no extra database queries; no speedup measurements are claimed.
 
-Проверены регистрация и владение, scoped identity, независимость каталогов,
-Admin/no-store и query binding, схемы, назначения и исторические ссылки,
-фильтрация набора модели, обычный и Codex-запуск, CLI/codegen, TypeScript,
-Admin build и бинарная проба. БД и внешний LLM для этих проверок заменяются
-управляемыми портами; живые PostgreSQL и провайдер в этой задаче не запускались.
-Результат: 471 тест без ошибок, TypeScript/Admin build и сборка app/CLI — PASS.
-Браузерная проверка формы и запуск бинарной пробы вне checkout — PASS.
-Команды и границы — в [отчёте](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agent-tools-module-2026-10-02.md).
+Checked: registration and ownership, scoped identity, catalog independence,
+Admin/no-store and query binding, schemas, assignments and historical references,
+filtering the model's set, regular and Codex runs, CLI/codegen, TypeScript, the
+Admin build and the binary probe. The database and the external LLM were replaced
+by controlled ports in these checks; live PostgreSQL and the provider were not run
+in this task. Result: 471 tests without errors, TypeScript/Admin build and the
+app/CLI build PASS. The browser check of the form and the binary probe outside the
+checkout PASS. Commands and limits are in the [report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/agent-tools-module-2026-10-02.md).

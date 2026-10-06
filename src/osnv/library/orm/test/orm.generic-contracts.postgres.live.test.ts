@@ -132,7 +132,7 @@ test("GC ownership controls validate UUID-scoped names and source-sensitive clea
 });
 
 describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
-  test("GC-TX-01 inserts multiple rows and returns ordered generated keys", async () => {
+  test("inserts multiple rows and returns ordered generated keys", async () => {
     await withContext("tx01_accounts", async (_provider, db) => {
       const set = db.setByName(db.fixtureModel.name);
       const rows = ["a", "b", "c"].map((name) => Object.assign(new db.fixtureModel.ctor(), { name }));
@@ -141,14 +141,14 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect(ids).toEqual([...ids].sort((a, b) => a - b));
     });
   });
-  test("GC-TX-02 chunks a limited batch and persists every row", async () => {
+  test("chunks a limited batch and persists every row", async () => {
     await withContext("tx02_accounts", async (provider, db) => {
       const original = provider.limits; (provider as unknown as { limits: typeof original }).limits = { ...original, maxParametersPerCommand: 2 };
       try { const set = db.setByName(db.fixtureModel.name); set.addRange(["a", "b", "c", "d", "e"].map((name) => Object.assign(new db.fixtureModel.ctor(), { name }))); await db.saveChanges(); expect(await set.count()).toBe(5); }
       finally { (provider as unknown as { limits: typeof original }).limits = original; }
     });
   });
-  test("GC-TX-03 settles callbacks and committed outcomes exactly once", async () => {
+  test("settles callbacks and committed outcomes exactly once", async () => {
     await withContext("tx03_accounts", async (provider) => {
       const events: string[] = []; await provider.transaction(async () => { provider.afterCommit(() => { events.push("commit"); }); }); expect(events).toEqual(["commit"]);
       await expect(provider.transaction(async () => { provider.afterCommit(() => { events.push("rollback-commit"); }); provider.afterRollback?.(() => { events.push("rollback"); }); throw new Error("rollback"); })).rejects.toThrow("rollback"); expect(events).toEqual(["commit", "rollback"]);
@@ -162,7 +162,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect(isCommittedOutcome(new PostCommitError([]))).toBe(true);
     });
   });
-  test("GC-TX-04 preserves nested savepoint and callback dispositions", async () => {
+  test("preserves nested savepoint and callback dispositions", async () => {
     await withContext("tx04_accounts", async (provider) => {
       const scope = provider.transactionScope!.bind(provider);
       const events: string[] = []; await scope(async () => { try { await scope(async () => { provider.afterCommit(() => { events.push("inner"); }); throw new Error("inner"); }); } catch {} provider.afterCommit(() => { events.push("outer"); }); }); expect(events).toEqual(["outer"]);
@@ -178,7 +178,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect(siblingWork).toBe(1);
     });
   });
-  test("GC-TX-05 retries only known top-level work", async () => {
+  test("retries only known top-level work", async () => {
     await withContext("tx05_accounts", async (provider, db) => {
       let attempts = 0; const retrying = withRetry(provider, { maxRetries: 1, isTransient: () => true });
       await retrying.transaction(async () => { attempts += 1; if (attempts === 1) throw new Error("transient"); }); expect(attempts).toBe(2);
@@ -194,7 +194,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect(await set.asNoTracking().count()).toBe(0);
     });
   });
-  test("GC-TX-06 joins explicit transactions and restores provisional identity", async () => {
+  test("joins explicit transactions and restores provisional identity", async () => {
     await withContext("tx06_accounts", async (provider, db) => {
       const set = db.setByName(db.fixtureModel.name); const committed = Object.assign(new db.fixtureModel.ctor(), { name: "commit" }); set.add(committed);
       await provider.transaction(async () => { await db.saveChanges(); }); expect(await set.count()).toBe(1);
@@ -204,7 +204,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     });
   });
 
-  test("GC-TX-07 restores the child savepoint baseline while retaining later tracked intent", async () => {
+  test("restores the child savepoint baseline while retaining later tracked intent", async () => {
     await withContext("tx07_accounts", async (provider, db) => {
       const set = db.setByName(db.fixtureModel.name); const item = Object.assign(new db.fixtureModel.ctor(), { name: "A" }); set.add(item); await db.saveChanges();
       const id = Number((item as Record<string, unknown>).id); expect(id).toBeGreaterThan(0);
@@ -220,7 +220,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     });
   });
 
-  test("GC-TX-08 restores the outer baseline after released child saves", async () => {
+  test("restores the outer baseline after released child saves", async () => {
     await withContext("tx08_accounts", async (provider, db) => {
       const set = db.setByName(db.fixtureModel.name); const item = Object.assign(new db.fixtureModel.ctor(), { name: "A" }); set.add(item); await db.saveChanges();
       const id = Number((item as Record<string, unknown>).id); expect(id).toBeGreaterThan(0);
@@ -235,7 +235,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     });
   });
 
-  test("GC-TX-09 restores manual and composite Added plus existing Deleted after outer rollback", async () => {
+  test("restores manual and composite Added plus existing Deleted after outer rollback", async () => {
     const provider = postgres({ url: url! }); const table = physical("tx09_manual");
     const manualModel = buildDynamicModel({ name: `Manual${table.slice(-8)}`, tableName: table, fields: [{ name: "id", type: "string", isKey: true }, { name: "name", type: "string", required: true }] });
     const manualOptions = new DbContextOptions({ provider, entities: [], validateOnSave: false }); manualOptions.model.registerModel(manualModel);
@@ -270,7 +270,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     } finally { await provider.close(); }
   });
 
-  test("GC-IMP-07 explicit DbSet and Repository updates persist through fresh contexts", async () => {
+  test("explicit DbSet and Repository updates persist through fresh contexts", async () => {
     await withContext("imp07_updates", async (provider, db, table) => {
       const set = db.setByName(db.fixtureModel.name); const seed = Object.assign(new db.fixtureModel.ctor(), { name: "before" }); set.add(seed); expect(await db.saveChanges()).toBe(1);
       const id = Number((seed as Record<string, unknown>).id); expect(id).toBeGreaterThan(0);
@@ -287,7 +287,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     });
   });
 
-  test("GC-IMP-08 retry wrapper retains schema admission capability", async () => {
+  test("retry wrapper retains schema admission capability", async () => {
     const provider = postgres({ url: url! }); const table = physical("imp08_retry_admission");
     try {
       const retrying = withRetry(provider, { maxRetries: 1, isTransient: () => false });
@@ -297,7 +297,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     } finally { await provider.close(); }
   });
 
-  test("GC-MIG-01 applies additive migration once without data loss", async () => {
+  test("applies additive migration once without data loss", async () => {
     const provider = postgres({ url: url! }); const table = physical("mig01_vectors");
     try {
       const v1 = contextWithFields(provider, table, [{ name: "id", type: "int", isKey: true }, { name: "name", type: "string", required: true }]);
@@ -309,7 +309,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect((await v2.database.migrate()).applied).toBe(0);
     } finally { await provider.close(); }
   });
-  test("GC-MIG-02 reports extra columns non-destructively", async () => {
+  test("reports extra columns non-destructively", async () => {
     const provider = postgres({ url: url! }); const table = physical("mig02_vectors");
     try {
       const model = buildDynamicModel({ name: `Migrated${run}`, tableName: table, fields: [{ name: "id", type: "int", isKey: true }, { name: "name", type: "string" }] });
@@ -321,7 +321,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect((await provider.query("SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='extra'", [table])).length).toBe(1);
     } finally { await provider.close(); }
   });
-  test("GC-MIG-03 serializes concurrent migration with two providers", async () => {
+  test("serializes concurrent migration with two providers", async () => {
     const table = physical("mig03_race"); const id = registerMigration(`${prefix}mig03_race`);
     const migration: Migration = { id, up: async (ctx) => { await ctx.execute(`CREATE TABLE ${quotedOwnedTable(table)} ("id" bigint PRIMARY KEY)`); }, down: async (ctx) => { await ctx.execute(`DROP TABLE IF EXISTS ${quotedOwnedTable(table)}`); } };
     const first = postgres({ url: url! }); const second = postgres({ url: url! });
@@ -331,7 +331,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect((await first.query("SELECT \"MigrationId\" FROM \"__OsnvMigrations\" WHERE \"MigrationId\"=$1", [id]))).toHaveLength(1);
     } finally { await first.close(); await second.close(); }
   });
-  test("GC-MIG-04 isolates versioned migrate replay and one-step rollback", async () => {
+  test("isolates versioned migrate replay and one-step rollback", async () => {
     const table = physical("mig04_versioned"); const id = registerMigration(`${prefix}mig04_versioned`);
     const migration: Migration = { id, up: async (ctx) => { await ctx.execute(`CREATE TABLE ${quotedOwnedTable(table)} ("id" bigint PRIMARY KEY)`); }, down: async (ctx) => { await ctx.execute(`DROP TABLE IF EXISTS ${quotedOwnedTable(table)}`); } };
     const provider = postgres({ url: url! });
@@ -354,14 +354,14 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
     } finally { await provider.close(); }
   });
 
-  test("GC-IMP-01 preserves tracking identity and no-tracking behavior", async () => {
+  test("preserves tracking identity and no-tracking behavior", async () => {
     await withContext("imp01_tracking", async (_provider, db) => {
       const set = db.setByName(db.fixtureModel.name); const item = Object.assign(new db.fixtureModel.ctor(), { name: "tracked" }); set.add(item); await db.saveChanges();
       const first = await set.first(); const again = await set.first(); const detached = await set.asNoTracking().first();
       expect(again).toBe(first); expect(detached).not.toBe(first); first.name = "changed"; await db.saveChanges(); expect((await set.asNoTracking().first()).name).toBe("changed");
     });
   });
-  test("GC-IMP-02 persists escaped query and JSON change semantics", async () => {
+  test("persists escaped query and JSON change semantics", async () => {
     const provider = postgres({ url: url! }); const table = physical("imp02_json");
     try {
       const db = contextWithFields(provider, table, [{ name: "id", type: "int", isKey: true }, { name: "name", type: "string", required: true }, { name: "meta", type: "json" }]); await db.database.ensureCreated();
@@ -371,12 +371,12 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect(await db.saveChanges()).toBe(0);
     } finally { await provider.close(); }
   });
-  test("GC-IMP-03 reports missing entity without a substitute result", async () => {
+  test("reports missing entity without a substitute result", async () => {
     await withContext("imp03_missing", async (_provider, db) => {
       const set = db.setByName(db.fixtureModel.name); await expect(set.first()).rejects.toBeInstanceOf(EntityNotFoundError);
     });
   });
-  test("GC-IMP-04 preserves provider methods and transaction callbacks through retry", async () => {
+  test("preserves provider methods and transaction callbacks through retry", async () => {
     await withContext("imp04_retry", async (provider) => {
       const retrying = withRetry(provider, { maxRetries: 1, isTransient: () => true }); const events: string[] = [];
       const afterCommit = retrying.afterCommit;
@@ -385,7 +385,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       expect(attempts).toBe(2); expect(events).toEqual(["commit"]); expect(await retrying.ping()).toBe(true); expect(retrying.close).toBeDefined();
     });
   });
-  test("GC-IMP-05 chunks IN values and loads complete navigation", async () => {
+  test("chunks IN values and loads complete navigation", async () => {
     const provider = postgres({ url: url! }); const categoriesTable = physical("imp05_categories"); const productsTable = physical("imp05_products");
     try {
       const [categories, products] = compileDynamicModelGraph([{ name: `Category${run}`, tableName: categoriesTable, fields: [{ name: "id", type: "int", isKey: true }, { name: "name", type: "string" }], relations: [{ navigationName: "products", kind: "collection", target: `Product${run}`, foreignKey: "categoryId" }] }, { name: `Product${run}`, tableName: productsTable, fields: [{ name: "id", type: "int", isKey: true }, { name: "name", type: "string" }, { name: "categoryId", type: "foreignKey", target: `Category${run}`, navigationName: "category", inverseNavigationName: "products", targetKeyType: "int" }] }]);
@@ -399,7 +399,7 @@ describe.skipIf(!url)("generic ORM contracts (PostgreSQL live)", () => {
       finally { (provider as unknown as { limits: typeof original }).limits = original; }
     } finally { await provider.close(); }
   });
-  test("GC-IMP-06 redacts by default and exposes raw tracing only explicitly", async () => {
+  test("redacts by default and exposes raw tracing only explicitly", async () => {
     const secret = "trace-secret-value"; const redacted: unknown[][] = []; const raw: unknown[][] = [];
     const defaultProvider = postgres({ url: url!, onSql: (_sql, params) => redacted.push([...params]) }); const rawProvider = postgres({ url: url!, redactSqlParams: false, onSql: (_sql, params) => raw.push([...params]) }); const defaultTable = physical("imp06_redacted"); const rawTable = physical("imp06_raw");
     try { for (const [provider, table] of [[defaultProvider, defaultTable], [rawProvider, rawTable]] as const) { const db = context(provider, table); await db.database.ensureCreated(); const set = db.setByName(db.fixtureModel.name); set.add(Object.assign(new db.fixtureModel.ctor(), { name: secret })); await db.saveChanges(); } expect(JSON.stringify(redacted)).not.toContain(secret); expect(JSON.stringify(raw)).toContain(secret); }

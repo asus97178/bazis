@@ -4,16 +4,23 @@ import { DatabaseFacade, type DbContextOptions, type Migration } from "../../lib
 import { compileExpectedSchema } from "../../library/orm/Schema/ExpectedSchema";
 
 /**
- * Hosted-сервис жизненного цикла ORM: при старте (опционально) создаёт схему
- * или выполняет авто-миграцию, при остановке закрывает соединение/пул.
- * Запускается рано (отрицательная фаза), чтобы БД была готова до серверов.
+ * ORM lifecycle hosted service: at start it (optionally) creates the schema or
+ * runs the auto-migration; at shutdown it closes the connection/pool.
+ * Starts early (negative phase) so the database is ready before the servers.
  */
 export class OrmLifecycle implements HostedService {
   readonly planValidator = ormHostedPlanValidator;
   readonly phase: number;
   /** Internal hosted-plan marker; public hosted services never receive it. */
   readonly __osnvOrmLegacyLifecycle = true;
+  /**
+   * Internal hosted-plan marker: this lifecycle changes the schema at phase -100
+   * without exact admission (`ensureCreated` on a non-PostgreSQL provider,
+   * `migrateOnStart` or startup migrations). The hosted-plan validator rejects
+   * it in a container that also uses exact schema admission.
+   */
   readonly __osnvLegacySchemaAuthority: boolean;
+  /** Internal hosted-plan marker: tables and foreign keys of the phase -105 exact `ensureCreated` admission on PostgreSQL. */
   readonly __osnvSchemaAdmission?: {
     readonly unit: readonly string[];
     readonly tables: readonly string[];
@@ -29,10 +36,10 @@ export class OrmLifecycle implements HostedService {
     private readonly migrations: readonly Migration[] = [],
     private readonly runMigrationsOnStart: boolean = false,
     /**
-     * Владеет ли этот lifecycle соединением. `false` для feature-режима поверх
-     * общего {@link DATABASE_PROVIDER}: соединением владеет инфраструктура
-     * (connection-модуль / `@Infra`-коннектор), и закрывать его на остановке
-     * фичи нельзя — иначе двойное закрытие общего пула.
+     * Whether this lifecycle owns the connection. `false` for the feature mode on
+     * top of the shared {@link DATABASE_PROVIDER}: the infrastructure owns the
+     * connection (the connection module / `@Infra` connector), and the feature
+     * must not close it at shutdown, or the shared pool would be closed twice.
      */
     private readonly ownsConnection: boolean = true,
   ) {
@@ -105,8 +112,11 @@ export class OrmLifecycle implements HostedService {
   }
 }
 
-/** Strict owner admission intentionally precedes the legacy -100 lifecycle. */
-/** Establishes the required -110 provider slot without taking connection ownership. */
+/**
+ * Occupies the phase -110 provider slot that exact schema admission requires:
+ * it runs before the phase -105 admissions and the phase -100 ORM lifecycle,
+ * without taking connection ownership.
+ */
 export class OrmProviderReadyLifecycle implements HostedService {
   readonly planValidator = ormHostedPlanValidator;
   public readonly phase = -110;

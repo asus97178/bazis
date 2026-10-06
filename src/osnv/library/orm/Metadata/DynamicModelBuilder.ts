@@ -17,9 +17,9 @@ import { registerDynamicTableIdentity } from "../Schema/tableKey";
 type EntityClass = new () => object;
 
 /**
- * Логический тип поля динамической таблицы — то, что выбирает пользователь в
- * админке DataManager. Раскладывается на физический `StorageColumnType` плюс
- * (для семантических полей) `PropertyConvention`.
+ * Logical field type of a dynamic table: what a user picks when designing the
+ * table. It maps to a physical `StorageColumnType` plus (for semantic fields)
+ * a `PropertyConvention`.
  */
 export type ScalarLogicalFieldType =
   | "string"
@@ -33,37 +33,37 @@ export type ScalarLogicalFieldType =
 
 export type LogicalFieldType = ScalarLogicalFieldType | "foreignKey";
 
-/** Определение одного поля динамической таблицы. */
+/** Definition of one dynamic table field. */
 export interface DynamicFieldDefinition {
-  /** Имя свойства в сущности (и колонки, если `columnName` не задан). */
+  /** Property name in the entity (and the column name, if `columnName` is not set). */
   readonly name: string;
-  /** Физическое имя колонки (по умолчанию — `name`). */
+  /** Physical column name (defaults to `name`). */
   readonly columnName?: string;
-  /** Логический тип. */
+  /** Logical type. */
   readonly type: LogicalFieldType;
-  /** Первичный ключ (ровно одно поле таблицы). */
+  /** Single-field primary key (at most one field). For a composite key use the table's `primaryKey` instead. */
   readonly isKey?: boolean;
-  /** NOT NULL. Ключ и семантические timestamp-поля всегда обязательны. */
+  /** NOT NULL. The key and semantic timestamp fields are always required. */
   readonly required?: boolean;
-  /** Создать уникальный индекс по колонке. */
+  /** Create a unique index on the column. */
   readonly unique?: boolean;
-  /** Создать обычный индекс по колонке. */
+  /** Create a regular index on the column. */
   readonly indexed?: boolean;
-  /** Автоповедение при сохранении (`uuid`/`createdAt`/`updatedAt`). */
+  /** Automatic behavior on save (`uuid`/`createdAt`/`updatedAt`). */
   readonly convention?: PropertyConvention;
-  /** Версия UUID для `uuid`-поля/ключа (по умолчанию v4). */
+  /** UUID version for a `uuid` field/key (default v4). */
   readonly uuidVersion?: "v4" | "v7";
-  /** Целевая динамическая таблица; обязательна только для `foreignKey`. */
+  /** Target dynamic table; required only for `foreignKey`. */
   readonly target?: string;
-  /** Reference-navigation этой таблицы; обязательна только для `foreignKey`. */
+  /** Reference navigation of this table; required only for `foreignKey`. */
   readonly navigationName?: string;
-  /** Опциональная collection-navigation на целевой таблице; компилируется её определением. */
+  /** Optional collection navigation on the target table; compiled by the target's definition. */
   readonly inverseNavigationName?: string;
-  /** Снимок логического типа ключа цели; определяет физический тип FK-колонки. */
+  /** Snapshot of the target key's logical type; defines the physical type of the FK column. */
   readonly targetKeyType?: ScalarLogicalFieldType;
 }
 
-/** Явный составной индекс динамической таблицы. */
+/** Explicit composite index of a dynamic table. */
 export interface DynamicIndexDefinition {
   readonly name?: string;
   /** Physical column names, not logical property names. */
@@ -72,32 +72,32 @@ export interface DynamicIndexDefinition {
 }
 
 /**
- * Скомпилированная навигация между динамическими таблицами. Reference
- * навигации и физические constraints выводятся из `foreignKey` fields;
- * этот контракт остаётся для server-derived inverse collections.
+ * Compiled navigation between dynamic tables. Reference navigations and
+ * physical constraints are derived from `foreignKey` fields; this contract
+ * remains for server-derived inverse collections.
  *
- * - `reference`: `foreignKey` — свойство ЭТОЙ таблицы, указывает на ключ `target`;
- * - `collection`: `foreignKey` — свойство таблицы `target`, указывает на ключ этой.
+ * - `reference`: `foreignKey` is a property of THIS table and points to the `target` key;
+ * - `collection`: `foreignKey` is a property of the `target` table and points to this table's key.
  */
 export interface DynamicRelationDefinition {
   readonly navigationName: string;
   readonly kind: RelationKind;
-  /** Имя целевой таблицы/модели. */
+  /** Name of the target table/model. */
   readonly target: string;
-  /** Имя свойства внешнего ключа (на зависимой стороне). */
+  /** Name of the foreign key property (on the dependent side). */
   readonly foreignKey: string | readonly string[];
 }
 export interface DynamicPrimaryKeyDefinition { readonly properties: readonly [string, ...string[]]; readonly name?: string }
 export interface DynamicForeignKeyDefinition { readonly properties: readonly [string, ...string[]]; readonly target: string; readonly name?: string; readonly onDelete?: "noAction" | "restrict" | "cascade" | "setNull"; readonly onUpdate?: "noAction" | "restrict" | "cascade" | "setNull" }
 export interface DynamicCheckDefinition { readonly name: string; readonly predicate: CheckPredicate<Record<string, unknown>> }
 
-/** Определение динамической таблицы (из каталога метаданных DataManager). */
+/** Dynamic table definition (from an application's metadata catalog). */
 export interface DynamicTableDefinition {
-  /** Имя сущности/модели (используется как ключ реестра и имя `ctor`). */
+  /** Entity/model name (used as the registry key and the `ctor` name). */
   readonly name: string;
-  /** Физическая схема БД (например, `data`). Войдёт в `tableName`. */
+  /** Physical database schema (for example `data`). Becomes part of `tableName`. */
   readonly schema?: string;
-  /** Физическое имя таблицы (по умолчанию — `name`). */
+  /** Physical table name (defaults to `name`). */
   readonly tableName?: string;
   readonly fields: readonly DynamicFieldDefinition[];
   readonly primaryKey?: DynamicPrimaryKeyDefinition;
@@ -105,13 +105,13 @@ export interface DynamicTableDefinition {
   readonly foreignKeys?: readonly DynamicForeignKeyDefinition[];
   readonly checks?: readonly DynamicCheckDefinition[];
   readonly relations?: readonly DynamicRelationDefinition[];
-  /** Имя свойства soft-delete (NULL = не удалено). */
+  /** Soft-delete property name (NULL = not deleted). */
   readonly softDeleteProperty?: string;
 }
 /** Strict schema contracts use the same dynamic entity shape; no second runtime exists. */
 export type DynamicEntityDefinition = DynamicTableDefinition;
 
-/** Резолвер ctor целевой таблицы по имени (ленивый, для связей). */
+/** Resolver of the target table's ctor by name (lazy, for relations). */
 export type DynamicTargetResolver = (name: string) => EntityClass;
 
 const LOGICAL_TO_STORAGE: Record<ScalarLogicalFieldType, StorageColumnType> = {
@@ -126,13 +126,13 @@ const LOGICAL_TO_STORAGE: Record<ScalarLogicalFieldType, StorageColumnType> = {
 };
 
 /**
- * Собирает `EntityModel` из определения таблицы каталога — без декораторов и
- * рефлексии. Создаёт именованный анонимный `ctor` (его инстансы — обычные
- * объекты-строки), после чего модель пригодна и для `DbSet`/`ChangeTracker`,
- * и для генерации DDL диалектом (`createTableSql` и т.д.).
+ * Builds an `EntityModel` from a catalog table definition, without decorators
+ * or reflection. Creates a named anonymous `ctor` (its instances are plain row
+ * objects); the model then works both for `DbSet`/`ChangeTracker` and for DDL
+ * generation by the dialect (`createTableSql` and so on).
  *
- * Зеркалит правила `ModelBuilder`: ровно один ключ, целочисленный ключ —
- * identity по умолчанию, ключ/timestamp-поля всегда NOT NULL.
+ * Mirrors the `ModelBuilder` rules: one primary key, an integer key is identity
+ * by default, key/timestamp fields are always NOT NULL.
  */
 export function buildDynamicModel(def: DynamicTableDefinition, resolveTarget?: DynamicTargetResolver): EntityModel {
   return buildDynamicModelWithCtor(def, { [def.name]: class {} }[def.name]! as EntityClass, resolveTarget);
@@ -335,7 +335,7 @@ function buildRelations(
         `Dynamic table "${def.name}": navigation "${relation.navigationName}" collides with a field.`,
       );
     }
-    // Для reference внешний ключ — свойство этой таблицы; для collection он на цели.
+    // For reference the foreign key is a property of this table; for collection it is on the target.
     const relationKeys = typeof relation.foreignKey === "string" ? [relation.foreignKey] : relation.foreignKey;
     if (relation.kind === "reference" && relationKeys.some((key) => !byName.has(key))) {
       throw new ModelBuildError(
@@ -363,9 +363,11 @@ function buildProperty(tableName: string, field: DynamicFieldDefinition): Proper
     throw new ModelBuildError(`Dynamic table "${tableName}": unknown field type "${field.type}" for "${field.name}".`);
   }
 
-  // Целочисленный ключ по умолчанию автоинкрементный (identity).
+  // An integer key is auto-increment (identity) by default.
   const generation: KeyGeneration =
-    isKey && storageType === "integer" ? "identity" : isKey && field.type === "uuid" ? "uuid" : "none";
+    isKey && storageType === "integer" ? "identity"
+      : isKey && field.type === "uuid" ? (field.uuidVersion === "v7" ? "uuidV7" : "uuid")
+      : "none";
   const convention: PropertyConvention | undefined =
     field.convention ?? (field.type === "uuid" && !isKey ? "uuid" : undefined);
   const required = isKey || field.required === true || convention === "createdAt" || convention === "updatedAt";
@@ -460,7 +462,7 @@ function buildIndexes(
   const indexes: IndexModel[] = [];
   const base = physicalName.toLowerCase();
 
-  // Индексы по флагам поля (unique/indexed).
+  // Indexes from field flags (unique/indexed).
   for (const field of def.fields) {
     if (!field.unique && !field.indexed) {
       continue;
@@ -469,7 +471,7 @@ function buildIndexes(
     indexes.push({ name: `ix_${base}_${column}`, columns: [column], unique: field.unique === true });
   }
 
-  // Явные составные индексы.
+  // Explicit composite indexes.
   for (const index of def.indexes ?? []) {
     for (const column of index.columns) {
       if (![...byName.values()].some((property) => property.columnName === column)) {

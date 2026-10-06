@@ -1,4 +1,4 @@
-// Метаданные и конфигурация сущностей
+// Entity metadata and configuration
 export {
   Column,
   Check,
@@ -62,7 +62,7 @@ export type {
   StorageColumnType,
 } from "./Metadata/types";
 
-// Контекст (чистый движок; DI-обвязка — в `@/core/orm`)
+// Context (the pure engine; the DI wiring is in `@/core/orm`)
 export { DbContext } from "./DbContext";
 export { DbContextOptions, type DbContextOptionsConfig } from "./DbContextOptions";
 export { DbContextFactory } from "./DbContextFactory";
@@ -70,10 +70,10 @@ export { DatabaseFacade } from "./DatabaseFacade";
 export { OrmTransaction } from "./Transactions/OrmTransaction";
 export type { OrmDatabaseTimeV1, OrmTransactionScopeOptions } from "./Transactions/OrmTransaction";
 
-// Repository (реализация; контракт `IRepository<T>` и токены — в `@/core/orm`)
+// Repository (the implementation; the `IRepository<T>` contract and tokens are in `@/core/orm`)
 export { Repository } from "./Repository/Repository";
 
-// Запросы
+// Queries
 export { DbSet } from "./Query/DbSet";
 export { EntityQuery, IncludableQuery, ProjectedQuery, type NavigationElement } from "./Query/EntityQuery";
 export type { ForUpdateOptionsV1 } from "./Query/EntityQuery";
@@ -81,7 +81,7 @@ export type { OrmMutationResultV1, OrmInsertIfAbsentResultV1, OrmUpdateValuesV1,
 export { Operand, Predicate } from "./Query/conditions";
 export type { FieldSelector, KeySelectorFn, PredicateFn } from "./Query/conditions";
 
-// Трекинг
+// Tracking
 export { ChangeTracker, type TrackedEntry } from "./Tracking/ChangeTracker";
 export { EntityState } from "./Tracking/EntityState";
 export {
@@ -91,7 +91,7 @@ export {
   type ExecutionStrategyOptions,
 } from "./Saving/ExecutionStrategy";
 
-// Провайдеры (значения-соединения: `postgres(...)`).
+// Providers (connection values: `postgres(...)`).
 export { PostgresProvider, postgres, type PostgresProviderOptions, type PostgresServerTimeouts, type PostgresOperationEvent } from "./Providers/PostgresProvider";
 export { PostgresDialect } from "./Providers/PostgresDialect";
 export type {
@@ -110,7 +110,7 @@ export type {
   TransactionCallback,
 } from "./Providers/types";
 
-// Схема и миграции
+// Schema and migrations
 export { SchemaDiffer, type SchemaDiff, type AdditiveSchemaOperation } from "./Schema/SchemaDiffer";
 export { Migrator, type MigrationResult } from "./Schema/Migrator";
 export {
@@ -138,7 +138,7 @@ export type { CheckAst, CheckExpression, CheckOperand, CheckField, CheckPredicat
 export { defineOrmOwnedStoreV1 } from "./Schema/OrmOwnedStore";
 export type { OrmCatalogScopeV1, OrmOwnedStoreDefinitionV1 } from "./Schema/OrmOwnedStore";
 
-// Ошибки
+// Errors
 export { isUnknownTransactionOutcome, TransactionOutcomeUnknownError } from "./Providers/transactionOutcome";
 export {
   ConcurrentTransactionScopeError,

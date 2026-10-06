@@ -3,10 +3,10 @@ import type { ValidationError } from "./ValidationError";
 const NO_ERRORS: readonly ValidationError[] = Object.freeze([]);
 
 /**
- * Итог валидации экземпляра: все найденные ошибки разом.
+ * Validation outcome of an instance: all errors found at once.
  *
- * Движок не останавливается на первой ошибке — `errors` содержит полный
- * список проблем по всем полям, включая вложенные объекты.
+ * The engine does not stop at the first error: `errors` holds the full list of
+ * problems across all fields, including nested objects.
  *
  * ```ts
  * const result = Validator.validate(dto);
@@ -17,31 +17,30 @@ const NO_ERRORS: readonly ValidationError[] = Object.freeze([]);
  */
 export class ValidationResult {
   /**
-   * Индекс «поле -> ошибки», строится лениво при первом обращении к
-   * `getErrorsFor`/`hasErrorsFor`, чтобы не платить аллокациями за
-   * валидный объект (горячий путь — `isValid === true`).
+   * "Field -> errors" index, built lazily on the first `getErrorsFor`/`hasErrorsFor`
+   * call so a valid object pays no allocations (the hot path is `isValid === true`).
    */
   private index?: Map<string, ValidationError[]>;
 
-  /** @param errors Все ошибки, собранные за один проход валидации. */
+  /** @param errors All errors collected in one validation pass. */
   constructor(readonly errors: readonly ValidationError[]) {}
 
-  /** `true`, если ни одно правило не нарушено. */
+  /** `true` if no rule is violated. */
   get isValid(): boolean {
     return this.errors.length === 0;
   }
 
   /**
-   * Ошибки конкретного поля. Для вложенных полей указывайте полный путь:
+   * Errors of a specific field. For nested fields pass the full path:
    * `getErrorsFor("address.city")`.
    *
-   * @returns Массив ошибок поля; пустой (замороженный, общий) массив, если ошибок нет.
+   * @returns The field's errors; an empty (frozen, shared) array if there are none.
    */
   getErrorsFor(property: string): readonly ValidationError[] {
     return this.buildIndex().get(property) ?? NO_ERRORS;
   }
 
-  /** Есть ли хотя бы одна ошибка у поля `property`. */
+  /** Whether the `property` field has at least one error. */
   hasErrorsFor(property: string): boolean {
     return this.buildIndex().has(property);
   }

@@ -1,69 +1,69 @@
 /**
- * Коды ошибок валидации.
+ * Validation error codes.
  *
- * Код однозначно идентифицирует правило, которое не прошло проверку.
- * По коду подбирается шаблон сообщения: локальный `message` декоратора >
- * глобальный (`Validator.setDefaultMessages`) > встроенный по умолчанию.
+ * A code uniquely identifies the rule that failed. The message template is
+ * picked by code: the decorator's local `message` > global
+ * (`Validator.setDefaultMessages`) > the built-in default.
  */
 export const ValidationCodes = {
-  /** Значение отсутствует (`undefined` или `null`), а поле обязательно. */
+  /** The value is missing (`undefined` or `null`) but the field is required. */
   required: "required",
-  /** Строка пустая, а правило требует непустую. */
+  /** The string is empty but the rule requires a non-empty one. */
   notEmpty: "notEmpty",
-  /** Длина строки меньше минимальной. */
+  /** The string is shorter than the minimum. */
   minLength: "minLength",
-  /** Длина строки больше максимальной. */
+  /** The string is longer than the maximum. */
   maxLength: "maxLength",
-  /** Длина строки вне диапазона `length: [min, max]`. */
+  /** The string length is outside `length: [min, max]`. */
   length: "length",
-  /** Строка не содержит обязательную подстроку. */
+  /** The string does not contain the required substring. */
   contains: "contains",
-  /** Строка содержит запрещённую подстроку. */
+  /** The string contains a forbidden substring. */
   notContains: "notContains",
-  /** Строка не соответствует регулярному выражению. */
+  /** The string does not match the regular expression. */
   pattern: "pattern",
-  /** Строка не является корректным email-адресом. */
+  /** The string is not a valid email address. */
   email: "email",
-  /** Строка не является корректным URL. */
+  /** The string is not a valid URL. */
   url: "url",
-  /** Строка не является корректным UUID. */
+  /** The string is not a valid UUID. */
   uuid: "uuid",
-  /** Значение имеет неподходящий тип (см. `{expected}` / `{actual}`). */
+  /** The value has the wrong type (see `{expected}` / `{actual}`). */
   type: "type",
-  /** Число меньше минимума. */
+  /** The number is below the minimum. */
   min: "min",
-  /** Число больше максимума. */
+  /** The number is above the maximum. */
   max: "max",
-  /** Число вне диапазона `range: [min, max]`. */
+  /** The number is outside `range: [min, max]`. */
   range: "range",
-  /** Число не положительное. */
+  /** The number is not positive. */
   positive: "positive",
-  /** Число не отрицательное. */
+  /** The number is not negative. */
   negative: "negative",
-  /** Число не целое. */
+  /** The number is not an integer. */
   integer: "integer",
-  /** Boolean-значение не равно `true`. */
+  /** The boolean value is not `true`. */
   mustBeTrue: "mustBeTrue",
-  /** Boolean-значение не равно `false`. */
+  /** The boolean value is not `false`. */
   mustBeFalse: "mustBeFalse",
-  /** Значение не входит в перечисление `enumType`. */
+  /** The value is not in the `enumType` enumeration. */
   enum: "enum",
-  /** Строка не парсится как JSON. */
+  /** The string does not parse as JSON. */
   json: "json",
-  /** Строка не является корректным номером телефона. */
+  /** The string is not a valid phone number. */
   phone: "phone",
-  /** Значение не является корректной датой. */
+  /** The value is not a valid date. */
   date: "date",
-  /** Пользовательская `custom`-проверка вернула `false` или строку. */
+  /** The `custom` check returned `false` or a string. */
   custom: "custom",
-  /** Пользовательская `custom`-проверка (или `validateIf`) бросила исключение. */
+  /** The `custom` check (or `validateIf`) threw an exception. */
   customError: "customError",
   /**
-   * Асинхронная `custom`-проверка вызвана через синхронный `validate()`.
-   * Используйте `Validator.validateAsync()`.
+   * An async `custom` check was called through the synchronous `validate()`.
+   * Use `Validator.validateAsync()`.
    */
   asyncCustomInSyncCall: "asyncCustomInSyncCall",
 } as const;
 
-/** Тип-объединение всех встроенных кодов ошибок. */
+/** Union type of all built-in error codes. */
 export type ValidationCode = (typeof ValidationCodes)[keyof typeof ValidationCodes];

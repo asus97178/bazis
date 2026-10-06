@@ -15,12 +15,12 @@ export function physicalTableIdentity(model: EntityModel): TableIdentity {
   return { schema: model.schema, table: model.tableName };
 }
 
-/** Ключ таблицы в интроспекции / diff для `EntityModel`. */
+/** Table key in the introspection / diff for an `EntityModel`. */
 export function entityStorageKey(model: EntityModel): string {
   return model.schema !== undefined ? `${model.schema}.${model.tableName}` : model.tableName;
 }
 
-/** Ключ таблицы из строки интроспекции PostgreSQL. */
+/** Table key from a PostgreSQL introspection row. */
 export function introspectedTableKey(schema: string, table: string): string {
   return schema === "public" ? table : `${schema}.${table}`;
 }

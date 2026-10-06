@@ -1,70 +1,71 @@
 # Background
 
-Версия паспорта: 1. Дата: 2026-10-04. Статус: частичный паспорт существующей
-реализации. Тип: атомарный технический модуль. Путь: `src/osnv/core/background`.
-Точка подключения: [backgroundModule(config)](backgroundModule.ts); публичный
-вход: [index.ts](index.ts). Область: изоляция диагностических callbacks при
-ошибках и перезапусках; полный аудит остальных options/lifecycle сюда не входит.
-Команда первоначального создания неизвестна; новый каркас не создавался.
+Passport version: 1. Date: 2026-10-04. Status: partial passport of the existing
+implementation. Type: atomic technical module. Path: `src/osnv/core/background`.
+Connection point: [backgroundModule(config)](backgroundModule.ts); public
+entry: [index.ts](index.ts). Scope: isolation of diagnostic callbacks on errors
+and restarts; a full audit of the other options/lifecycle is out of scope.
+The original creation command is unknown; no new scaffold was created.
 
-## Ответственность и компоненты
+## Responsibility and components
 
-Модуль запускает длительную или периодическую работу через существующий
-HostedService. BackgroundService владеет отменой, выполняемой задачей и
-ограниченным числом перезапусков; PeriodicBackgroundService — последовательными
-тиками. DI, ORM, HTTP, данные и внешние эффекты задачи принадлежат потребителю.
-Составные части, собственный контейнер и постоянное хранилище не используются.
+The module runs long or periodic work through the existing HostedService.
+BackgroundService owns cancellation, the running task and a bounded number of
+restarts; PeriodicBackgroundService owns sequential ticks. DI, ORM, HTTP, data and
+the task's external effects belong to the consumer. No parts, own container or
+persistent storage are used.
 
-| Компонент | Вход и ответственность | Результат |
+| Component | Input and responsibility | Result |
 | --- | --- | --- |
-| [BackgroundService](BackgroundService.ts) | execute(signal), restart policy | Выполнение и перезапуски с backoff |
-| [PeriodicBackgroundService](BackgroundService.ts) | intervalMs, tick(signal) | Последовательные тики без наложения |
-| [Background](decorator.ts) | Metadata options | Настройки класса; явный super(options) приоритетен |
-| [delay](delay.ts) | ms, signal? | Пауза с ранним завершением при отмене |
+| [BackgroundService](BackgroundService.ts) | execute(signal), restart policy | Execution and restarts with backoff |
+| [PeriodicBackgroundService](BackgroundService.ts) | intervalMs, tick(signal) | Sequential ticks without overlap |
+| [Background](decorator.ts) | Metadata options | Class settings; an explicit super(options) wins |
+| [delay](delay.ts) | ms, signal? | A pause that ends early on cancellation |
 
-Сохранены классы, наследование и простые внутренние функции; новых слоёв,
-зависимостей и DI-токенов нет. Обработка ошибок наблюдателя отделена от
-управления задачей. На каждый сбой добавляется ограниченная работа по
-наблюдению результата callback; производительность не объявляется улучшенной.
+The classes, inheritance and simple internal functions are kept; there are no new
+layers, dependencies or DI tokens. Observer error handling is separate from task
+control. Each failure adds bounded work to observe the callback result; no
+performance improvement is claimed.
 
-## Подключение и DI
+## Connection and DI
 
-`backgroundModule({ services })` регистрирует классы как singleton и публикует
-каждый через существующий enumerable HOSTED_SERVICE. Imports и явные exports
-у исторической фабрики отсутствуют; её прежняя видимость сохранена. Конструкторы
-сервисов связывает обычный codegen. Пример и типы — в [backgroundModule.ts](backgroundModule.ts).
-Конфигурация окружения, ORM, схема и миграции здесь не используются.
+`backgroundModule({ services })` registers the classes as singletons and publishes
+each through the existing enumerable HOSTED_SERVICE. The historical factory has no
+imports and no explicit exports; its former visibility is kept. Regular codegen
+wires the service constructors. Example and types: [backgroundModule.ts](backgroundModule.ts).
+Environment configuration, ORM, schema and migrations are not used here.
 
-## Изменённый контракт диагностики
+## Changed diagnostics contract
 
-| Вход | Тип / default | Выполнение и ошибки |
+| Input | Type / default | Execution and errors |
 | --- | --- | --- |
-| `restart.onError` | `(error: unknown, restarts: number) => void`; необязателен, null не поддерживается | Вызывается для каждого сбоя execute до решения о повторе. Синхронная ошибка наблюдателя изолируется |
-| `onTickError` | protected `(error: unknown) => void`; default безопасное журналирование | Сбой tick наблюдается, затем расписание продолжается; ошибка наблюдателя также изолируется |
-| Неожиданно возвращённый Promise/thenable | Не расширяет синхронный публичный контракт | Rejection наблюдается без ожидания; он не останавливает цикл и не становится unhandled rejection |
+| `restart.onError` | `(error: unknown, restarts: number) => void`; optional, null is not supported | Called for every execute failure before the retry decision. A synchronous observer error is isolated |
+| `onTickError` | protected `(error: unknown) => void`; default is safe logging | A tick failure is observed, then the schedule continues; an observer error is isolated too |
+| An unexpectedly returned Promise/thenable | Does not extend the synchronous public contract | The rejection is observed without waiting; it does not stop the loop and does not become an unhandled rejection |
 
-Ошибка наблюдателя журналируется с существующим маскированием секретов.
-Ошибка самого diagnostic sink также изолируется. Наблюдатель не определяет
-успех задачи: ошибку execute по-прежнему обрабатывает прежняя restart policy.
-Итоговая ошибка внутреннего supervisor дополнительно наблюдается на start.
-Публичный start остаётся неблокирующим, а stop сохраняет прежний grace period.
-Принудительная отмена произвольного пользовательского кода не добавлена.
+An observer error is logged with the existing secret masking. An error of the
+diagnostic sink itself is isolated too. The observer does not decide task success:
+the execute error is still handled by the existing restart policy. The final error
+of the internal supervisor is additionally observed at start. The public start
+stays non-blocking, and stop keeps the existing grace period. Forced cancellation
+of arbitrary user code was not added.
 
-Асинхронный наблюдатель не ожидается и не входит в остановку службы; контракт
-предназначен для коротких синхронных уведомлений. Внешние эффекты, повторы
-самого логирования и завершение зависшего callback модуль не гарантирует.
+An async observer is not awaited and is not part of the service shutdown; the
+contract is meant for short synchronous notifications. The module does not
+guarantee external effects, retries of the logging itself or the completion of a
+hung callback.
 
-## Проверки и границы
+## Checks and limits
 
-[background.test.ts](test/background.test.ts) проверяет сохранение трёх запусков
-при maxRestarts=2 для sync throw, Promise rejection, thenable rejection и
-сломанного console.error; секрет не появляется в журнале. Отдельно проверено
-продолжение периодических тиков при sync/async сбоях onTickError. Существующие
-проверки lifecycle, DI и маскирования сохранены.
+[background.test.ts](test/background.test.ts) checks that three runs are kept with
+maxRestarts=2 for a sync throw, a Promise rejection, a thenable rejection and a
+broken console.error; the secret never appears in the log. Periodic ticks are also
+checked to continue on sync/async onTickError failures. The existing lifecycle, DI
+and masking checks are kept.
 
-Исправление R7 не требует codegen, новых ресурсов или динамических импортов.
-В собранной через `bun build --compile` регрессионной fixture проверены три
-запуска задачи при sync throw и Promise rejection диагностического callback;
-бинарник исполнен вне проекта. Команды и результаты — в
-[отчёте об исправлениях](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-reaudit-2026-10-04/FIXES.md).
-БД, нагрузочные испытания и production не затрагивались.
+The R7 fix needs no codegen, new resources or dynamic imports. A regression
+fixture built with `bun build --compile` checked three task runs on a sync throw
+and a Promise rejection of the diagnostic callback; the binary ran outside the
+project. Commands and results are in the
+[fixes report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-reaudit-2026-10-04/FIXES.md).
+The database, load tests and production were not involved.

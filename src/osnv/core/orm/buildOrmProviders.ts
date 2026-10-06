@@ -79,8 +79,8 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
       DI.singleton(
         DI.factoryProvider(HOSTED_SERVICE, [token, SERVICE_PROVIDER] as const, (provider: DatabaseProvider, serviceProvider) => {
           const current = effectiveConfigFor(serviceProvider, registrationIdentity, config);
-          // Feature-режим: соединение общее (DATABASE_PROVIDER), им владеет
-          // инфраструктура — здесь только ensureCreated/миграции, без close.
+          // Feature mode: the connection is shared (DATABASE_PROVIDER) and owned by
+          // the infrastructure; only ensureCreated/migrations here, no close.
           if (current.ownedStore !== undefined) {
             const container = serviceProvider as import("../di").DiContainer;
             const records = ownedStoreRegistrations({
@@ -109,7 +109,7 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
       const context = current === config ? config.context : current.context;
       return new context(current === config && optionsAtModuleCall !== undefined ? optionsAtModuleCall : createContextOptions(current, provider));
     })),
-    // Standalone-режим: контекст владеет собственным провайдером — закрывает его.
+    // Standalone mode: the context owns its provider and closes it.
     DI.singleton(DI.factoryProvider(HOSTED_SERVICE, [SERVICE_PROVIDER], (serviceProvider) => {
       const current = effectiveConfigFor(serviceProvider, registrationIdentity, config);
       return createOrmLifecycle(current, current === config && optionsAtModuleCall !== undefined ? optionsAtModuleCall : createContextOptions(current, provider), true);
@@ -118,7 +118,7 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
   return providers;
 }
 
-/** Health-check соединения по конкретному провайдеру-значению. */
+/** Connection health check for a concrete provider value. */
 export function buildOrmHealthCheck(provider: DatabaseProvider): ProviderDefinition {
   return DI.singleton(
     DI.factoryProvider(HEALTH_CHECK, [], () => ({
@@ -128,7 +128,7 @@ export function buildOrmHealthCheck(provider: DatabaseProvider): ProviderDefinit
   );
 }
 
-/** Health-check соединения по общему {@link DATABASE_PROVIDER} (feature-режим). */
+/** Connection health check through the shared {@link DATABASE_PROVIDER} (feature mode). */
 export function buildOrmHealthCheckFromToken(token: InjectionToken<DatabaseProvider>): ProviderDefinition {
   return DI.singleton(
     DI.factoryProvider(HEALTH_CHECK, [token], (provider: DatabaseProvider) => ({

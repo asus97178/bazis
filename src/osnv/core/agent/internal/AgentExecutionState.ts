@@ -99,7 +99,10 @@ export type AgentExecutionControlDecision =
   | { readonly kind: "continue" }
   | { readonly kind: "suspend"; readonly reason: string };
 
-/** Owner-private durable boundary. The driver wires this in WP2-B2. */
+/**
+ * Owner-private durable boundary, passed in the driver request. The driver
+ * consults it before each checkpoint transition, model dispatch and settlement.
+ */
 export interface AgentExecutionBoundary {
   checkControl(checkpoint: AgentExecutionCheckpointV1, next: AgentExecutionCheckpointV1): Promise<AgentExecutionControlDecision>;
   beforeModelDispatch(checkpoint: AgentExecutionCheckpointV1, step: number, request: AgentModelRequest): Promise<void>;

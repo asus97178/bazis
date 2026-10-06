@@ -830,7 +830,12 @@ function analyzeOwnedStoreCatalogContextV1(snapshot: OwnedStoreCatalogSnapshotV1
     }
   return Object.freeze({ stores: Object.freeze([...stores]), rootsByStoreKey });
 }
-/** Private B2 semantic verifier over one B1-owned, immutable catalogue snapshot. */
+/**
+ * Checks that an owned table's TOAST table, if any, has exactly the shape
+ * PostgreSQL creates: `pg_toast` schema, `chunk_id`/`chunk_seq`/`chunk_data`
+ * columns, one index and only the expected internal dependencies. Works on one
+ * immutable, already parsed catalog snapshot.
+ */
 function validateToastClosureV1(owner: OwnedCatalogRelationV1, relations: ReadonlyMap<string, OwnedCatalogRelationV1>, columns: ReadonlyMap<string, OwnedCatalogColumnV1[]>, indexes: ReadonlyMap<string, OwnedCatalogIndexV1[]>, consumedToastRelationOids: Set<string>, pgClass: string, pgNamespace: string, consume: (dependentClassOid: string, dependentOid: string, dependentSubId: string, referencedClassOid: string, referencedOid: string, referencedSubId: string, kind: OwnedCatalogDependencyV1["kind"], count?: number) => void, rejectDirect: (dependentClassOid: string, dependentOid: string, referencedClassOid: string, referencedOid: string) => void): void {
   if (owner.toastRelationOid === null)
     return;

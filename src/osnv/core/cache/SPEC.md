@@ -1,65 +1,65 @@
-# Модуль Cache (`@/core/cache`) — спецификация
+# The Cache module (`@/core/cache`): specification
 
-In-memory и распределённое (multi-instance) кэширование в стиле ASP.NET Core:
-`[OutputCache]` + `IMemoryCache` / `IDistributedCache`. Четыре декоратора на двух уровнях
-(HTTP и сервисы), без внешних npm-зависимостей, совместимо с `bun build --compile`.
+In-memory and distributed (multi-instance) caching in the ASP.NET Core style:
+`[OutputCache]` + `IMemoryCache` / `IDistributedCache`. Four decorators on two levels
+(HTTP and services), no external npm dependencies, compatible with `bun build --compile`.
 
-**Backend-agnostic:** фреймворк (`@/core/cache`) знает только абстракцию `IDistributedCache`.
-Конкретный backend (Redis и т.п.) живёт в `@/core/infra/*` и подключается через
-`redisConnect(redisConfig, { cache: "distributed" })` в `@Infra`. В самом
-`@/core/cache` нет ни одного `import … from "bun"`/Redis.
+**Backend-agnostic:** the framework (`@/core/cache`) knows only the `IDistributedCache`
+abstraction. A concrete backend (Redis and so on) lives in `@/core/infra/*` and is
+enabled with `redisConnect(redisConfig, { cache: "distributed" })` in `@Infra`.
+`@/core/cache` itself has no `import … from "bun"`/Redis at all.
 
-Быстрая навигация:
-- [1. Что это и зачем](#1-что-это-и-зачем)
-- [2. Архитектура: два уровня × два backend'а](#2-архитектура-два-уровня--два-backendа)
-- [3. Быстрый старт](#3-быстрый-старт)
+Quick navigation:
+- [1. What it is and why](#1-what-it-is-and-why)
+- [2. Architecture: two levels × two backends](#2-architecture-two-levels--two-backends)
+- [3. Quick start](#3-quick-start)
 - [4. `memory()` / advanced cache module configuration](#4-memory--advanced-cache-module-configuration)
 - [5. Named policies](#5-named-policies)
 - [6. `@OutputCache` — HTTP output cache (memory)](#6-outputcache--http-output-cache-memory)
 - [7. `@OutputRedisCache` — HTTP output cache (distributed)](#7-outputrediscache--http-output-cache-distributed)
-- [8. `@Cacheable` — кэш методов сервисов (memory)](#8-cacheable--кэш-методов-сервисов-memory)
-- [9. `@CacheableRedis` — кэш методов сервисов (distributed)](#9-cacheableredis--кэш-методов-сервисов-distributed)
-- [10. DI-провайдеры: `cachedSingleton` / `cachedScoped` (+ auto-hook)](#10-di-провайдеры-cachedsingleton--cachedscoped--auto-hook)
-- [11. `ICache` — программный API](#11-icache--программный-api)
-- [12. Формирование ключей output cache](#12-формирование-ключей-output-cache)
-- [13. Anti-stampede и concurrent miss](#13-anti-stampede-и-concurrent-miss)
+- [8. `@Cacheable`: service method cache (memory)](#8-cacheable-service-method-cache-memory)
+- [9. `@CacheableRedis`: service method cache (distributed)](#9-cacheableredis-service-method-cache-distributed)
+- [10. DI providers: `cachedSingleton` / `cachedScoped` (+ auto-hook)](#10-di-providers-cachedsingleton--cachedscoped--auto-hook)
+- [11. `ICache`: programmatic API](#11-icache-programmatic-api)
+- [12. Output cache key building](#12-output-cache-key-building)
+- [13. Anti-stampede and concurrent miss](#13-anti-stampede-and-concurrent-miss)
 - [14. Tag invalidation](#14-tag-invalidation)
-- [15. Интеграция с HTTP pipeline](#15-интеграция-с-http-pipeline)
-  - [15.1. Диаграммы pipeline (Mermaid)](#151-диаграммы-pipeline-mermaid)
-- [16. Распределённый backend и `@/core/infra`](#16-распределённый-backend-и-coreinfra)
-- [17. Безопасность](#17-безопасность)
-- [18. Сценарии production](#18-сценарии-production)
-- [19. Ограничения и анти-паттерны](#19-ограничения-и-анти-паттерны)
+- [15. Integration with the HTTP pipeline](#15-integration-with-the-http-pipeline)
+  - [15.1. Pipeline diagrams (Mermaid)](#151-pipeline-diagrams-mermaid)
+- [16. The distributed backend and `@/core/infra`](#16-the-distributed-backend-and-coreinfra)
+- [17. Security](#17-security)
+- [18. Production scenarios](#18-production-scenarios)
+- [19. Limits and anti-patterns](#19-limits-and-anti-patterns)
 - [20. FAQ](#20-faq)
-- [21. Карта папки](#21-карта-папки)
+- [21. Folder map](#21-folder-map)
 
 ---
 
-## 1. Что это и зачем
+## 1. What it is and why
 
-Модуль решает две разные задачи кэширования:
+The module solves two different caching tasks:
 
-| Задача | Декоратор | Что кэшируется | Аналог .NET |
+| Task | Decorator | What is cached | .NET counterpart |
 | --- | --- | --- | --- |
-| **Output cache** | `@OutputCache` / `@OutputRedisCache` | готовый HTTP-ответ (status + headers + body) | `[OutputCache]` |
-| **Method cache** | `@Cacheable` / `@CacheableRedis` | return value метода сервиса | `IMemoryCache` + `@Cacheable` |
+| **Output cache** | `@OutputCache` / `@OutputRedisCache` | the ready HTTP response (status + headers + body) | `[OutputCache]` |
+| **Method cache** | `@Cacheable` / `@CacheableRedis` | the return value of a service method | `IMemoryCache` + `@Cacheable` |
 
-**Зачем два уровня:**
+**Why two levels:**
 
-- **HTTP (output cache)** — один раз отработал controller action → повторные GET/HEAD отдаются без выполнения action и часто без обращения к сервисам/БД. Подходит для публичных catalog/list endpoint'ов.
-- **Сервис (method cache)** — кэшируется результат бизнес-метода независимо от HTTP. Подходит когда один сервис вызывается из нескольких controller'ов, фоновых job'ов или `@CacheableRedis` нужен между pod'ами.
+- **HTTP (output cache)**: the controller action ran once → repeated GET/HEAD are served without running the action and often without touching services/the database. Fits public catalog/list endpoints.
+- **Service (method cache)**: the result of a business method is cached regardless of HTTP. Fits when one service is called from several controllers or background jobs, or when `@CacheableRedis` is needed across pods.
 
-**Зачем memory и Redis:**
+**Why memory and Redis:**
 
-| Backend | Область | Когда |
+| Backend | Scope | When |
 | --- | --- | --- |
-| **In-memory** (`MemoryCache`) | один процесс | dev, single-instance, `@Cacheable` по умолчанию |
-| **Distributed** (`IDistributedCache`, backend из `@/core/infra/*`) | все инстансы приложения | horizontal scaling, `@OutputRedisCache`, `@CacheableRedis` |
+| **In-memory** (`MemoryCache`) | one process | dev, single instance, `@Cacheable` by default |
+| **Distributed** (`IDistributedCache`, a backend from `@/core/infra/*`) | all application instances | horizontal scaling, `@OutputRedisCache`, `@CacheableRedis` |
 
-> «Redis» в именах декораторов = «распределённый уровень». Backend подключается отдельно;
-> ядро оперирует абстракцией `IDistributedCache`.
+> "Redis" in the decorator names means "distributed level". The backend is connected
+> separately; the core works with the `IDistributedCache` abstraction.
 
-Импорт публичного API:
+Public API import:
 
 ```ts
 import {
@@ -77,14 +77,14 @@ import { redisConnect } from "@/core/infra";
 
 ---
 
-## 2. Архитектура: два уровня × два backend'а
+## 2. Architecture: two levels × two backends
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         HTTP Request                            │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │
-          jwtBearer (auth) → authorize (@Authorize) → output cache
+      authorize (@Authorize) → route middleware → binding → output cache
                                 │
               ┌─────────────────┴─────────────────┐
               │                                   │
@@ -94,7 +94,7 @@ import { redisConnect } from "@/core/infra";
          ICache<CachedHttpPayload>      DISTRIBUTED_OUTPUT_CACHE (registry)
               │                                   │
               └─────────────────┬─────────────────┘
-                                │ cache HIT → response без action
+                                │ cache HIT → response without the action
                                 │ cache MISS → action → store payload
                                 ▼
                          Controller action
@@ -110,25 +110,26 @@ import { redisConnect } from "@/core/infra";
          (method return value)           ({prefix}svc:… keys)
 ```
 
-### Четыре декоратора — сводная таблица
+### Four decorators: summary table
 
-| Декоратор | Уровень | Store | DI / HTTP wiring |
+| Decorator | Level | Store | DI / HTTP wiring |
 | --- | --- | --- | --- |
-| `@OutputCache` | controller action | `ICache` in-memory | `cache.httpIntegration.routeMiddlewareComposer` |
-| `@OutputRedisCache` | controller action | `IDistributedCache` | то же + `redisConnect(config, { cache: "distributed" })` в Infra |
-| `@Cacheable` | метод сервиса | `ICache` in-memory | `cachedSingleton` / `cachedScoped` (или auto-hook) |
-| `@CacheableRedis` | метод сервиса | `IDistributedCache` | `cachedSingleton` / `cachedScoped` + `redisConnect(config, { cache: "distributed" })` в Infra |
+| `@OutputCache` | controller action | `ICache` in-memory | the cache module's `ROUTE_MIDDLEWARE_COMPOSER` registration (automatic) |
+| `@OutputRedisCache` | controller action | `IDistributedCache` | the same + `redisConnect(config, { cache: "distributed" })` in Infra |
+| `@Cacheable` | service method | `ICache` in-memory | `cachedSingleton` / `cachedScoped` (or the auto-hook) |
+| `@CacheableRedis` | service method | `IDistributedCache` | `cachedSingleton` / `cachedScoped` + `redisConnect(config, { cache: "distributed" })` in Infra |
 
-**Важно:** декораторы на **классе реализации**, не на TypeScript interface. DI регистрирует interface token → proxy оборачивает implementation.
+**Important:** put decorators on the **implementation class**, not on a TypeScript interface. DI registers the interface token → the proxy wraps the implementation.
 
-### 2.1. Обзорная диаграмма (Mermaid)
+### 2.1. Overview diagram (Mermaid)
 
 ```mermaid
 flowchart TB
   subgraph HTTP["HTTP layer"]
-    REQ[Request] --> JWT[jwtBearer]
-    JWT --> AUTH[authorize @Authorize]
-    AUTH --> OC{output cache decorator?}
+    REQ[Request] --> GLOBAL[server middleware]
+    GLOBAL --> AUTH[authorize @Authorize]
+    AUTH --> ROUTE[route middleware + binding]
+    ROUTE --> OC{output cache decorator?}
     OC -->|@OutputCache| MEM_OUT[(ICache memory)]
     OC -->|@OutputRedisCache| REDIS_OUT[(IDistributedCache)]
     OC -->|none| ACT[Controller action]
@@ -155,9 +156,9 @@ flowchart TB
 
 ---
 
-## 3. Быстрый старт
+## 3. Quick start
 
-### 3.1. Минимум: in-memory output + method cache
+### 3.1. Minimum: in-memory output + method cache
 
 ```ts
 import { Cacheable, OutputCache, cachedScoped, memory } from "@/core/cache";
@@ -198,9 +199,9 @@ providers: [
 ],
 ```
 
-### 3.2. С распределённым backend (multi-instance)
+### 3.2. With a distributed backend (multi-instance)
 
-Backend подключается из `@/core/infra/*` — фреймворк остаётся backend-agnostic:
+The backend is connected from `@/core/infra/*`; the framework stays backend-agnostic:
 
 ```ts
 import { memory } from "@/core/cache";
@@ -229,8 +230,8 @@ class ProductService {
   async bySku(sku: string) { /* … */ }
 }
 
-// Тот же провайдер, что и для memory — распределённый уровень включается
-// автоматически, когда Infra публикует реестр распределённых хранилищ в DI.
+// The same provider as for memory: the distributed level turns on
+// automatically when Infra publishes the registry of distributed stores in DI.
 cachedScoped(IProductService, ProductService, deps);
 ```
 
@@ -259,50 +260,50 @@ const advanced = buildCacheModule({
 
 ### 4.1. `CacheOptions` — in-memory store
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `maxEntries` | `number` | ∞ | Макс. записей; при переполнении — LRU eviction |
-| `maxInFlight` | `number` | `1024` | Положительное safe integer. Предел выполняемых factory; новый miss при заполнении бросает `CacheCapacityError` до запуска factory |
-| `defaultTtlSeconds` | `number` | — | TTL по умолчанию для `ICache.set` без явного `ttlSeconds` |
-| `maxKeyLength` | `number` | `256` | Макс. длина ключа; более длинный ключ отклоняется |
-| `maxValueBytes` | `number` | ∞ | Лимит размера значения (UTF-8 байты); `set` бросает при превышении |
+| `maxEntries` | `number` | ∞ | Max entries; LRU eviction on overflow |
+| `maxInFlight` | `number` | `1024` | A positive safe integer. The limit of running factories; a new miss at the full limit throws `CacheCapacityError` before the factory starts |
+| `defaultTtlSeconds` | `number` | — | The default TTL for `ICache.set` without an explicit `ttlSeconds` |
+| `maxKeyLength` | `number` | `256` | Max key length; a longer key is rejected |
+| `maxValueBytes` | `number` | ∞ | The value size limit (UTF-8 bytes); `set` throws when exceeded |
 
 ### 4.2. `CacheOutputCacheOptions`
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `enabled` | `boolean` | `true` | Глобальный выключатель HTTP output cache |
-| `insecureAuthorizedRouteBehavior` | `"throw" \| "warn" \| "ignore"` | `"throw"` | Политика для `@Authorize` route без изоляции по пользователю |
-| `requireAuthenticationByDefault` | `boolean` | `false` | Согласовать с `jwtModule({ options: { requireAuthenticationByDefault } })` при guard |
+| `enabled` | `boolean` | `true` | The global switch of the HTTP output cache |
+| `insecureAuthorizedRouteBehavior` | `"throw" \| "warn" \| "ignore"` | `"throw"` | The policy for an `@Authorize` route without per-user isolation |
+| `requireAuthenticationByDefault` | `boolean` | `false` | Treat every route without `@AllowAnonymous` as protected in that check (for applications that authenticate every route) |
 
-### 4.3. Распределённые хранилища
+### 4.3. Distributed stores
 
-Подключение: `redisConnect(redisConfig, { cache: "distributed" })` в `@Infra`.
-Коннектор публикует `DistributedCacheStores` и HTTP/service-реестры через DI.
-Cache module принимает политики и настройки memory/output cache; ресурсами
-внешнего backend управляет Infra. Параметры Redis — в §16.
+Connection: `redisConnect(redisConfig, { cache: "distributed" })` in `@Infra`.
+The connector publishes `DistributedCacheStores` and the HTTP/service registries through
+DI. The cache module takes the policies and the memory/output cache settings; Infra
+manages the external backend's resources. Redis parameters are in §16.
 
-### 4.4. Что регистрирует модуль
+### 4.4. What the module registers
 
-| Token / сервис | Назначение |
+| Token / service | Purpose |
 | --- | --- |
-| `ICache` | `MemoryCache` singleton |
+| `ICache` | the `MemoryCache` singleton |
 | `CACHE_OPTIONS` | validated options |
-| `CACHE_POLICIES` | named policies из config |
+| `CACHE_POLICIES` | named policies from the config |
 | `HEALTH_CHECK` | `cache:memory` |
 
-Infra отдельно публикует `DISTRIBUTED_CACHE_BACKEND`, `DISTRIBUTED_OUTPUT_CACHE`,
-`DISTRIBUTED_SERVICE_CACHE`, свой lifecycle и health соединения.
+Infra separately publishes `DISTRIBUTED_CACHE_BACKEND`, `DISTRIBUTED_OUTPUT_CACHE`,
+`DISTRIBUTED_SERVICE_CACHE`, its lifecycle and the connection health.
 
 ---
 
 ## 5. Named policies
 
-Policies — переиспользуемые пресеты в `cacheModule({ policies })`. Декоратор ссылается через `policy: "name"`.
-Inline-поля декоратора **перекрывают** policy (policy → inline, inline wins).
+Policies are reusable presets in `buildCacheModule({ policies })`. A decorator refers to one with `policy: "name"`.
+Inline decorator fields **override** the policy (policy → inline, inline wins).
 
 ```ts
-cacheModule({
+buildCacheModule({
   policies: {
     catalog: {
       seconds: 60,
@@ -313,7 +314,7 @@ cacheModule({
     userById: {
       seconds: 300,
       tags: ["users"],
-      key: (...args) => `user:${String(args[0])}`, // для @Cacheable
+      key: (...args) => `user:${String(args[0])}`, // for @Cacheable
     },
   },
 });
@@ -324,62 +325,62 @@ cacheModule({
 @Cacheable({ policy: "userById" })
 ```
 
-Policy тип `CachePolicy` объединяет поля output cache и method cache — одна policy может использоваться и там, и там (лишние поля игнорируются на другом уровне).
+The `CachePolicy` type combines the output cache and method cache fields: one policy can be used on both levels (extra fields are ignored on the other level).
 
 ---
 
 ## 6. `@OutputCache` — HTTP output cache (memory)
 
-Кэширует **полный HTTP-ответ** после выполнения action. На cache hit controller **не вызывается**.
+Caches the **full HTTP response** after the action runs. On a cache hit the controller is **not called**.
 
-### 6.1. Справочник полей
+### 6.1. Field reference
 
-#### Общие (`CachePolicyBase`)
+#### Common (`CachePolicyBase`)
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `seconds` | `number` | — | **Обязателен** (inline или в policy). TTL записи |
-| `policy` | `string` | — | Имя policy из `cacheModule({ policies })` |
-| `tags` | `string[]` | — | Теги для `ICache.evictByTag(tag)` |
-| `enabled` | `boolean` | `true` | `false` — middleware не вешается (metadata сохраняется) |
-| `noStore` | `boolean` | `false` | `true` — не читать и не писать кэш |
+| `seconds` | `number` | — | **Required** (inline or in the policy). The entry TTL |
+| `policy` | `string` | — | A policy name from `buildCacheModule({ policies })` |
+| `tags` | `string[]` | — | Tags for `ICache.evictByTag(tag)` |
+| `enabled` | `boolean` | `true` | `false`: the middleware is not attached (the metadata is kept) |
+| `noStore` | `boolean` | `false` | `true`: neither read nor write the cache |
 
 #### HTTP-specific (`OutputCachePolicyFields`)
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `varyByQuery` | `string[]` \| `"*"` | `"*"` | Query-параметры в ключе. `[]` — явно игнорировать query |
-| `varyByRoute` | `string[]` | — | Route params (`:id`, …) в ключе |
-| `varyByHeader` | `string[]` | — | Значения заголовков запроса в ключе |
-| `varyByUser` | `boolean` | `false` | Отдельный ключ на JWT `sub` (требует auth middleware до cache) |
-| `varyByClaim` | `string` | — | Отдельный ключ на значение claim (например role) |
-| `maxBodyBytes` | `number` | `16777216` | Макс. body, материализуемый для одной записи; `0` явно отключает лимит |
-| `bodyReadTimeoutMs` | `number` | `5000` | Общий timeout материализации body; `0` явно отключает timeout |
-| `unlessAuthenticated` | `boolean` | `false` | `true` — не кэшировать для logged-in пользователей |
-| `allowAuthenticatedShared` | `boolean` | `false` | Явно разрешить общую запись для optional-auth request, если ответ не зависит от principal |
-| `methods` | `string[]` | `GET`, `HEAD` | HTTP-методы, для которых работает cache |
-| `statusCodes` | `number[]` | `[200]` | Какие status codes сохранять |
-| `clientCache` | `ClientCacheOptions` | — | `Cache-Control` для браузера/CDN (Response Cache слой) |
+| `varyByQuery` | `string[]` \| `"*"` | `"*"` | Query parameters in the key. `[]` explicitly ignores the query |
+| `varyByRoute` | `string[]` | — | Route params (`:id`, …) in the key |
+| `varyByHeader` | `string[]` | — | Request header values in the key |
+| `varyByUser` | `boolean` | `false` | A separate key per principal `subject` (an `@Authorize` check stores the principal; authorization runs before the cache) |
+| `varyByClaim` | `string` | — | A separate key per claim value (for example role) |
+| `maxBodyBytes` | `number` | `16777216` | The max body materialized for one entry; `0` explicitly disables the limit |
+| `bodyReadTimeoutMs` | `number` | `5000` | The overall body materialization timeout; `0` explicitly disables the timeout |
+| `unlessAuthenticated` | `boolean` | `false` | `true`: do not cache for signed-in users |
+| `allowAuthenticatedShared` | `boolean` | `false` | Explicitly allow a shared entry for an optional-auth request if the response does not depend on the principal |
+| `methods` | `string[]` | `GET`, `HEAD` | The HTTP methods the cache works for |
+| `statusCodes` | `number[]` | `[200]` | Which status codes to store |
+| `clientCache` | `ClientCacheOptions` | — | `Cache-Control` for the browser/CDN (the Response Cache layer) |
 | `when` | `(ctx) => boolean \| Promise<boolean>` | — | `false` → skip read/write |
 
-Если body превышает `maxBodyBytes` или не успевает материализоваться за
-`bodyReadTimeoutMs`, ответ отдаётся клиенту без изменений, но в cache не попадает.
+If the body exceeds `maxBodyBytes` or does not materialize within `bodyReadTimeoutMs`,
+the response goes to the client unchanged but does not get into the cache.
 
 #### `ClientCacheOptions`
 
-| Поле | Тип | Описание |
+| Field | Type | Description |
 | --- | --- | --- |
-| `maxAge` | `number` | `max-age=N` в `Cache-Control` |
-| `public` | `boolean` | `public` directive |
-| `private` | `boolean` | `private` directive |
-| `noCache` | `boolean` | `no-cache` directive |
+| `maxAge` | `number` | `max-age=N` in `Cache-Control` |
+| `public` | `boolean` | the `public` directive |
+| `private` | `boolean` | the `private` directive |
+| `noCache` | `boolean` | the `no-cache` directive |
 
-Для `varyByUser`/`varyByClaim` client policy всегда становится `private`;
-`clientCache.public: true` совместно с персонализацией — startup error.
+For `varyByUser`/`varyByClaim` the client policy always becomes `private`;
+`clientCache.public: true` together with personalization is a startup error.
 
-### 6.2. Примеры
+### 6.2. Examples
 
-**Публичный catalog с pagination:**
+**A public catalog with pagination:**
 
 ```ts
 @Get("items")
@@ -394,7 +395,7 @@ list(limit = 20, page = 1) {
 }
 ```
 
-**Protected list — изоляция по пользователю:**
+**A protected list isolated per user:**
 
 ```ts
 @Controller("users")
@@ -407,7 +408,7 @@ export class UsersController {
 }
 ```
 
-**Условное кэширование:**
+**Conditional caching:**
 
 ```ts
 @Get("report")
@@ -418,45 +419,45 @@ export class UsersController {
 report() { /* … */ }
 ```
 
-**Только для anonymous:**
+**Only for anonymous users:**
 
 ```ts
 @Get("landing-stats")
 @OutputCache({ seconds: 60, unlessAuthenticated: true })
-stats() { /* один кэш для всех гостей; logged-in всегда fresh */ }
+stats() { /* one cache for all guests; signed-in users always get fresh data */ }
 ```
 
-### 6.3. Что сохраняется в кэше
+### 6.3. What is stored in the cache
 
-Ответ сериализуется как `CachedHttpPayload`:
+The response is serialized as a `CachedHttpPayload`:
 
 ```ts
 { status: number; headers: Record<string, string>; body: Uint8Array }
 ```
 
-Sensitive response headers **не сохраняются и не replay'ятся**:
+Sensitive response headers are **neither stored nor replayed**:
 `Set-Cookie`, `Authorization`, `Cookie`, `WWW-Authenticate`, `Proxy-Authenticate`, `Proxy-Authorization`.
 
-Body читается целиком (`arrayBuffer`) — **streaming response не поддерживается**.
+The body is read whole (`arrayBuffer`): **streaming responses are not supported**.
 
 ---
 
 ## 7. `@OutputRedisCache` — HTTP output cache (distributed)
 
-Семантика идентична `@OutputCache`, store — распределённый `IDistributedCache`.
-Shared между всеми инстансами приложения с одним backend.
+The semantics are identical to `@OutputCache`; the store is the distributed `IDistributedCache`.
+It is shared by all application instances with one backend.
 
-### 7.1. Дополнительные поля
+### 7.1. Extra fields
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `connection` | `string` | `"default"` | Имя connection backend'а |
-| `keyPrefix` | `string` | из connection | Доп. prefix для ключей **этого route** |
-| `lockSeconds` | `number` | из connection | Override TTL anti-stampede lock при miss |
+| `connection` | `string` | `"default"` | The backend connection name |
+| `keyPrefix` | `string` | from the connection | An extra key prefix for **this route** |
+| `lockSeconds` | `number` | from the connection | Overrides the TTL of the anti-stampede lock on a miss |
 
-Наследует все поля `@OutputCache` (см. §6.1).
+Inherits all `@OutputCache` fields (see §6.1).
 
-### 7.2. Подключение
+### 7.2. Connection
 
 ```ts
 import { Infra, redisConnect } from "@/core/infra";
@@ -480,7 +481,7 @@ feed() { /* … */ }
 MISS:
   GET key → miss
   SET lock:{key} NX EX lockSeconds
-  → run action (один pod)
+  → run action (one pod)
   → SET payload EX seconds
   → SADD tag:{tag} payloadKey
 
@@ -489,59 +490,59 @@ HIT:
 ```
 
 Concurrent miss:
-- **на одном pod** — in-process `inFlight` dedup;
-- **между pod'ами** — `SET NX EX` + poll peer result до `lockSeconds`.
+- **on one pod**: in-process `inFlight` dedup;
+- **between pods**: `SET NX EX` + polling for the peer result up to `lockSeconds`.
 
-### 7.4. Ограничения
+### 7.4. Limits
 
-- Без DI-реестра `DISTRIBUTED_OUTPUT_CACHE` на route с `@OutputRedisCache` первый запрос получает `CacheError`.
-- `@OutputCache` + `@OutputRedisCache` на одном action — **warning**, побеждает распределённый.
-- Требует готовое соединение до первого запроса: Redis подключает `InfraLifecycle`, default phase −100.
+- Without the `DISTRIBUTED_OUTPUT_CACHE` DI registry, the first request to a route with `@OutputRedisCache` gets a `CacheError`.
+- `@OutputCache` + `@OutputRedisCache` on one action is a **warning**; the distributed one wins.
+- The connection must be ready before the first request: `InfraLifecycle` connects Redis, default phase −100.
 
 ---
 
-## 8. `@Cacheable` — кэш методов сервисов (memory)
+## 8. `@Cacheable`: service method cache (memory)
 
-Перехватывает вызов метода через DI proxy. Кэшируется **return value** (ссылка на объект).
+Intercepts the method call through the DI proxy. The **return value** is cached (an object reference).
 
-### 8.1. Справочник полей
+### 8.1. Field reference
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `seconds` | `number` | — | **Обязателен** (inline или policy) |
-| `policy` | `string` | — | Named policy |
+| `seconds` | `number` | — | **Required** (inline or in the policy) |
+| `policy` | `string` | — | A named policy |
 | `tags` | `string[]` | — | Tag invalidation |
-| `enabled` / `noStore` | `boolean` | — | Как у output cache |
-| `key` | `string` \| `(...args) => string` | auto | Ключ записи. Без `key` — SHA-256 от class/method и канонического графа аргументов; неподдерживаемый ввод обходит кэш |
-| `unless` | `(...args) => boolean` | — | `true` → skip cache для этого вызова |
+| `enabled` / `noStore` | `boolean` | — | As in the output cache |
+| `key` | `string` \| `(...args) => string` | auto | The entry key. Without `key`: SHA-256 of the class/method and the canonical argument graph; unsupported input bypasses the cache |
+| `unless` | `(...args) => boolean` | — | `true` → skip the cache for this call |
 
-### 8.2. Примеры
+### 8.2. Examples
 
-Автоматический ключ поддерживает примитивы, обычные массивы, стандартный Date,
-Map/Set без дополнительных свойств и записи с Object.prototype/null и
-перечисляемыми строковыми data-полями. Map/Set обходятся встроенными итераторами
-в порядке вставки; вложенные коллекции поддерживаются. Поля записей по-прежнему
-сортируются. Граф всего списка аргументов различает повторную ссылку и равные
-копии. Объектным ключам Map и элементам Set присваивается стабильная identity
-внутри сервисного proxy, включая их появления в других аргументах. UUID encoder
-различает такие identity даже у разных proxy с общим cacheNamespace. Поэтому
-проверка `map.has(knownObject)` не смешивается с поиском другого равного объекта.
-Содержимое графа пересчитывается при каждом вызове; мутации влияют на следующий ключ.
+The automatic key supports primitives, regular arrays, a standard Date, Map/Set without
+extra properties and records with the Object.prototype/null prototype and enumerable
+string data fields. Map/Set are walked with the built-in iterators in insertion order;
+nested collections are supported. Record fields are still sorted. The graph of the whole
+argument list distinguishes a repeated reference from equal copies. Object keys of a Map
+and Set elements get a stable identity within the service proxy, including their
+occurrences in other arguments. The encoder UUID distinguishes such identities even for
+different proxies with a shared cacheNamespace. So `map.has(knownObject)` is not mixed up
+with looking up another equal object. The graph content is recomputed on every call;
+mutations affect the next key.
 
-Для классов со скрытым состоянием, подклассов встроенных типов, accessors,
-functions/symbols, symbol/non-enumerable полей, дополнительных свойств встроенных
-объектов, циклов, Proxy и invalid Date обёртка автоматически вызывает исходный
-метод без кэша. Метод вызывается один раз, оба backend и distributed registry
-не затрагиваются; getters/Proxy traps не исполняются encoder. Это не требует
-явного `key`. Ошибки метода, явно заданного `key` и backend не подавляются.
-Для CacheableRedis отсутствие backend проверяется после решения использовать кэш.
+For classes with hidden state, subclasses of built-in types, accessors,
+functions/symbols, symbol/non-enumerable fields, extra properties of built-in objects,
+cycles, Proxy and an invalid Date, the wrapper automatically calls the original method
+without the cache. The method is called once, both backends and the distributed registry
+are not touched; the encoder runs no getters/Proxy traps. This needs no explicit `key`.
+Errors of the method, an explicitly set `key` and the backend are not suppressed.
+For CacheableRedis a missing backend is checked after deciding to use the cache.
 
-Обычные записи/массивы остаются данными по значению: порядок полей записи,
-флаги дескрипторов и произвольная внешняя идентичность вложенных объектов не входят
-в ключ. Аргументы не замораживаются: ключ — снимок на входе, поэтому данные
-незавершённой операции не следует менять. При иной семантике эквивалентности
-можно задать прикладной `key`. Getter/setter самого кэшируемого сервиса исполняются
-на исходном экземпляре и поддерживают нативные private-поля.
+Regular records/arrays stay data by value: the field order of a record, the descriptor
+flags and the arbitrary external identity of nested objects are not part of the key.
+Arguments are not frozen: the key is a snapshot at entry, so do not change the data of an
+unfinished operation. For other equivalence semantics set an application `key`. Getters
+and setters of the cached service itself run on the original instance and support native
+private fields.
 
 ```ts
 class UserService implements IUserStore {
@@ -562,7 +563,7 @@ class UserService implements IUserStore {
 }
 ```
 
-**Ключ `key` — всегда через `(...args: readonly unknown[]) => string`** (TypeScript constraint proxy).
+**The `key` is always `(...args: readonly unknown[]) => string`** (a TypeScript constraint of the proxy).
 
 ### 8.3. Class-level vs method-level
 
@@ -579,70 +580,71 @@ class ReportService {
 
 ---
 
-## 9. `@CacheableRedis` — кэш методов сервисов (distributed)
+## 9. `@CacheableRedis`: service method cache (distributed)
 
-Shared method cache между инстансами. Значения сериализуются **JSON** (`jsonCacheCodec`).
+A method cache shared between instances. Values are serialized as **JSON** (`jsonCacheCodec`).
 
-### 9.1. Поля
+### 9.1. Fields
 
-Все поля `@Cacheable` (§8.1) плюс:
+All `@Cacheable` fields (§8.1) plus:
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `connection` | `string` | `"default"` | Distributed connection name |
-| `lockSeconds` | `number` | из connection | Distributed lock TTL |
+| `connection` | `string` | `"default"` | The distributed connection name |
+| `lockSeconds` | `number` | from the connection | The distributed lock TTL |
 
-### 9.2. Namespace ключей
+### 9.2. Key namespace
 
 | Store | Key pattern |
 | --- | --- |
 | HTTP output (codec payload) | `{keyPrefix}{routeKey}` |
 | Service (codec JSON) | `{keyPrefix}svc:{methodKey}` |
 
-HTTP и service cache **не пересекаются** даже при одном connection.
+The HTTP and service caches **do not overlap** even with one connection.
 
-### 9.3. Пример hybrid-класса
+### 9.3. A hybrid class example
 
 ```ts
 class UserService implements IUserStore {
   @Cacheable({ policy: "userById", key: (...args) => String(args[0]) })
-  async byId(id: number) { /* memory — быстрый локальный */ }
+  async byId(id: number) { /* memory: a fast local cache */ }
 
   @CacheableRedis({ policy: "userByName", key: (...args) => String(args[0]) })
-  async findByName(name: string) { /* Redis — shared lookup для auth */ }
+  async findByName(name: string) { /* Redis: a lookup shared across pods */ }
 }
 ```
 
-**Один метод — один декоратор.** `@Cacheable` + `@CacheableRedis` на одном method → runtime error.
+**One method, one decorator.** `@Cacheable` + `@CacheableRedis` on one method → a runtime error.
 
 ---
 
-## 10. DI-провайдеры: `cachedSingleton` / `cachedScoped` (+ auto-hook)
+## 10. DI providers: `cachedSingleton` / `cachedScoped` (+ auto-hook)
 
-Один провайдер покрывает оба уровня. `@Cacheable` → in-memory `ICache`; `@CacheableRedis` →
-распределённый `DISTRIBUTED_SERVICE_CACHE` — **автоматически**, если реестр зарегистрирован
-через Infra/DI. Отдельных `redisCached*` / `hybridCached*` больше нет.
+One provider covers both levels. `@Cacheable` → the in-memory `ICache`; `@CacheableRedis` →
+the distributed `DISTRIBUTED_SERVICE_CACHE`, **automatically** if the registry is
+registered through Infra/DI. There are no separate `redisCached*` / `hybridCached*` anymore.
 
-| Provider | Декораторы | Зависимости DI | Scope |
+| Provider | Decorators | DI dependencies | Scope |
 | --- | --- | --- | --- |
-| `cachedSingleton` | `@Cacheable` и/или `@CacheableRedis` | `ICache`, `CACHE_POLICIES`, (опц.) `DISTRIBUTED_SERVICE_CACHE` | singleton |
-| `cachedScoped` | `@Cacheable` и/или `@CacheableRedis` | то же | scoped |
+| `cachedSingleton` | `@Cacheable` and/or `@CacheableRedis` | `ICache`, `CACHE_POLICIES`, (optional) `DISTRIBUTED_SERVICE_CACHE` | singleton |
+| `cachedScoped` | `@Cacheable` and/or `@CacheableRedis` | the same | scoped |
 
 Removed aliases: `src/osnv/core/cache/COMPATIBILITY.md`.
 
 ```ts
 // Interface token ← proxy ← implementation class with decorators.
-// Работает и для @Cacheable, и для @CacheableRedis (если backend настроен).
+// Works for both @Cacheable and @CacheableRedis (if the backend is configured).
 cachedScoped(IUserStore, UserService, [repositoryFor(User)]);
 ```
 
-### 10.0. Магия из коробки (auto-hook)
+### 10.0. Out of the box (auto-hook)
 
-`memory()` регистрирует hook на core-провайдеры `singleton()` / `scoped()`: если класс
-несёт `@Cacheable` / `@CacheableRedis`, обычная регистрация **автоматически** оборачивается
-кэширующим proxy. Явный `cachedScoped` нужен лишь когда вы хотите быть предельно явными.
+`memory()` registers a hook on the core `singleton()` / `scoped()` providers: if a class
+carries `@Cacheable` / `@CacheableRedis`, the regular registration is **automatically**
+wrapped with a caching proxy. An explicit `cachedScoped` is needed only when you want to
+be completely explicit.
 
-### 10.1. Interface vs implementation — частый вопрос
+### 10.1. Interface vs implementation: a common question
 
 ```ts
 interface IUserStore {
@@ -654,18 +656,18 @@ class UserService implements IUserStore {
   async byId(id: number) { /* … */ }
 }
 
-// ✅ правильно
+// ✅ correct
 cachedScoped(IUserStore, UserService, deps);
 
-// ❌ декоратор на interface не работает
-// При подключённом memory() обычный singleton(IUserStore, UserService)
-// также получает proxy через auto-hook.
+// ❌ a decorator on an interface does not work
+// With memory() connected, a plain singleton(IUserStore, UserService)
+// also gets the proxy through the auto-hook.
 ```
 
-### 10.2. Encapsulation модулей
+### 10.2. Module encapsulation
 
-Приложение должно установить cache module один раз через `runApp({ cache: memory() })`
-или корневый import `memory()`. Feature-модуль регистрирует только свой сервис:
+The application must install the cache module once with `runApp(AppModule, { cache: memory() })`
+or a root import of `memory()`. A feature module registers only its own service:
 
 ```ts
 @Module({
@@ -677,63 +679,63 @@ class UsersModule {}
 
 ---
 
-## 11. `ICache` — программный API
+## 11. `ICache`: programmatic API
 
-Прямое использование без декораторов (invalidation, custom cache logic):
+Direct use without decorators (invalidation, custom cache logic):
 
 ```ts
-@Inject(ICache) private readonly cache: ICache;
+constructor(private readonly cache: ICache) {}
 
-// sync/async factory с dedup
+// a sync/async factory with dedup
 const value = await this.cache.getOrCreateAsync(
   "config:features",
   () => this.loadFeatures(),
   { ttlSeconds: 300, tags: ["config"] },
 );
 
-// групповая очистка
+// group cleanup
 this.cache.evictByTag("users");
 ```
 
-| Метод | Описание |
+| Method | Description |
 | --- | --- |
-| `get(key)` | Читает запись; `undefined` если нет или TTL истёк |
-| `set(key, value, options?)` | Записывает; **бросает** при нарушении лимитов |
-| `getOrCreate(key, factory, options?)` | Sync/async factory; dedup если factory вернула Promise |
+| `get(key)` | Reads an entry; `undefined` if it is missing or the TTL expired |
+| `set(key, value, options?)` | Writes; **throws** when limits are violated |
+| `getOrCreate(key, factory, options?)` | A sync/async factory; dedup if the factory returned a Promise |
 | `getOrCreateAsync(key, factory, options?)` | Async + in-process anti-stampede |
-| `remove(key)` | Удаляет одну запись |
-| `clear()` | Очищает весь store |
-| `evictByTag(tag)` | Удаляет все записи с тегом |
-| `list()` / `size` | Introspection (без expired) |
+| `remove(key)` | Removes one entry |
+| `clear()` | Clears the whole store |
+| `evictByTag(tag)` | Removes all entries with the tag |
+| `list()` / `size` | Introspection (without expired entries) |
 
-`getOrCreate*` не бросает при переполнении — graceful degradation (значение возвращается, но может не сохраниться).
+`getOrCreate*` does not throw on value-size overflow: graceful degradation (the value is returned but may not be stored). The `maxInFlight` limit is the exception: a new miss at the full limit gets `CacheCapacityError`.
 
-Прямые ключи `ICache` длиннее `maxKeyLength` (default 256) отклоняются.
-Встроенные HTTP/service key builders до записи хэшируют каноническое представление SHA-256.
+Direct `ICache` keys longer than `maxKeyLength` (default 256) are rejected.
+The built-in HTTP/service key builders hash a canonical representation with SHA-256 before writing.
 
 ---
 
-## 12. Формирование ключей output cache
+## 12. Output cache key building
 
-Функция `buildOutputCacheKey(ctx, routeName, options)` собирает JSON-tuple,
-куда всегда входят HTTP method, action identity, request `origin` и фактический `pathname`,
-а затем возвращает `http:<sha256>`. Исходные query/header/user values в keyspace не попадают.
+The `buildOutputCacheKey(ctx, routeName, options)` function builds a JSON tuple that
+always includes the HTTP method, the action identity, the request `origin` and the actual
+`pathname`, then returns `http:<sha256>`. Raw query/header/user values never get into the keyspace.
 
 ```
 http:<sha256(JSON tuple)>
 ```
 
-| Vary option | Компонент tuple | Пример |
+| Vary option | Tuple component | Example |
 | --- | --- | --- |
-| `varyByQuery: ["limit"]` | `["query","limit",["20"]]` | все repeated values указанного params |
-| `varyByQuery: "*"` | все query names sorted | каждое имя + все его values |
+| `varyByQuery: ["limit"]` | `["query","limit",["20"]]` | all repeated values of the named params |
+| `varyByQuery: "*"` | all query names sorted | each name + all its values |
 | `varyByRoute: ["id"]` | `["route","id","42"]` | |
-| `varyByHeader: ["Accept-Language"]` | `["header","accept-language","ru"]` | header name lowercased |
-| `varyByUser: true` | auth state + `sub` | пустой authenticated `sub` отключает cache для request |
-| `varyByClaim: "role"` | auth state + claim type/value | пустой claim отключает cache для request |
-| API version | `["version","2"]` | если `ctx.apiVersion` задан |
+| `varyByHeader: ["Accept-Language"]` | `["header","accept-language","ru"]` | the header name lowercased |
+| `varyByUser: true` | auth state + `sub` | an empty authenticated `sub` disables the cache for the request |
+| `varyByClaim: "role"` | auth state + claim type/value | an empty claim disables the cache for the request |
+| API version | `["version","2"]` | if `ctx.apiVersion` is set |
 
-Пример итогового ключа:
+An example of the final key:
 
 ```
 http:8f5d…<64 hex chars>
@@ -741,18 +743,18 @@ http:8f5d…<64 hex chars>
 
 ---
 
-## 13. Anti-stampede и concurrent miss
+## 13. Anti-stampede and concurrent miss
 
-**Проблема:** 100 одновременных miss на один ключ → 100 одинаковых запросов к БД.
+**The problem:** 100 concurrent misses on one key → 100 identical database queries.
 
-**Решение:**
+**The solution:**
 
-| Store | Механизм |
+| Store | Mechanism |
 | --- | --- |
-| Memory (`MemoryCache`, output + `@Cacheable`) | `inFlight` Map — один factory на ключ в процессе |
-| Redis output / `@CacheableRedis` | `SET lock NX EX` + in-process dedup + poll peer |
+| Memory (`MemoryCache`, output + `@Cacheable`) | the `inFlight` Map: one factory per key in the process |
+| Redis output / `@CacheableRedis` | `SET lock NX EX` + in-process dedup + polling the peer |
 
-При Redis lock не acquired — ожидание результата peer pod'а (poll каждые 50ms до `lockSeconds`).
+If the Redis lock is not acquired, the instance waits for the peer pod's result (polling every 50 ms up to `lockSeconds`).
 
 ---
 
@@ -766,67 +768,66 @@ http:8f5d…<64 hex chars>
 ```ts
 import { DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE } from "@/core/cache";
 
-// После мутации данных:
+// After a data mutation:
 cache.evictByTag("catalog");   // memory output + method cache
 
-// Распределённый уровень (резолв реестра из DI):
+// The distributed level (resolve the registry from DI):
 await services.resolve(DISTRIBUTED_OUTPUT_CACHE).resolve("default").evictByTag("catalog");
 await services.resolve(DISTRIBUTED_SERVICE_CACHE).resolve("default").evictByTag("users");
 ```
 
-Backend хранит tag index как SET: `SADD tag:{tag} memberKeys` (+ `EXPIRE` на размер TTL записи)
-→ `SMEMBERS` + `DEL` при evict. У SET теперь есть TTL — индекс тегов не растёт безгранично.
+The backend keeps the tag index as a SET: `SADD tag:{tag} memberKeys` (+ `EXPIRE` for the entry TTL)
+→ `SMEMBERS` + `DEL` on evict. The SET has a TTL, so the tag index does not grow without bound.
 
-**Особенность:** invalidation **не автоматическая** — приложение вызывает `evictByTag` после POST/PUT/DELETE (как в ASP.NET `IOutputCacheStore.EvictByTagAsync`).
+**Note:** invalidation is **not automatic**: the application calls `evictByTag` after POST/PUT/DELETE (like `IOutputCacheStore.EvictByTagAsync` in ASP.NET).
 
 ---
 
-## 15. Интеграция с HTTP pipeline
+## 15. Integration with the HTTP pipeline
 
-Порядок middleware (типичный production setup):
+The order on a route with `@Authorize` and an output cache:
 
 ```
-1. jwtBearer()              ← server middleware (authentication)
-2. authorize()              ← route composer (authorization, @Authorize)
-3. outputCache()            ← route composer (cache module)
-4. controller action
+1. server middleware        ← httpModule({ middleware }) + DI SERVER_MIDDLEWARE
+2. authorize                ← built-in @Authorize / @AllowAnonymous check
+3. route middleware         ← controller and method @Middleware
+4. binding + ActionFilter.before
+5. outputCache              ← route composer from the cache module (DI)
+6. controller action
 ```
 
-Подключение:
+Connection: installing the cache module is enough. `memory()` (or `buildCacheModule(...)`) registers the output cache composer through the `ROUTE_MIDDLEWARE_COMPOSER` DI token, and `httpModule` picks it up:
 
 ```ts
-httpModule({
-  middleware: [...jwt.httpIntegration.serverMiddleware],
-  routeMiddlewareComposer: composeRouteMiddlewareComposers(
-    jwt.httpIntegration.routeMiddlewareComposer,
-    cache.httpIntegration.routeMiddlewareComposer,
-  ),
+await runApp(AppModule, {
+  cache: memory(),            // registers the output cache ROUTE_MIDDLEWARE_COMPOSER
+  http: {},
 });
 ```
 
-**Auth до cache обязателен** для `varyByUser` / `varyByClaim` — principal должен быть в `ctx.state` до построения ключа.
+No manual `routeMiddlewareComposer` wiring is needed; an explicit
+`httpModule({ routeMiddlewareComposer })` is combined with the DI composers.
 
-На **cache hit** шаг 4 не выполняется — в логах HTTP middleware ответ быстрее, action side effects отсутствуют.
+**Authorization before the cache** is built into the route chain: for `varyByUser` / `varyByClaim` the `@Authorize` check must store the principal in `ctx.state` (`PRINCIPAL_STATE_KEY`) before the key is built.
 
-### 15.1. Диаграммы pipeline (Mermaid)
+On a **cache hit** step 6 does not run: the response is faster in the HTTP logs, and there are no action side effects.
 
-#### Порядок middleware
+### 15.1. Pipeline diagrams (Mermaid)
+
+#### Middleware order
 
 ```mermaid
 sequenceDiagram
   participant C as Client
   participant H as HttpServer
-  participant J as jwtBearer
   participant A as authorize
   participant O as outputCache
   participant X as Controller action
 
   C->>H: GET /api/users?limit=100
-  H->>J: server middleware
-  J->>J: validate JWT, set ctx.state principal
-  H->>A: route middleware
-  A->>A: check @Authorize / roles
-  H->>O: route middleware
+  H->>A: after server middleware
+  A->>A: run @Authorize checks, store ctx.state principal
+  H->>O: after route middleware and binding
   alt cache HIT
     O-->>C: cached Response (action skipped)
   else cache MISS
@@ -883,7 +884,7 @@ sequenceDiagram
   C-->>R2: value (deduped)
 ```
 
-#### Redis distributed lock (между pod'ами)
+#### Redis distributed lock (between pods)
 
 ```mermaid
 sequenceDiagram
@@ -920,119 +921,118 @@ flowchart LR
 
 ---
 
-## 16. Распределённый backend и `@/core/infra`
+## 16. The distributed backend and `@/core/infra`
 
-### Ответственность и контракты
+### Responsibility and contracts
 
-`DistributedCache` владеет TTL, тегами, fencing lock, объединением запросов и
-ограничениями значений. Низкоуровневые команды реализует `DistributedCacheDriver`;
-для Redis это `RedisDistributedCacheDriver` из Infra.
-`DistributedCacheStores` предоставляет имена, HTTP/service-реестры и `ping()` без
-управления соединением. `RedisDistributedCacheBackend` строит эти реестры поверх
-клиента, которым владеет `redisConnect` и его `InfraLifecycle`.
+`DistributedCache` owns TTL, tags, the fencing lock, request coalescing and value limits.
+`DistributedCacheDriver` implements the low-level commands; for Redis that is
+`RedisDistributedCacheDriver` from Infra.
+`DistributedCacheStores` provides the names, the HTTP/service registries and `ping()`
+without managing the connection. `RedisDistributedCacheBackend` builds these registries on
+top of the client owned by `redisConnect` and its `InfraLifecycle`.
 
-Контракт и DI-токен `DISTRIBUTED_CACHE_BACKEND` используют `DistributedCacheStores`.
-Он доступен через публичный Cache API и не содержит методов lifecycle.
-Redis backend также не имеет `start/stop`: подключение и health принадлежат
-Redis-коннектору. Cache не регистрирует backend как HostedService.
+The contract and the DI token `DISTRIBUTED_CACHE_BACKEND` use `DistributedCacheStores`.
+It is available through the public Cache API and has no lifecycle methods.
+The Redis backend has no `start/stop` either: the connection and health belong to the
+Redis connector. Cache does not register the backend as a HostedService.
 
-### Единственный backend
+### A single backend
 
-В приложении допускается одна unkeyed-регистрация `DISTRIBUTED_CACHE_BACKEND`.
-При сборке модульного контейнера Cache проверяет итоговые регистрации после
-configure. Два backend, даже с разными `connection` или в разных модулях,
-дают `CacheError` до создания клиентов; порядок imports не выбирает победителя.
-Общие HTTP/service-реестры относятся к одному выбранному backend.
-Повторный импорт того же модуля обрабатывается DI однократно; отдельные контейнеры
-не конфликтуют. Явная замена через `configure.replace` учитывается по результату.
-Проверка работает в `createContainer`/kernel, не в standalone ServiceCollection.
+An application allows one unkeyed `DISTRIBUTED_CACHE_BACKEND` registration.
+When the module container is built, Cache checks the final registrations after configure.
+Two backends, even with different `connection` values or in different modules, give a
+`CacheError` before clients are created; the order of imports does not pick a winner.
+The shared HTTP/service registries belong to the one chosen backend.
+DI handles a repeated import of the same module once; separate containers do not conflict.
+An explicit replacement through `configure.replace` is counted by its result.
+The check works in `createContainer`/kernel, not in a standalone ServiceCollection.
 
-Один `redisConnect(config, { cache: ... })` предоставляет одно именованное
-соединение. Другие Redis-клиенты разрешены с отдельными `token` без cache mode.
-Свой backend может предоставлять несколько имён через NamedCacheRegistry;
-автоматического объединения нескольких backend и поля `connections` в
-`redisConnect` нет.
+One `redisConnect(config, { cache: ... })` provides one named connection. Other Redis
+clients are allowed with separate `token` values without the cache mode.
+A custom backend may provide several names through NamedCacheRegistry; there is no
+automatic merging of several backends and no `connections` field in `redisConnect`.
 
-### Параметры Redis
+### Redis parameters
 
-Объявление `config` содержит обязательный `url: string | Secret`. Второй аргумент
-коннектора принимает `token?` и `cache?: "distributed" | { mode: "distributed", ...tuning }`.
-Без cache mode регистрируется только клиент. Tuning необязателен:
+The `config` declaration holds the required `url: string | Secret`. The connector's second
+argument takes `token?` and `cache?: "distributed" | { mode: "distributed", ...tuning }`.
+Without a cache mode only the client is registered. Tuning is optional:
 
-| Поле | Тип | Default | Описание |
+| Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `connection` | `string` | `default` | Имя для decorators и NamedCacheRegistry |
-| `keyPrefix` | `string` | `osnv:cache:` | Общий префикс; backend добавляет `out:` и `svc:` |
-| `defaultLockSeconds` | `number` | `10` | Положительное конечное время блокировки, секунды |
-| `maxKeyLength` | `number` | `512` | Положительное целое, длина ключа |
-| `maxValueBytes` | `number` | Без лимита | Положительное целое; предел сериализованного значения |
-| `pollIntervalMs` | `number` | `50` | Положительный конечный интервал ожидания результата, мс |
+| `connection` | `string` | `default` | The name for decorators and NamedCacheRegistry |
+| `keyPrefix` | `string` | `osnv:cache:` | A shared prefix; the backend adds `out:` and `svc:` |
+| `defaultLockSeconds` | `number` | `10` | A positive finite lock time, seconds |
+| `maxKeyLength` | `number` | `512` | A positive integer, the key length |
+| `maxValueBytes` | `number` | No limit | A positive integer; the limit of a serialized value |
+| `pollIntervalMs` | `number` | `50` | A positive finite interval for waiting for a result, ms |
 
-Коннектор читает представление `defineConfig` своего kernel. Env-переопределения
-задаются правилами kernel/config и объявлением приложения; универсальные
-`REDIS_URL`/`REDIS_KEY_PREFIX` автоматически не читаются.
+The connector reads the `defineConfig` view of its kernel. Env overrides follow the
+kernel/config rules and the application declaration; generic `REDIS_URL`/`REDIS_KEY_PREFIX`
+are not read automatically.
 
-### Запуск и остановка
+### Startup and shutdown
 
-`InfraLifecycle` лениво создаёт клиента и публикует его через DI. Backend и
-реестры могут быть разрешены до старта; I/O разрешено выполнять после готовности
-соединения. При старте Infra вызывает `RedisClient.connect()` (default phase −100),
-при ошибке или остановке — `close()` ровно один раз. Backend не открывает и не
-закрывает клиент. Повторное использование остановленного kernel не поддерживается.
+`InfraLifecycle` creates the client lazily and publishes it through DI. The backend and the
+registries may be resolved before start; I/O is allowed once the connection is ready. At
+start Infra calls `RedisClient.connect()` (default phase −100), and on an error or at
+shutdown `close()` exactly once. The backend neither opens nor closes the client. Reusing a
+stopped kernel is not supported.
 
-### Атомарность lock (fencing) и health
+### Lock atomicity (fencing) and health
 
-Lock берётся `SET lock token NX EX`. Снятие — атомарный Lua `compare-and-del`
-(`if get==token then del`); медленный worker не удалит чужой lock.
+The lock is taken with `SET lock token NX EX`. Release is an atomic Lua `compare-and-del`
+(`if get==token then del`); a slow worker cannot delete someone else's lock.
 
-`cache:memory` показывает entries. Infra-путь Redis регистрирует `infra:<имя>`
-с реальным PING. Пользовательский коннектор определяет свою проверку соединения.
-Без distributed backend доступны memory-операции; `@OutputRedisCache` и
-`@CacheableRedis` требуют соответствующие DI-реестры.
+`cache:memory` shows the entries. The Infra Redis path registers `infra:<name>` with a real
+PING. A custom connector defines its own connection check.
+Without a distributed backend the memory operations are available; `@OutputRedisCache` and
+`@CacheableRedis` need the matching DI registries.
 
-Проверки композиции: [cache-composition.test.ts](../infra/test/cache-composition.test.ts).
-Проверки алгоритмов с подставным драйвером не подменяют физическую приёмку Redis.
+Composition checks: [cache-composition.test.ts](../infra/test/cache-composition.test.ts).
+Algorithm checks with a stub driver do not replace physical Redis acceptance.
 
 ---
 
-## 17. Безопасность
+## 17. Security
 
 ### 17.1. Startup guard
 
-При HTTP startup модуль проверяет: `@OutputCache` / `@OutputRedisCache` на route с `@Authorize` (или global auth default) **без** `varyByUser: true` и **без** `unlessAuthenticated: true` → fail-fast error по умолчанию:
+At HTTP startup the module checks: `@OutputCache` / `@OutputRedisCache` on a route with `@Authorize` (or with `requireAuthenticationByDefault`) **without** `varyByUser: true` and **without** `unlessAuthenticated: true` → a fail-fast error by default:
 
 ```
 [cache] @OutputCache on UsersController.list is on an authorized route
 without varyByUser or unlessAuthenticated — …
 ```
 
-Для миграции можно временно включить warning-mode:
+For a migration you can temporarily enable the warning mode:
 `buildCacheModule({ outputCache: { insecureAuthorizedRouteBehavior: "warn" } })`.
-Полное отключение (`"ignore"`) допустимо только при внешней политике безопасности.
+Disabling it fully (`"ignore"`) is acceptable only with an external security policy.
 
-### 17.2. Рекомендации по сценариям
+### 17.2. Recommendations by scenario
 
-| Сценарий | Рекомендация |
+| Scenario | Recommendation |
 | --- | --- |
-| Публичный GET catalog | `@OutputCache({ seconds: 60, varyByQuery: [...] })` |
-| Protected list per user | `varyByUser: true` |
-| Shared stats только для guests | `unlessAuthenticated: true` |
-| Персональные данные | `@Cacheable` в сервисе с явным `key`, не output cache |
-| Multi-instance public API | `@OutputRedisCache` |
-| Auth lookup shared между pods | `@CacheableRedis` на `findByName` / similar |
+| A public GET catalog | `@OutputCache({ seconds: 60, varyByQuery: [...] })` |
+| A protected per-user list | `varyByUser: true` |
+| Shared stats only for guests | `unlessAuthenticated: true` |
+| Personal data | `@Cacheable` in the service with an explicit `key`, not the output cache |
+| A multi-instance public API | `@OutputRedisCache` |
+| An auth lookup shared between pods | `@CacheableRedis` on `findByName` or similar |
 
-### 17.3. Что нельзя кэшировать через output cache
+### 17.3. What must not be cached through the output cache
 
-- Ответы с `Set-Cookie` (session establishment)
+- Responses with `Set-Cookie` (session establishment)
 - Streaming / chunked responses
-- Персональные данные без `varyByUser`
-- Mutating methods (POST/PUT/DELETE) — по умолчанию не кэшируются (`methods: GET, HEAD`)
+- Personal data without `varyByUser`
+- Mutating methods (POST/PUT/DELETE): not cached by default (`methods: GET, HEAD`)
 
 ---
 
-## 18. Сценарии production
+## 18. Production scenarios
 
-Реальный composition root — `src/index.ts` + `src/app/infra/App.infra.ts`:
+In the osnova application the composition root is `src/index.ts` + `src/app/infra/App.infra.ts`:
 
 ```ts
 import { memory } from "@/core/cache";
@@ -1051,7 +1051,7 @@ await runApp(AppModule, {
 });
 ```
 
-**Service** (один и тот же провайдер для memory и distributed):
+**Service** (one and the same provider for memory and distributed):
 
 ```ts
 class UserService implements IUserStore {
@@ -1067,68 +1067,68 @@ imports: [UsersDataModule],
 providers: [cachedScoped(IUserStore, UserService, deps)],
 ```
 
-`@CacheableRedis.findByName` использует распределённый уровень автоматически, когда backend
-настроен; без backend такой вызов бросит понятную ошибку (см. §19).
+`@CacheableRedis.findByName` uses the distributed level automatically when the backend is
+configured; without a backend such a call throws a clear error (see §19).
 
-### Проверка output cache (manual)
+### Checking the output cache (manual)
 
-1. `GET /api/users?limit=100` с JWT → список N пользователей
-2. `POST /api/users` → создать нового
-3. Повторный `GET /api/users?limit=100` → **всё ещё N** (stale до истечения TTL / evictByTag)
+1. `GET /api/users?limit=100` with a JWT → a list of N users
+2. `POST /api/users` → create a new one
+3. A repeated `GET /api/users?limit=100` → **still N** (stale until the TTL expires / evictByTag)
 
-Скрипт: `bun run scripts/test-binary-live.ts` (нужен app-бинарник `./bin/osnv-app` на порту 3460).
+Run these steps against a running application or its built binary.
 
 ---
 
-## 19. Ограничения и анти-паттерны
+## 19. Limits and anti-patterns
 
-### Ограничения v1
+### v1 limits
 
-| # | Ограничение |
+| # | Limit |
 | --- | --- |
-| 1 | `@OutputCache` / `@Cacheable` — один процесс (не shared) |
-| 2 | `@CacheableRedis` values — JSON-serializable only (Date → string, class instances теряют prototype) |
-| 3 | `@Cacheable` / `@CacheableRedis` без явного `key` кодируют поддержанные данные и Map/Set по §8.2; неподдерживаемые аргументы, включая cycles и скрытое состояние, автоматически обходят кэш |
-| 4 | Кэшируются **ссылки** на objects in-memory — мутация после get меняет «кэш» |
-| 5 | Output cache материализует полный body в пределах `maxBodyBytes`/`bodyReadTimeoutMs`; большие или долгие streams отдаются без cache |
-| 6 | Tag invalidation — manual (`evictByTag`), не привязана к ORM events |
-| 7 | Нет `@CacheEvict` decorator (invalidate в коде явно) |
-| 8 | Redis-backend — только Bun built-in `RedisClient` (другой backend — свой `DistributedCacheDriver`) |
+| 1 | `@OutputCache` / `@Cacheable`: one process (not shared) |
+| 2 | `@CacheableRedis` values are JSON-serializable only (Date → string, class instances lose their prototype) |
+| 3 | `@Cacheable` / `@CacheableRedis` without an explicit `key` encode supported data and Map/Set per §8.2; unsupported arguments, including cycles and hidden state, automatically bypass the cache |
+| 4 | **References** to objects are cached in memory: mutating after get changes the "cache" |
+| 5 | The output cache materializes the full body within `maxBodyBytes`/`bodyReadTimeoutMs`; large or slow streams are served without the cache |
+| 6 | Tag invalidation is manual (`evictByTag`), not tied to ORM events |
+| 7 | No `@CacheEvict` decorator (invalidate explicitly in code) |
+| 8 | The Redis backend is only Bun's built-in `RedisClient` (another backend is your own `DistributedCacheDriver`) |
 
-**Что улучшено в этой версии:**
+**What improved in this version:**
 
-- Distributed lock снимается атомарно (fencing-token Lua `compare-and-del`) — нет Redlock-бага.
-- `maxValueBytes` применяется и к распределённому уровню, и к бинарным значениям (output payload).
-- `MemoryCache.size` — O(1) (без полного скана при каждом обращении).
-- InfraLifecycle освобождает клиент при ошибке подключения; координатор откатывает уже запущенные службы.
-- Health-check `infra:<имя>` Redis-коннектора делает реальный `PING`.
-- Один кэширующий proxy (`wrapCachedService`) на оба уровня — без дублирования и фейкового `ICache`.
+- The distributed lock is released atomically (fencing-token Lua `compare-and-del`): no Redlock bug.
+- `maxValueBytes` applies both to the distributed level and to binary values (the output payload).
+- `MemoryCache.size` is O(1) (no full scan on every access).
+- InfraLifecycle releases the client on a connection error; the coordinator rolls back services that already started.
+- The Redis connector's `infra:<name>` health check does a real `PING`.
+- One caching proxy (`wrapCachedService`) for both levels: no duplication and no fake `ICache`.
 
-### Анти-паттерны
+### Anti-patterns
 
 ```ts
-// ❌ Декоратор на interface
+// ❌ A decorator on an interface
 interface IUserStore {
-  @Cacheable({ seconds: 60 }) // не работает
+  @Cacheable({ seconds: 60 }) // does not work
   byId(id: number): Promise<User>;
 }
 
-// ✅ Обычный singleton/scoped — auto-hook оборачивает класс с @Cacheable/@CacheableRedis
-singleton(IUserStore, UserService); // proxy применяется автоматически (cacheModule подключён)
+// ✅ A regular singleton/scoped: the auto-hook wraps a class with @Cacheable/@CacheableRedis
+singleton(IUserStore, UserService); // the proxy applies automatically (memory() is connected)
 
-// ❌ @OutputRedisCache без распределённых хранилищ в Infra/DI
-memory({}); // + @OutputRedisCache → CacheError на первом запросе
+// ❌ @OutputRedisCache without distributed stores in Infra/DI
+memory({}); // + @OutputRedisCache → CacheError on the first request
 
-// ❌ Оба output decorator на action
+// ❌ Both output decorators on an action
 @OutputCache({ seconds: 60 })
-@OutputRedisCache({ seconds: 60 }) // warning, wins distributed
+@OutputRedisCache({ seconds: 60 }) // warning, the distributed one wins
 
-// ❌ Оба method decorator на одном method
+// ❌ Both method decorators on one method
 @Cacheable({ seconds: 10 })
 @CacheableRedis({ seconds: 10 }) // runtime throw
 
-// ❌ Output cache персональных данных без varyByUser
-@Authorize()
+// ❌ Output cache of personal data without varyByUser
+@Authorize(isSignedIn)
 @OutputCache({ seconds: 60 }) // startup throw + data leak risk
 ```
 
@@ -1136,143 +1136,143 @@ memory({}); // + @OutputRedisCache → CacheError на первом запрос
 
 ## 20. FAQ
 
-### `@OutputCache` или `@Cacheable` — что выбрать?
+### `@OutputCache` or `@Cacheable`: which one?
 
-| Критерий | `@OutputCache` | `@Cacheable` |
+| Criterion | `@OutputCache` | `@Cacheable` |
 | --- | --- | --- |
-| Кэширует | весь HTTP-ответ | return value метода |
-| Уровень | controller | service |
-| Vary по query/header/user | ✅ | ❌ (только `key` из args) |
+| Caches | the whole HTTP response | the method return value |
+| Level | controller | service |
+| Vary by query/header/user | ✅ | ❌ (only a `key` from args) |
 | Client `Cache-Control` | ✅ `clientCache` | ❌ |
-| Переиспользование вне HTTP | ❌ | ✅ (jobs, другие controllers) |
-| Streaming response | ❌ | ✅ (метод может stream, но value cache — нет) |
+| Reuse outside HTTP | ❌ | ✅ (jobs, other controllers) |
+| Streaming response | ❌ | ✅ (the method may stream, but the value cache does not) |
 
-**Правило:** публичный GET endpoint → `@OutputCache`. Метод вызывается из нескольких мест или нужен cache без HTTP → `@Cacheable`.
+**Rule:** a public GET endpoint → `@OutputCache`. A method called from several places, or a cache needed without HTTP → `@Cacheable`.
 
 ---
 
-### `@OutputCache` или `@OutputRedisCache`?
+### `@OutputCache` or `@OutputRedisCache`?
 
 | | Memory | Redis |
 | --- | --- | --- |
-| Инстансы | 1 процесс | N pod'ов |
-| Зависимости | только `cacheModule()` | + `REDIS_URL` |
+| Instances | 1 process | N pods |
+| Dependencies | only `memory()` | + `redisConnect(config, { cache: "distributed" })` in `@Infra` |
 | Latency | ~μs | ~ms (network) |
-| Eviction tags | in-process | shared в Redis |
+| Eviction tags | in-process | shared in Redis |
 
-Один pod / dev → `@OutputCache`. Production horizontal scale + одинаковые GET для всех → `@OutputRedisCache`.
+One pod / dev → `@OutputCache`. Production horizontal scale + the same GET for everyone → `@OutputRedisCache`.
 
-Отдельные декораторы (не `provider: "redis"` в options) — явный store в metadata, проще grep и fail-fast без redis config.
-
----
-
-### Поставил `@Cacheable` на сервис, но кэш не работает
-
-Чеклист:
-
-1. Декоратор на **class `UserService`**, не на `interface IUserStore`.
-2. Root app устанавливает `cache: memory()` или imports `memory()` (auto-hook + `ICache`, `CACHE_POLICIES`).
-3. Регистрация через `singleton`/`scoped` (auto-hook обернёт) или явно `cachedScoped`/`cachedSingleton`.
-4. В options есть **`seconds`** (inline или в `policy`).
-5. Для `@CacheableRedis` — в infra подключён `redisConnect(redisConfig, { cache: "distributed" })`, иначе вызов бросит ошибку.
+Separate decorators (not `provider: "redis"` in options): the store is explicit in the metadata, easier to grep and fail-fast without a Redis config.
 
 ---
 
-### Controller inject'ит interface — cache на implementation работает?
+### I put `@Cacheable` on a service, but the cache does not work
 
-**Да**, если:
+Checklist:
+
+1. The decorator is on the **class `UserService`**, not on `interface IUserStore`.
+2. The root app installs `cache: memory()` or imports `memory()` (auto-hook + `ICache`, `CACHE_POLICIES`).
+3. The registration goes through `singleton`/`scoped` (the auto-hook wraps it) or explicitly `cachedScoped`/`cachedSingleton`.
+4. The options have **`seconds`** (inline or in the `policy`).
+5. For `@CacheableRedis`, infra connects `redisConnect(redisConfig, { cache: "distributed" })`, otherwise the call throws.
+
+---
+
+### The controller injects an interface: does the cache on the implementation work?
+
+**Yes**, if:
 
 ```ts
-// UserService.ts — декоратор здесь
+// UserService.ts: the decorator is here
 @Cacheable({ seconds: 60 })
 async byId(id: number) { ... }
 
-// UsersModule.ts — регистрация на interface token
+// UsersModule.ts: registration on the interface token
 cachedScoped(IUserStore, UserService, deps);
 ```
 
-Controller получает proxy, зарегистрированный как `IUserStore`. Metadata читается с класса `UserService` (`Symbol.metadata`), не с interface.
+The controller gets the proxy registered as `IUserStore`. The metadata is read from the `UserService` class (`Symbol.metadata`), not from the interface.
 
 ---
 
-### Что такое `varyByQuery`?
+### What is `varyByQuery`?
 
-Query-параметры участвуют в **ключе кэша**. Запросы с разными значениями — разные записи:
+Query parameters take part in the **cache key**. Requests with different values are different entries:
 
 ```
 GET /items?limit=20  → http:<digest A>
-GET /items?limit=50  → http:<digest B>  (отдельный cache entry)
+GET /items?limit=50  → http:<digest B>  (a separate cache entry)
 ```
 
-`varyByQuery: "*"` — все query params (sorted) и это secure default.
-Только явный `varyByQuery: []` игнорирует query для доказанно query-independent ответа.
+`varyByQuery: "*"` means all query params (sorted), and it is the secure default.
+Only an explicit `varyByQuery: []` ignores the query for a response proven to be query-independent.
 
 ---
 
-### После POST данные в GET не обновились — это баг?
+### After a POST the GET data did not update: is it a bug?
 
-**Нет**, если не вызывали `evictByTag`. Output cache хранит snapshot ответа до истечения TTL.
+**No**, if you did not call `evictByTag`. The output cache keeps a snapshot of the response until the TTL expires.
 
 ```ts
 await this.users.add(dto);
-await this.cache.evictByTag("users"); // или ICache из DI после мутации
+await this.cache.evictByTag("users"); // or ICache from DI after the mutation
 ```
 
-Demo-проверка: `scripts/test-binary-live.ts` — после POST ghost-user не виден в cached list.
+A manual check: after a POST the new record is not visible in the cached list until `evictByTag` or the TTL.
 
 ---
 
-### Есть заголовок `X-Cache: HIT`?
+### Is there an `X-Cache: HIT` header?
 
-**Нет** в v1. Признаки hit:
+**No** in v1. Signs of a hit:
 
-- повторный запрос быстрее в HTTP logs;
-- controller side effects не срабатывают (stale data test);
-- `ICache.size` растёт после первого miss.
-
----
-
-### Можно ли `@OutputCache` и `@OutputRedisCache` на одном action?
-
-Технически можно, но **не нужно** — startup warning, побеждает Redis. Выберите один store.
+- a repeated request is faster in the HTTP logs;
+- controller side effects do not fire (the stale data test);
+- `ICache.size` grows after the first miss.
 
 ---
 
-### Можно ли `@Cacheable` и `@CacheableRedis` на одном методе?
+### Can `@OutputCache` and `@OutputRedisCache` be on one action?
 
-**Нет** — runtime error. На **разных** методах одного класса — обычный `cachedScoped` (один proxy роутит memory и distributed).
+Technically yes, but **do not**: a startup warning, and Redis wins. Pick one store.
 
 ---
 
-### `cachedSingleton` или `cachedScoped`?
+### Can `@Cacheable` and `@CacheableRedis` be on one method?
+
+**No**: a runtime error. On **different** methods of one class use a regular `cachedScoped` (one proxy routes memory and distributed).
+
+---
+
+### `cachedSingleton` or `cachedScoped`?
 
 | | singleton | scoped |
 | --- | --- | --- |
-| Proxy instance | один на DI-регистрацию в контейнере | один на DI-регистрацию в scope |
-| `@Cacheable` cache | общий ICache store, автоматические ключи изолированы по экземпляру | тот же ICache store, автоматические ключи изолированы по экземпляру |
-| ORM `DbContext` | ⚠️ осторожно | ✅ типичный case |
+| Proxy instance | one per DI registration in the container | one per DI registration in the scope |
+| `@Cacheable` cache | the shared ICache store, automatic keys are isolated per instance | the same ICache store, automatic keys are isolated per instance |
+| ORM `DbContext` | ⚠️ careful | ✅ the typical case |
 
-В demo `UserService` + ORM → **`cachedScoped`**. Stateless read-only сервис без scoped deps → можно `cachedSingleton`.
-Явный `key` у `cachedScoped` и `cachedSingleton` — договор на совместное использование:
-включайте в него tenant/user, если результат персонализирован. Без явного `key`
-framework изолирует автоматический ключ по экземпляру, чтобы скрытое состояние
-конструктора не попало в ответ другой регистрации или запроса. Это относится и к
-`@CacheableRedis`: для обмена между процессами и переиспользования после перезапуска
-нужен явный прикладной `key`. DI создаёт объект обычным class provider, а затем
-применяет proxy; constructor deps и lifecycle не обходятся.
-
----
-
-### Нужен ли Redis для работы приложения?
-
-**Нет.** Без backend работают `@OutputCache` + `@Cacheable` (memory). `@OutputRedisCache`
-бросает CacheError на первом запросе, а `@CacheableRedis` — при вызове метода, если
-распределённые хранилища не зарегистрированы через Infra/DI. Обычное подключение:
-`redisConnect(config, { cache: "distributed" })` в `infraModule`.
+A `UserService` with an ORM → **`cachedScoped`**. A stateless read-only service without scoped deps → `cachedSingleton` is fine.
+An explicit `key` in `cachedScoped` and `cachedSingleton` is a sharing contract: include the
+tenant/user in it if the result is personalized. Without an explicit `key` the framework
+isolates the automatic key per instance, so hidden constructor state does not leak into the
+response of another registration or request. This also applies to `@CacheableRedis`:
+sharing between processes and reuse after a restart need an explicit application `key`.
+DI creates the object with a regular class provider and then applies the proxy;
+constructor deps and lifecycle are not bypassed.
 
 ---
 
-### Как инвалидировать cache после update?
+### Is Redis needed for the application to work?
+
+**No.** Without a backend `@OutputCache` + `@Cacheable` (memory) work. `@OutputRedisCache`
+throws a CacheError on the first request, and `@CacheableRedis` on a method call, if the
+distributed stores are not registered through Infra/DI. The usual connection:
+`redisConnect(config, { cache: "distributed" })` in `infraModule`.
+
+---
+
+### How to invalidate the cache after an update?
 
 ```ts
 import { ICache, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE } from "@/core/cache";
@@ -1280,76 +1280,76 @@ import { ICache, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE } from "@/c
 // memory output + @Cacheable
 cache.evictByTag("users");
 
-// distributed HTTP output / service cache (резолв реестра из DI):
+// distributed HTTP output / service cache (resolve the registry from DI):
 await services.resolve(DISTRIBUTED_OUTPUT_CACHE).resolve("default").evictByTag("catalog");
 await services.resolve(DISTRIBUTED_SERVICE_CACHE).resolve("default").evictByTag("users");
 ```
 
-Авто-invalidation при ORM `saveChanges` **не реализована** (v1).
+Automatic invalidation on ORM `saveChanges` is **not implemented** (v1).
 
 ---
 
-### Совместимо с `bun build --compile`?
+### Is it compatible with `bun build --compile`?
 
-**Да.** Metadata через TC39 decorators (`Symbol.metadata`), без runtime reflection npm-пакетов.
-Ядро `@/core/cache` не импортирует Redis вовсе; backend живёт в `@/core/infra/cache`
-и подключается через `redisConnect(...)`.
+**Yes.** Metadata goes through TC39 decorators (`Symbol.metadata`), without runtime reflection npm packages.
+The `@/core/cache` core does not import Redis at all; the backend lives in `@/core/infra/cache`
+and is connected through `redisConnect(...)`.
 
 ---
 
-### Где посмотреть working example?
+### Where is a working example?
 
-| Файл | Что |
+| File | What |
 | --- | --- |
-| `src/app/infra/App.infra.ts` | app composition root: infra manifest → cache backend |
-| `src/osnv/core/infra/connectors/redis.ts` | Redis connector factory |
-| `src/osnv/core/infra/cache/` | Redis backend adapter over Bun Redis APIs |
-| `src/osnv/core/cache/test/cache.distributed.test.ts` | distributed-логика без Redis |
-| `src/osnv/core/infra/test/redisCache.test.ts` | Redis backend integration without real Redis |
+| `src/app/infra/App.infra.ts` (the osnova application) | the application composition root: infra manifest → cache backend |
+| `src/osnv/core/infra/connectors/redis.ts` | the Redis connector factory |
+| `src/osnv/core/infra/cache/` | the Redis backend adapter over Bun Redis APIs |
+| `src/osnv/core/cache/test/cache.distributed.test.ts` | the distributed logic without Redis |
+| `src/osnv/core/infra/test/redisCache.test.ts` | Redis backend integration without a real Redis |
 
 ---
 
-## 21. Карта папки
+## 21. Folder map
 
-| Путь | Назначение |
+| Path | Purpose |
 | --- | --- |
-| `cacheModule.ts` | DI module factory + health checks |
-| `ICache.ts` / `MemoryCache.ts` | In-memory contract + LRU/TTL/dedup |
+| `cacheModule.ts` | `memory()`: the cache module factory |
+| `ICache.ts` / `MemoryCache.ts` | The in-memory contract + LRU/TTL/dedup |
 | `decorators/OutputCache.ts` | HTTP metadata (memory) |
 | `decorators/OutputRedisCache.ts` | HTTP metadata (Redis) |
 | `decorators/Cacheable.ts` | Service metadata (memory) |
 | `decorators/CacheableRedis.ts` | Service metadata (Redis) |
 | `decorators/*Metadata.ts` | TC39 metadata readers |
-| `http/outputCacheMiddleware.ts` | Per-route memory middleware |
-| `http/outputRedisCacheMiddleware.ts` | Per-route Redis middleware |
-| `http/composeOutputCache.ts` | Route middleware composer |
-| `http/buildOutputCacheKey.ts` | Cache key builder |
+| `http/outputCacheMiddleware.ts` | The per-route memory middleware |
+| `http/outputRedisCacheMiddleware.ts` | The per-route Redis middleware |
+| `http/composeOutputCache.ts` | The route middleware composer |
+| `http/buildOutputCacheKey.ts` | The cache key builder |
 | `http/CachedHttpPayload.ts` | Response serialization + header stripping |
-| `http/applyClientCacheHeaders.ts` | Client Cache-Control layer |
+| `http/applyClientCacheHeaders.ts` | The client Cache-Control layer |
 | `http/outputCacheSecurityWarning.ts` | Startup security warnings |
-| `distributed/IDistributedCache.ts` | Backend-agnostic contract |
-| `distributed/DistributedCache.ts` | Вся политика (fencing lock, anti-stampede, tags, size) |
-| `distributed/DistributedCacheDriver.ts` | Низкоуровневые примитивы (реализует backend) |
-| `distributed/DistributedCacheStores.ts` | Имена хранилищ, реестры и ping без lifecycle |
-| `distributed/NamedCacheRegistry.ts` | Резолв именованных connection'ов |
-| `distributed/CacheCodec.ts`, `codecs.ts` | Сериализация (JSON / HTTP payload) |
-| `tokens/DISTRIBUTED_CACHE.ts` | `DISTRIBUTED_*` DI-токены |
-| `services/cacheProxy.ts` | Единый `@Cacheable` + `@CacheableRedis` proxy |
+| `distributed/IDistributedCache.ts` | The backend-agnostic contract |
+| `distributed/DistributedCache.ts` | All the policy (fencing lock, anti-stampede, tags, size) |
+| `distributed/DistributedCacheDriver.ts` | Low-level primitives (implemented by the backend) |
+| `distributed/DistributedCacheStores.ts` | Store names, registries and ping without lifecycle |
+| `distributed/NamedCacheRegistry.ts` | Resolving named connections |
+| `distributed/CacheCodec.ts`, `codecs.ts` | Serialization (JSON / HTTP payload) |
+| `tokens/DISTRIBUTED_CACHE.ts` | The `DISTRIBUTED_*` DI tokens |
+| `services/cacheProxy.ts` | The single `@Cacheable` + `@CacheableRedis` proxy |
 | `providers/cachedProviders.ts` | DI registration helpers |
-| `di/classProviderHook.ts` | Auto-hook на `singleton`/`scoped` |
+| `di/classProviderHook.ts` | The auto-hook on `singleton`/`scoped` |
 | `internal/resolveCachePolicy.ts` | Policy merge + `requireCacheSeconds` |
 | `internal/normalizeCacheKey.ts` | Long key hashing |
 | `types/*.ts` | Options + policy types |
 | `test/*.test.ts` | Unit + e2e tests |
 
-Backend Redis (инфраструктура, отдельно от фреймворка):
+The Redis backend (infrastructure, separate from the framework core):
 
-| Путь | Назначение |
+| Path | Purpose |
 | --- | --- |
-| `@/core/infra/cache/RedisDistributedCacheDriver.ts` | Примитивы Redis client (+ Lua fencing release) |
-| `@/core/infra/cache/RedisDistributedCacheBackend.ts` | Хранилища и ping поверх клиента Redis |
-| `@/core/infra/connectors/redis.ts` | Connector + config validation |
+| `@/core/infra/cache/RedisDistributedCacheDriver.ts` | Redis client primitives (+ Lua fencing release) |
+| `@/core/infra/cache/RedisDistributedCacheBackend.ts` | Stores and ping on top of the Redis client |
+| `@/core/infra/connectors/redis.ts` | The connector + config validation |
 
 ---
 
-*Сборка в бинарник:* `bun run build:bin` → `bin/osnv-app` (app) и `bin/osnv` (CLI).
+*Binary build:* `bun run build:bin` → `bin/osnv` (the CLI).

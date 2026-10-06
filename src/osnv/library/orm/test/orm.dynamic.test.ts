@@ -235,7 +235,7 @@ describe("OrmModel runtime registration", () => {
   test("re-registering a name drops the previous ctor", () => {
     const registry = new OrmModel([]);
     const first = buildDynamicModel(productDef);
-    const second = buildDynamicModel(productDef); // другой ctor
+    const second = buildDynamicModel(productDef); // a different ctor
     registry.registerModel(first);
     registry.registerModel(second);
 

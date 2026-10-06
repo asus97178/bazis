@@ -14,19 +14,19 @@ import {
 
 @Prompt({
   name: "product.designer.prompt",
-  role: "Продуктовый аналитик",
-  goal: "Превратить продуктовые идеи в понятный план поставки.",
-  instructions: ["Запрашивай недостающий бизнес-контекст.", "Предпочитай явные критерии приемки."],
-  constraints: ["Не выдумывай регуляторные утверждения."],
+  role: "Product analyst",
+  goal: "Turn product ideas into a clear delivery plan.",
+  instructions: ["Ask for missing business context.", "Prefer explicit acceptance criteria."],
+  constraints: ["Do not invent regulatory claims."],
   sections: [
     {
       kind: "developer",
-      title: "Правила домена",
-      content: ["Сохраняй enterprise-процессы аудируемыми.", "Предпочитай обратимые операции."],
+      title: "Domain rules",
+      content: ["Keep enterprise processes auditable.", "Prefer reversible operations."],
     },
     {
       kind: "tool-policy",
-      content: "Используй read-инструменты перед предложением write-действий.",
+      content: "Use read tools before proposing write actions.",
     },
   ],
 })
@@ -34,8 +34,8 @@ class ProductDesignerPrompt {}
 
 @Agent({
   name: "product-designer",
-  role: "Старший продуктовый аналитик",
-  description: "Проектирует enterprise-процессы продукта.",
+  role: "Senior product analyst",
+  description: "Designs enterprise product processes.",
   prompt: ProductDesignerPrompt,
 })
 class ProductDesignerAgent {}
@@ -45,14 +45,14 @@ class PlainAgent {}
 
 @Agent({
   name: "inline-prompt-agent",
-  role: "Оператор каталога",
-  goal: "Помочь пользователю управлять каталогом товаров.",
-  instructions: ["Отвечай кратко.", "Не выдумывай товары и остатки."],
-  constraints: ["Используй только данные из tools."],
+  role: "Catalog operator",
+  goal: "Help the user manage the product catalog.",
+  instructions: ["Answer briefly.", "Do not invent products or stock."],
+  constraints: ["Use only data from tools."],
   sections: [
     {
       kind: "tool-policy",
-      content: "Перед ответом по товарам вызови read-инструмент.",
+      content: "Call a read tool before answering about products.",
     },
   ],
 })
@@ -78,20 +78,20 @@ describe("agent context builder", () => {
     const context = builder.build({
       invocationId: "inv-1",
       agent,
-      messages: [agentMessage("user", "Спроектируй оформление заказа")],
+      messages: [agentMessage("user", "Design the checkout")],
       metadata: {},
     });
 
     expect(context.messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(textOf(context.messages[0])).toContain("Role: Старший продуктовый аналитик");
-    expect(textOf(context.messages[0])).toContain("Prompt role: Продуктовый аналитик");
-    expect(textOf(context.messages[0])).toContain("Goal: Превратить продуктовые идеи в понятный план поставки.");
-    expect(textOf(context.messages[0])).toContain("- Предпочитай явные критерии приемки.");
-    expect(textOf(context.messages[0])).toContain("- Не выдумывай регуляторные утверждения.");
-    expect(textOf(context.messages[0])).toContain("Правила домена:");
-    expect(textOf(context.messages[0])).toContain("- Сохраняй enterprise-процессы аудируемыми.");
+    expect(textOf(context.messages[0])).toContain("Role: Senior product analyst");
+    expect(textOf(context.messages[0])).toContain("Prompt role: Product analyst");
+    expect(textOf(context.messages[0])).toContain("Goal: Turn product ideas into a clear delivery plan.");
+    expect(textOf(context.messages[0])).toContain("- Prefer explicit acceptance criteria.");
+    expect(textOf(context.messages[0])).toContain("- Do not invent regulatory claims.");
+    expect(textOf(context.messages[0])).toContain("Domain rules:");
+    expect(textOf(context.messages[0])).toContain("- Keep enterprise processes auditable.");
     expect(textOf(context.messages[0])).toContain("Tool policy:");
-    expect(textOf(context.messages[0])).toContain("Используй read-инструменты перед предложением write-действий.");
+    expect(textOf(context.messages[0])).toContain("Use read tools before proposing write actions.");
     expect(context.trace[0]).toMatchObject({ section: "prompt", role: "system", included: true });
     expect(context.trace[0]?.tokens).toBeGreaterThan(0);
     expect(context.trace[1]).toMatchObject({ section: "conversation[0]", role: "user", included: true });
@@ -107,18 +107,18 @@ describe("agent context builder", () => {
     const context = builder.build({
       invocationId: "inv-1",
       agent,
-      messages: [agentMessage("user", "Покажи товары")],
+      messages: [agentMessage("user", "Show the products")],
       metadata: {},
     });
 
     const system = textOf(context.messages[0]);
     expect(context.messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(system).toContain("Role: Оператор каталога");
-    expect(system).toContain("Goal: Помочь пользователю управлять каталогом товаров.");
-    expect(system).toContain("- Отвечай кратко.");
-    expect(system).toContain("- Используй только данные из tools.");
+    expect(system).toContain("Role: Catalog operator");
+    expect(system).toContain("Goal: Help the user manage the product catalog.");
+    expect(system).toContain("- Answer briefly.");
+    expect(system).toContain("- Use only data from tools.");
     expect(system).toContain("Tool policy:");
-    expect(system).toContain("Перед ответом по товарам вызови read-инструмент.");
+    expect(system).toContain("Call a read tool before answering about products.");
     expect(agent.prompt).toBeUndefined();
   });
 

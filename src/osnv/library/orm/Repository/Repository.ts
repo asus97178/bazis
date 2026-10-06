@@ -7,9 +7,9 @@ import type { EntityState } from "../Tracking/EntityState";
 type EntityClass<T extends object> = new () => T;
 
 /**
- * Scoped-реализация репозитория: тонкая обёртка над `DbSet<T>` и `DbContext`
- * без дублирования SQL или change tracking. Структурно совместима с
- * `IRepository<T>` из `@/core/orm` (движок не зависит от DI-слоя).
+ * Scoped repository implementation: a thin wrapper over `DbSet<T>` and `DbContext`
+ * without duplicating SQL or change tracking. Structurally compatible with
+ * `IRepository<T>` from `@/core/orm` (the engine does not depend on the DI layer).
  */
 export class Repository<T extends object> {
   constructor(
@@ -53,7 +53,7 @@ export class Repository<T extends object> {
     return this.context.stateOf(entity);
   }
 
-  /** Сохраняет весь DbContext, включая изменения других его DbSet. */
+  /** Saves the whole DbContext, including changes of its other DbSets. */
   saveChanges(): Promise<number> {
     return this.context.saveChanges();
   }

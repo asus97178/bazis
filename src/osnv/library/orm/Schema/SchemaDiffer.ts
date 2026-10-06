@@ -3,8 +3,8 @@ import type { EntityModel, IndexModel, PropertyModel } from "../Metadata/types";
 import type { IntrospectedSchema, IntrospectedTable } from "./introspection";
 
 /**
- * Аддитивная операция изменения схемы. Деструктив (drop/смена типа) сюда не
- * попадает — он фиксируется как предупреждение, чтобы не терять данные.
+ * Additive schema change operation. Destructive changes (drop/type change) never
+ * get here; they are recorded as warnings so no data is lost.
  */
 export type AdditiveSchemaOperation =
   | { readonly kind: "createTable"; readonly model: EntityModel }
@@ -13,14 +13,14 @@ export type AdditiveSchemaOperation =
 
 export interface SchemaDiff {
   readonly operations: readonly AdditiveSchemaOperation[];
-  /** Найденные деструктивные расхождения, которые авто-режим не трогает. */
+  /** Destructive differences found, which the auto mode leaves alone. */
   readonly warnings: readonly string[];
 }
 
 /**
- * Сравнивает целевую модель (сущности контекста) с фактической схемой
- * БД и выдаёт список аддитивных операций. Текущее состояние берётся из
- * интроспекции — отдельный снапшот-файл не нужен.
+ * Compares the target model (the context entities) with the actual database
+ * schema and returns a list of additive operations. The current state comes
+ * from introspection; no separate snapshot file is needed.
  */
 export class SchemaDiffer {
   diff(targets: readonly EntityModel[], schema: IntrospectedSchema): SchemaDiff {
@@ -31,7 +31,7 @@ export class SchemaDiffer {
       const table =
         schema.tables.get(entityStorageKey(model)) ?? schema.tables.get(model.tableName);
       if (!table) {
-        // Таблицы нет — создаём её целиком (вместе с индексами и FK).
+        // No table: create it whole (with indexes and FKs).
         operations.push({ kind: "createTable", model });
         for (const index of model.indexes) {
           operations.push({ kind: "createIndex", model, index });
@@ -56,7 +56,7 @@ export class SchemaDiffer {
         operations.push({ kind: "addColumn", model, property });
       }
     }
-    // Деструктив: колонки есть в БД, но нет в модели — не удаляем автоматически.
+    // Destructive: columns exist in the database but not in the model; never dropped automatically.
     const modelColumns = new Set(model.properties.map((property) => property.columnName));
     for (const columnName of table.columns.keys()) {
       if (!modelColumns.has(columnName)) {

@@ -24,18 +24,18 @@ export function registerGeneratedBindings(
 }
 
 /**
- * Конвенции привязки, выведенные codegen'ом (`bun run di:generate`) из
- * сигнатуры метода контроллера — аналог auto deps у DI:
+ * Binding conventions inferred by codegen (`bun run di:generate`) from the
+ * controller method signature, the counterpart of DI auto deps:
  *
- * - имя параметра совпадает с `:name` маршрута -> из маршрута;
- * - тип-класс -> тело запроса и валидация;
- * - `HttpContext` / `Request` / `ResponseBuilder` -> контекст/сырой запрос/билдер;
- * - остальные примитивы -> query (с конверсией по типу; `?`/default -> optional).
+ * - a parameter named like a route `:name` -> from the route;
+ * - a class type -> request body plus validation;
+ * - `HttpContext` / `Request` / `ResponseBuilder` -> context/raw request/builder;
+ * - other primitives -> query (converted by type; `?`/default -> optional).
  *
- * Заголовки и сырые тела читаются через HttpContext; сервисы внедряются
- * в конструктор. Любой параметр DTO-класса считается телом запроса.
- * Разрешение имён моделей происходит
- * один раз на старте; ошибки конфигурации — `HttpSetupError` (fail fast).
+ * Headers and raw bodies are read through HttpContext; services are injected
+ * into the constructor. Any DTO class parameter is treated as the request body.
+ * Model names are resolved once at startup; configuration errors are
+ * `HttpSetupError` (fail fast).
  */
 export function resolveGeneratedBindings(
   controller: GeneratedControllerClass,

@@ -24,13 +24,13 @@ interface FactorySnapshot {
 }
 
 /**
- * In-memory реализация {@link ICache}.
+ * In-memory implementation of {@link ICache}.
  *
- * - O(1) get/set/remove через `Map`;
- * - LRU через порядок вставки Map (перемещение при чтении);
- * - ленивый TTL на get/list/size;
- * - in-flight dedup в {@link getOrCreateAsync};
- * - `dispose()` очищает кэш при shutdown DI.
+ * - O(1) get/set/remove through a `Map`;
+ * - LRU through Map insertion order (moved on read);
+ * - lazy TTL on get/list/size;
+ * - in-flight dedup in {@link getOrCreateAsync};
+ * - `dispose()` clears the cache on DI shutdown.
  */
 export class MemoryCache<TValue = unknown> implements ICache<TValue> {
   private readonly store = new Map<string, StoredEntry<TValue>>();
@@ -235,7 +235,7 @@ export class MemoryCache<TValue = unknown> implements ICache<TValue> {
     return removed;
   }
 
-  /** Освобождает память при dispose контейнера. */
+  /** Frees memory when the container is disposed. */
   public dispose(): void {
     this.disposed = true;
     this.clear();

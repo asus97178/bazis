@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import type { ResolvedOutputCacheOptions } from "../internal/resolveCachePolicy";
 
 /**
- * Ключ `ctx.state` с принципалом запроса. Совпадает с {@link PRINCIPAL_STATE_KEY}
- * ядра, поэтому `varyByUser`/`unlessAuthenticated` видят того же субъекта, что
- * кладёт слой аутентификации.
+ * The `ctx.state` key holding the request principal. Equal to the kernel's
+ * {@link PRINCIPAL_STATE_KEY}, so `varyByUser`/`unlessAuthenticated` see the same
+ * subject the authentication layer stores.
  */
 export const OUTPUT_CACHE_PRINCIPAL_STATE_KEY = PRINCIPAL_STATE_KEY;
 

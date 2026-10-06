@@ -1,44 +1,43 @@
-# Модуль валидации osnv — спецификация
+# osnv validation module: specification
 
-Декларативная валидация классов: один декоратор `@Validator(options)` на полях
-и статические методы `Validator.validate` / `Validator.validateAsync`.
+Declarative class validation: one `@Validator(options)` decorator on fields and the
+static methods `Validator.validate` / `Validator.validateAsync`.
 
-Быстрая навигация:
-- [1. Что это и зачем](#1-что-это-и-зачем)
-- [2. Быстрый старт](#2-быстрый-старт)
-- [3. Справочник опций декоратора](#3-справочник-опций-декоратора)
-- [4. Сценарии использования](#4-сценарии-использования)
-- [5. Результат: `ValidationResult` и `ValidationError`](#5-результат-validationresult-и-validationerror)
-- [6. Сообщения об ошибках и плейсхолдеры](#6-сообщения-об-ошибках-и-плейсхолдеры)
-- [7. Коды ошибок](#7-коды-ошибок)
-- [8. Производительность и сборка в бинарник](#8-производительность-и-сборка-в-бинарник)
-- [9. Безопасность и отказоустойчивость](#9-безопасность-и-отказоустойчивость)
-- [10. Ограничения и анти-паттерны](#10-ограничения-и-анти-паттерны)
+Quick navigation:
+- [1. What it is and why](#1-what-it-is-and-why)
+- [2. Quick start](#2-quick-start)
+- [3. Decorator options reference](#3-decorator-options-reference)
+- [4. Usage scenarios](#4-usage-scenarios)
+- [5. Result: `ValidationResult` and `ValidationError`](#5-result-validationresult-and-validationerror)
+- [6. Error messages and placeholders](#6-error-messages-and-placeholders)
+- [7. Error codes](#7-error-codes)
+- [8. Performance and binary build](#8-performance-and-binary-build)
+- [9. Security and resilience](#9-security-and-resilience)
+- [10. Limits and anti-patterns](#10-limits-and-anti-patterns)
 
 ---
 
-## 1. Что это и зачем
+## 1. What it is and why
 
-Модуль решает одну задачу: **проверить, что объект (обычно DTO на границе
-системы — тело HTTP-запроса, сообщение из очереди, конфиг) соответствует
-правилам**, и вернуть полный список нарушений.
+The module solves one task: **check that an object (usually a DTO at the system
+boundary: an HTTP request body, a queue message, a config) follows the rules**, and
+return the full list of violations.
 
-Зачем свой модуль, а не class-validator:
+Why an own module instead of class-validator:
 
-- **Без внешних зависимостей** — только Bun API, ничего не тянется в бинарник.
-- **Без рефлексии** — никаких `emitDecoratorMetadata` / `reflect-metadata`.
-  Правила хранятся через стандартные TC39-декораторы и `Symbol.metadata`,
-  которые Bun выполняет нативно. Поэтому модуль свободно компилируется
-  через `bun build --compile`.
-- **Один проход — ошибки всех полей.** Валидация не останавливается на первой
-  ошибке. После превышения верхней границы длины строки проверки её содержимого
-  в том же декораторе пропускаются; ошибка длины остаётся в результате.
-- **Отказоустойчивость.** Исключение в пользовательской функции не роняет
-  валидацию — оно превращается в обычную ошибку с кодом `customError`.
-- **ООП-стиль.** Правила живут рядом с полями класса, движок — за фасадом
-  `Validator`.
+- **No external dependencies**: only Bun APIs, nothing is pulled into the binary.
+- **No reflection**: no `emitDecoratorMetadata` / `reflect-metadata`.
+  Rules are stored through standard TC39 decorators and `Symbol.metadata`, which Bun
+  runs natively. So the module compiles freely with `bun build --compile`.
+- **One pass, errors of all fields.** Validation does not stop at the first error.
+  After a string exceeds its upper length bound, the content checks of the same
+  decorator are skipped; the length error stays in the result.
+- **Resilience.** An exception in a user function does not crash validation: it becomes
+  a regular error with the `customError` code.
+- **OOP style.** Rules live next to the class fields, the engine behind the
+  `Validator` facade.
 
-Импорт всего публичного API — из одной точки:
+The whole public API is imported from one place:
 
 ```ts
 import { Validator, ValidationError, ValidationResult, ValidationCodes } from "@/library/validation";
@@ -46,10 +45,10 @@ import { Validator, ValidationError, ValidationResult, ValidationCodes } from "@
 
 ---
 
-## 2. Быстрый старт
+## 2. Quick start
 
 ```ts
-import { Validator } from "@/library/validation";
+import { Validator } from "osnv/library/validation";
 
 class CreateUserDto {
   @Validator({ required: true, minLength: 3, maxLength: 50 })
@@ -63,8 +62,8 @@ class CreateUserDto {
 }
 
 const dto = new CreateUserDto();
-dto.username = "ab";            // короче 3
-dto.age = 17.5;                 // меньше 18 и не целое
+dto.username = "ab";            // shorter than 3
+dto.age = 17.5;                 // below 18 and not an integer
 
 const result = Validator.validate(dto);
 
@@ -72,115 +71,114 @@ result.isValid;                  // false
 result.errors.length;            // 4 (minLength, required email, min, integer)
 result.hasErrorsFor("email");    // true
 result.getErrorsFor("age")[0].message;
-// 'Поле "age" должно быть не меньше 18'
+// 'Field "age" must be at least 18'
 ```
 
-Правила класса собираются и компилируются **один раз** при первом вызове
-`validate` (кэш в WeakMap) — повторные проверки ничего не пересобирают.
+Class rules are collected and compiled **once** on the first `validate` call (cached in
+a WeakMap); repeated checks rebuild nothing.
 
 ---
 
-## 3. Справочник опций декоратора
+## 3. Decorator options reference
 
-Один `@Validator({...})` — один набор правил. На поле можно вешать несколько
-декораторов, выполняются все.
+One `@Validator({...})` is one rule set. A field may have several decorators; all of them run.
 
-### Общие
+### General
 
-| Опция | Тип | Что делает |
+| Option | Type | What it does |
 |---|---|---|
-| `required` | `boolean` | `undefined`/`null` — ошибка `required`. Без него отсутствующее значение пропускает все проверки |
-| `type` | `"string" \| "number" \| "boolean" \| "enum" \| "json" \| "phone" \| "email" \| "date" \| "any"` | подсказка типа; несоответствие — ошибка `type`. Опциональна: тип также выводится из правил (`minLength` ⇒ строка, `min` ⇒ число) |
-| `validateIf` | `(instance) => boolean` | вернула `false` — все остальные правила **этого декоратора** пропускаются |
-| `custom` | `(value, instance) => boolean \| string \| void \| ValidationError \| Promise<...>` | пользовательская проверка, см. [4.6](#46-custom-пользовательские-проверки) |
-| `message` | `string` | локальный шаблон сообщения для всех правил декоратора; приоритетнее глобальных |
-| `nested` | `boolean` | рекурсивная проверка значения; без указания включается автоматически, `false` — отключает, см. [4.9](#49-вложенные-объекты-и-массивы-nested) |
+| `required` | `boolean` | `undefined`/`null` is a `required` error. Without it a missing value skips all checks |
+| `type` | `"string" \| "number" \| "boolean" \| "enum" \| "json" \| "phone" \| "email" \| "date" \| "any"` | a type hint; a mismatch is a `type` error. Optional: the type is also inferred from the rules (`minLength` ⇒ string, `min` ⇒ number) |
+| `validateIf` | `(instance) => boolean` | returned `false`: all other rules **of this decorator** are skipped |
+| `custom` | `(value, instance) => boolean \| string \| void \| ValidationError \| Promise<...>` | a user check, see [4.6](#46-custom-user-checks) |
+| `message` | `string` | a local message template for all rules of the decorator; wins over the global ones |
+| `nested` | `boolean` | recursive check of the value; turns on automatically when not set, `false` turns it off, see [4.9](#49-nested-objects-and-arrays-nested) |
 
-### Строки
+### Strings
 
-Любое из этих правил требует, чтобы значение было строкой (иначе — одна ошибка `type`).
+Any of these rules requires the value to be a string (otherwise one `type` error).
 
-| Опция | Тип | Ошибка при |
+| Option | Type | Error when |
 |---|---|---|
-| `notEmpty` | `boolean` | пустая строка `""` |
-| `minLength` / `maxLength` | `number` | длина меньше/больше указанной |
-| `length` | `[number, number]` | длина вне диапазона (включительно) |
-| `contains` / `notContains` | `string` | подстрока отсутствует / присутствует |
-| `pattern` | `RegExp \| string` | строка не матчится (строка-источник компилируется один раз) |
-| `email` | `boolean` | не email-адрес |
-| `url` | `boolean` | не URL (проверка через `URL.canParse`) |
-| `uuid` | `boolean` | не UUID версий 1–8 (nil-UUID допустим, регистр не важен) |
-| `json` | `boolean` | не парсится `JSON.parse` |
-| `phone` | `boolean` | не телефон: опциональный `+`, 7–15 цифр; пробелы, дефисы и скобки игнорируются |
+| `notEmpty` | `boolean` | the string is empty `""` |
+| `minLength` / `maxLength` | `number` | the length is below/above the given one |
+| `length` | `[number, number]` | the length is outside the range (inclusive) |
+| `contains` / `notContains` | `string` | the substring is missing / present |
+| `pattern` | `RegExp \| string` | the string does not match (a source string is compiled once) |
+| `email` | `boolean` | not an email address |
+| `url` | `boolean` | not a URL (checked with `URL.canParse`) |
+| `uuid` | `boolean` | not a UUID of versions 1–8 (the nil UUID is allowed, case does not matter) |
+| `json` | `boolean` | does not parse with `JSON.parse` |
+| `phone` | `boolean` | not a phone number: an optional `+`, 7–15 digits; spaces, hyphens and parentheses are ignored |
 
-`maxLength` и верхняя граница `length` ограничивают вход последующих проверок
-содержимого **этого же декоратора**: `contains`, `notContains`, `pattern`, `email`,
-`url`, `uuid`, `json`, `phone`. При превышении остаются ошибки длины, а перечисленные
-проверки не выполняются. Нижняя граница длины, остальные поля/декораторы и `custom`
-сохраняют прежнее поведение. Для недоверенного `pattern` задавайте верхнюю границу
-в одном декораторе с ним; отдельный декоратор ограничения не меняет соседние правила.
+`maxLength` and the upper bound of `length` limit the input of the later content checks
+**of the same decorator**: `contains`, `notContains`, `pattern`, `email`, `url`, `uuid`,
+`json`, `phone`. When exceeded, the length errors stay and the listed checks do not run.
+The lower length bound, the other fields/decorators and `custom` keep their behavior.
+For an untrusted `pattern`, set the upper bound in the same decorator; a separate
+limiting decorator does not change the neighboring rules.
 
-### Числа
+### Numbers
 
-Требуют `typeof value === "number"` и не-`NaN` (иначе — ошибка `type`).
+They require `typeof value === "number"` and not `NaN` (otherwise a `type` error).
 
-| Опция | Тип | Ошибка при |
+| Option | Type | Error when |
 |---|---|---|
-| `min` / `max` | `number` | меньше/больше границы |
-| `range` | `[number, number]` | вне диапазона (включительно) |
-| `positive` / `negative` | `boolean` | значение `<= 0` / `>= 0` |
-| `integer` | `boolean` | не целое |
+| `min` / `max` | `number` | below/above the bound |
+| `range` | `[number, number]` | outside the range (inclusive) |
+| `positive` / `negative` | `boolean` | the value is `<= 0` / `>= 0` |
+| `integer` | `boolean` | not an integer |
 
 ### Boolean
 
-| Опция | Ошибка при |
+| Option | Error when |
 |---|---|
-| `mustBeTrue` | значение не `true` (типичный кейс — согласие с условиями) |
-| `mustBeFalse` | значение не `false` |
+| `mustBeTrue` | the value is not `true` (the typical case is accepting terms) |
+| `mustBeFalse` | the value is not `false` |
 
 ### Enum
 
-| Опция | Тип | Что делает |
+| Option | Type | What it does |
 |---|---|---|
-| `enumType` | `object` (enum TypeScript) | значение должно входить в значения enum; обратные ключи числовых enum игнорируются |
+| `enumType` | `object` (a TypeScript enum) | the value must be one of the enum values; reverse keys of numeric enums are ignored |
 
 ---
 
-## 4. Сценарии использования
+## 4. Usage scenarios
 
-### 4.1 Обязательные и опциональные поля
+### 4.1 Required and optional fields
 
-`required` проверяет только `undefined` и `null`. Всё остальное — отдельные
-правила (пустая строка — это `notEmpty`, не `required`).
+`required` checks only `undefined` and `null`. Everything else is a separate rule (an
+empty string is `notEmpty`, not `required`).
 
 ```ts
 class Dto {
   @Validator({ required: true })
-  id!: string;                 // нет значения -> ошибка required
+  id!: string;                 // no value -> required error
 
   @Validator({ minLength: 3 })
-  comment?: string;            // нет значения -> валидно; есть -> проверяется длина
+  comment?: string;            // no value -> valid; a value -> its length is checked
 }
 ```
 
-### 4.2 Строки
+### 4.2 Strings
 
 ```ts
 class ArticleDto {
   @Validator({ required: true, length: [5, 120], notContains: "<script" })
   title!: string;
 
-  @Validator({ pattern: /^[a-z0-9-]+$/, message: "Slug — только строчные буквы, цифры и дефис" })
+  @Validator({ pattern: /^[a-z0-9-]+$/, message: "Slug: only lowercase letters, digits and hyphens" })
   slug!: string;
 
-  @Validator({ contains: "@corp.ru" })
+  @Validator({ contains: "@example.com" })
   authorEmail!: string;
 }
 ```
 
-`pattern` принимает и строку-источник: `@Validator({ pattern: "^\\d{4}$" })`.
+`pattern` also accepts a source string: `@Validator({ pattern: "^\\d{4}$" })`.
 
-### 4.3 Форматы: email, url, uuid, json, phone, date
+### 4.3 Formats: email, url, uuid, json, phone, date
 
 ```ts
 class ContactDto {
@@ -191,20 +189,20 @@ class ContactDto {
   site?: string;               // https://bun.sh/docs
 
   @Validator({ uuid: true })
-  id?: string;                 // v4 (crypto.randomUUID) и v7 (Bun.randomUUIDv7)
+  id?: string;                 // v4 (crypto.randomUUID) and v7 (Bun.randomUUIDv7)
 
   @Validator({ json: true })
   payload?: string;            // '{"a":1}'
 
   @Validator({ phone: true })
-  phone?: string;              // "+7 (912) 345-67-89" — скобки/пробелы/дефисы допустимы
+  phone?: string;              // "+1 (912) 345-67-89": parentheses/spaces/hyphens are allowed
 
   @Validator({ type: "date" })
-  bornAt?: Date | string;      // Date, ISO-строка или timestamp; Invalid Date — ошибка
+  bornAt?: Date | string;      // a Date, an ISO string or a timestamp; Invalid Date is an error
 }
 ```
 
-### 4.4 Числа и boolean
+### 4.4 Numbers and boolean
 
 ```ts
 class PaymentDto {
@@ -214,40 +212,40 @@ class PaymentDto {
   @Validator({ negative: true })
   correction?: number;
 
-  @Validator({ required: true, mustBeTrue: true, message: "Подтвердите списание" })
+  @Validator({ required: true, mustBeTrue: true, message: "Confirm the charge" })
   confirmed!: boolean;
 }
 ```
 
-`NaN` не проходит как число — будет ошибка `type` с `{actual}` = `NaN`.
+`NaN` does not pass as a number: it gives a `type` error with `{actual}` = `NaN`.
 
 ### 4.5 Enum
 
 ```ts
 enum Role { Admin = "admin", User = "user" }
-enum Level { Low, High }       // числовой enum
+enum Level { Low, High }       // a numeric enum
 
 class MemberDto {
   @Validator({ required: true, enumType: Role })
-  role!: string;               // "root" -> ошибка: должно быть одним из: admin, user
+  role!: string;               // "root" -> error: must be one of: admin, user
 
   @Validator({ enumType: Level })
-  level?: number;              // допустимы 0 и 1; строка "Low" — НЕ допустима
+  level?: number;              // 0 and 1 are allowed; the string "Low" is NOT allowed
 }
 ```
 
-### 4.6 `custom`: пользовательские проверки
+### 4.6 `custom`: user checks
 
-Функция получает значение поля **и весь экземпляр** — на этом строятся
-перекрёстные проверки. Возвращаемое значение трактуется так:
+The function gets the field value **and the whole instance**; cross-field checks are
+built on this. The return value is interpreted like this:
 
-| Вернула | Результат |
+| Returned | Result |
 |---|---|
-| `true` или ничего (`void`) | значение корректно |
-| `false` | ошибка `custom` со стандартным сообщением |
-| `string` | ошибка `custom` с этим сообщением (приоритетнее `message`) |
-| `ValidationError` | добавляется в результат как есть (свой `code` и `property`) |
-| брошено исключение | ошибка `customError` с текстом исключения; валидация продолжается |
+| `true` or nothing (`void`) | the value is valid |
+| `false` | a `custom` error with the standard message |
+| `string` | a `custom` error with this message (wins over `message`) |
+| `ValidationError` | added to the result as is (its own `code` and `property`) |
+| an exception thrown | a `customError` error with the exception text; validation continues |
 
 ```ts
 class SignupDto {
@@ -257,7 +255,7 @@ class SignupDto {
     custom: (value, instance) => {
       const dto = instance as SignupDto;
       if ((value as number) < 21 && dto.guardianConsent !== true) {
-        return "Для регистрации до 21 года необходимо согласие опекуна";
+        return "Registration under 21 requires guardian consent";
       }
       return true;
     },
@@ -269,51 +267,51 @@ class SignupDto {
 }
 ```
 
-Полностью свой код ошибки — через `ValidationError`:
+A fully custom error code goes through `ValidationError`:
 
 ```ts
 @Validator({
   custom: (value) =>
     RESERVED.has(value as string)
-      ? new ValidationError("username", value, "Имя зарезервировано", "reserved")
+      ? new ValidationError("username", value, "This name is reserved", "reserved")
       : true,
 })
 username!: string;
 ```
 
-### 4.7 `validateIf`: условная валидация
+### 4.7 `validateIf`: conditional validation
 
-Если функция вернула `false`, **все** правила этого декоратора пропускаются.
-Удобно для полей, обязательных только в определённом состоянии объекта:
+If the function returns `false`, **all** rules of this decorator are skipped.
+Handy for fields that are required only in a certain object state:
 
 ```ts
 class DeliveryDto {
   @Validator({ required: true, enumType: DeliveryType })
   type!: string;
 
-  // адрес обязателен только для курьерской доставки
+  // the address is required only for courier delivery
   @Validator({ validateIf: (i) => (i as DeliveryDto).type === "courier", required: true, notEmpty: true })
   address?: string;
 }
 ```
 
-### 4.8 Несколько декораторов на одном поле
+### 4.8 Several decorators on one field
 
-Выполняются все, ошибки суммируются. Это позволяет разделять правила
-с разными сообщениями или условиями:
+All of them run and their errors add up. This lets you split rules with different
+messages or conditions:
 
 ```ts
 class LoginDto {
-  @Validator({ minLength: 5, message: "Логин слишком короткий" })
-  @Validator({ contains: "@corp", message: "Логин должен быть корпоративным" })
+  @Validator({ minLength: 5, message: "The login is too short" })
+  @Validator({ contains: "@corp", message: "The login must be a corporate one" })
   login!: string;
 }
 ```
 
-### 4.9 Вложенные объекты и массивы (`nested`)
+### 4.9 Nested objects and arrays (`nested`)
 
-Значение поля проверяется рекурсивно как класс с собственными декораторами.
-Ошибки приходят с полным путём: `address.city`, `items[1].name`.
+The field value is checked recursively as a class with its own decorators.
+Errors come with the full path: `address.city`, `items[1].name`.
 
 ```ts
 class AddressDto {
@@ -329,38 +327,38 @@ class OrderDto {
   address!: AddressDto;
 
   @Validator({ nested: true })
-  deliveryPoints: AddressDto[] = [];   // массив — поэлементно
+  deliveryPoints: AddressDto[] = [];   // an array is checked element by element
 }
 
 const result = Validator.validate(order);
-result.getErrorsFor("address.city");        // ошибки вложенного поля
+result.getErrorsFor("address.city");        // errors of the nested field
 result.hasErrorsFor("deliveryPoints[1].zip");
 ```
 
-Три режима:
+Three modes:
 
-- **`nested: true`** — рекурсия всегда (для элементов массива тоже);
-- **не указан** — авто-режим: рекурсия включается, если на классе значения
-  есть декораторы `@Validator`;
-- **`nested: false`** — вложенная проверка для поля отключена.
+- **`nested: true`**: always recurse (for array elements too);
+- **not set**: auto mode: recursion turns on if the value's class has `@Validator`
+  decorators;
+- **`nested: false`**: nested checking is off for the field.
 
-Детали поведения:
-- циклические ссылки (`a.next.next === a`) безопасно пропускаются;
-- при нескольких декораторах на поле вложенная проверка выполняется один раз —
-  ошибки не дублируются;
-- глубина не ограничена, пути накапливаются: `a.b.c.d`.
+Behavior details:
+- circular references (`a.next.next === a`) are skipped safely;
+- with several decorators on a field the nested check runs once, so errors are not
+  duplicated;
+- depth is not limited, paths accumulate: `a.b.c.d`.
 
-### 4.10 Асинхронная валидация
+### 4.10 Asynchronous validation
 
-`custom` может быть `async` (проверка занятости имени в БД, внешний API).
-Такие проверки работают **только** через `validateAsync`:
+`custom` may be `async` (checking whether a name is taken in the database, an external
+API). Such checks work **only** through `validateAsync`:
 
 ```ts
 class RegisterDto {
   @Validator({
     custom: async (value) => {
       const taken = await usersRepo.exists(value as string);
-      return taken ? "Имя уже занято" : true;
+      return taken ? "The name is taken" : true;
     },
   })
   username!: string;
@@ -369,31 +367,30 @@ class RegisterDto {
 const result = await Validator.validateAsync(dto);
 ```
 
-Правила выполнения:
-- все синхронные правила выполняются сразу, асинхронные `custom` — после них,
-  последовательно (детерминированный порядок ошибок);
-- `reject`/исключение в async-функции — ошибка `customError`, не падение;
-- async `custom` внутри вложенных объектов тоже дожидается;
-- если async `custom` попал в **синхронный** `validate()` — поле не считается
-  валидным молча: добавляется ошибка `asyncCustomInSyncCall`.
+Execution rules:
+- all synchronous rules run at once, async `custom` checks run after them, sequentially
+  (a deterministic error order);
+- a `reject`/exception in an async function is a `customError` error, not a crash;
+- async `custom` inside nested objects is awaited too;
+- if an async `custom` ends up in the **synchronous** `validate()`, the field is not
+  silently treated as valid: an `asyncCustomInSyncCall` error is added.
 
-### 4.11 Подсказка `type` без других правил
+### 4.11 The `type` hint without other rules
 
-Когда нужна только проверка типа:
+When only a type check is needed:
 
 ```ts
 class RawDto {
   @Validator({ type: "string" })  a: unknown;
-  @Validator({ type: "number" })  b: unknown;   // NaN не проходит
+  @Validator({ type: "number" })  b: unknown;   // NaN does not pass
   @Validator({ type: "boolean" }) c: unknown;
-  @Validator({ type: "any" })     d: unknown;   // проверки типа нет
+  @Validator({ type: "any" })     d: unknown;   // no type check
 }
 ```
 
-### 4.12 Наследование
+### 4.12 Inheritance
 
-Правила родительского класса работают в потомке; правила потомка
-не «протекают» в родителя:
+Parent class rules work in a subclass; subclass rules do not leak into the parent:
 
 ```ts
 class BaseDto {
@@ -406,95 +403,96 @@ class ChildDto extends BaseDto {
   extra!: number;
 }
 
-Validator.validate(new ChildDto());  // проверит и id, и extra
-Validator.validate(new BaseDto());   // только id
+Validator.validate(new ChildDto());  // checks both id and extra
+Validator.validate(new BaseDto());   // only id
 ```
 
 ---
 
-## 5. Результат: `ValidationResult` и `ValidationError`
+## 5. Result: `ValidationResult` and `ValidationError`
 
 ```ts
 const result = Validator.validate(dto);
 
-result.isValid;                       // boolean: ни одно правило не нарушено
-result.errors;                        // readonly ValidationError[] — все ошибки разом
-result.getErrorsFor("email");         // ошибки конкретного поля (или пустой массив)
-result.getErrorsFor("address.city");  // для вложенных — полный путь
+result.isValid;                       // boolean: no rule is violated
+result.errors;                        // readonly ValidationError[]: all errors at once
+result.getErrorsFor("email");         // errors of a specific field (or an empty array)
+result.getErrorsFor("address.city");  // the full path for nested fields
 result.hasErrorsFor("age");           // boolean
 ```
 
 `ValidationError`:
 
-| Поле | Тип | Описание |
+| Field | Type | Description |
 |---|---|---|
-| `property` | `string` | имя поля; для вложенных — путь (`address.city`, `items[2].name`) |
-| `value` | `unknown` | фактическое значение на момент проверки |
-| `message` | `string` | готовое сообщение (плейсхолдеры уже подставлены) |
-| `code` | `string?` | машиночитаемый код правила (`required`, `minLength`, ...) |
+| `property` | `string` | the field name; for nested fields the path (`address.city`, `items[2].name`) |
+| `value` | `unknown` | the actual value at check time |
+| `message` | `string` | the ready message (placeholders already substituted) |
+| `code` | `string?` | the machine-readable rule code (`required`, `minLength`, ...) |
 
-Индекс «поле → ошибки» строится лениво при первом `getErrorsFor`/`hasErrorsFor` —
-валидный объект не платит за него аллокациями.
+The "field → errors" index is built lazily on the first `getErrorsFor`/`hasErrorsFor`,
+so a valid object pays no allocations for it.
 
 ---
 
-## 6. Сообщения об ошибках и плейсхолдеры
+## 6. Error messages and placeholders
 
-Приоритет шаблона: **локальный `message` декоратора > глобальный
-(`setDefaultMessages`) > встроенный**. Строка из `custom` приоритетнее всех.
+Template priority: **the decorator's local `message` > global (`setDefaultMessages`) >
+built-in**. A string returned from `custom` wins over all of them.
+Built-in messages are English; `RU_VALIDATION_MESSAGES` is a Russian set for `setDefaultMessages`.
 
 ```ts
-// Глобально (один раз при старте приложения):
+// Globally (once at application start):
 Validator.setDefaultMessages({
-  required: "Поле {property} обязательно для заполнения",
-  minLength: "Минимальная длина {min} символов",
+  required: "{property} is required",
+  minLength: "At least {min} characters",
 });
 
-// Локально (для конкретного правила):
-@Validator({ pattern: /^\d{6}$/, message: "Индекс — ровно 6 цифр, получено: {value}" })
+// Locally (for a specific rule):
+@Validator({ pattern: /^\d{6}$/, message: "A ZIP code is exactly 6 digits, got: {value}" })
 zip!: string;
 
-// Сброс к встроенным (полезно в тестах):
+// Reset to the built-in ones (handy in tests):
 Validator.resetDefaultMessages();
 ```
 
-Плейсхолдеры:
+Placeholders:
 
-| Плейсхолдер | Подставляется в | Значение |
+| Placeholder | Substituted in | Value |
 |---|---|---|
-| `{property}` | все | имя/путь поля |
-| `{value}` | все | текущее значение |
-| `{min}` / `{max}` | `minLength`, `maxLength`, `length`, `min`, `max`, `range` | границы |
-| `{pattern}` | `pattern` | источник регулярного выражения |
-| `{contains}` | `contains`, `notContains` | искомая подстрока |
-| `{allowed}` | `enum` | список допустимых значений через запятую |
-| `{expected}` / `{actual}` | `type` | ожидаемый и фактический тип |
-| `{error}` | `customError` | текст перехваченного исключения |
+| `{property}` | all | the field name/path |
+| `{value}` | all | the current value |
+| `{min}` / `{max}` | `minLength`, `maxLength`, `length`, `min`, `max`, `range` | the bounds |
+| `{pattern}` | `pattern` | the regular expression source |
+| `{contains}` | `contains`, `notContains` | the substring looked for |
+| `{allowed}` | `enum` | a comma-separated list of allowed values |
+| `{expected}` / `{actual}` | `type` | the expected and actual type |
+| `{error}` | `customError` | the text of the caught exception |
 
-Неизвестные плейсхолдеры остаются в тексте как есть (без исключений).
-`setDefaultMessages` принимает и собственные коды — можно задать шаблон для
-кода из своей `ValidationError`.
+Unknown placeholders stay in the text as is (no exceptions).
+`setDefaultMessages` also accepts your own codes, so you can set a template for a code
+from your own `ValidationError`.
 
 ---
 
-## 7. Коды ошибок
+## 7. Error codes
 
-| Код | Когда |
+| Code | When |
 |---|---|
-| `required` | значение `undefined`/`null` при `required: true` |
-| `notEmpty`, `minLength`, `maxLength`, `length` | длина строки |
-| `contains`, `notContains`, `pattern` | содержимое строки |
-| `email`, `url`, `uuid`, `json`, `phone`, `date` | формат |
-| `type` | значение неподходящего типа (в т.ч. `NaN` для числовых правил) |
-| `min`, `max`, `range`, `positive`, `negative`, `integer` | числовые границы |
+| `required` | the value is `undefined`/`null` with `required: true` |
+| `notEmpty`, `minLength`, `maxLength`, `length` | the string length |
+| `contains`, `notContains`, `pattern` | the string content |
+| `email`, `url`, `uuid`, `json`, `phone`, `date` | the format |
+| `type` | the value has the wrong type (including `NaN` for number rules) |
+| `min`, `max`, `range`, `positive`, `negative`, `integer` | numeric bounds |
 | `mustBeTrue`, `mustBeFalse` | boolean |
-| `enum` | значение не входит в `enumType` |
-| `custom` | `custom` вернула `false` или строку |
-| `customError` | `custom` или `validateIf` бросила исключение |
-| `asyncCustomInSyncCall` | async `custom` вызвана через синхронный `validate()` |
+| `enum` | the value is not in `enumType` |
+| `custom` | `custom` returned `false` or a string |
+| `customError` | `custom` or `validateIf` threw an exception |
+| `asyncCustomInSyncCall` | an async `custom` was called through the synchronous `validate()` |
 
-Константы доступны как `ValidationCodes.minLength` и т.д. — используйте их
-вместо строковых литералов:
+The constants are available as `ValidationCodes.minLength` and so on; use them instead
+of string literals:
 
 ```ts
 import { ValidationCodes } from "@/library/validation";
@@ -504,85 +502,78 @@ if (result.getErrorsFor("age").some((e) => e.code === ValidationCodes.min)) { ..
 
 ---
 
-## 8. Производительность и сборка в бинарник
+## 8. Performance and binary build
 
-- **План класса компилируется один раз.** При первом `validate` правила
-  собираются из метаданных, `pattern`-строки компилируются в RegExp,
-  значения enum складываются в `Set` (проверка членства за O(1)). Всё
-  кэшируется в `WeakMap` по конструктору — классы не удерживаются от GC.
-- **Горячий путь почти не аллоцирует.** Для валидного объекта создаются
-  только массив ошибок (пустой) и `ValidationResult`. Объекты параметров
-  сообщений создаются исключительно на пути ошибки.
-- **Бинарник.** Никакой рефлексии, `eval` и динамических импортов; стандартные
-  декораторы Bun выполняет нативно. Проверено:
-
-```bash
-bun build --compile src/examples/osnv/validation.ts --outfile bin/validation-demo
-./bin/validation-demo
-```
+- **The class plan is compiled once.** On the first `validate` the rules are collected
+  from the metadata, `pattern` strings are compiled into RegExp, and enum values go into
+  a `Set` (O(1) membership checks). Everything is cached in a `WeakMap` by constructor,
+  so classes are not kept from GC.
+- **The hot path barely allocates.** For a valid object only the (empty) error array
+  and the `ValidationResult` are created. Message parameter objects are created only
+  on the error path.
+- **Binary.** No reflection, `eval` or dynamic imports; Bun runs the standard decorators
+  natively. The framework CI (`run ci`) compiles binaries that use this module.
 
 ---
 
-## 9. Безопасность и отказоустойчивость
+## 9. Security and resilience
 
-- **Prototype pollution.** Движок читает только поля, объявленные декораторами
-  (служебные ключи вроде `__proto__` не обходятся); при обходе переданных
-  объектов (`enumType`, словарь сообщений) используется
-  `Object.prototype.hasOwnProperty.call`.
-- **Исключения в пользовательском коде.** `custom` и `validateIf` обёрнуты
-  в try/catch: исключение становится ошибкой `customError`, остальные поля
-  проверяются дальше.
-- **Async в sync.** Promise из `custom` в синхронном `validate()` — явная
-  ошибка `asyncCustomInSyncCall`, а не тихо «валидно».
-- **Циклы в графе объектов** при `nested` не зацикливают валидацию.
-- **Никаких `eval`** и динамической компиляции; `pattern: string` — это
-  обычный конструктор `RegExp`.
-- **Длина до содержимого.** Превышение `maxLength`/верхнего `length` не запускает
-  regex и форматные парсеры того же декоратора. Встроенный `email` работает
-  линейными проходами без перебора вариантов; допустимая грамматика сохранена.
-  Пользовательские `pattern`, `custom` и `validateIf` остаются ответственностью
-  автора правил: верхняя граница не доказывает безопасность произвольного regex.
-- Декоратор на статическом или приватном (`#x`) поле — немедленное исключение
-  при объявлении класса (fail-fast), такие поля не поддерживаются.
+- **Prototype pollution.** The engine reads only the fields declared by decorators
+  (service keys like `__proto__` are never traversed); walking passed objects
+  (`enumType`, the message dictionary) uses `Object.prototype.hasOwnProperty.call`.
+- **Exceptions in user code.** `custom` and `validateIf` are wrapped in try/catch: an
+  exception becomes a `customError` error, and the other fields are still checked.
+- **Async in sync.** A Promise from `custom` in the synchronous `validate()` is an
+  explicit `asyncCustomInSyncCall` error, not a silent "valid".
+- **Cycles in the object graph** with `nested` do not loop the validation.
+- **No `eval`** and no dynamic compilation; `pattern: string` is the regular `RegExp`
+  constructor.
+- **Length before content.** Exceeding `maxLength`/the upper `length` does not run the
+  regex and format parsers of the same decorator. The built-in `email` works with linear
+  passes without backtracking; the accepted grammar is unchanged.
+  User `pattern`, `custom` and `validateIf` stay the responsibility of the rule author:
+  an upper bound does not prove an arbitrary regex is safe.
+- A decorator on a static or private (`#x`) field throws immediately when the class is
+  declared (fail-fast); such fields are not supported.
 
 ---
 
-## 10. Ограничения и анти-паттерны
+## 10. Limits and anti-patterns
 
-**Нет `Reflect.getMetadata("design:type")` — это осознанно.** Автоматический
-вывод типа поля требует `emitDecoratorMetadata` и внешний пакет
-`reflect-metadata`, что нарушает принципы фреймворка (без зависимостей,
-без рефлексии, бинарник). Тип выводится из правил или задаётся `type`.
+**There is no `Reflect.getMetadata("design:type")`, on purpose.** Inferring the field
+type automatically needs `emitDecoratorMetadata` and the external `reflect-metadata`
+package, which breaks the framework principles (no dependencies, no reflection,
+binary). The type is inferred from the rules or set with `type`.
 
-**Анти-паттерны:**
+**Anti-patterns:**
 
 ```ts
-// ПЛОХО: тяжёлая логика в validateIf — она выполняется при каждой валидации
+// BAD: heavy logic in validateIf: it runs on every validation
 @Validator({ validateIf: (i) => expensiveComputation(i), required: true })
 
-// ПЛОХО: запрос к БД в синхронном custom — вернётся Promise,
-// поле получит ошибку asyncCustomInSyncCall
-@Validator({ custom: (v) => usersRepo.exists(v) })  // используйте validateAsync
+// BAD: a database query in a synchronous custom returns a Promise,
+// and the field gets an asyncCustomInSyncCall error
+@Validator({ custom: (v) => usersRepo.exists(v) })  // use validateAsync
 
-// ПЛОХО: мутировать экземпляр внутри custom — валидация должна быть чистой
+// BAD: mutating the instance inside custom: validation must be pure
 @Validator({ custom: (v, i) => { (i as Dto).normalized = v.trim(); return true; } })
 
-// ПЛОХО: один гигантский custom вместо встроенных правил —
-// теряются коды ошибок и кастомизация сообщений
+// BAD: one giant custom instead of the built-in rules
+// loses the error codes and message customization
 @Validator({ custom: (v) => typeof v === "string" && v.length >= 3 && v.includes("@") })
-// ХОРОШО:
+// GOOD:
 @Validator({ minLength: 3, contains: "@" })
 ```
 
-**Что модуль не делает:**
-- не трансформирует значения (trim, приведение типов) — только проверяет;
-- не валидирует приватные (`#field`) и статические поля;
-- не ограничивает глубину вложенности (циклы при этом безопасны).
+**What the module does not do:**
+- it does not transform values (trim, type conversion), it only checks;
+- it does not validate private (`#field`) and static fields;
+- it does not limit nesting depth (cycles are still safe).
 
-Карта файлов модуля — в [README.md](README.md). Запускаемая демонстрация всех
-сценариев: `bun src/examples/osnv/validation.ts`.
+The module file map is in [README.md](README.md). Scenarios with real assertions are in
+[test/validation.test.ts](test/validation.test.ts).
 
-Регрессии ограничения строк и совместимости email:
+Regressions of string limits and email compatibility:
 [test/validation.string-limits.test.ts](test/validation.string-limits.test.ts).
-Проверка HTTP 400 и ограничения запросов до binding:
+The HTTP 400 check and rate limiting before binding:
 [validation-admission.test.ts](../../core/http/test/validation-admission.test.ts).
