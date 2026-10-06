@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import { cors, preflightResponse, type CorsOptions } from "../Middleware/cors";
 
-describe("HTTP-07: every origin-dependent representation carries Vary", () => {
+describe("every origin-dependent representation carries Vary", () => {
   for (const origin of ["https://allowed.test", ["https://allowed.test"], (value: string) => value === "https://allowed.test"] satisfies CorsOptions["origin"][]) {
     test.each([undefined, "https://denied.test", "https://allowed.test"])(`${typeof origin} policy, Origin=%s`, async requestOrigin => {
       const response = new Response("cacheable", { headers: { vary: "Accept-Encoding", "cache-control": "public, max-age=60" } });

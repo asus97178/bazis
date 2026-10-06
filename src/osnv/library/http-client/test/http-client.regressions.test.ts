@@ -56,7 +56,7 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
   }
 }
 
-describe("HTTP-08: query precedes fragment", () => {
+describe("query precedes fragment", () => {
   test.each([
     ["https://api.test/items#section", "https://api.test/items?page=2#section"],
     ["https://api.test/items?q=a#section", "https://api.test/items?q=a&page=2#section"],
@@ -82,7 +82,7 @@ describe("HTTP-08: query precedes fragment", () => {
   });
 });
 
-describe("HTTP-09: malformed JSON preserves the HTTP envelope", () => {
+describe("malformed JSON preserves the HTTP envelope", () => {
   for (const [status, validateStatus, code] of [
     [502, undefined, HttpErrorCode.BadStatus],
     [200, undefined, HttpErrorCode.BadResponse],
@@ -114,7 +114,7 @@ describe("HTTP-09: malformed JSON preserves the HTTP envelope", () => {
   });
 });
 
-describe("HTTP-06: producer cleanup cannot retain client operations", () => {
+describe("producer cleanup cannot retain client operations", () => {
   for (const cancellation of ["pending", "rejecting"] as const) {
     for (const operation of ["retry", "redirect", "limit", "advertised-limit"] as const) {
       test(`${operation} with ${cancellation} cancel`, async () => {
