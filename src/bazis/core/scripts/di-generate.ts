@@ -1009,22 +1009,31 @@ function hasDecorator(node: ts.HasDecorators, name: string): boolean {
 }
 
 /** Route parameter names from all route decorators of a method (":id(int)" -> "id"). */
+/**
+ * Route parameter names of an action: the `@Controller` prefix and the method
+ * template, parsed like `Routing/template.ts` (`:name`, `:name(int)`, `*name`,
+ * and a bare `*` named `rest`).
+ */
 function routeParamNames(method: ts.MethodDeclaration): Set<string> {
   const names = new Set<string>();
-  for (const decorator of ts.getDecorators(method) ?? []) {
-    const info = decoratorCall(decorator);
-    if (!info?.call || !ROUTE_DECORATORS.has(info.name)) {
-      continue;
+  const templates: string[] = [];
+  const owner = method.parent;
+  const sources: readonly [readonly ts.Decorator[], (name: string) => boolean][] = [
+    [ts.isClassDeclaration(owner) ? ts.getDecorators(owner) ?? [] : [], (name) => name === "Controller"],
+    [ts.getDecorators(method) ?? [], (name) => ROUTE_DECORATORS.has(name)],
+  ];
+  for (const [decorators, accepts] of sources) {
+    for (const decorator of decorators) {
+      const info = decoratorCall(decorator);
+      const firstArg = info?.call?.arguments[0];
+      if (info && accepts(info.name) && firstArg && ts.isStringLiteralLike(firstArg)) templates.push(firstArg.text);
     }
-    const firstArg = info.call.arguments[0];
-    if (!firstArg || !ts.isStringLiteralLike(firstArg)) {
-      continue;
-    }
-    for (const segment of firstArg.text.split("/")) {
-      const match = /^:([A-Za-z_][A-Za-z0-9_]*)/.exec(segment);
-      if (match) {
-        names.add(match[1] as string);
-      }
+  }
+  for (const template of templates) {
+    for (const segment of template.split("/")) {
+      const param = /^:([A-Za-z_][A-Za-z0-9_]*)/.exec(segment);
+      if (param) names.add(param[1] as string);
+      else if (segment.startsWith("*")) names.add(segment.length > 1 ? segment.slice(1) : "rest");
     }
   }
   return names;

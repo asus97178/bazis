@@ -4,6 +4,16 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.96.4 — 2026-10-06
+
+### Fixed
+
+- Codegen bound route parameters only from `:name` in the method template.
+  A parameter from the `@Controller` prefix (`@Controller("orgs/:org/things")`)
+  or a wildcard segment (`files/*path`, or a bare `*` named `rest`) was bound
+  as a required query parameter, so the request failed with 400. Both are
+  now bound to the route value.
+
 ## 0.96.3 — 2026-10-06
 
 ### Fixed
