@@ -23,7 +23,7 @@ import {
   type ResponseBuilder,
 } from "@/core/http";
 
-// ── Тестовое приложение ─────────────────────────────────────────────────────
+// ── Test application ────────────────────────────────────────────────────────
 
 interface UsersService {
   byId(id: number): { id: number; name: string } | undefined;
@@ -183,7 +183,7 @@ class DataV2Controller {
   }
 }
 
-// ── Инфраструктура тестов ───────────────────────────────────────────────────
+// ── Test infrastructure ─────────────────────────────────────────────────────
 
 let container: DiContainer;
 let server: HttpServer;
@@ -228,21 +228,21 @@ afterAll(async () => {
   await container.dispose();
 });
 
-// ── Тесты ───────────────────────────────────────────────────────────────────
+// ── Tests ───────────────────────────────────────────────────────────────────
 
-describe("маршрутизация и привязка", () => {
-  test("GET с int-параметром и DI-зависимостью контроллера", async () => {
+describe("routing and binding", () => {
+  test("GET with an int parameter and a controller DI dependency", async () => {
     const response = await fetch(`${base}/api/users/1?v=`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ id: 1, name: "Alice" });
   });
 
-  test("нарушение ограничения int -> 404", async () => {
+  test("int constraint violation -> 404", async () => {
     const response = await fetch(`${base}/api/users/abc`);
     expect(response.status).toBe(404);
   });
 
-  test("query: обязательный и с default", async () => {
+  test("query: required and with a default", async () => {
     const ok = await fetch(`${base}/api/users/search?q=test`);
     expect(await ok.json()).toEqual({ q: "test", limit: 10 });
 
@@ -256,24 +256,24 @@ describe("маршрутизация и привязка", () => {
     expect(badType.status).toBe(400);
   });
 
-  test("wildcard и Ctx-привязка", async () => {
+  test("wildcard and Ctx binding", async () => {
     const response = await fetch(`${base}/api/misc/files/css/site.css`);
     expect(await response.json()).toEqual({ path: "css/site.css", url: "/api/misc/files/css/site.css" });
   });
 
-  test("опциональный заголовок", async () => {
+  test("optional header", async () => {
     const without = await fetch(`${base}/api/misc/header`);
     expect(await without.json()).toEqual({ token: null });
     const with_ = await fetch(`${base}/api/misc/header`, { headers: { "x-token": "abc" } });
     expect(await with_.json()).toEqual({ token: "abc" });
   });
 
-  test("FromServices: сервис из scope запроса", async () => {
+  test("FromServices: a service from the request scope", async () => {
     const response = await fetch(`${base}/api/misc/services`);
     expect(await response.json()).toEqual({ hasAlice: true });
   });
 
-  test("404 и 405 c Allow", async () => {
+  test("404 and 405 with Allow", async () => {
     expect((await fetch(`${base}/api/nope`)).status).toBe(404);
     const blocked = await fetch(`${base}/api/users/search`, { method: "DELETE" });
     expect(blocked.status).toBe(405);
@@ -281,8 +281,8 @@ describe("маршрутизация и привязка", () => {
   });
 });
 
-describe("тело запроса и валидация", () => {
-  test("валидный DTO -> 201 (@HttpCode)", async () => {
+describe("request body and validation", () => {
+  test("valid DTO -> 201 (@HttpCode)", async () => {
     const response = await fetch(`${base}/api/users`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -292,7 +292,7 @@ describe("тело запроса и валидация", () => {
     expect(await response.json()).toEqual({ created: "Bob" });
   });
 
-  test("невалидный DTO -> 400 со списком ошибок", async () => {
+  test("invalid DTO -> 400 with the error list", async () => {
     const response = await fetch(`${base}/api/users`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -304,7 +304,7 @@ describe("тело запроса и валидация", () => {
     expect(payload.details.map((d) => d.property).sort()).toEqual(["age", "name"]);
   });
 
-  test("битый JSON -> 400, prototype pollution отфильтрован", async () => {
+  test("broken JSON -> 400, prototype pollution filtered out", async () => {
     const broken = await fetch(`${base}/api/users`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -338,20 +338,20 @@ describe("тело запроса и валидация", () => {
   });
 });
 
-describe("ответы", () => {
-  test("Produces задаёт Content-Type строки", async () => {
+describe("responses", () => {
+  test("Produces sets the Content-Type of a string", async () => {
     const response = await fetch(`${base}/api/misc/text`);
     expect(response.headers.get("content-type")).toBe("text/csv");
     expect(await response.text()).toBe("a;b;c");
   });
 
-  test("прямой Response возвращается как есть", async () => {
+  test("a direct Response is returned as is", async () => {
     const response = await fetch(`${base}/api/misc/explicit`);
     expect(response.status).toBe(418);
     expect(await response.text()).toBe("raw");
   });
 
-  test("Created с Location", async () => {
+  test("Created with Location", async () => {
     const response = await fetch(`${base}/api/misc/created`);
     expect(response.status).toBe(201);
     expect(response.headers.get("location")).toBe("/misc/42");
@@ -363,7 +363,7 @@ describe("ответы", () => {
     expect(response.headers.get("location")).toBe("/misc/text");
   });
 
-  test("inline-опции маршрута: code, produces, middleware", async () => {
+  test("inline route options: code, produces, middleware", async () => {
     const response = await fetch(`${base}/api/misc/inline`);
     expect(response.status).toBe(207);
     expect(response.headers.get("content-type")).toBe("text/x-inline");
@@ -371,13 +371,13 @@ describe("ответы", () => {
     expect(await response.text()).toBe("multi");
   });
 
-  test("inline-опции первым аргументом при пустом пути", async () => {
+  test("inline options as the first argument with an empty path", async () => {
     const response = await fetch(`${base}/api/misc`, { method: "POST" });
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ queued: true });
   });
 
-  test("ResponseBuilder: статус и заголовки для plain-результата", async () => {
+  test("ResponseBuilder: status and headers for a plain result", async () => {
     const response = await fetch(`${base}/api/misc/builder`);
     expect(response.status).toBe(202);
     expect(response.headers.get("x-custom")).toBe("yes");
@@ -385,15 +385,15 @@ describe("ответы", () => {
   });
 });
 
-describe("ошибки, фильтры, middleware", () => {
-  test("@Catch контроллера превращает доменную ошибку в 404", async () => {
+describe("errors, filters, middleware", () => {
+  test("controller @Catch turns a domain error into 404", async () => {
     const response = await fetch(`${base}/api/users/999`);
     expect(response.status).toBe(404);
     const payload = (await response.json()) as { error: string };
     expect(payload.error).toContain("user 999 not found");
   });
 
-  test("необработанное исключение -> 500 без деталей", async () => {
+  test("unhandled exception -> 500 without details", async () => {
     const response = await fetch(`${base}/api/misc/fail`);
     expect(response.status).toBe(500);
     const payload = (await response.json()) as { error: string; message?: string };
@@ -402,32 +402,32 @@ describe("ошибки, фильтры, middleware", () => {
     expect(JSON.stringify(payload)).not.toContain("secret internals");
   });
 
-  test("ActionFilter.after подменяет результат", async () => {
+  test("ActionFilter.after replaces the result", async () => {
     const response = await fetch(`${base}/api/misc/filtered`);
     expect(await response.json()).toEqual({ value: 1, wrapped: true });
   });
 
-  test("порядок middleware: global снаружи controller", async () => {
+  test("middleware order: global wraps controller", async () => {
     const response = await fetch(`${base}/api/users/1`);
-    // Заголовки добавляются после next() — изнутри наружу.
+    // Headers are added after next(), from the inside out.
     expect(response.headers.get("x-trace")).toBe("controller, global");
   });
 });
 
-describe("версионирование (query source)", () => {
-  test("v=1.0 и v=2.0 попадают в разные контроллеры", async () => {
+describe("versioning (query source)", () => {
+  test("v=1.0 and v=2.0 reach different controllers", async () => {
     const v1 = await fetch(`${base}/api/data?v=1.0`);
     expect(await v1.json()).toEqual({ version: 1 });
     const v2 = await fetch(`${base}/api/data?v=2.0`);
     expect(await v2.json()).toEqual({ version: 2 });
   });
 
-  test("без параметра действует defaultVersion", async () => {
+  test("without the parameter defaultVersion applies", async () => {
     const response = await fetch(`${base}/api/data`);
     expect(await response.json()).toEqual({ version: 1 });
   });
 
-  test("несуществующая версия -> 400 со списком поддерживаемых", async () => {
+  test("unknown version -> 400 with the supported list", async () => {
     const response = await fetch(`${base}/api/data?v=9.9`);
     expect(response.status).toBe(400);
     const payload = (await response.json()) as { details: { supported: string[] } };
@@ -436,7 +436,7 @@ describe("версионирование (query source)", () => {
 });
 
 describe("CORS", () => {
-  test("preflight отвечает 204 с заголовками без вызова роутов", async () => {
+  test("preflight answers 204 with headers without calling routes", async () => {
     const response = await fetch(`${base}/api/users/1`, {
       method: "OPTIONS",
       headers: {
@@ -451,7 +451,7 @@ describe("CORS", () => {
     expect(response.headers.get("access-control-allow-headers")).toBe("content-type");
   });
 
-  test("обычный запрос с Origin получает CORS-заголовки; чужой Origin — нет", async () => {
+  test("a regular request with Origin gets CORS headers; a foreign Origin does not", async () => {
     const allowed = await fetch(`${base}/api/users/1`, { headers: { origin: "https://app.example.com" } });
     expect(allowed.headers.get("access-control-allow-origin")).toBe("https://app.example.com");
 

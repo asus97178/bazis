@@ -1,282 +1,280 @@
-# Kernel: lifecycle и исправления аудита
+# Kernel: lifecycle and audit fixes
 
-Версия паспорта: 1.6. Дата: 2026-10-04.
-Статус: исправления аудита реализованы; проверки перечислены в разделе 6.
-Изоляция конфигурации каждого kernel реализована; проверки и границы в §7,
-входы зафиксированы в [контрактах config](config/README.md).
-Тип: существующая атомарная инфраструктурная ответственность — жизненный цикл host.
-Точка подключения: `KernelBuilder.build()` / `Osnv.run()`.
-Область паспорта: K01–K08 из [аудита](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-2026-09-13.md)
-и принятое решение о разделении объявления конфигурации и представления kernel.
-Это частичный паспорт: полные контракты config sources, health, корреляции,
-модульных подписчиков и ORM admission здесь не переопределяются.
+Passport version: 1.6. Date: 2026-10-04.
+Status: the audit fixes are implemented; the checks are listed in section 6.
+Per-kernel configuration isolation is implemented; checks and limits are in §7,
+the inputs are recorded in the [config contracts](config/README.md).
+Type: an existing atomic infrastructure responsibility: the host lifecycle.
+Connection point: `KernelBuilder.build()` / `Osnv.run()`.
+Passport scope: K01–K08 from the [audit](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-2026-09-13.md)
+and the accepted decision to separate the configuration declaration from the kernel view.
+This is a partial passport: the full contracts of config sources, health, correlation,
+module subscribers and ORM admission are not redefined here.
 
-### Повторные health-запросы
+### Repeated health requests
 
-В одном `HealthService` для одной инстанции `HealthCheck` одновременно выполняется
-не более одной операции. Конкурентные отчёты разделяют её результат, сохраняя
-собственные deadline и отмену. Signal самой операции отменяется, когда уходят все
-ожидающие отчёты. Если операция игнорирует отмену, последующие отчёты возвращают
-unhealthy до её фактического завершения; повторного запуска и накопления работ нет.
-После завершения следующий отчёт выполняет новую проверку. Позднее отклонение
-Promise обработано. Check должен быть зарегистрирован singleton, как встроенные
-Infra checks. Лимит `concurrency` остаётся лимитом одного отчёта; разные экземпляры
-HealthService и разные проверки не получают общего глобального лимита.
-Сигнатуры `HealthCheckOptions` и результата сохранены. Обоснование и приёмка:
-[план](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/PLAN.md).
+In one `HealthService`, at most one operation runs at a time for one `HealthCheck`
+instance. Concurrent reports share its result while keeping their own deadline and
+cancellation. The operation's own signal is aborted when all waiting reports leave. If
+the operation ignores cancellation, later reports return unhealthy until it actually
+finishes; there are no repeated runs and no piling up of work. After it finishes, the
+next report runs a new check. A late Promise rejection is handled. A check must be
+registered as a singleton, like the built-in Infra checks. The `concurrency` limit stays
+a per-report limit; different HealthService instances and different checks get no shared
+global limit. The `HealthCheckOptions` and result signatures are kept. Rationale and acceptance:
+[plan](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-infra-config-acceptance/PLAN.md).
 
-## 1. Ответственность и структура
+## 1. Responsibility and structure
 
-Kernel запускает и останавливает зарегистрированные DI-службы, управляет
-тайм-аутами, уведомлениями и завершением процесса. Деление на новые подмодули
-не требуется. Существующая host-композиция в `KernelBuilder` сохраняется:
-`OsnvKernelModule` импортирует `OsnvKernelInfraModule` и пользовательский root.
-Данные предметных модулей, HTTP-авторизация и изменение схемы БД находятся вне области.
+The Kernel starts and stops the registered DI services and manages timeouts,
+notifications and process exit. No split into new submodules is needed. The existing
+host composition in `KernelBuilder` is kept: `OsnvKernelModule` imports
+`OsnvKernelInfraModule` and the user root. Domain module data, HTTP authorization and
+database schema changes are out of scope.
 
-## 2. Компоненты
+## 2. Components
 
-| Компонент | Файл | Изменяемый контракт |
+| Component | File | Changed contract |
 | --- | --- | --- |
-| Kernel | [Kernel.ts](Kernel.ts) | Общий startup deadline, отмена, общий `run`, ошибки очистки |
-| LifecycleCoordinator | [LifecycleCoordinator.ts](LifecycleCoordinator.ts) | Фактическое завершение async hooks перед rollback; сохранение тайм-аута и ошибок очистки |
-| ApplicationLifetime | [ApplicationLifetime.ts](ApplicationLifetime.ts) | Отмена ожидания started callbacks; пропуск оставшихся после отмены |
-| EventBus | [events/EventBus.ts](events/EventBus.ts) | Опциональный signal для остановки dispatch |
-| SupervisedHostedService | [SupervisedHostedService.ts](SupervisedHostedService.ts) | Передача signal, отмена повторов/backoff |
-| KernelBuilder | [KernelBuilder.ts](KernelBuilder.ts) | Проверка тайм-аутов; разрешение объявлений для своего окружения до создания DI-клиентов |
-| ConsoleLogger | [logging/ConsoleLogger.ts](logging/ConsoleLogger.ts) | Безопасное представление несериализуемых полей |
-| Configuration | [config/Configuration.ts](config/Configuration.ts) | Копия входной Map |
-| defineConfig / ConfigRegistry | [config/defineConfig.ts](config/defineConfig.ts), [config/ConfigRegistry.ts](config/ConfigRegistry.ts) | Неизменяемое объявление и отдельные представления kernel; контракт в §7 |
+| Kernel | [Kernel.ts](Kernel.ts) | The shared startup deadline, cancellation, the shared `run`, cleanup errors |
+| LifecycleCoordinator | [LifecycleCoordinator.ts](LifecycleCoordinator.ts) | Actual completion of async hooks before rollback; keeping the timeout and cleanup errors |
+| ApplicationLifetime | [ApplicationLifetime.ts](ApplicationLifetime.ts) | Cancelling the wait for started callbacks; skipping the rest after cancellation |
+| EventBus | [events/EventBus.ts](events/EventBus.ts) | An optional signal to stop dispatch |
+| SupervisedHostedService | [SupervisedHostedService.ts](SupervisedHostedService.ts) | Passing the signal, cancelling retries/backoff |
+| KernelBuilder | [KernelBuilder.ts](KernelBuilder.ts) | Timeout checks; resolving declarations for its environment before DI clients are created |
+| ConsoleLogger | [logging/ConsoleLogger.ts](logging/ConsoleLogger.ts) | A safe representation of non-serializable fields |
+| Configuration | [config/Configuration.ts](config/Configuration.ts) | A copy of the input Map |
+| defineConfig / ConfigRegistry | [config/defineConfig.ts](config/defineConfig.ts), [config/ConfigRegistry.ts](config/ConfigRegistry.ts) | An immutable declaration and separate kernel views; the contract is in §7 |
 
-Внутренние утилиты отмены и диапазона таймеров не являются публичными TS-входами.
-Проверки размещаются в `test/kernel.audit-regressions.test.ts` и `test/fixtures/`.
+The internal cancellation and timer range utilities are not public TS inputs.
+The checks live in `test/kernel.audit-regressions.test.ts` and `test/fixtures/`.
 
-## 3. DI и публичные поверхности
+## 3. DI and public surfaces
 
-TypeScript-вход: [index.ts](index.ts), alias `osnv/core/kernel`.
-Публичных HTTP/AI-входов у описываемой области нет.
-Kernel регистрирует инфраструктуру и разрешённые представления конфигурации:
+TypeScript entry: [index.ts](index.ts), alias `osnv/core/kernel`.
+The described scope has no public HTTP/AI inputs.
+The Kernel registers the infrastructure and the resolved configuration views:
 
-| provide | Реализация | Зависимости | Lifetime / видимость |
+| provide | Implementation | Dependencies | Lifetime / visibility |
 | --- | --- | --- | --- |
-| Environment | value из builder | kernel options / process env | singleton, global |
-| Configuration | value из builder | config sources | singleton, global |
-| ConfigRegistry | value из builder | объявления из графа, Environment, Configuration | singleton, global |
-| `definition.token` | ConfigView из реестра | одно объявление и снимок источников kernel | singleton, global |
-| ApplicationLifetime | value из builder | нет | singleton, global |
-| LOGGER | выбранное value | пользовательский Logger либо ConsoleLogger | singleton, global |
-| EventBus | существующая resolver factory | ServiceResolver текущего контейнера | singleton, global |
-| HealthService | существующая resolver factory | ServiceResolver текущего контейнера | singleton, global |
+| Environment | a value from the builder | kernel options / process env | singleton, global |
+| Configuration | a value from the builder | config sources | singleton, global |
+| ConfigRegistry | a value from the builder | declarations from the graph, Environment, Configuration | singleton, global |
+| `definition.token` | a ConfigView from the registry | one declaration and the kernel's sources snapshot | singleton, global |
+| ApplicationLifetime | a value from the builder | none | singleton, global |
+| LOGGER | the chosen value | a user Logger or ConsoleLogger | singleton, global |
+| EventBus | the existing resolver factory | the current container's ServiceResolver | singleton, global |
+| HealthService | the existing resolver factory | the current container's ServiceResolver | singleton, global |
 
-У исторического `OsnvKernelInfraModule` поле `exports` отсутствует; его открытая
-global-поверхность сохраняется. Реестр и представления регистрируются значениями;
-обычные классовые зависимости связывает существующий codegen.
-Явные зависимости диагностических фабрик относятся только
-к синтетическим тестовым службам, а не к альтернативной привязке классов.
+The historical `OsnvKernelInfraModule` has no `exports` field; its open global surface
+is kept. The registry and the views are registered as values; the existing codegen
+wires the regular class dependencies. The explicit dependencies of diagnostic
+factories apply only to synthetic test services, not to an alternative class binding.
 
-## 4. Данные и lifecycle
+## 4. Data and lifecycle
 
-Собственные ORM-сущности, миграции, UI и AI не используются. С 2026-10-02 проверки
-плана принадлежат соответствующей capability через `HostedService.planValidator`.
-Kernel получает неизменяемый массив настоящих hosted-служб, вызывает каждый уникальный
-validator один раз на версию плана и передаёт startup signal. `validate(services,
-signal?)` возвращает void либо Promise<void>; исключение/отмена прерывает старт.
-Поле optional, без default и без null. Реализации ORM автоматически предоставляют
-свой stateless validator; Kernel не знает таблиц, ORM-фаз или видов AI-коннекторов.
-Тип `HostedServicePlanValidator` опубликован DI рядом с HostedService, новых
-DI-регистраций нет. Лёгкие Application и startHostedServices применяют ту же проверку.
-Начальный план проверяется до onInit/start. Валидатор — чистая повторяемая проверка
-конфигурации: retry может вызвать его снова для плана с уже запущенными службами.
-Простой Kernel без валидаторов сохраняет обычный порядок.
-Проверки: `lifecycle-plan.test.ts` и прежние ORM/Agent hosting регрессии.
+No own ORM entities, migrations, UI or AI are used. Since 2026-10-02 plan checks belong
+to the relevant capability through `HostedService.planValidator`.
+The Kernel gets an immutable array of the real hosted services, calls each unique
+validator once per plan version and passes the startup signal. `validate(services,
+signal?)` returns void or Promise<void>; an exception/cancellation aborts startup.
+The field is optional, with no default and no null. The ORM implementations provide
+their stateless validator automatically; the Kernel knows nothing about tables, ORM
+phases or kinds of AI connectors. The `HostedServicePlanValidator` type is published by
+DI next to HostedService; there are no new DI registrations. The lightweight Application
+and startHostedServices apply the same check. The initial plan is checked before
+onInit/start. A validator is a pure repeatable configuration check: a retry may call it
+again for a plan with services already started.
+A simple Kernel without validators keeps the regular order.
+Checks: `lifecycle-plan.test.ts` and the existing ORM/Agent hosting regressions.
 
-SupervisedHostedService поддерживает службы с собственным planValidator и
-вложенные supervised-оболочки. Общая подготовка DI сначала вызывает все factories
-и сохраняет первые экземпляры, затем проверяет полный план настоящих служб до
-onInit и любого start. Factory только конструирует объект; соединения и работа
-принадлежат start. Повторная проверка и первый start используют тот же экземпляр.
-Ошибка factory при подготовке прекращает запуск без повторов. Собственный
-`planValidator` оболочки сохранён и делегирует общей подготовке; при раскрытии
-оболочек он не подменяет валидаторы реальных служб.
+SupervisedHostedService supports services with their own planValidator and nested
+supervised wrappers. The shared DI preparation first calls all factories and keeps the
+first instances, then checks the full plan of real services before onInit and any
+start. A factory only constructs the object; connections and work belong to start.
+The repeated check and the first start use the same instance. A factory error during
+preparation stops the startup without retries. The wrapper's own `planValidator` is
+kept and delegates to the shared preparation; when wrappers are unwrapped it does not
+replace the validators of the real services.
 
-Без policy.phase оболочка наследует фазу реальной службы после подготовки;
-до неё getter возвращает 0 без вызова factory. Явный override сохраняется для
-планов без validators. Если validator есть у любой службы плана, несовпадающий
-override отклоняется до проверки и запуска: старый контракт validator читает
-service.phase и должен видеть фактическую фазу. Реальные службы не изменяются.
-Kernel сохраняет порядок регистрации внутри фазы; Application/helpers по-прежнему
-используют порядок регистрации без сортировки фаз.
+Without policy.phase the wrapper inherits the real service's phase after preparation;
+before that the getter returns 0 without calling the factory. An explicit override is
+kept for plans without validators. If any service of the plan has a validator, a
+mismatching override is rejected before the check and the start: the old validator
+contract reads service.phase and must see the actual phase. Real services are not
+changed. The Kernel keeps the registration order within a phase; Application/helpers
+still use the registration order without sorting phases.
 
-После ошибки start supervisor сначала успешно останавливает попытку, затем
-применяет maxAttempts/backoff и вызывает factory снова. Общий координатор DI
-сериализует замены, повторно проверяет полный текущий план и атомарно принимает
-кандидата до его start; фаза root-позиции не может измениться. Проверка включает
-новые validators кандидата и сохраняет реальные identity остальных служб.
-Ошибка factory/admission, цикл, дублирование или отмена прекращают эту замену.
-Повторное использование того же экземпляра после успешного stop разрешено;
-готовность экземпляра к новому start принадлежит реализации службы. Ошибка stop
-не скрывается: AggregateError содержит исходную ошибку start и cleanup, новая
-попытка запрещена. Внешний stop сохраняет возможность очистить удержанный экземпляр.
-Одновременные start/stop каждого вида разделяют свою операцию; start после
-успешного stop создаёт новый запуск, после неудачного stop не допускается.
+After a start error the supervisor first stops the attempt successfully, then applies
+maxAttempts/backoff and calls the factory again. The shared DI coordinator serializes
+replacements, rechecks the full current plan and atomically accepts the candidate before
+its start; the phase of the root position cannot change. The check includes the
+candidate's new validators and keeps the real identities of the other services.
+A factory/admission error, a cycle, a duplicate or cancellation stops this replacement.
+Reusing the same instance after a successful stop is allowed; whether the instance is
+ready for a new start is up to the service implementation. A stop error is not hidden:
+an AggregateError holds the original start error and the cleanup error, and a new attempt
+is forbidden. An external stop can still clean up the held instance.
+Concurrent starts/stops of each kind share their operation; a start after a successful
+stop creates a new run, and after a failed stop it is not allowed.
 
-Прямой supervised.start использует тот же механизм с одноэлементным планом.
-Уже отменённый signal не вызывает factory; отмена async validator не публикует
-кандидата и не разрешает поздний start. Первая проверка до любых эффектов и
-повторяемость validators — разные гарантии; неизвестные будущие retry-кандидаты
-проверяются непосредственно перед их запуском. Проверки:
+A direct supervised.start uses the same mechanism with a one-element plan.
+An already aborted signal does not call the factory; cancelling an async validator does
+not publish the candidate and does not allow a late start. The first check before any
+effects and the repeatability of validators are different guarantees; unknown future
+retry candidates are checked right before their start. Checks:
 [supervised-plan.test.ts](test/supervised-plan.test.ts).
 
-Отмена прекращает ожидание и запуск следующих
-callbacks/handlers; произвольный уже выполняющийся пользовательский код нельзя
-принудительно остановить. Его Promise наблюдается, чтобы поздний отказ не стал
-unhandled rejection. Hosted services получают существующий `AbortSignal`.
-Coordinator проверяет уже отменённый signal до разрешения плана, затем повторно
-непосредственно перед `onInit`, `start` и `onBootstrap` внутри их microtask.
-Отмена между планированием и исполнением поэтому не запускает callback.
-Успешно завершившийся после отмены пользовательский `start`, который уже начал
-работу и игнорирует signal, по-прежнему получает один `stop`.
-Регрессии: [lifecycle-cancellation.test.ts](test/lifecycle-cancellation.test.ts).
+Cancellation stops waiting for and starting the next callbacks/handlers; arbitrary user
+code that is already running cannot be stopped by force. Its Promise is observed so a
+late rejection does not become an unhandled rejection. Hosted services get the existing
+`AbortSignal`. The Coordinator checks an already aborted signal before resolving the
+plan, then again right before `onInit`, `start` and `onBootstrap` inside their
+microtask. So a cancellation between scheduling and execution does not run the callback.
+A user `start` that finished successfully after cancellation, already started work and
+ignores the signal still gets one `stop`.
+Regressions: [lifecycle-cancellation.test.ts](test/lifecycle-cancellation.test.ts).
 
-Отмена уже начатого `onInit` или `onBootstrap` не запускает `onDestroy` параллельно
-с ним. Coordinator сохраняет исходный Promise и сначала дожидается его фактического
-завершения, затем в обратном порядке останавливает запущенные службы и очищает hooks.
-Kernel освобождает контейнер после этой последовательности, поэтому незавершённый
-hook сохраняет доступ к своим зависимостям. `shutdownTimeoutMs` ограничивает всё
-ожидание rollback и освобождения контейнера одним бюджетом; 0 отключает предел.
-Исчерпание бюджета даёт `ShutdownTimeoutError`, а не успешный `stop`/`run`. Позднее
-завершение продолжает реальную очистку; повторный `stop` сохраняет исходный timeout.
-Бесконечно зависший hook не считается очищенным: `Osnv.run` выполняет предусмотренный
-принудительный выход. Произвольный Promise не прерывается принудительно.
+Cancelling an already started `onInit` or `onBootstrap` does not run `onDestroy` in
+parallel with it. The Coordinator keeps the original Promise and first waits for it to
+actually finish, then stops the started services in reverse order and cleans up hooks.
+The Kernel releases the container after this sequence, so an unfinished hook keeps
+access to its dependencies. `shutdownTimeoutMs` bounds the whole wait for rollback and
+container release with one budget; 0 disables the limit. Running out of the budget gives
+`ShutdownTimeoutError`, not a successful `stop`/`run`. A late completion continues the
+real cleanup; a repeated `stop` keeps the original timeout. An endlessly hanging hook is
+not considered cleaned up: `Osnv.run` performs the planned forced exit. An arbitrary
+Promise is not interrupted by force.
 
-Поздний отказ hook и ошибки `stop`/`onDestroy` собираются, остальные доступные шаги
-очистки выполняются; startup и cleanup ошибки возвращаются через `AggregateError`
-с исходной ошибкой старта в `cause`. Если срок уже истёк, последующий отказ cleanup
-сообщается фиксированным `[osnv] startup.cleanup failed.` без содержимого ошибки.
-Внутренние `waitForRollback`, `rollbackFailure`, `rollbackElapsedMs` связывают
-Coordinator с Kernel, не регистрируют новые DI-сервисы. Подписчики `onStarted`
-и EventBus сохраняют прежнее поведение; они не являются resource lifecycle hooks.
+A late hook rejection and `stop`/`onDestroy` errors are collected, and the other
+available cleanup steps run; startup and cleanup errors are returned through an
+`AggregateError` with the original startup error in `cause`. If the deadline has already
+passed, a later cleanup failure is reported with the fixed `[osnv] startup.cleanup failed.`
+without the error content. The internal `waitForRollback`, `rollbackFailure`,
+`rollbackElapsedMs` link the Coordinator with the Kernel and register no new DI services.
+`onStarted` and EventBus subscribers keep their behavior; they are not resource lifecycle hooks.
 
-`RestartPolicy.onRetry` — диагностическое уведомление перед повтором, не управляющий
-callback. Синхронное исключение, отклонение Promise/thenable и ошибка чтения `then`
-не прекращают повтор и не заменяют исходную ошибку запуска. Promise наблюдается,
-но не задерживает recovery. Сбой виден как `[osnv] supervised.onRetry failed.`;
-исходная ошибка не сериализуется, сбой самого diagnostic sink изолирован.
+`RestartPolicy.onRetry` is a diagnostic notification before a retry, not a controlling
+callback. A synchronous exception, a Promise/thenable rejection and an error reading
+`then` do not stop the retry and do not replace the original startup error. The Promise
+is observed but does not delay recovery. The failure shows as
+`[osnv] supervised.onRetry failed.`; the original error is not serialized, and a failure
+of the diagnostic sink itself is isolated.
 
-Собранный Kernel хранит независимую копию уникальных `signals`. Повтор значения
-в массиве не создаёт второй обработчик; изменение исходного массива после build
-не меняет Kernel. Первая доставка сигнала запускает graceful shutdown; следующая
-отдельная доставка во время остановки сохраняет немедленный `exit(130)`.
-Проверки перечисленных случаев:
+A built Kernel keeps an independent copy of the unique `signals`. A repeated value in the
+array does not create a second handler; changing the source array after build does not
+change the Kernel. The first signal delivery starts a graceful shutdown; a separate next
+delivery during shutdown keeps the immediate `exit(130)`.
+Checks of these cases:
 [kernel.repeat-audit-regressions.test.ts](test/kernel.repeat-audit-regressions.test.ts).
 
-## 5. Изменяемые входы и результаты
+## 5. Changed inputs and results
 
-Это доверенные внутрипроцессные TypeScript-вызовы. `null` не поддерживается,
-приведения строк к числам нет; неизвестные поля options не используются.
+These are trusted in-process TypeScript calls. `null` is not supported, strings are not
+converted to numbers; unknown options fields are not used.
 
-| Вход / поле | Тип, источник | Обязательность / default | Проверка и результат |
+| Input / field | Type, source | Required / default | Check and result |
 | --- | --- | --- | --- |
-| `KernelOptions.startupTimeoutMs` | number, builder options | нет; 30000 | Целое 0…2147483647 мс; 0 отключает deadline всего старта |
-| `KernelOptions.shutdownTimeoutMs` | number, builder options | нет; 10000 | Тот же диапазон; 0 отключает deadline остановки |
-| `KernelOptions.signals` | readonly NodeJS.Signals[], builder options | нет; SIGINT, SIGTERM | При build сохраняется snapshot уникальных значений; пустой массив отключает обработчики |
-| `useStartupTimeout(timeoutMs)`, `useShutdownTimeout(timeoutMs)` | number, аргумент | обязателен | Та же проверка при build; invalid → KernelError до config/DI |
-| `Kernel.start()` | входных полей нет | — | Promise<void>; общий для повторных вызовов; deadline включает уведомления |
-| `Kernel.run()` | входных полей нет | — | Общий Promise<number> и один комплект process handlers |
-| `Kernel.stop(request)` | объект, аргумент | default `{exitCode:0}` | Общая операция остановки |
-| `request.exitCode` | number, код завершения | обязателен при явном request | Передаётся существующему runtime; контракт диапазона не меняется |
-| `request.signal` | string, имя сигнала | нет | Передаётся stopping event и shutdown hooks |
-| `ApplicationLifetime.notifyStarted(signal?)` | AbortSignal, внутренний вызов kernel | нет | Ожидание и оставшиеся callbacks отменяются; Promise<void> |
-| `SupervisedHostedService.start(signal?)` | AbortSignal, HostedService-контракт | нет | Тот же signal передаётся inner; отмена запрещает следующий retry |
-| `PublishOptions.signal` | AbortSignal, аргумент publish/publishScoped | нет | Отмена ожидания, без запуска оставшихся обработчиков; причина отмены отклоняет publish даже при isolate |
-| `PublishOptions.handlerTimeoutMs` | number, аргумент | нет; без лимита | Существующий отдельный timeout handler; поля order/isolate/onError сохраняются |
-| `Configuration(values)` | ReadonlyMap<string,string>, аргумент | обязателен | Собственный снимок; значения строковые, null не поддерживается |
-| `ConfigDefinition.ensureValid(environment?)` | development / test / production | нет; process env | Проверка без изменения объявления; готовый ConfigView проверяет совпадение своего окружения |
-| `ConsoleLogger.*(message, fields?)` | string и LogFields | message обязателен | Несериализуемые fields заменяются фиксированным маркером |
+| `KernelOptions.startupTimeoutMs` | number, builder options | no; 30000 | An integer 0…2147483647 ms; 0 disables the deadline of the whole startup |
+| `KernelOptions.shutdownTimeoutMs` | number, builder options | no; 10000 | The same range; 0 disables the shutdown deadline |
+| `KernelOptions.signals` | readonly NodeJS.Signals[], builder options | no; SIGINT, SIGTERM | A snapshot of unique values is kept at build; an empty array disables the handlers |
+| `useStartupTimeout(timeoutMs)`, `useShutdownTimeout(timeoutMs)` | number, argument | required | The same check at build; invalid → KernelError before config/DI |
+| `Kernel.start()` | no input fields | — | Promise<void>; shared by repeated calls; the deadline includes notifications |
+| `Kernel.run()` | no input fields | — | A shared Promise<number> and one set of process handlers |
+| `Kernel.stop(request)` | object, argument | default `{exitCode:0}` | The shared stop operation |
+| `request.exitCode` | number, exit code | required with an explicit request | Passed to the existing runtime; the range contract does not change |
+| `request.signal` | string, signal name | no | Passed to the stopping event and shutdown hooks |
+| `ApplicationLifetime.notifyStarted(signal?)` | AbortSignal, an internal kernel call | no | The wait and the remaining callbacks are cancelled; Promise<void> |
+| `SupervisedHostedService.start(signal?)` | AbortSignal, the HostedService contract | no | The same signal is passed to inner; cancellation forbids the next retry |
+| `PublishOptions.signal` | AbortSignal, a publish/publishScoped argument | no | Cancels the wait without starting the remaining handlers; the cancellation reason rejects publish even with isolate |
+| `PublishOptions.handlerTimeoutMs` | number, argument | no; unlimited | The existing separate handler timeout; the order/isolate/onError fields are kept |
+| `Configuration(values)` | ReadonlyMap<string,string>, argument | required | An own snapshot; values are strings, null is not supported |
+| `ConfigDefinition.ensureValid(environment?)` | development / test / production | no; process env | A check without changing the declaration; a ready ConfigView checks that its environment matches |
+| `ConsoleLogger.*(message, fields?)` | string and LogFields | message is required | Non-serializable fields are replaced with a fixed marker |
 
-Пример отмены события: `await bus.publish(event, payload, { signal: controller.signal })`.
-Event identity, payload T, формат логов и политика регистрации обработчиков остаются
-существующими контрактами [EventBus](events/EventBus.ts) и [Logger](logging/Logger.ts).
-RestartPolicy сохраняет `maxAttempts` (3), `backoffMs` (100), `maxBackoffMs` (5000),
-`onRetry?`; default phase наследуется от службы, explicit phase проверяется как
-описано выше. Отмена проверяется до фабрики и после неудачной попытки.
+An event cancellation example: `await bus.publish(event, payload, { signal: controller.signal })`.
+Event identity, the payload T, the log format and the handler registration policy stay
+the existing contracts of [EventBus](events/EventBus.ts) and [Logger](logging/Logger.ts).
+RestartPolicy keeps `maxAttempts` (3), `backoffMs` (100), `maxBackoffMs` (5000),
+`onRetry?`; the default phase is inherited from the service, an explicit phase is checked
+as described above. Cancellation is checked before the factory and after a failed attempt.
 
-Ошибка старта сохраняется как основная, если очистка успешно завершилась в срок.
-При завершившемся отказе очистки она остаётся в `AggregateError`/`cause` вместе
-с ошибками освобождения; публичный `stop` не выдаёт такой rollback за успех.
-Если очистка превысила deadline, наружу выходит `ShutdownTimeoutError` с исходной
-ошибкой в `cause`, чтобы `Osnv.run()` выполнил предусмотренный принудительный выход.
-Обычный отказ старта `Osnv.run()` выводит в stderr после существующего
-`redactSensitive`: вложенные подробности форматируются явно без сворачивания
-в `[Object ...]`. Маскирование секретов и предел глубины redaction сохраняются;
-форматирование поддерживает BigInt и уже обезличенные циклические ссылки,
-не вызывает пользовательский `inspect`. Код завершения остаётся 1.
-Чтение объявления через `get()` и `ensureValid(environment)` не фиксирует
-окружение и не изменяет будущие чтения. Host использует отдельный `resolve`,
-а сервисы — представление из DI/ConfigRegistry своего kernel.
+The startup error stays the main one if the cleanup finished successfully in time.
+If the cleanup finished with a failure, the startup error stays in `AggregateError`/`cause`
+together with the release errors; the public `stop` does not present such a rollback as
+success. If the cleanup exceeded the deadline, a `ShutdownTimeoutError` with the original
+error in `cause` comes out, so `Osnv.run()` performs the planned forced exit.
+A regular startup failure is printed by `Osnv.run()` to stderr after the existing
+`redactSensitive`: nested details are formatted explicitly without collapsing into
+`[Object ...]`. Secret masking and the redaction depth limit are kept; formatting
+supports BigInt and already anonymized circular references and does not call a user
+`inspect`. The exit code stays 1.
+Reading a declaration through `get()` and `ensureValid(environment)` does not fix the
+environment and does not change future reads. The host uses a separate `resolve`, and
+services use the view from DI/ConfigRegistry of their kernel.
 
-## 6. Исторические проверки исправлений K01–K08
+## 6. Historical checks of the K01–K08 fixes
 
-| Проверка | Результат |
+| Check | Result |
 | --- | --- |
-| Kernel, app/config, background, Infra | 121 PASS / 0 FAIL, 286 expect, 11 файлов |
-| В том числе новые регрессии K01–K08 | 27 PASS / 0 FAIL |
-| TypeScript kernel и его импортируемые зависимости | PASS, `tsc --noEmit -p tsconfig.kernel.json` |
-| TypeScript всего `src` при исправлении K01–K08 | PASS, exit 0; промежуточные ошибки WebSocket сохранены в отчёте |
+| Kernel, app/config, background, Infra | 121 PASS / 0 FAIL, 286 expect, 11 files |
+| Including the new K01–K08 regressions | 27 PASS / 0 FAIL |
+| TypeScript of the kernel and its imported dependencies | PASS, `tsc --noEmit -p tsconfig.kernel.json` |
+| TypeScript of the whole `src` when K01–K08 were fixed | PASS, exit 0; intermediate WebSocket errors are kept in the report |
 
-Проверенные команды и журналы фиксируются в
-[отчёте об исправлениях](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-fixes-2026-09-14.md).
-Физические PostgreSQL/контейнерные проверки неприменимы к этим изменениям.
-Эти результаты относятся к исправлениям K01–K08 и не подтверждают реализацию §7.
-Публичные конструкторные зависимости и генерируемые контракты при фиксации
-архитектурного решения не менялись. Переходное состояние config описано ниже.
+The checked commands and logs are recorded in the
+[fixes report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-fixes-2026-09-14.md).
+Physical PostgreSQL/container checks do not apply to these changes.
+These results refer to the K01–K08 fixes and do not confirm the implementation of §7.
+The public constructor dependencies and generated contracts did not change when the
+architectural decision was recorded. The transitional config state is described below.
 
 <a id="config-isolation-decision"></a>
 
-## 7. Принятое решение: конфигурация каждого kernel
+## 7. The accepted decision: configuration per kernel
 
-Основание: решение владельца от 2026-09-14 и
+Basis: the owner's decision of 2026-09-14 and
 [MOD-ARCH-001 §5.4](../../../../docs/architecture/MODULE_ARCHITECTURE.md#kernel-config-isolation).
-Статус: реализовано; проверено в исходниках и собранном бинарнике.
+Status: implemented; checked in the sources and in a built binary.
 
-Контракт реализации согласован с текущей доработкой Infra/config:
-`Configuration` хранит снимок источников, `ConfigRegistry` — представления
-по идентичности объявления. `ConfigRegistry.get(config)` возвращает один
-типизированный `AppConfig<T>` текущего kernel. `defineConfig` возвращает
-неизменяемый `ConfigDefinition<T>` с `resolve(environment?, configuration?)`
-и DI-токеном `token`. Валидация объявления не меняет его состояния.
-Прямые `get/has` объявления сохраняются для отдельных вызовов вне kernel,
-читают текущее process env без общего кэша; сервисы получают `definition.token`
-через существующий DI или используют `ConfigRegistry.get`.
-Пользовательский `AppConfig.resolve(environment?, configuration?)` может
-строить своё независимое представление;
-старые объекты только с `ensureValid` остаются валидаторами, ответственность
-за отсутствие изменяемого общего состояния в них принадлежит автору.
+The implementation contract is aligned with the current Infra/config work:
+`Configuration` holds the sources snapshot, `ConfigRegistry` the views by declaration
+identity. `ConfigRegistry.get(config)` returns one typed `AppConfig<T>` of the current
+kernel. `defineConfig` returns an immutable `ConfigDefinition<T>` with
+`resolve(environment?, configuration?)` and the `token` DI token. Validating a
+declaration does not change its state.
+A declaration's direct `get/has` are kept for separate calls outside a kernel and read
+the current process env without a shared cache; services get `definition.token` through
+the existing DI or use `ConfigRegistry.get`.
+A user `AppConfig.resolve(environment?, configuration?)` may build its own independent
+view; older objects with only `ensureValid` stay validators, and their author is
+responsible for having no mutable shared state in them.
 
-Источники задаются существующим `KernelBuilder.addConfigSource`, окружение —
-`useEnvironment`. Полный контракт источников описан в [config/README.md](config/README.md).
-`InfraConnector.create(configs?: ConfigRegistry)` получает владельца значений;
-вызов без аргумента остаётся standalone-сценарием. JWT-конфигурация приложения
-собирается фабрикой при разрешении TokenService через DI, а не при импорте файла.
+Sources are set with the existing `KernelBuilder.addConfigSource`, the environment with
+`useEnvironment`. The full sources contract is in [config/README.md](config/README.md).
+`InfraConnector.create(configs?: ConfigRegistry)` gets the owner of the values; a call
+without an argument stays a standalone scenario. The application's JWT configuration is
+assembled by a factory when TokenService is resolved through DI, not on file import.
 
-Модуль владеет общим неизменяемым объявлением конфигурации. Kernel владеет
-выбранным окружением, снимком разрешённых значений и кэшем. Одно объявление
-должно поддерживать несколько kernel в одном процессе без ручного копирования
-потребителем. Разрешение и проверка не меняют объявление или соседний kernel.
+A module owns the shared immutable configuration declaration. The Kernel owns the chosen
+environment, the snapshot of resolved values and the cache. One declaration must support
+several kernels in one process without manual copying by the consumer. Resolution and
+checks do not change the declaration or a neighboring kernel.
 
-Ответственность остаётся внутри существующих `config/defineConfig.ts` и
-`KernelBuilder`. Переход затрагивает сбор `@Module.config`, host-композицию
-`runApp`, DI-потребителей и Infra-коннекторы: все они должны использовать
-представление соответствующего kernel. Типизированное чтение, приоритеты
-источников и `Secret` сохраняются; точные сигнатуры описаны выше.
+The responsibility stays inside the existing `config/defineConfig.ts` and
+`KernelBuilder`. The transition affects collecting `@Module.config`, the `runApp` host
+composition, DI consumers and Infra connectors: all of them must use the view of the
+corresponding kernel. Typed reading, source priorities and `Secret` are kept; the exact
+signatures are described above.
 
-Временный запрет повторного использования объявления снят. Регрессия K07
-теперь проверяет успешную сборку двух kernel и независимое чтение их представлений.
-Добавлены проверки сервисов, Infra, отложенных профилей LLM, JWT и составного
-конфига защиты сессий. Реестр вызывает фабрику составного конфига один раз
-для своего kernel; адаптер защиты сессий получает именно этот результат.
+The temporary ban on reusing a declaration is lifted. The K07 regression now checks a
+successful build of two kernels and independent reading of their views.
+Checks of services, Infra, deferred LLM profiles, JWT and the composite session
+protection config were added. The registry calls the composite config factory once for
+its kernel; the session protection adapter gets exactly that result.
 
-Результат профильного прогона: **225 PASS / 15 SKIP / 0 FAIL**, 653 expect,
-30 файлов. Двенадцать новых проверок изоляции находятся в kernel, auth и session.
-TypeScript затронутой области, codegen и бинарные проверки прошли.
-Состояние общего TypeScript и состав SKIP перечислены в
-[отчёте](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
+Result of the focused run: **225 PASS / 15 SKIP / 0 FAIL**, 653 expect, 30 files.
+Twelve new isolation checks live in kernel, auth and session.
+TypeScript of the affected area, codegen and the binary checks passed.
+The state of the overall TypeScript and the SKIP composition are listed in the
+[report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).

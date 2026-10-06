@@ -3,75 +3,76 @@ import { redactSensitiveText } from "../../library/redaction";
 import type { ConfigRegistry } from "../kernel/config/ConfigRegistry";
 
 /**
- * Контракт инфраструктурного коннектора — единая форма «подключения к чему-то
- * внешнему» (БД, кэш, поисковый движок, шина). Коннектор инкапсулирует четыре
- * вещи, которые иначе пишутся руками в каждом интеграционном модуле:
+ * Infrastructure connector contract: one shape for "a connection to something
+ * external" (a database, cache, search engine, bus). A connector encapsulates
+ * four things that would otherwise be hand-written in every integration module:
  *
- * 1. **создание клиента** из конфига подсистемы ({@link create}) — коннектору
- *    передаётся типизированный `defineConfig`-объект, и он сам читает объявленные
- *    ключи (секреты раскрываются на границе, не из `process.env` напрямую);
- * 2. **открытие соединения** на старте приложения ({@link connect});
- * 3. **закрытие соединения** на остановке ({@link dispose}) — graceful shutdown;
- * 4. **health-check** ({@link healthCheck}) — для встроенного `/health`.
+ * 1. **creating the client** from the subsystem config ({@link create}): the
+ *    connector gets a typed `defineConfig` object and reads the declared keys
+ *    itself (secrets are revealed at the boundary, not read from `process.env`);
+ * 2. **opening the connection** at application start ({@link connect});
+ * 3. **closing the connection** at shutdown ({@link dispose}): graceful shutdown;
+ * 4. **health check** ({@link healthCheck}) for the built-in `/health`.
  *
- * Декоратор {@link Infra} разворачивает набор коннекторов в обычный global-модуль:
- * клиент регистрируется singleton под своим {@link token}, lifecycle — как
- * `HOSTED_SERVICE` (фаза по умолчанию отрицательная, чтобы инфраструктура
- * поднялась раньше серверов), health-check — как `HEALTH_CHECK`.
- * Тип подключения задаёт реализация коннектора; общего списка типов нет.
- * Имя записи манифеста используется для диагностики, клиент определяется токеном DI.
+ * The {@link Infra} decorator expands a set of connectors into a regular global
+ * module: the client is registered as a singleton under its {@link token}, the
+ * lifecycle as a `HOSTED_SERVICE` (the default phase is negative so that
+ * infrastructure starts before the servers), the health check as `HEALTH_CHECK`.
+ * The connector implementation defines the connection type; there is no common
+ * list of types. The manifest entry name is used for diagnostics; the client is
+ * identified by its DI token.
  *
- * @typeParam TClient Тип клиента, который инжектится в приложении по {@link token}.
+ * @typeParam TClient Type of the client injected in the application by {@link token}.
  */
 export interface InfraConnector<TClient = unknown> {
-  /** Токен, под которым клиент доступен для инъекции в сервисы приложения. */
+  /** Token under which the client is available for injection into application services. */
   readonly token: InjectionToken<TClient>;
 
   /**
-   * Конфиги, которыми владеет коннектор. `@Infra` поднимает их в metadata
-   * модуля, а `runApp` валидирует до старта приложения.
+   * Configs owned by the connector. `@Infra` lifts them into the module
+   * metadata, and `runApp` validates them before the application starts.
    */
   readonly config?: ModuleConfig | readonly ModuleConfig[];
 
   /**
-   * Фаза старта hosted-lifecycle. Меньше — раньше стартует, позже гасится.
-   * По умолчанию `-100` (как `OrmLifecycle`): инфраструктура готова до серверов.
+   * Start phase of the hosted lifecycle. Lower starts earlier and stops later.
+   * Defaults to `-100`, so infrastructure is ready before the servers.
    */
   readonly phase?: number;
 
   /**
-   * Создаёт клиент (ещё **не** подключённый — соединение открывается в
-   * {@link connect}). Конфиг подсистемы коннектор держит в себе (передан в его
-   * фабрику, напр. `postgres(dbConfig)`); здесь читаются креды и валидируются
-   * обязательные ключи.
+   * Creates the client (**not** connected yet: the connection is opened in
+   * {@link connect}). The connector keeps the subsystem config itself (it was
+   * passed to its factory, e.g. `postgres(dbConfig)`); this is where
+   * credentials are read and required keys are validated.
    */
   create(configs?: ConfigRegistry): TClient;
 
-  /** Открыть соединение / прогреть пул. Вызывается на старте приложения. */
+  /** Opens the connection / warms up the pool. Called at application start. */
   connect(client: TClient, signal?: AbortSignal): Promise<void> | void;
 
-  /** Закрыть соединение / освободить ресурсы. Вызывается на остановке. */
+  /** Closes the connection / releases resources. Called at shutdown. */
   dispose(client: TClient): Promise<void> | void;
 
   /**
-   * Проверка живости соединения для `/health`. Если не задан — health-check для
-   * этого коннектора не регистрируется.
+   * Connection liveness check for `/health`. If not set, no health check is
+   * registered for this connector.
    */
   healthCheck?(client: TClient, signal?: AbortSignal): Promise<boolean> | boolean;
 
   /**
-   * Дополнительные провайдеры, которые коннектор добавляет в инфраструктурный
-   * модуль помимо самого клиента (например, `redisConnect(cfg, { cache: "distributed" })` публикует
-   * распределённый кэш-бэкенд поверх клиента). Обычно `factoryProvider`,
-   * ссылающийся на {@link token}. Видимость наружу — через {@link exports}.
+   * Extra providers the connector adds to the infrastructure module besides
+   * the client itself (for example `redisConnect(cfg, { cache: "distributed" })`
+   * publishes a distributed cache backend on top of the client). Usually a
+   * `factoryProvider` that refers to {@link token}. Exposed through {@link exports}.
    */
   readonly providers?: readonly ProviderDefinition[];
 
-  /** Токены из {@link providers}, которые нужно сделать видимыми приложению. */
+  /** Tokens from {@link providers} to make visible to the application. */
   readonly exports?: readonly ModuleExport[];
 }
 
-/** Ошибка конфигурации/подключения инфраструктуры. */
+/** Infrastructure configuration/connection error. */
 export class InfraError extends Error {
   public constructor(message: string) {
     super(message);
@@ -79,7 +80,7 @@ export class InfraError extends Error {
   }
 }
 
-/** Безопасно извлекает текст ошибки (на случай, если брошено не-`Error`). */
+/** Safely extracts the error text (in case a non-`Error` was thrown). */
 export function errorMessage(error: unknown): string {
   return redactSensitiveText(error instanceof Error ? error.message : String(error));
 }

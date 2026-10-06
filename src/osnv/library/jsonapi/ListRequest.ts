@@ -3,13 +3,13 @@ import type { FilterGroup, FilterRule, ListQuery, PageParams, SortField } from "
 const EMPTY_PAGE: PageParams = { number: 1, size: 20, offset: 0, limit: 20 };
 
 /**
- * Базовый класс типизированного list-запроса. Наследник декларирует
- * разрешённую «поверхность запроса» декораторами полей (`@Sortable`,
- * `@Filterable`) и лимиты (`@ListOptions`); ядро распознаёт такой параметр
- * контроллера по наследованию от `ListRequest` и наполняет инстанс разобранными
- * `sort`/`filters`/`page` — **по сигнатуре**.
+ * Base class of a typed list request. A subclass declares the allowed "request
+ * surface" with field decorators (`@Sortable`, `@Filterable`) and limits
+ * (`@ListOptions`); the kernel recognizes such a controller parameter by its
+ * `ListRequest` base and fills the instance with the parsed
+ * `sort`/`filters`/`page`, **by signature**.
  *
- * Реализует {@link ListQuery}, поэтому передаётся прямо в `paginate(...)`.
+ * Implements {@link ListQuery}, so it is passed straight to `paginate(...)`.
  *
  * ```ts
  * @ListOptions({ defaultSize: 20, maxSize: 100 })
@@ -18,12 +18,12 @@ const EMPTY_PAGE: PageParams = { number: 1, size: 20, offset: 0, limit: 20 };
  *   @Sortable() @Filterable("gte", "lte", "in") age!: number;
  * }
  *
- * // контроллер — по сигнатуре:
+ * // controller, by signature:
  * list(query: UserListQuery) { return this.users.list(query); }
  * ```
  *
- * Параметр-тип `T` — фантомный маркер сущности (для читаемости и будущих
- * типобезопасных хелперов); в рантайме не используется.
+ * The type parameter `T` is a phantom entity marker for readability; it is not
+ * used at runtime.
  */
 export class ListRequest<T = unknown> implements ListQuery {
   declare readonly __entity?: T;

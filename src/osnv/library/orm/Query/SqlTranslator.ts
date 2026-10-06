@@ -12,10 +12,10 @@ export interface CompiledSql {
 }
 type ConditionValueEncoder = (property: PropertyModel, value: unknown) => SqlParam;
 
-/** Кэш квотированного списка колонок по (модель, диалект) — строится один раз. */
+/** Cache of the quoted column list per (model, dialect), built once. */
 const columnListCache = new WeakMap<EntityModel, Map<string, string>>();
 
-/** Квотированный `"a", "b", ...` список всех колонок сущности (мемоизирован). */
+/** Quoted `"a", "b", ...` list of all entity columns (memoized). */
 export function quotedColumnList(model: EntityModel, dialect: SqlDialect): string {
   let byDialect = columnListCache.get(model);
   if (!byDialect) {
@@ -31,8 +31,8 @@ export function quotedColumnList(model: EntityModel, dialect: SqlDialect): strin
 }
 
 /**
- * Транслирует план запроса в параметризованный SQL. Значения попадают только
- * в массив параметров (никакой конкатенации пользовательских данных).
+ * Translates a query plan into parameterized SQL. Values go only into the
+ * parameter array (no concatenation of user data).
  */
 export class SqlTranslator {
   constructor(
@@ -40,7 +40,7 @@ export class SqlTranslator {
     private readonly dialect: SqlDialect,
   ) {}
 
-  /** SELECT всех колонок (или проекции) с WHERE/ORDER/LIMIT/OFFSET. */
+  /** SELECT of all columns (or a projection) with WHERE/ORDER/LIMIT/OFFSET. */
   selectAll(plan: QueryPlan): CompiledSql {
     const params: SqlParam[] = [];
     const columns =
@@ -63,7 +63,7 @@ export class SqlTranslator {
     return { sql, params };
   }
 
-  /** SELECT COUNT(*) с теми же фильтрами (без order/limit). */
+  /** SELECT COUNT(*) with the same filters (without order/limit). */
   selectCount(plan: QueryPlan): CompiledSql {
     const params: SqlParam[] = [];
     let sql = `SELECT COUNT(*) AS count FROM ${this.dialect.qualifyTable(this.model)}`;
@@ -144,15 +144,15 @@ export class SqlTranslator {
         const property = this.requireProperty(condition.property);
         const placeholder = this.dialect.parameter(params.length);
         params.push(encode(property, condition.value));
-        // startsWith/endsWith/contains экранируют джокеры `\` — это работает
-        // только с явным `ESCAPE '\'` (иначе `%`/`_` остаются джокерами).
+        // startsWith/endsWith/contains escape wildcards with `\`; this works
+        // only with an explicit `ESCAPE '\'` (otherwise `%`/`_` stay wildcards).
         const escape = condition.escaped ? " ESCAPE '\\'" : "";
         return `${this.dialect.quoteId(property.columnName)} ${condition.op} ${placeholder}${escape}`;
       }
       case "in": {
         const property = this.requireProperty(condition.property);
         if (condition.values.length === 0) {
-          return "0 = 1"; // пустой IN — всегда ложь
+          return "0 = 1"; // an empty IN is always false
         }
         const placeholders = condition.values.map((value) => {
           const placeholder = this.dialect.parameter(params.length);

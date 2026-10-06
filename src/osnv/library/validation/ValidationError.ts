@@ -1,15 +1,15 @@
 /**
- * Одна ошибка валидации: какое поле, какое значение и почему не прошло.
+ * One validation error: which field, which value and why it failed.
  *
- * Экземпляры создаются движком валидации, но их можно создавать и вручную —
- * например, возвращать из `custom`-функции, чтобы полностью контролировать
- * `code` и `message`:
+ * Instances are created by the validation engine, but they can also be created
+ * by hand, for example returned from a `custom` function to fully control
+ * `code` and `message`:
  *
  * ```ts
  * @Validator({
  *   custom: (value) =>
  *     isReserved(value)
- *       ? new ValidationError("username", value, "Имя зарезервировано", "reserved")
+ *       ? new ValidationError("username", value, "This name is reserved", "reserved")
  *       : true,
  * })
  * username!: string;
@@ -17,11 +17,11 @@
  */
 export class ValidationError {
   /**
-   * @param property Имя поля. Для вложенных объектов — путь через точку
-   *   (`address.city`), для массивов — с индексом (`items[2].name`).
-   * @param value Фактическое значение поля на момент проверки.
-   * @param message Человекочитаемое сообщение (уже с подставленными плейсхолдерами).
-   * @param code Машиночитаемый код правила, например `"required"` или `"minLength"`.
+   * @param property Field name. For nested objects, a dotted path
+   *   (`address.city`); for arrays, with an index (`items[2].name`).
+   * @param value Actual field value at check time.
+   * @param message Human-readable message (placeholders already substituted).
+   * @param code Machine-readable rule code, for example `"required"` or `"minLength"`.
    */
   constructor(
     readonly property: string,
@@ -30,7 +30,7 @@ export class ValidationError {
     readonly code?: string,
   ) {}
 
-  /** Краткое представление вида `property: message` — удобно для логов. */
+  /** Short `property: message` form, handy for logs. */
   toString(): string {
     return `${this.property}: ${this.message}`;
   }

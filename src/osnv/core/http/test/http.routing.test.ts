@@ -11,8 +11,8 @@ function register(router: Router, template: string, method = "GET", version = ""
   router.register(parseTemplate(template), method, version, action(template));
 }
 
-describe("парсер шаблонов", () => {
-  test("статические, параметры, ограничения, wildcard", () => {
+describe("template parser", () => {
+  test("static segments, parameters, constraints, wildcard", () => {
     const segments = parseTemplate("users/:id(int)/files/*path");
     expect(segments).toHaveLength(4);
     expect(segments[0]).toEqual({ kind: "static", value: "users" });
@@ -20,35 +20,35 @@ describe("парсер шаблонов", () => {
     expect(segments[3]).toEqual({ kind: "wildcard", name: "path" });
   });
 
-  test("неизвестное ограничение и wildcard не в конце — ошибка старта", () => {
+  test("unknown constraint and a non-trailing wildcard fail at startup", () => {
     expect(() => parseTemplate(":id(decimal)")).toThrow(HttpSetupError);
     expect(() => parseTemplate("*rest/users")).toThrow(HttpSetupError);
   });
 
-  test("запрещённые имена параметров (prototype pollution)", () => {
+  test("forbidden parameter names (prototype pollution)", () => {
     expect(() => parseTemplate(":__proto__")).toThrow(HttpSetupError);
     expect(() => parseTemplate("*constructor")).toThrow(HttpSetupError);
   });
 
-  test("joinPaths нормализует слэши", () => {
+  test("joinPaths normalizes slashes", () => {
     expect(joinPaths("api", "/v1.0/", "users", ":id")).toBe("api/v1.0/users/:id");
     expect(joinPaths(undefined, "users", "")).toBe("users");
   });
 });
 
-describe("парсер пути запроса", () => {
-  test("декодирование и отбрасывание пустых сегментов", () => {
+describe("request path parser", () => {
+  test("decoding and dropping empty segments", () => {
     expect(parseRequestPath("/a//b%20c/")).toEqual(["a", "b c"]);
   });
 
-  test("обход каталогов и битые проценты -> undefined (400)", () => {
+  test("directory traversal and broken percent escapes -> undefined (400)", () => {
     expect(parseRequestPath("/a/../etc/passwd")).toBeUndefined();
     expect(parseRequestPath("/a/%zz")).toBeUndefined();
   });
 });
 
-describe("radix-роутер", () => {
-  test("статический маршрут приоритетнее параметра", () => {
+describe("radix router", () => {
+  test("a static route wins over a parameter", () => {
     const router = new Router();
     register(router, "users/me");
     register(router, "users/:id");
@@ -57,7 +57,7 @@ describe("radix-роутер", () => {
     expect((matched as { action: RouteAction }).action.name).toBe("users/me");
   });
 
-  test("ограничение int конвертирует значение, нарушение — не матчится", () => {
+  test("the int constraint converts the value; a violation does not match", () => {
     const router = new Router();
     register(router, "users/:id(int)");
     const matched = router.match("GET", ["users", "42"]);
@@ -66,7 +66,7 @@ describe("radix-роутер", () => {
     expect(router.match("GET", ["users", "abc"]).kind).toBe("not-found");
   });
 
-  test("backtracking: статическая ветка без листа отступает к параметру", () => {
+  test("backtracking: a static branch without a leaf falls back to the parameter", () => {
     const router = new Router();
     register(router, "files/special/meta");
     register(router, "files/:name/download");
@@ -75,7 +75,7 @@ describe("radix-роутер", () => {
     expect((matched as { action: RouteAction }).action.name).toBe("files/:name/download");
   });
 
-  test("wildcard захватывает остаток пути, включая пустой", () => {
+  test("wildcard captures the rest of the path, including an empty one", () => {
     const router = new Router();
     register(router, "static/*path");
     const deep = router.match("GET", ["static", "css", "site.css"]);
@@ -84,7 +84,7 @@ describe("radix-роутер", () => {
     expect((empty as { params: Record<string, unknown> }).params.path).toBe("");
   });
 
-  test("405 со списком Allow; @All матчит любой метод", () => {
+  test("405 with the Allow list; @All matches any method", () => {
     const router = new Router();
     register(router, "items", "GET");
     register(router, "items", "POST");
@@ -96,7 +96,7 @@ describe("radix-роутер", () => {
     expect(router.match("PATCH", ["anything"]).kind).toBe("matched");
   });
 
-  test("версии: точное совпадение, fallback на безверсионный, unsupported", () => {
+  test("versions: exact match, fallback to unversioned, unsupported", () => {
     const router = new Router();
     register(router, "things", "GET", "1.0");
     register(router, "things", "GET", "2.0");
@@ -105,29 +105,29 @@ describe("radix-роутер", () => {
     const unsupported = router.match("GET", ["things"], "9.9");
     expect(unsupported.kind).toBe("unsupported-version");
     expect([...(unsupported as { supported: readonly string[] }).supported].sort()).toEqual(["1.0", "2.0"]);
-    // Запрос без версии, безверсионного маршрута нет.
+    // A request without a version, and there is no unversioned route.
     expect(router.match("GET", ["things"]).kind).toBe("unsupported-version");
   });
 
-  test("дубликат маршрута — ошибка старта", () => {
+  test("a duplicate route fails at startup", () => {
     const router = new Router();
     register(router, "users/:id");
     expect(() => register(router, "users/:id")).toThrow(HttpSetupError);
   });
 
-  test("логический дубликат с другим именем параметра — ошибка старта", () => {
+  test("a logical duplicate with another parameter name fails at startup", () => {
     const router = new Router();
     register(router, "users/:id");
     expect(() => register(router, "users/:name")).toThrow(HttpSetupError);
   });
 
-  test("логический wildcard-дубликат с другим именем — ошибка старта", () => {
+  test("a logical wildcard duplicate with another name fails at startup", () => {
     const router = new Router();
     register(router, "files/*path");
     expect(() => register(router, "files/*rest")).toThrow(HttpSetupError);
   });
 
-  test("разные методы могут использовать разные имена одного параметра", () => {
+  test("different methods may use different names for one parameter", () => {
     const router = new Router();
     register(router, "users/:id", "GET");
     register(router, "users/:name", "POST");
@@ -137,7 +137,7 @@ describe("radix-роутер", () => {
     expect((post as { params: Record<string, unknown> }).params).toEqual({ name: "alice" });
   });
 
-  test("имена параметров принадлежат только выбранному методу и версии", () => {
+  test("parameter names belong only to the chosen method and version", () => {
     const router = new Router();
     register(router, "orgs/:orgId/items/:id", "GET");
     register(router, "orgs/:id/items/:itemId", "PUT");
@@ -158,7 +158,7 @@ describe("radix-роутер", () => {
     }
   });
 
-  test("wildcard и отступление от неуспешной ветки не оставляют чужие параметры", () => {
+  test("wildcard and backtracking from a failed branch leave no foreign parameters", () => {
     const router = new Router();
     register(router, "orgs/:orgId/files/*id", "GET");
     register(router, "orgs/:id/files/*path", "PUT");
@@ -171,7 +171,7 @@ describe("radix-роутер", () => {
     }
   });
 
-  test("int имеет стабильный приоритет перед более широким number", () => {
+  test("int has a stable priority over the wider number", () => {
     const router = new Router();
     register(router, "values/:value(number)");
     register(router, "values/:value(int)");

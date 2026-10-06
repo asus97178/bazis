@@ -1,61 +1,62 @@
-# Контракты конфигурации
+# Configuration contracts
 
-Дата: 2026-09-14. Контракты по MODULE_ARCHITECTURE §5.4.
-Компонент существующего kernel; новый архитектурный модуль не создаётся.
+Date: 2026-09-14. Contracts per MODULE_ARCHITECTURE §5.4.
+A component of the existing kernel; no new architectural module is created.
 
-Изоляция представлений каждого kernel, сервисов и коннекторов реализована и
-проверена: [отчёт](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
+Isolation of the views of each kernel, its services and connectors is implemented and
+checked: [report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/kernel-config-isolation-2026-09-14.md).
 
-`defineConfig` возвращает неизменяемое объявление `ConfigDefinition<T>`.
-Поля `default`, `development`, `test`, `production` сохраняются. Дополнения:
+`defineConfig` returns an immutable `ConfigDefinition<T>` declaration.
+The `default`, `development`, `test`, `production` fields are kept. Additions:
 
-| Вход | Тип / default | Правило |
+| Input | Type / default | Rule |
 | --- | --- | --- |
-| `env` | Необязательная карта локальный ключ → имя или массив имён | Явные дополнительные OSNV_* имена; каноническое имя также принимается; разные значения в одном источнике дают ошибку |
-| `validate` | Необязательная карта ключ → `(value) => string \| undefined` | Синхронная предметная проверка; строка — безопасное описание ошибки без значения |
-| `configEnum(values, defaultValue)` | Непустой readonly-массив строк или чисел, default из него | Ограничивает и TS-тип, и runtime env; нужен для полей с литеральным union |
-| `resolve(environment?, configuration?)` | Окружение; неизменяемый Configuration | Создаёт независимый ConfigView; без источников снимает OSNV_* в момент вызова |
-| `token` | InjectionToken<ConfigView<T>> | Kernel регистрирует view в существующем DI для каждого объявления из Module.config |
-| `ConfigRegistry.get(definition)` | Объявление из графа текущего kernel | Возвращает одно представление этого kernel; неизвестное объявление — ошибка |
-| `AppConfig.resolve(environment?, configuration?)` | Необязательная фабрика пользовательского объявления | Для составного конфига строит своё независимое представление из снимка kernel; тот же результат используется всеми его потребителями |
-| `ConfigView.inspect()` | Без аргументов | Ключ, тип, допустимые env-имена, источник и безопасное значение; Secret всегда `***` |
+| `env` | Optional map of local key → name or array of names | Explicit extra OSNV_* names; the canonical name is accepted too; different values in one source are an error |
+| `validate` | Optional map of key → `(value) => string \| undefined` | Synchronous domain check; a string is a safe error description without the value |
+| `configEnum(values, defaultValue)` | A non-empty readonly array of strings or numbers, the default taken from it | Restricts both the TS type and the runtime env; needed for fields with a literal union |
+| `resolve(environment?, configuration?)` | Environment; an immutable Configuration | Creates an independent ConfigView; without sources it snapshots OSNV_* at call time |
+| `token` | InjectionToken<ConfigView<T>> | The kernel registers the view in the existing DI for every declaration from Module.config |
+| `ConfigRegistry.get(definition)` | A declaration from the current kernel's graph | Returns the one view of this kernel; an unknown declaration is an error |
+| `AppConfig.resolve(environment?, configuration?)` | Optional factory of a user declaration | A composite config builds its own independent view from the kernel snapshot; all its consumers use the same result |
+| `ConfigView.inspect()` | No arguments | Key, type, allowed env names, source and a safe value; a Secret is always `***` |
 
-Default → секция окружения → снимок источников. Источники kernel объединяются
-в порядке регистрации; если список не задан, используются env и затем CLI args.
-Имена плоских ключей Configuration нечувствительны к регистру. Более поздний
-источник побеждает также между каноническим именем и явным env-alias.
-Числа конечные; пустая строка не становится нулём; Secret не допускает пустое
-или пробельное значение. Неподдерживаемые объектные типы запрещены TypeScript.
+Default → environment section → sources snapshot. Kernel sources are merged in
+registration order; if no list is given, env and then CLI args are used.
+Flat Configuration key names are case-insensitive. A later source also wins
+between the canonical name and an explicit env alias.
+Numbers are finite; an empty string never becomes zero; a Secret does not allow an
+empty or whitespace value. TypeScript forbids unsupported object types.
 
-Объявление не хранит выбранное окружение, значения и кэш. `get/has/ensureValid`
-сохраняются для самостоятельного чтения process env, но `ensureValid` больше
-не переключает последующие чтения. Host-код получает `resolve`, сервис —
-инъекцию `definition.token`, коннектор — `ConfigRegistry` аргументом create.
-Все встроенные коннекторы переходят на этот аргумент; пользовательский коннектор
-читает `configs?.get(config) ?? config`. Прямое глобальное get внутри сервиса
-не является чтением настроек его kernel.
+A declaration stores no chosen environment, values or cache. `get/has/ensureValid`
+stay for standalone reading of the process env, but `ensureValid` no longer
+switches later reads. Host code gets `resolve`, a service injects
+`definition.token`, a connector gets `ConfigRegistry` as the create argument.
+All built-in connectors use this argument; a custom connector reads
+`configs?.get(config) ?? config`. A direct global get inside a service does not
+read the settings of its kernel.
 
-Пользовательская конфигурация со вложенными значениями, например набором ключей
-защиты сессий, реализует `resolve(environment, configuration)`, если значения
-зависят от запуска. Фабрика возвращает неизменяемый `AppConfig` и не изменяет
-объявление. Старые объекты только с `ensureValid` остаются совместимыми
-валидаторами/готовыми значениями; их автор отвечает за отсутствие изменяемого
-состояния общего запуска. Адаптер защиты сессий также читает представление реестра.
+A custom configuration with nested values, for example a set of session protection
+keys, implements `resolve(environment, configuration)` if the values depend on the
+run. The factory returns an immutable `AppConfig` and does not change the
+declaration. Older objects with only `ensureValid` stay compatible as
+validators/ready values; their author is responsible for having no mutable shared
+run state. The session protection adapter also reads the registry view.
 
-Kernel собирает ошибки всех объявлений до создания DI-клиентов. Ошибка одного
-kernel не меняет другие представления. Историческая защита activeStand удаляется
-только вместе с регрессиями двух kernel, источников, секретов и коннекторов.
+The kernel collects the errors of all declarations before creating DI clients. An
+error in one kernel does not change the other views. The historical activeStand
+guard is removed only together with the regressions for two kernels, sources,
+secrets and connectors.
 
-Health: `HealthService.check(options?)` / `Kernel.health(options?)` принимают
-`timeoutMs` (весь отчёт, default 5000), `checkTimeoutMs` (одна проверка, default
-1000), `concurrency` (default 4) и необязательный `signal`. Числа — положительные
-целые, таймеры до 2147483647 мс, concurrency до 1024. Порядок результатов
-совпадает с регистрацией. `HealthCheck.check(signal?)` получает отмену; timeout
-или исключение дают unhealthy. Просроченные ещё не начатые checks не запускаются.
-Это предел ожидания; пользовательский check обязан учитывать signal для
-прекращения собственной работы. Диагностика проходит существующее редактирование.
-Конкурентные отчёты одного HealthService разделяют одну операцию для одной
-singleton-инстанции check. Отмена одного отчёта не прерывает остальных.
-Когда все ожидающие завершаются, signal операции отменяется. Если она продолжает
-висеть, повторные отчёты дают unhealthy до её фактического завершения, не запуская
-дубликаты. Следующий вызов после завершения выполняет свежую проверку.
+Health: `HealthService.check(options?)` / `Kernel.health(options?)` accept
+`timeoutMs` (the whole report, default 5000), `checkTimeoutMs` (one check, default
+1000), `concurrency` (default 4) and an optional `signal`. Numbers are positive
+integers, timers up to 2147483647 ms, concurrency up to 1024. Results come in
+registration order. `HealthCheck.check(signal?)` gets the cancellation; a timeout
+or an exception gives unhealthy. Expired checks that have not started are not run.
+This bounds the wait; a custom check must honor the signal to stop its own work.
+Diagnostics go through the existing redaction.
+Concurrent reports of one HealthService share one operation per singleton
+check instance. Cancelling one report does not abort the others.
+When all waiters finish, the operation's signal is aborted. If the operation keeps
+hanging, repeated reports give unhealthy until it actually finishes, without starting
+duplicates. The next call after it finishes runs a fresh check.

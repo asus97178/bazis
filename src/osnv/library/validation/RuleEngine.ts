@@ -6,43 +6,42 @@ import { hasRules } from "./metadata";
 import { ValidationCodes } from "./types/ValidationCode";
 import type { CustomOutcome, ValidatorOptions } from "./types/ValidatorOptions";
 
-/** Email проверяется линейными проходами; пробелы запрещены в обеих частях. */
+/** Email is checked with linear passes; whitespace is forbidden in both parts. */
 const EMAIL_WHITESPACE_PATTERN = /\s/;
 
 /**
- * UUID версий 1–8 (включая v4 из `crypto.randomUUID()` и v7 из
- * `Bun.randomUUIDv7()`) с корректным вариантом, плюс nil-UUID.
- * Только классы символов — без бэктрекинга.
+ * UUID versions 1–8 (including v4 from `crypto.randomUUID()` and v7 from
+ * `Bun.randomUUIDv7()`) with a correct variant, plus the nil UUID.
+ * Character classes only, no backtracking.
  */
 const UUID_PATTERN =
   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
 
-/** Телефон после нормализации: опциональный `+` и 7–15 цифр. */
+/** Phone number after normalization: an optional `+` and 7–15 digits. */
 const PHONE_PATTERN = /^\+?\d{7,15}$/;
 
-/** Символы, отбрасываемые при нормализации телефона: пробелы, дефисы, скобки. */
+/** Characters dropped when normalizing a phone number: spaces, hyphens, parentheses. */
 const PHONE_NOISE = /[\s\-()]/g;
 
-/** Отложенная асинхронная проверка (custom-функция, ждущая await). */
+/** Deferred async check (a custom function that needs await). */
 type AsyncJob = () => Promise<void>;
 
 /**
- * Движок валидации: один проход по скомпилированному плану класса.
+ * Validation engine: one pass over the compiled plan of a class.
  *
- * Принципы:
- * - ошибки собираются в один массив; проверки содержимого строки пропускаются
- *   при превышении верхней границы длины этого же декоратора;
- * - горячий путь (валидный объект) почти не аллоцирует: план закэширован,
- *   объекты параметров сообщений создаются только при ошибке;
- * - исключения из пользовательских функций (`custom`, `validateIf`)
- *   перехватываются и превращаются в ошибку с кодом `customError` —
- *   валидация продолжается;
- * - вложенные объекты проверяются рекурсивно с защитой от циклических ссылок.
+ * Principles:
+ * - errors are collected into one array; string content checks are skipped
+ *   when the value exceeds the upper length bound of the same decorator;
+ * - the hot path (a valid object) barely allocates: the plan is cached, and
+ *   message parameter objects are created only on error;
+ * - exceptions from user functions (`custom`, `validateIf`) are caught and
+ *   turned into an error with the `customError` code; validation continues;
+ * - nested objects are checked recursively with protection against circular references.
  */
 export class RuleEngine {
   /**
-   * Синхронная валидация. Если у поля асинхронная `custom`-функция
-   * (вернула Promise) — добавляется ошибка `asyncCustomInSyncCall`.
+   * Synchronous validation. If a field has an async `custom` function
+   * (it returned a Promise), an `asyncCustomInSyncCall` error is added.
    */
   static validate(instance: object): ValidationResult {
     const errors: ValidationError[] = [];
@@ -51,9 +50,8 @@ export class RuleEngine {
   }
 
   /**
-   * Асинхронная валидация: все синхронные правила выполняются сразу,
-   * асинхронные `custom`-функции — последовательно после них
-   * (детерминированный порядок ошибок).
+   * Asynchronous validation: all synchronous rules run immediately, async
+   * `custom` functions run sequentially after them (deterministic error order).
    */
   static async validateAsync(instance: object): Promise<ValidationResult> {
     const errors: ValidationError[] = [];
@@ -65,7 +63,7 @@ export class RuleEngine {
     return new ValidationResult(errors);
   }
 
-  /** Прогоняет план класса экземпляра; без декораторов — молча выходит. */
+  /** Runs the plan of the instance's class; without decorators it silently returns. */
   private static collect(
     instance: object,
     prefix: string,
@@ -93,7 +91,7 @@ export class RuleEngine {
     const o = rule.options;
     const path = prefix === "" ? rule.property : `${prefix}.${rule.property}`;
 
-    // 1. Условная валидация: false -> весь декоратор пропускается.
+    // 1. Conditional validation: false -> the whole decorator is skipped.
     if (o.validateIf !== undefined) {
       try {
         if (!(o.validateIf as (instance: unknown) => boolean)(instance)) {
@@ -107,7 +105,7 @@ export class RuleEngine {
 
     const value = (instance as Record<string, unknown>)[rule.property];
 
-    // 2. Отсутствующее значение: ошибка только при required, иначе поле опционально.
+    // 2. Missing value: an error only with required, otherwise the field is optional.
     if (value === undefined || value === null) {
       if (o.required === true) {
         RuleEngine.fail(errors, ValidationCodes.required, path, value, o, undefined);
@@ -115,7 +113,7 @@ export class RuleEngine {
       return;
     }
 
-    // 3. Строковые правила: сначала единая проверка типа, потом сами правила.
+    // 3. String rules: first one type check, then the rules themselves.
     if (rule.needsString) {
       if (typeof value !== "string") {
         RuleEngine.failType(errors, path, value, o, "string");
@@ -124,7 +122,7 @@ export class RuleEngine {
       RuleEngine.applyStringRules(rule, value, path, errors);
     }
 
-    // 4. Числовые правила.
+    // 4. Number rules.
     if (rule.needsNumber) {
       if (typeof value !== "number" || Number.isNaN(value)) {
         RuleEngine.failType(errors, path, value, o, "number");
@@ -133,7 +131,7 @@ export class RuleEngine {
       RuleEngine.applyNumberRules(o, value, path, errors);
     }
 
-    // 5. Boolean-правила.
+    // 5. Boolean rules.
     if (rule.needsBoolean) {
       if (typeof value !== "boolean") {
         RuleEngine.failType(errors, path, value, o, "boolean");
@@ -147,23 +145,23 @@ export class RuleEngine {
       }
     }
 
-    // 6. Enum: членство в предвычисленном Set (O(1)).
+    // 6. Enum: membership in a precomputed Set (O(1)).
     if (rule.enumValues !== undefined && !rule.enumValues.has(value)) {
       RuleEngine.fail(errors, ValidationCodes.enum, path, value, o, { allowed: rule.enumLabel });
     }
 
-    // 7. Дата (подсказка type: "date").
+    // 7. Date (the type: "date" hint).
     if (rule.checkDate && !RuleEngine.isValidDate(value)) {
       RuleEngine.fail(errors, ValidationCodes.date, path, value, o, undefined);
     }
 
-    // 8. Пользовательская проверка.
+    // 8. Custom check.
     if (o.custom !== undefined) {
       RuleEngine.applyCustom(o, value, instance, path, errors, jobs);
     }
 
-    // 9. Вложенная валидация — только правило-носитель (см. RuleCompiler),
-    // чтобы несколько декораторов на поле не дублировали ошибки.
+    // 9. Nested validation: only the carrier rule (see RuleCompiler),
+    // so several decorators on a field do not duplicate errors.
     if (rule.nested !== "none") {
       RuleEngine.applyNested(rule.nested === "explicit", value, instance, path, errors, jobs, seen);
     }
@@ -185,8 +183,8 @@ export class RuleEngine {
     if (o.length !== undefined && (value.length < o.length[0] || value.length > o.length[1])) {
       RuleEngine.fail(errors, ValidationCodes.length, path, value, o, { min: o.length[0], max: o.length[1] });
     }
-    // Верхняя граница ограничивает вход RegExp/парсеров. Проверки других полей,
-    // декораторов и custom сохраняют прежний порядок и сбор ошибок.
+    // The upper bound limits the input of RegExp/parsers. Other fields, decorators
+    // and custom checks still run and collect their errors in order.
     if (exceedsMaxLength || exceedsLengthRange) {
       return;
     }
@@ -238,8 +236,8 @@ export class RuleEngine {
   }
 
   /**
-   * Пользовательская проверка. В синхронном режиме Promise — это ошибка
-   * `asyncCustomInSyncCall`; в асинхронном проверка откладывается в очередь.
+   * Custom check. In synchronous mode a Promise is an `asyncCustomInSyncCall`
+   * error; in asynchronous mode the check is queued.
    */
   private static applyCustom(
     o: ValidatorOptions,
@@ -263,8 +261,8 @@ export class RuleEngine {
     try {
       const outcome = custom(value, instance);
       if (outcome instanceof Promise) {
-        // Незавершённый Promise нельзя «дождаться» синхронно; молча считать
-        // поле валидным было бы небезопасно — фиксируем ошибку использования.
+        // A pending Promise cannot be awaited synchronously; silently treating
+        // the field as valid would be unsafe, so record a usage error.
         outcome.catch(() => {});
         RuleEngine.fail(errors, ValidationCodes.asyncCustomInSyncCall, path, value, o, undefined);
         return;
@@ -290,7 +288,7 @@ export class RuleEngine {
       return;
     }
     if (typeof outcome === "string") {
-      // Возвращённая строка — самое локальное сообщение, приоритетнее message.
+      // A returned string is the most local message and wins over message.
       errors.push(new ValidationError(path, value, MessageRegistry.format(ValidationCodes.custom, outcome, { property: path, value }), ValidationCodes.custom));
       return;
     }
@@ -298,9 +296,9 @@ export class RuleEngine {
   }
 
   /**
-   * Вложенная валидация. Включается явным `nested: true` либо автоматически,
-   * когда значение (или элемент массива) — экземпляр класса с декораторами.
-   * Защита от циклов: посещённые объекты в цепочке пропускаются.
+   * Nested validation. Enabled by an explicit `nested: true` or automatically
+   * when the value (or an array element) is an instance of a decorated class.
+   * Cycle protection: objects already visited in the chain are skipped.
    */
   private static applyNested(
     explicit: boolean,
@@ -333,7 +331,7 @@ export class RuleEngine {
     jobs: AsyncJob[] | undefined,
     seen: Set<object> | undefined,
   ): void {
-    // Set создаётся лениво — только когда вложенность реально встретилась.
+    // The Set is created lazily, only when nesting actually occurs.
     const visited = seen ?? new Set<object>([parent]);
     if (visited.has(child)) {
       return;
@@ -342,9 +340,9 @@ export class RuleEngine {
     RuleEngine.collect(child, path, errors, jobs, visited);
   }
 
-  // ── Вспомогательные методы ────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /** Создаёт ValidationError с сообщением по приоритету local > global > built-in. */
+  /** Creates a ValidationError with the message by priority local > global > built-in. */
   private static fail(
     errors: ValidationError[],
     code: string,
@@ -381,8 +379,8 @@ export class RuleEngine {
     if (at <= 0 || at !== value.lastIndexOf("@") || EMAIL_WHITESPACE_PATTERN.test(value)) {
       return false;
     }
-    // Сохраняет прежнюю грамматику: по одному символу до/после разделяющей
-    // точки домена; дополнительные точки допустимы, как в исходном pattern.
+    // Grammar: at least one character before and after the dot that separates
+    // the domain; extra dots are allowed.
     const dot = value.indexOf(".", at + 2);
     return dot !== -1 && dot < value.length - 1;
   }

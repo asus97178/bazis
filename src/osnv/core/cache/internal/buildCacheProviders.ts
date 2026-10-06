@@ -121,8 +121,8 @@ function outputCacheComposerProvider(config: CacheModuleConfig): ProviderDefinit
       behavior: outputCacheSecurityBehavior(config.outputCache),
       requireAuthenticationByDefault: config.outputCache?.requireAuthenticationByDefault,
     },
-    // Реестры для `@OutputRedisCache` публикует Infra через DI.
-    // При отсутствии реестра middleware сообщает об ошибке на первом запросе.
+    // Registries for `@OutputRedisCache` are published by Infra through DI.
+    // Without a registry the middleware reports an error on the first request.
     distributedEnabled: true,
   });
   return singletonValue(ROUTE_MIDDLEWARE_COMPOSER, {

@@ -3,7 +3,7 @@ import { createContainer, createToken, DI, HOSTED_SERVICE } from "../../di";
 import { Osnv, defineConfig, secret } from "../../kernel";
 import { infraModule, InfraLifecycle, llmProfile, llmRouter, type InfraConnector } from "../index";
 
-describe("Infra audit resource ownership", () => {
+describe("Infra resource ownership", () => {
   function connector(name: string, events: string[]): InfraConnector<object> {
     return {
       token: createToken<object>(name),

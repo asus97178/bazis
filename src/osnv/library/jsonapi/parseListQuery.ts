@@ -33,19 +33,19 @@ const FILTER_OPERATORS: ReadonlySet<string> = new Set<FilterOperator>([
 const VALUELESS_OPERATORS: ReadonlySet<FilterOperator> = new Set(["isNull", "isNotNull"]);
 const MULTI_VALUE_OPERATORS: ReadonlySet<FilterOperator> = new Set(["in", "nin"]);
 
-/** `filter[field]` или `filter[field][op]`. */
+/** `filter[field]` or `filter[field][op]`. */
 const FILTER_KEY = /^filter\[([^\]]+)\](?:\[([^\]]+)\])?$/;
-/** `filter[or][N][field]` или `filter[or][N][field][op]` (N — индекс OR-группы). */
+/** `filter[or][N][field]` or `filter[or][N][field][op]` (N is the OR group index). */
 const FILTER_OR_KEY = /^filter\[or\]\[(\d+)\]\[([^\]]+)\](?:\[([^\]]+)\])?$/;
 /** `fields[type]`. */
 const FIELDS_KEY = /^fields\[([^\]]+)\]$/;
 
 /**
- * Разбирает query-параметры в стиле JSON:API в типизированный {@link ListQuery}.
+ * Parses JSON:API-style query parameters into a typed {@link ListQuery}.
  *
- * Безопасность по умолчанию: сортировка/фильтрация/include разрешены только по
- * полям из {@link ListQueryOptions}; всё прочее даёт {@link ListQueryError}
- * (со списком всех проблем сразу).
+ * Secure by default: sorting/filtering/include are allowed only for fields
+ * from {@link ListQueryOptions}; anything else produces a {@link ListQueryError}
+ * (with the list of all problems at once).
  *
  * ```ts
  * const query = parseListQuery(url.searchParams, {
@@ -116,10 +116,10 @@ function parseFilters(
 }
 
 /**
- * Разбирает OR-группы `filter[or][N][field][op]=v`. Условия с одинаковым `N`
- * собираются в группу (AND), группы возвращаются в порядке возрастания `N`
- * (разные группы — OR). Каждый лист валидируется тем же белым списком, что и
- * фильтры верхнего уровня.
+ * Parses OR groups `filter[or][N][field][op]=v`. Conditions with the same `N`
+ * form a group (AND); groups are returned in ascending `N` order (different
+ * groups are OR). Each leaf is validated against the same allow list as the
+ * top-level filters.
  */
 function parseOrGroups(
   params: URLSearchParams,
@@ -148,7 +148,7 @@ function parseOrGroups(
   return [...groups.keys()].sort((a, b) => a - b).map((key) => groups.get(key)!);
 }
 
-/** Разбирает и валидирует одно условие фильтра (`field`/`op`/`value`). */
+/** Parses and validates one filter condition (`field`/`op`/`value`). */
 function parseFilterLeaf(
   field: string,
   opToken: string,

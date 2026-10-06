@@ -4,9 +4,9 @@ import type { OutputRedisCacheOptions } from "../types/OutputRedisCacheOptions";
 import { resolveCacheOptions } from "./resolveCachePolicy";
 
 /**
- * Сливает inline-опции `@OutputRedisCache` с именованной политикой и подставляет
- * `connection` по умолчанию. `seconds` валидирует вызывающий уже после проверки
- * `enabled`/`noStore` (выключенный кэш без TTL не должен падать на старте).
+ * Merges inline `@OutputRedisCache` options with the named policy and fills in the
+ * default `connection`. The caller validates `seconds` after checking
+ * `enabled`/`noStore` (a disabled cache without a TTL must not fail at startup).
  */
 export function resolveOutputRedisCacheOptions(
   inline: OutputRedisCacheOptions,

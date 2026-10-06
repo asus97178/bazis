@@ -1,16 +1,16 @@
 import type { DatabaseProvider, DbExecutor, Row, SqlParam } from "../Providers/types";
 
-/** Контекст выполнения версионированной миграции. */
+/** Execution context of a versioned migration. */
 export interface MigrationContext {
-  /** Выполнить изменяющий SQL с параметрами `{0}` или `$1`. */
+  /** Runs modifying SQL with `{0}` or `$1` parameters. */
   execute(sql: string, ...params: SqlParam[]): Promise<void>;
-  /** SELECT с параметрами. */
+  /** SELECT with parameters. */
   query<T extends Row = Row>(sql: string, ...params: SqlParam[]): Promise<T[]>;
 }
 
-/** Версионированная миграция с `up` и опциональным `down`. */
+/** Versioned migration with `up` and an optional `down`. */
 export interface Migration {
-  /** Уникальный идентификатор (обычно timestamp_name). */
+  /** Unique identifier (usually timestamp_name). */
   readonly id: string;
   readonly up: (ctx: MigrationContext) => Promise<void>;
   readonly down?: (ctx: MigrationContext) => Promise<void>;
@@ -24,9 +24,9 @@ export interface VersionedMigrationResult {
 const HISTORY_TABLE = "__OsnvMigrations";
 
 /**
- * Применяет зарегистрированные миграции с историей в таблице `__OsnvMigrations`.
- * Compile-safe: миграции передаются явным массивом (без dynamic import — дружелюбно
- * к `bun build --compile`).
+ * Applies the registered migrations with history in the `__OsnvMigrations` table.
+ * Compile-safe: migrations are passed as an explicit array (no dynamic import,
+ * which keeps `bun build --compile` working).
  */
 export class MigrationRunner {
   constructor(
@@ -35,8 +35,8 @@ export class MigrationRunner {
   ) {}
 
   async migrate(): Promise<VersionedMigrationResult> {
-    // Межпроцессная advisory lock PostgreSQL не даёт двум стартующим инстансам
-    // применить миграции наперегонки.
+    // A cross-process PostgreSQL advisory lock keeps two starting instances
+    // from racing to apply migrations.
     return this.withMigrationLock(() => this.migrateCore());
   }
 
@@ -59,7 +59,7 @@ export class MigrationRunner {
     return { applied, rolledBack: [] };
   }
 
-  /** Откатывает последние `steps` миграций (требуется `down`). */
+  /** Rolls back the last `steps` migrations (requires `down`). */
   async rollback(steps = 1): Promise<VersionedMigrationResult> {
     if (!Number.isSafeInteger(steps) || steps < 0) {
       throw new RangeError(`Migration rollback steps must be a non-negative safe integer; received ${String(steps)}.`);

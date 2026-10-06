@@ -101,9 +101,9 @@ export function outputCacheMiddleware(options: OutputCacheMiddlewareOptions): Ht
       return;
     }
 
-    // Анти-stampede мог склеить наш запрос с другим, чей ответ оказался
-    // некэшируемым: тогда фабрика отработала на чужом контексте и наш `ctx.response`
-    // пуст — выполняем конвейер сами, чтобы вернуть полноценный ответ.
+    // Anti-stampede may have merged our request with another one whose response turned out
+    // uncacheable: then the factory ran on the other context and our `ctx.response`
+    // is empty, so run the pipeline ourselves to return a complete response.
     if (ctx.response === undefined) {
       await next();
     }

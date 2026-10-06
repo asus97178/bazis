@@ -1,19 +1,19 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 /**
- * Конвертер значения между моделью (свойство класса) и провайдером (параметр SQL
- * / значение колонки). Применяется до/после типовой encode/decode диалекта.
+ * Value converter between the model (a class property) and the provider (an SQL
+ * parameter / column value). Applied before/after the dialect's type encode/decode.
  */
 export interface ValueConverter<TModel = unknown, TProvider = unknown> {
   toProvider(value: TModel): TProvider;
   fromProvider(value: TProvider): TModel;
 }
 
-/** Встроенные конвертеры (без внешних зависимостей — Node/Bun `crypto`). */
+/** Built-in converters (no external dependencies: Node/Bun `crypto`). */
 export const ValueConverters = {
   /**
-   * AES-256-GCM шифрование строки at-rest. В БД хранится base64(nonce|ciphertext|tag).
-   * `secret` — пароль/ключ приложения (derive через SHA-256).
+   * AES-256-GCM at-rest string encryption. The database stores base64(nonce|ciphertext|tag).
+   * `secret` is the application password/key (derived through SHA-256).
    */
   encrypted(secret: string): ValueConverter<string, string> {
     const key = createHash("sha256").update(secret).digest();
@@ -43,7 +43,7 @@ export const ValueConverters = {
     };
   },
 
-  /** JSON <-> string через сериализацию (для нестандартных структур поверх text-колонки). */
+  /** JSON <-> string through serialization (for custom structures on top of a text column). */
   json<T>(): ValueConverter<T, string> {
     return {
       toProvider(value: T): string {

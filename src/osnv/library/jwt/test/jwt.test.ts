@@ -192,7 +192,7 @@ describe("TokenIssuer", () => {
   });
 });
 
-describe("TokenService — изоляция видов токенов", () => {
+describe("TokenService: token kinds are isolated", () => {
   test("USER and ADMIN tokens are not interchangeable", async () => {
     const tokens = new TokenService({
       user: {

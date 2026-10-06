@@ -1,4 +1,4 @@
-import type { EntityModel, PropertyModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import type { SqlDialect, SqlParam } from "../Providers/types";
 import { encodeProperty } from "../Providers/propertyConversion";
 import { EntityState } from "../Tracking/EntityState";
@@ -8,16 +8,16 @@ export interface DbCommand {
   readonly sql: string;
   readonly params: SqlParam[];
   /**
-   * Колонка сгенерированного ключа, которую нужно прочитать из строки результата
-   * (identity INSERT через `RETURNING`), либо `undefined`. Свойство-ключ берётся
-   * из модели вызывающим кодом.
+   * Column of the generated key to read from the result row (identity INSERT
+   * through `RETURNING`), or `undefined`. The calling code takes the key
+   * property from the model.
    */
   readonly returnsGeneratedKey?: { readonly column: string; readonly property: string; readonly type: PropertyModel["type"] };
 }
 
 /**
- * Строит параметризованные SQL-команды для отслеживаемых сущностей.
- * Все значения попадают только в массив параметров.
+ * Builds parameterized SQL commands for tracked entities.
+ * All values go only into the parameter array.
  */
 export class CommandBuilder {
   constructor(private readonly dialect: SqlDialect) {}
@@ -43,13 +43,13 @@ export class CommandBuilder {
   }
 
   /**
-   * Пакетная вставка одной таблицы: `INSERT ... VALUES (..),(..),...`. Для
-   * identity-ключей добавляет `RETURNING` — ключи читаются по порядку строк.
-   * Колонки одинаковы для всех Added одной сущности, поэтому батч безопасен.
+   * Batch insert into one table: `INSERT ... VALUES (..),(..),...`. For identity
+   * keys it adds `RETURNING`; keys are read in row order. The columns are the
+   * same for all Added entries of one entity, so the batch is safe.
    */
   insertMany(entities: readonly Record<string, unknown>[], model: EntityModel): DbCommand {
     const scalarKey = model.key.length === 1 ? model.key[0] : undefined;
-    const dbGeneratedKey = scalarKey?.generation === "identity" || scalarKey?.generation === "uuid";
+    const dbGeneratedKey = scalarKey !== undefined && isDatabaseGenerated(scalarKey.generation);
     const columns = model.properties.filter((property) => !isDatabaseGenerated(property.generation));
     const columnList = columns.map((property) => this.dialect.quoteId(property.columnName)).join(", ");
     const params: SqlParam[] = [];
@@ -115,7 +115,7 @@ export class CommandBuilder {
     return { sql, params };
   }
 
-  /** Soft-delete: UPDATE метки времени вместо DELETE. */
+  /** Soft delete: an UPDATE of the timestamp instead of DELETE. */
   private softDelete(entity: Record<string, unknown>, model: EntityModel): DbCommand {
     const propName = model.softDeleteProperty!;
     const property = model.propertyByName(propName)!;
@@ -136,8 +136,4 @@ export class CommandBuilder {
       return `${this.dialect.quoteId(key.columnName)} = ${placeholder}`;
     }).join(" AND ");
   }
-}
-
-function isDatabaseGenerated(generation: "identity" | "uuid" | "none"): boolean {
-  return generation === "identity" || generation === "uuid";
 }

@@ -11,15 +11,15 @@ import { RedisDistributedCacheBackend, type RedisDistributedCacheTuning } from "
 import { reader, requireValue } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 
-/** Клиент Redis/Valkey (нативный Bun `RedisClient`, без внешних зависимостей). */
+/** Redis/Valkey client (native Bun `RedisClient`, no external dependencies). */
 export const REDIS: InjectionToken<RedisClient> = createToken<RedisClient>("Redis");
 
 /**
- * Интерфейс конфига, который требует коннектор Redis. Конфиг подсистемы
- * (`defineConfig<RedisConfig>("redis", ...)`) должен предоставлять эти ключи.
+ * Config interface required by the Redis connector. The subsystem config
+ * (`defineConfig<RedisConfig>("redis", ...)`) must provide these keys.
  */
 export interface RedisConfigShape {
-  /** Полная строка подключения, напр. `redis://localhost:6379`. */
+  /** Full connection string, e.g. `redis://localhost:6379`. */
   readonly url: string | Secret;
 }
 
@@ -30,16 +30,16 @@ export type RedisConnectorCacheMode =
 export interface RedisConnectorOptions {
   readonly token?: InjectionToken<RedisClient>;
   /**
-   * Опубликовать поверх клиента распределённый кэш-бэкенд: `{ cache: "distributed" }`.
-   * Для тонкого тюнинга используйте `{ cache: { mode: "distributed", keyPrefix, ... } }`.
-   * В приложении допускается один backend; второй отклоняется при сборке контейнера.
+   * Publishes a distributed cache backend on top of the client: `{ cache: "distributed" }`.
+   * For fine tuning use `{ cache: { mode: "distributed", keyPrefix, ... } }`.
+   * An application may have one backend; a second one is rejected when the container is built.
    */
   readonly cache?: RedisConnectorCacheMode;
 }
 
 /**
- * Провайдеры распределённого кэша поверх Redis-клиента: бэкенд + два реестра
- * (HTTP-ответы и значения методов). Cache-модуль подхватывает их из DI.
+ * Distributed cache providers on top of the Redis client: the backend plus two
+ * registries (HTTP responses and method values). The cache module picks them up from DI.
  */
 function distributedCacheProviders(tuning: RedisDistributedCacheTuning, token: InjectionToken<RedisClient>): ProviderDefinition[] {
   return [
@@ -64,16 +64,16 @@ function distributedCacheProviders(tuning: RedisDistributedCacheTuning, token: I
 }
 
 /**
- * Коннектор Redis для манифеста `@Infra`. Конфигурация берётся из переданного
- * `redisConfig` (`defineConfig("redis", ...)`) — коннектор читает объявленный
- * ключ `url`. Открывает соединение на старте, закрывает на стопе. Вторым
- * аргументом — опции коннектора (распределённый кэш и т. п.).
+ * Redis connector for the `@Infra` manifest. Configuration comes from the given
+ * `redisConfig` (`defineConfig("redis", ...)`): the connector reads the declared
+ * `url` key. Opens the connection at start and closes it at shutdown. The second
+ * argument takes connector options (distributed cache and so on).
  *
  * ```ts
  * export const redisConfig = defineConfig("redis", { default: { url: "redis://localhost:6379" } });
  * @Infra({ cache: redisConnect(redisConfig, { cache: "distributed" }) })
  * export class AppInfra {}
- * // инъекция: constructor(private readonly redis: RedisClient) {}  // токен REDIS
+ * // injection by token: scoped(ISessionsService, SessionsService, [REDIS] as const)
  * ```
  */
 export function redisConnect<T extends RedisConfigShape>(

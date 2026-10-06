@@ -5,22 +5,22 @@ import { OrmError } from "../../library/orm";
 const MAX_ORM_PAGE_SIZE = 1_000;
 const MAX_ORM_PAGE_OFFSET = 10_000_000;
 
-/** Страница результата: элементы и общее число записей (с учётом фильтров). */
+/** Result page: the items and the total number of records (with filters applied). */
 export interface PageResult<T> {
   readonly items: readonly T[];
   readonly total: number;
 }
 
 /**
- * Применяет универсальный {@link ListQuery} (фильтры/сортировка/пагинация) к
- * ORM-запросу и возвращает страницу элементов вместе с общим числом записей.
+ * Applies a universal {@link ListQuery} (filters/sorting/paging) to an ORM query
+ * and returns a page of items together with the total number of records.
  *
- * `total` считается отдельным `count()` с теми же фильтрами, но без пагинации —
- * чтобы клиент мог построить навигацию по страницам.
+ * `total` is computed by a separate `count()` with the same filters but without
+ * paging, so the client can build page navigation.
  *
- * Имена полей в `ListQuery` уже провалидированы парсером по белому списку
- * (`parseListQuery`), поэтому здесь они применяются напрямую. SQL всегда
- * параметризован движком ORM — пользовательские значения не попадают в текст.
+ * Field names in the `ListQuery` were already validated against the allow list
+ * by the parser (`parseListQuery`), so they are applied directly here. The ORM
+ * engine always parameterizes SQL: user values never get into the SQL text.
  *
  * ```ts
  * const { items, total } = await paginate(repo.query(), query);
@@ -90,9 +90,9 @@ function primaryKeyFields(model: EntityModel): readonly string[] {
 }
 
 /**
- * Строит итоговый предикат: `filters` (AND) и OR-группы (`(g0) OR (g1) OR ...`),
- * объединённые между собой через AND: `filters AND (g0 OR g1 ...)`.
- * Вызывается только когда есть хотя бы одно условие (см. `hasFilter` в paginate).
+ * Builds the final predicate: `filters` (AND) and OR groups (`(g0) OR (g1) OR ...`)
+ * joined with AND: `filters AND (g0 OR g1 ...)`.
+ * Called only when there is at least one condition (see `hasFilter` in paginate).
  */
 function buildWhere<T extends object>(entity: FieldSelector<T>, list: ListQuery, model: EntityModel): Predicate {
   const base = combineAnd(entity, list.filters, model);
@@ -166,8 +166,8 @@ const NUMERIC = /^-?\d+(\.\d+)?$/;
 const INTEGER = /^-?\d+$/;
 
 /**
- * Тип выбирается по колонке: текстовые значения нельзя пропускать через Number,
- * иначе теряются ведущие нули и точность. Конвертер и диалект применяются позже.
+ * The type is chosen by the column: text values must not go through Number, or
+ * leading zeros and precision are lost. The converter and dialect apply later.
  */
 function coerce(value: string, type: ColumnType | undefined): string | number | bigint | boolean {
   if (type !== "integer" && type !== "real" && type !== "boolean") {

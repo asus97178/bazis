@@ -18,19 +18,19 @@ export function knownExecutionStrategyBase(provider: DatabaseProvider): Database
   return undefined;
 }
 
-/** Опции стратегии повторов при transient-ошибках БД. */
+/** Options of the retry strategy for transient database errors. */
 export interface ExecutionStrategyOptions {
-  /** Максимум повторов после первой неудачи (по умолчанию 3). */
+  /** Maximum retries after the first failure (default 3). */
   readonly maxRetries?: number;
-  /** Базовая задержка между попытками, мс (экспоненциальный backoff). */
+  /** Base delay between attempts, ms (exponential backoff). */
   readonly baseDelayMs?: number;
-  /** Признак временной ошибки, при которой имеет смысл повторить. */
+  /** Tells whether an error is transient and worth retrying. */
   readonly isTransient?: (error: unknown) => boolean;
 }
 
 /**
- * Стратегия выполнения операций с повторами (аналог EF `EnableRetryOnFailure`).
- * Оборачивает SaveChanges и может использоваться для пользовательских транзакций.
+ * Execution strategy with retries (the counterpart of EF `EnableRetryOnFailure`).
+ * Wraps SaveChanges and can be used for user transactions.
  */
 export class ExecutionStrategy {
   private readonly maxRetries: number;
@@ -73,7 +73,7 @@ export class ExecutionStrategy {
   }
 }
 
-/** Обёртка провайдера с retry на всех execute/query (опционально). */
+/** Provider wrapper with retries on every execute/query (optional). */
 export function withRetry(provider: DatabaseProvider, options?: ExecutionStrategyOptions): DatabaseProvider {
   const strategy = new ExecutionStrategy(options);
   const transactionScope = provider.transactionScope?.bind(provider);
@@ -86,8 +86,8 @@ export function withRetry(provider: DatabaseProvider, options?: ExecutionStrateg
       ? strategy.execute(operation)
       : Promise.resolve().then(operation);
   };
-  // Явное делегирование: spread `{...provider}` потерял бы методы класса
-  // (они на прототипе), оставив обёртку без ping/introspect/close.
+  // Explicit delegation: a `{...provider}` spread would lose the class methods
+  // (they live on the prototype), leaving the wrapper without ping/introspect/close.
   const wrapped: DatabaseProvider = {
     name: provider.name,
     dialect: provider.dialect,

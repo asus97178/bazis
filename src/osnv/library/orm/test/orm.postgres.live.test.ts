@@ -18,16 +18,17 @@ import {
 } from "@/library/orm";
 
 /**
- * Живая интеграция провайдера PostgreSQL.
+ * Live integration of the PostgreSQL provider.
  *
- * Запускается только если задан `OSNV_PG_URL` (иначе весь блок пропускается),
- * поэтому в обычном `bun test` без базы он не мешает, а в CI с поднятой PG —
- * проверяет реальный путь: миграция, RETURNING-ключи, нативные типы
- * (boolean/timestamptz/jsonb), запросы, include и транзакционный SaveChanges.
+ * Runs only when `OSNV_PG_URL` is set (otherwise the whole block is skipped),
+ * so it does not get in the way of a plain `bun test` without a database, and in
+ * CI with PostgreSQL up it checks the real path: migration, RETURNING keys,
+ * native types (boolean/timestamptz/jsonb), queries, include and the
+ * transactional SaveChanges.
  *
  *   OSNV_PG_URL="postgres://postgres:PASSWORD@localhost:5432/bun_app" bun test
  *
- * Использует таблицы `pg_it_*` и удаляет их до и после прогона.
+ * Uses the `pg_it_*` tables and drops them before and after the run.
  */
 
 const PG_SECRET = "pg-live-test-secret";

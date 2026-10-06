@@ -120,7 +120,7 @@ function validateOwned(catalog: Catalog, tuples: Rows): void {
 }
 async function health(container: ReturnType<typeof createContainer>) { return container.resolveAll(HEALTH_CHECK).filter(check => check.name.startsWith("orm-owned-store:")).sort((a, b) => a.name.localeCompare(b.name)); }
 
-test.skipIf(enabled)("E327 ENV_OFF rejects incomplete or redirected opt-in before observer, Infra, or container effects", () => {
+test.skipIf(enabled)("without the exact opt-in env, rejects incomplete or redirected opt-in before observer, Infra, or container effects", () => {
   expect(enabled).toBe(false);
   const valid: NodeJS.ProcessEnv = { OSNV_PG_URL: "postgres://unused/oe327_00000000000000000000000000000000", OSNV_OWNED_STORE_E_LIVE: "wp-orm-3-e327-integrated-v1", OSNV_OWNED_STORE_E_DATABASE: "oe327_00000000000000000000000000000000", OSNV_OWNED_STORE_E_ROLE: "owned-store-e-child-v1", OSNV_OWNED_STORE_E_RUN: "00000000-0000-0000-0000-000000000000" };
   expect(exactGate(valid)).toBe(true);
@@ -131,7 +131,7 @@ test.skipIf(enabled)("E327 ENV_OFF rejects incomplete or redirected opt-in befor
   expect({ infraDefinitions, observers, containers }).toEqual({ infraDefinitions: 0, observers: 0, containers: 0 });
 });
 
-test.skipIf(!enabled)("E327 sequential two-store PostgreSQL core lifecycle", async () => {
+test.skipIf(!enabled)("sequential two-store PostgreSQL core lifecycle", async () => {
   const url = process.env.OSNV_PG_URL!;
   type Container = ReturnType<typeof createContainer>;
   type Entry = { container: Container; coordinator: LifecycleCoordinator; stopped: boolean; disposed: boolean };

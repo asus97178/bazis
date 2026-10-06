@@ -4,12 +4,12 @@ import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { reader, requireValue } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 
-/** Клиент PostgreSQL (нативный Bun `SQL`, без внешних зависимостей). */
+/** PostgreSQL client (native Bun `SQL`, no external dependencies). */
 export const POSTGRES: InjectionToken<SQL> = createToken<SQL>("Postgres");
 
 /**
- * Интерфейс конфига, который требует коннектор PostgreSQL. Конфиг подсистемы БД
- * (`defineConfig<DbConfig>("db", ...)`) должен предоставлять эти ключи.
+ * Config interface required by the PostgreSQL connector. The database subsystem
+ * config (`defineConfig<DbConfig>("db", ...)`) must provide these keys.
  */
 export interface PostgresConfigShape {
   readonly host: string;
@@ -57,11 +57,11 @@ export function postgresConnectionOptions(config: AppConfig<PostgresConfigShape>
 }
 
 /**
- * Коннектор PostgreSQL для манифеста `@Infra`. Конфигурация берётся целиком из
- * переданного объекта `dbConfig` (`defineConfig("db", ...)`): коннектор сам читает
- * объявленные ключи (`host`/`port`/`database`/`username`/`password`), никаких
- * строк-ключей в манифесте. Открывает соединение на старте (`SELECT 1`) и
- * закрывает на остановке.
+ * PostgreSQL connector for the `@Infra` manifest. The whole configuration comes
+ * from the given `dbConfig` object (`defineConfig("db", ...)`): the connector
+ * reads the declared keys (`host`/`port`/`database`/`username`/`password`)
+ * itself, with no string keys in the manifest. Opens the connection at start
+ * (`SELECT 1`) and closes it at shutdown.
  *
  * ```ts
  * export const dbConfig = defineConfig("db", {
@@ -69,7 +69,7 @@ export function postgresConnectionOptions(config: AppConfig<PostgresConfigShape>
  * });
  * @Infra({ db: postgres(dbConfig) })
  * export class AppInfra {}
- * // инъекция: constructor(private readonly sql: SQL) {}  // токен POSTGRES
+ * // injection by token: scoped(IReportsService, ReportsService, [POSTGRES] as const)
  * ```
  */
 export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, options: PostgresConnectorOptions = {}): InfraConnector<SQL> {

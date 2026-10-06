@@ -23,8 +23,8 @@ async function outcome<T>(work: Promise<T>, timeoutMs = 200) {
   } finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
-describe("Kernel audit regressions", () => {
-  test("K01: startup timeout covers an uncooperative onStarted callback", async () => {
+describe("Kernel regressions", () => {
+  test("startup timeout covers an uncooperative onStarted callback", async () => {
     const gate = Promise.withResolvers<void>();
     let stops = 0;
     const kernel = await builder(hosted({ start() {}, stop() { stops++; } })).useStartupTimeout(20).build();
@@ -43,7 +43,7 @@ describe("Kernel audit regressions", () => {
     }
   });
 
-  test("K01: lifetime stop cancels onStarted and prevents late callbacks and events", async () => {
+  test("lifetime stop cancels onStarted and prevents late callbacks and events", async () => {
     const entered = Promise.withResolvers<void>();
     const gate = Promise.withResolvers<void>();
     let later = 0;
@@ -71,7 +71,7 @@ describe("Kernel audit regressions", () => {
     }
   });
 
-  test("K01: started event dispatch shares the startup deadline and stops later handlers", async () => {
+  test("started event dispatch shares the startup deadline and stops later handlers", async () => {
     const gate = Promise.withResolvers<void>();
     let later = 0;
     const kernel = await builder({ providers: [
@@ -94,7 +94,7 @@ describe("Kernel audit regressions", () => {
     }
   });
 
-  test("K01: onStarted may await public stop without deadlocking startup", async () => {
+  test("onStarted may await public stop without deadlocking startup", async () => {
     let stops = 0;
     const kernel = await builder(hosted({ start() {}, stop() { stops++; } })).build();
     kernel.lifetime.onStarted(() => kernel.stop({ exitCode: 23 }));
@@ -105,7 +105,7 @@ describe("Kernel audit regressions", () => {
     } finally { await kernel.stop().catch(() => {}); }
   });
 
-  test("K08: started failure preserves a shutdown timeout with the original cause", async () => {
+  test("started failure preserves a shutdown timeout with the original cause", async () => {
     const gate = Promise.withResolvers<void>();
     const original = new Error("audit started failure");
     const root = hosted({ start() {}, stop() { return gate.promise; } });
@@ -121,7 +121,7 @@ describe("Kernel audit regressions", () => {
     } finally { gate.resolve(); await starting.catch(() => {}); await kernel.stop().catch(() => {}); }
   });
 
-  test("K08: failed coordinator startup preserves a rollback timeout", async () => {
+  test("failed coordinator startup preserves a rollback timeout", async () => {
     const gate = Promise.withResolvers<void>();
     const original = new Error("audit hosted failure");
     const kernel = await builder(hosted(
@@ -139,7 +139,7 @@ describe("Kernel audit regressions", () => {
     } finally { gate.resolve(); await starting.catch(() => {}); await kernel.stop().catch(() => {}); }
   });
 
-  test("K08: failed startup does not hide a container disposal timeout", async () => {
+  test("failed startup does not hide a container disposal timeout", async () => {
     const gate = Promise.withResolvers<void>();
     const original = new Error("audit initial failure");
     const resource = { async [Symbol.asyncDispose]() { await gate.promise; } };
@@ -159,7 +159,7 @@ describe("Kernel audit regressions", () => {
     } finally { gate.resolve(); await starting.catch(() => {}); await kernel.stop().catch(() => {}); }
   });
 
-  test("K08: stop joins and preserves an incomplete startup rollback", async () => {
+  test("stop joins and preserves an incomplete startup rollback", async () => {
     const gate = Promise.withResolvers<void>();
     const entered = Promise.withResolvers<void>();
     const kernel = await builder(hosted(
@@ -200,7 +200,7 @@ describe("Kernel audit regressions", () => {
     });
   }
 
-  test("K02: supervisor forwards the original startup signal", async () => {
+  test("supervisor forwards the original startup signal", async () => {
     const controller = new AbortController();
     let received: AbortSignal | undefined;
     const service = new SupervisedHostedService(() => ({ start(signal) { received = signal; }, stop() {} }));
@@ -209,7 +209,7 @@ describe("Kernel audit regressions", () => {
     expect(received).toBe(controller.signal);
   });
 
-  test("K02: a pre-aborted startup never invokes the factory", async () => {
+  test("a pre-aborted startup never invokes the factory", async () => {
     const controller = new AbortController();
     const reason = new StartupAbortedError();
     controller.abort(reason);
@@ -221,7 +221,7 @@ describe("Kernel audit regressions", () => {
     await service.stop();
   });
 
-  test("K02: cancellation during backoff prevents every subsequent factory", async () => {
+  test("cancellation during backoff prevents every subsequent factory", async () => {
     const controller = new AbortController();
     const retry = Promise.withResolvers<void>();
     let attempts = 0;
@@ -241,7 +241,7 @@ describe("Kernel audit regressions", () => {
     expect(stops).toBe(1);
   });
 
-  test("K02: supervisor cleans a cooperative cancelled inner without retrying", async () => {
+  test("supervisor cleans a cooperative cancelled inner without retrying", async () => {
     const controller = new AbortController();
     const entered = Promise.withResolvers<void>();
     const gate = Promise.withResolvers<void>();
@@ -266,7 +266,7 @@ describe("Kernel audit regressions", () => {
     } finally { gate.resolve(); await starting.catch(() => {}); await service.stop(); }
   });
 
-  test("K02: no supervised attempt starts after kernel stop has returned", async () => {
+  test("no supervised attempt starts after kernel stop has returned", async () => {
     const retry = Promise.withResolvers<void>();
     let attempts = 0;
     const wrapper = new SupervisedHostedService(() => ({
@@ -283,7 +283,7 @@ describe("Kernel audit regressions", () => {
     expect(attempts).toBe(atStop);
   });
 
-  test("K01: pre-aborted publish rejects even for an empty event and isolate mode", async () => {
+  test("pre-aborted publish rejects even for an empty event and isolate mode", async () => {
     const controller = new AbortController();
     const reason = new Error("cancelled event");
     const event = createEventToken<void>("audit.cancel.empty");
@@ -294,7 +294,7 @@ describe("Kernel audit regressions", () => {
     } finally { await kernel.stop(); }
   });
 
-  test("K01: cancelled scoped dispatch observes late rejection and skips remaining handlers", async () => {
+  test("cancelled scoped dispatch observes late rejection and skips remaining handlers", async () => {
     const controller = new AbortController();
     const reason = new Error("cancelled event");
     const event = createEventToken<void>("audit.cancel.scoped");
@@ -322,7 +322,7 @@ describe("Kernel audit regressions", () => {
     } finally { gate.resolve(); await scope.dispose(); await kernel.stop(); }
   });
 
-  test("K03: failed formatting never invokes a raw field toString", () => {
+  test("failed formatting never invokes a raw field toString", () => {
     const lines: string[] = [];
     const original = console.info;
     let stringifications = 0;
@@ -337,7 +337,7 @@ describe("Kernel audit regressions", () => {
     } finally { console.info = original; }
   });
 
-  test("K03: an object that cannot enumerate fields still produces a safe log", () => {
+  test("an object that cannot enumerate fields still produces a safe log", () => {
     const lines: string[] = [];
     const original = console.info;
     console.info = value => { lines.push(String(value)); };
@@ -349,7 +349,7 @@ describe("Kernel audit regressions", () => {
     } finally { console.info = original; }
   });
 
-  test("K04: invalid timer budgets fail before loading configuration", async () => {
+  test("invalid timer budgets fail before loading configuration", async () => {
     let loads = 0;
     const accepted: string[] = [];
     for (const name of ["startupTimeoutMs", "shutdownTimeoutMs"] as const) {
@@ -363,7 +363,7 @@ describe("Kernel audit regressions", () => {
     expect(loads).toBe(0);
   });
 
-  test("K04: zero and the maximum timer budget remain valid", async () => {
+  test("zero and the maximum timer budget remain valid", async () => {
     for (const value of [0, 1, 2_147_483_647]) {
       const kernel = await builder().useOptions({ startupTimeoutMs: value, shutdownTimeoutMs: value }).build();
       await kernel.start();
@@ -371,7 +371,7 @@ describe("Kernel audit regressions", () => {
     }
   });
 
-  test("K05: every run caller joins one operation and receives the same exit code", async () => {
+  test("every run caller joins one operation and receives the same exit code", async () => {
     const kernel = await builder().build();
     await kernel.start();
     const first = kernel.run();
@@ -385,7 +385,7 @@ describe("Kernel audit regressions", () => {
     await kernel.stop();
   });
 
-  test("K05: repeated run installs one signal listener and removes it after stop", async () => {
+  test("repeated run installs one signal listener and removes it after stop", async () => {
     const before = process.listenerCount("SIGUSR2");
     const kernel = await builder().useSignals(["SIGUSR2"]).build();
     const first = kernel.run();
@@ -400,7 +400,7 @@ describe("Kernel audit regressions", () => {
     } finally { await kernel.stop(); }
   });
 
-  test("K06: Configuration owns a snapshot of its input map", () => {
+  test("Configuration owns a snapshot of its input map", () => {
     const values = new Map([["db.host", "before"]]);
     const config = new Configuration(values);
     values.set("db.host", "after");
@@ -409,7 +409,7 @@ describe("Kernel audit regressions", () => {
     expect(config.keys()).toEqual(["db.host"]);
   });
 
-  test("K07: two kernels share a declaration and retain independent views", async () => {
+  test("two kernels share a declaration and retain independent views", async () => {
     const config = defineConfig("kernel_audit", { default: { mode: "default" }, production: { mode: "prod" }, test: { mode: "test" } });
     const root = { config };
     const first = await builder(root).useEnvironment("production").build();
@@ -423,7 +423,7 @@ describe("Kernel audit regressions", () => {
     } finally { await first.stop(); await second.stop(); }
   });
 
-  test("K07: failed validation never pins an environment", () => {
+  test("failed validation never pins an environment", () => {
     const config = defineConfig("kernel_audit_unset", { default: { key: secret("test-only") }, production: { key: secret() } });
     expect(() => config.ensureValid("production")).toThrow(KernelError);
     expect(() => config.ensureValid("test")).not.toThrow();

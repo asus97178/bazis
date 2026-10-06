@@ -1,7 +1,7 @@
-// Слой инфраструктуры: декларативное подключение внешних систем (БД, кэш,
-// поисковый движок, ...) через единый контракт `InfraConnector` и собирательный
-// декоратор `@Infra`. Коннекторы опираются на встроенные в Bun клиенты
-// (`SQL`, `RedisClient`) и `fetch` — ноль внешних зависимостей.
+// Infrastructure layer: declarative connection of external systems (database, cache,
+// search engine, ...) through one `InfraConnector` contract and the `@Infra`
+// decorator. Connectors build on clients built into Bun
+// (`SQL`, `RedisClient`) and `fetch`, with zero external dependencies.
 
 export { Infra, infraModule, type InfraManifest } from "./Infra";
 export { InfraError, errorMessage, type InfraConnector } from "./InfraConnector";

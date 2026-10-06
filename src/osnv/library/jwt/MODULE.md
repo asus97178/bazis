@@ -1,256 +1,255 @@
 # JWT
 
-Версия паспорта: 1.2. Дата: 2026-09-14.
-Тип: атомарная библиотечная функция, без собственного DI-модуля.
-Путь: src/osnv/library/jwt. Публичный вход: [index.ts](index.ts), osnv/library/jwt.
-Статус: JWT-01–JWT-06 исправлены; добавлены ротация ключей и эксплуатационные проверки.
-Область: ключи и их lifecycle, validate, issue/rotate и helpers base64url.
-Вызовы с одним SigningAlgorithm сохраняются; добавлены JwtKeyRing и лимит размера.
-Создание каркаса: историческая библиотека, команда создания неизвестна. Новый модуль не создаётся.
+Passport version: 1.2. Date: 2026-09-14.
+Type: an atomic library feature without its own DI module.
+Path: src/osnv/library/jwt. Public entry: [index.ts](index.ts), osnv/library/jwt.
+Status: JWT-01–JWT-06 are fixed; key rotation and operational checks were added.
+Scope: keys and their lifecycle, validate, issue/rotate and the base64url helpers.
+Calls with a single SigningAlgorithm are kept; JwtKeyRing and a size limit were added.
+Scaffold creation: a historical library; the creation command is unknown. No new module is created.
 
-## 1. Ответственность и структура
+## 1. Responsibility and structure
 
-Библиотека владеет подписью и проверкой compact JWS, JWT claims и выпуском пары
-access/refresh. Это одна техническая функция. SigningAlgorithm остаётся портом
-криптографии; JwtValidator проверяет недоверенный токен, TokenIssuer владеет
-настройками выпуска, TokenService выбирает издателя по виду токена.
+The library owns signing and verifying compact JWS, JWT claims and issuing an
+access/refresh pair. It is one technical feature. SigningAlgorithm stays the
+cryptography port; JwtValidator checks an untrusted token, TokenIssuer owns the issue
+settings, TokenService picks the issuer by token kind.
 
-HTTP, DI, роли, состояние учётной записи, хранилище refresh, отзыв сессий и
-выбор окружения принадлежат приложению. imports и DI-exports отсутствуют;
-[AuthModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/auth/Auth.module.ts) регистрирует TokenService
-через существующую фабрику. ORM, HTTP-контроллеры, фоновые службы и AI здесь не используются.
+HTTP, DI, roles, account state, refresh storage, session revocation and the choice of
+environment belong to the application. There are no imports or DI exports; the
+osnova application's [AuthModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/auth/Auth.module.ts) registers TokenService
+through its existing factory. ORM, HTTP controllers, background services and AI are not used here.
 
-ООП/SOLID и простота: инварианты остаются у существующих владельцев, новых
-подмодулей и внешних зависимостей нет. Снимки ключей и настроек создаются один раз.
-Частый путь линейный по размеру токена; ключи Web Crypto кешируются после импорта.
-Неизвестные критические JOSE-расширения отклоняются: их обработчик не заявлен.
-Бинарное исполнение использует стандартные Web Crypto/TextEncoder/TextDecoder,
-без чтения исходников и файлов ключей во время проверки.
+OOP/SOLID and simplicity: the invariants stay with their existing owners; there are no
+new submodules or external dependencies. Key and settings snapshots are created once.
+The hot path is linear in the token size; Web Crypto keys are cached after import.
+Unknown critical JOSE extensions are rejected: no handler for them is declared.
+Binary execution uses the standard Web Crypto/TextEncoder/TextDecoder, without reading
+sources or key files during verification.
 
-## 2. Компоненты
+## 2. Components
 
-| Компонент | Файл | Ответственность / вход |
+| Component | File | Responsibility / input |
 | --- | --- | --- |
-| Hs256Algorithm / hs256 | [signing/Hs256Algorithm.ts](signing/Hs256Algorithm.ts) | Снимок секрета, HMAC-SHA256; строка signingInput и байты подписи |
-| Rs256Algorithm / rs256 | [signing/Rs256Algorithm.ts](signing/Rs256Algorithm.ts) | Снимок PEM-настроек; импорт RSA не слабее 2048 бит, sign/verify/exportPublicJwk |
-| JwtKeyRing | [JwtKeyRing.ts](JwtKeyRing.ts) | Доверенный набор ключей, подготовка, атомарная замена, отзыв и безопасные метаданные |
-| JwtValidator | [JwtValidator.ts](JwtValidator.ts) | Снимок validation options, строгий формат и зарегистрированные claims |
-| JwtEncoder | [JwtEncoder.ts](JwtEncoder.ts) | Сериализация переданных claims и подпись; бизнес-правила claims принадлежат вызывающему |
-| TokenIssuer | [TokenIssuer.ts](TokenIssuer.ts) | Проверенная конфигурация, subject, access/refresh, stateless rotate |
-| TokenService | [TokenService.ts](TokenService.ts) | Реестр видов токенов; алгоритмы и аудитории назначает приложение |
-| base64url | [base64url.ts](base64url.ts) | Каноническая base64url без padding; точный UTF-8 |
-| limits | [limits.ts](limits.ts) | DEFAULT_MAX_TOKEN_LENGTH = 16384; проверка положительного safe integer |
-| Ошибки и типы | [errors.ts](errors.ts), [claims.ts](claims.ts) | Публичные ошибки JWT и существующие TypeScript-контракты |
+| Hs256Algorithm / hs256 | [signing/Hs256Algorithm.ts](signing/Hs256Algorithm.ts) | A secret snapshot, HMAC-SHA256; the signingInput string and the signature bytes |
+| Rs256Algorithm / rs256 | [signing/Rs256Algorithm.ts](signing/Rs256Algorithm.ts) | A snapshot of the PEM settings; RSA import of at least 2048 bits, sign/verify/exportPublicJwk |
+| JwtKeyRing | [JwtKeyRing.ts](JwtKeyRing.ts) | A trusted key set, preparation, atomic replacement, revocation and safe metadata |
+| JwtValidator | [JwtValidator.ts](JwtValidator.ts) | A snapshot of the validation options, the strict format and registered claims |
+| JwtEncoder | [JwtEncoder.ts](JwtEncoder.ts) | Serializes the given claims and signs; business rules of the claims belong to the caller |
+| TokenIssuer | [TokenIssuer.ts](TokenIssuer.ts) | Checked configuration, subject, access/refresh, stateless rotate |
+| TokenService | [TokenService.ts](TokenService.ts) | The registry of token kinds; the application assigns algorithms and audiences |
+| base64url | [base64url.ts](base64url.ts) | Canonical base64url without padding; exact UTF-8 |
+| limits | [limits.ts](limits.ts) | DEFAULT_MAX_TOKEN_LENGTH = 16384; the positive safe integer check |
+| Errors and types | [errors.ts](errors.ts), [claims.ts](claims.ts) | Public JWT errors and the existing TypeScript contracts |
 
-## 3. Ключи и lifecycle
+## 3. Keys and lifecycle
 
-Конструкторы алгоритмов вызываются приложением. Ключи — доверенная конфигурация,
-не данные из kid или других полей токена. Сеть, JWKS discovery и файловый ввод
-не используются. В одиночной стратегии kid сравнивается с настроенным значением;
-в JwtKeyRing выбирает ровно одну доверенную стратегию из локальной Map.
+The application calls the algorithm constructors. Keys are trusted configuration,
+not data from kid or other token fields. Network, JWKS discovery and file input are
+not used. With a single strategy, kid is compared with the configured value; in
+JwtKeyRing it selects exactly one trusted strategy from a local Map.
 
-| Поле | Тип / формат | Обязательно | null / default | Проверки и владение |
+| Field | Type / format | Required | null / default | Checks and ownership |
 | --- | --- | --- | --- | --- |
-| secret | string UTF-8 или Uint8Array | да, HS256 | нет / нет | Минимум 32 байта; собственная копия, включая Buffer/subarray |
-| keys.publicKeyPem | string, SPKI PEM | да, RS256 | нет / нет | Непустая строка; Web Crypto импорт; modulusLength >= 2048 |
-| keys.privateKeyPem | string, PKCS#8 PEM | для sign | нет / отсутствует | Непустая строка при наличии; импорт и modulusLength >= 2048 |
-| keys.keyId | string | нет | нет / отсутствует | Непустая строка; снимок, записывается в kid |
-| signingInput | string, header.payload | sign/verify | нет / нет | Байты UTF-8 передаются криптографическому алгоритму |
-| signature | Uint8Array | verify | нет / нет | Несовпадение подписи возвращает false |
+| secret | a UTF-8 string or Uint8Array | yes, HS256 | no / none | At least 32 bytes; an own copy, including Buffer/subarray |
+| keys.publicKeyPem | string, SPKI PEM | yes, RS256 | no / none | A non-empty string; Web Crypto import; modulusLength >= 2048 |
+| keys.privateKeyPem | string, PKCS#8 PEM | for sign | no / absent | A non-empty string when present; import and modulusLength >= 2048 |
+| keys.keyId | string | no | no / absent | A non-empty string; a snapshot, written into kid |
+| signingInput | string, header.payload | sign/verify | no / none | The UTF-8 bytes are passed to the crypto algorithm |
+| signature | Uint8Array | verify | no / none | A signature mismatch returns false |
 
-Минимальный размер RSA проверяется при ленивом импорте перед использованием.
-Ошибки ключевой конфигурации — TypeError/RangeError либо ошибки Web Crypto.
-Они не маскируются как ошибки недоверенного JWT. Ключи сохраняются в памяти
-экземпляра; API отмены, явной очистки CryptoKey и автоматической ротации отсутствуют.
-Повтор импорта после отказа возможен при следующем вызове; частично выполненный
-выпуск пары не возвращает успешного результата.
+The minimum RSA size is checked on the lazy import before use.
+Key configuration errors are TypeError/RangeError or Web Crypto errors.
+They are not disguised as errors of an untrusted JWT. Keys are kept in the instance
+memory; there is no API for cancellation, explicit CryptoKey cleanup or automatic
+rotation. Importing again after a failure is possible on the next call; a partially
+completed pair issue never returns a successful result.
 
 ### JwtKeyRing
 
-Приложение вызывает `await JwtKeyRing.create(config)` до публикации TokenService.
-`JwtEncoder`, `JwtValidator`, `TokenIssuerConfig.algorithm/refreshAlgorithm`
-принимают этот объект вместо одиночной стратегии. При подготовке signing key
-подписывает случайную служебную строку: правильная подпись должна проверяться,
-изменённое сообщение — отклоняться. Public-only key импортируется при проверке
-пустой подписи, которая обязана дать false. Это проверяет пригодность ключа,
-но не заменяет доверие к реализации SigningAlgorithm.
+The application calls `await JwtKeyRing.create(config)` before publishing TokenService.
+`JwtEncoder`, `JwtValidator`, `TokenIssuerConfig.algorithm/refreshAlgorithm` accept this
+object instead of a single strategy. While preparing a signing key, it signs a random
+service string: the correct signature must verify, and a changed message must be
+rejected. A public-only key is imported by verifying an empty signature, which must
+give false. This checks that the key is usable, but does not replace trust in the
+SigningAlgorithm implementation.
 
-| Поле | Тип / источник | Обязательность | null / default | Проверка / пример |
+| Field | Type / source | Required | null / default | Check / example |
 | --- | --- | --- | --- | --- |
-| config.keys | readonly JwtKeyEntry[], аргумент create/replace | да | нет / нет | 1…32 элемента |
-| config.keys[].keyId | string, доверенная конфигурация | да | нет / нет | 1…128 ASCII букв/цифр/`._-`; уникален; `auth-2026-09` |
-| config.keys[].algorithm | SigningAlgorithm | да | нет / нет | Непустой alg кроме none; boolean canSign; sign/verify; algorithm.keyId при наличии совпадает |
-| config.activeKeyId | string | для выпуска | нет / отсутствует | Id существующего canSign ключа; без поля только проверка |
-| config.legacy | object {keyId, acceptUntil} | нет | нет / отсутствует | Явный переход JWT без kid; оба вложенных поля обязательны |
-| config.legacy.keyId | string | при legacy | нет / нет | Один существующий ключ, формат id как выше |
-| config.legacy.acceptUntil | number, Unix seconds | при legacy | нет / нет | Конечное число > 0; при now >= acceptUntil JWT без kid отклоняется |
-| revoke(keyId) | string, команда оператора | да | нет / нет | Та же проверка id; результат boolean: был ли ключ в наборе |
+| config.keys | readonly JwtKeyEntry[], the create/replace argument | yes | no / none | 1…32 elements |
+| config.keys[].keyId | string, trusted configuration | yes | no / none | 1…128 ASCII letters/digits/`._-`; unique; `auth-2026-09` |
+| config.keys[].algorithm | SigningAlgorithm | yes | no / none | A non-empty alg other than none; boolean canSign; sign/verify; algorithm.keyId matches when present |
+| config.activeKeyId | string | for issuing | no / absent | The id of an existing canSign key; without the field the ring only verifies |
+| config.legacy | object {keyId, acceptUntil} | no | no / absent | An explicit migration of JWTs without kid; both nested fields are required |
+| config.legacy.keyId | string | with legacy | no / none | One existing key, id format as above |
+| config.legacy.acceptUntil | number, Unix seconds | with legacy | no / none | A finite number > 0; when now >= acceptUntil a JWT without kid is rejected |
+| revoke(keyId) | string, an operator command | yes | no / none | The same id check; a boolean result: whether the key was in the set |
 
-`replace(config): Promise<void>` проверяет новый снимок, затем заменяет текущий
-одним присваиванием. Ошибка подготовки оставляет текущий снимок. Конкурентное
-replace/revoke меняет revision; запоздалая подготовка отклоняется обычным Error,
-автоматический повтор отсутствует. Для плановой ротации передаются старый и новый
-ключи, activeKeyId указывает новый. Сохраняющиеся экземпляры стратегий повторно
-не импортируются. Поиск ключа O(1), обработка токена ограничена по длине.
+`replace(config): Promise<void>` checks the new snapshot, then replaces the current one
+with a single assignment. A preparation error keeps the current snapshot. A concurrent
+replace/revoke changes the revision; a late preparation is rejected with a plain Error,
+with no automatic retry. For a planned rotation pass the old and the new keys, with
+activeKeyId pointing to the new one. Strategy instances that stay are not imported
+again. Key lookup is O(1), and token processing is bounded by length.
 
-`revoke` синхронно исключает ключ, отзывает его id и прерывает дальнейшую выдачу,
-если он был активен. Завершающиеся encode/validate повторно сверяют выбранный ключ
-после await; исключённый ключ даёт JwtClaimError. Уже завершённые операции
-не отменяются. Удалённые при replace id также нельзя вернуть в этот экземпляр;
-для новых ключей используются новые id. При смене алгоритма новый id обязателен.
-Приложение не должно заменять ключевой материал под прежним id: библиотека
-не сравнивает скрытые приватные ключи пользовательских SigningAlgorithm.
+`revoke` synchronously removes the key, revokes its id and stops further issuing if
+it was active. Finishing encode/validate calls recheck the chosen key after await; a
+removed key gives JwtClaimError. Already finished operations are not cancelled. Ids
+removed by replace also cannot return to this instance; new keys use new ids. A new
+id is mandatory when the algorithm changes. The application must not replace the key
+material under an existing id: the library does not compare the hidden private keys
+of user SigningAlgorithm implementations.
 
-`status()` без аргументов возвращает замороженные revision:number,
-activeKeyId:string|undefined, keys:readonly {keyId,alg,canSign}[] и необязательный
-замороженный legacy:{keyId,acceptUntil}. Секретов и PEM
-в результате нет. `signingKey`, `verificationKey`, `assertCurrent` — внутренние
-методы Encoder/Validator, не API авторизации приложения.
-Некорректная конфигурация даёт TypeError; crypto/self-test/конфликт — ошибки
-провайдера или Error. Unknown kid либо missing kid без действующего legacy — JwtClaimError, подмена alg —
-JwtAlgorithmError. Никакой перебор всех ключей или получение jku/x5u/jwk из JWT
-не выполняется. Неизвестные поля конфигурации не используются.
+`status()` without arguments returns the frozen revision:number,
+activeKeyId:string|undefined, keys:readonly {keyId,alg,canSign}[] and an optional
+frozen legacy:{keyId,acceptUntil}. There are no secrets or PEM in the result.
+`signingKey`, `verificationKey`, `assertCurrent` are internal Encoder/Validator
+methods, not an application authorization API.
+An invalid configuration gives TypeError; crypto/self-test/conflict give provider
+errors or Error. An unknown kid or a missing kid without an active legacy gives
+JwtClaimError, an alg substitution gives JwtAlgorithmError. No brute force over all
+keys and no fetching of jku/x5u/jwk from the JWT happen. Unknown configuration fields are not used.
 
-Legacy по умолчанию выключен. Если задан, только отсутствие kid выбирает один
-указанный ключ до фиксированного acceptUntil; неизвестный или пустой kid не
-использует fallback. Подпись, alg и все claims остаются обязательными по настройкам
-валидатора. Срок/выбор повторно проверяются после crypto, clock skew к этому сроку
-не прибавляется. Новые JWT получают activeKeyId. Исключение ключа или legacy из
-снимка прекращает миграцию; revoke legacy-ключа также удаляет его legacy policy.
+Legacy is off by default. When set, only a missing kid selects the one given key until
+the fixed acceptUntil; an unknown or empty kid uses no fallback. The signature, alg and
+all claims stay mandatory per the validator settings. The deadline/choice is rechecked
+after crypto, and clock skew is not added to that deadline. New JWTs get activeKeyId.
+Removing the key or legacy from the snapshot ends the migration; revoking the legacy
+key also removes its legacy policy.
 
-Состояние ring принадлежит процессу. Распространение набора и списка отзывов,
-его безопасное хранение и восстановление после restart принадлежат host.
-Обязательная последовательность rollout, TTL/clock skew и действия при
-компрометации: [эксплуатационная инструкция](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/OPERATIONS.md).
+The ring state belongs to the process. Distributing the set and the revocation list,
+storing them safely and restoring them after a restart belong to the host.
+The mandatory rollout sequence, TTL/clock skew and the actions on compromise:
+[operations guide](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/OPERATIONS.md).
 
-## 4. Настройки и публичные операции
+## 4. Settings and public operations
 
-### JwtValidator(algorithm, options?) и validate(token)
+### JwtValidator(algorithm, options?) and validate(token)
 
-algorithm — SigningAlgorithm либо подготовленный JwtKeyRing, обязательная доверенная стратегия.
-options — объект, по умолчанию {}; null и массив не допускаются. Известные поля
-и массив audience копируются при создании, неизвестные поля не используются.
+algorithm is a SigningAlgorithm or a prepared JwtKeyRing, a mandatory trusted strategy.
+options is an object, {} by default; null and an array are not allowed. Known fields
+and the audience array are copied at creation; unknown fields are not used.
 
-| Поле options | Тип | Обязательно | null / default | Проверка |
+| options field | Type | Required | null / default | Check |
 | --- | --- | --- | --- | --- |
-| issuer | string | нет | нет / отсутствует | Непустая строка, точное сравнение iss |
-| audience | string или readonly string[] | нет | нет / отсутствует | Непустые строки; непустой массив; совпадение хотя бы одной аудитории |
-| expectedTokenUse | access или refresh | нет | нет / отсутствует | Точное сравнение token_use |
-| clockSkewSeconds | number, секунды | нет | нет / 60 | Конечное число >= 0; без автоматического преобразования и верхней границы |
-| requireExpiration | boolean | нет | нет / true | false отключает только обязательность exp |
-| maxTokenLength | number, число ASCII-символов compact JWS | нет | нет / 16384 | Положительное safe integer; отказ до split/JSON/crypto |
-| token | string, compact JWS | да, validate | нет / нет | Три непустых сегмента; base64url без пробелов, padding и неканонических pad bits |
+| issuer | string | no | no / absent | A non-empty string, exact iss comparison |
+| audience | string or readonly string[] | no | no / absent | Non-empty strings; a non-empty array; at least one audience matches |
+| expectedTokenUse | access or refresh | no | no / absent | Exact token_use comparison |
+| clockSkewSeconds | number, seconds | no | no / 60 | A finite number >= 0; no automatic conversion and no upper bound |
+| requireExpiration | boolean | no | no / true | false turns off only the exp requirement |
+| maxTokenLength | number, ASCII characters of the compact JWS | no | no / 16384 | A positive safe integer; rejection before split/JSON/crypto |
+| token | string, compact JWS | yes, validate | no / none | Three non-empty segments; base64url without spaces, padding and non-canonical pad bits |
 
-Пример настроек: { issuer: "auth", audience: ["client"], expectedTokenUse: "access", clockSkewSeconds: 0 }.
-Невалидные настройки отклоняются конструктором как TypeError/RangeError.
+Settings example: { issuer: "auth", audience: ["client"], expectedTokenUse: "access", clockSkewSeconds: 0 }.
+The constructor rejects invalid settings with TypeError/RangeError.
 
-Header и payload должны декодироваться в JSON-объекты, не null/массивы.
-Подпись проверяется до использования payload для claims. Неизвестные обычные
-поля сохраняются; JSON.parse использует последнее значение дублирующегося ключа.
-Неизвестные критические расширения и unencoded payload не поддерживаются.
+The header and payload must decode to JSON objects, not null/arrays.
+The signature is verified before the payload is used for claims. Unknown regular
+fields are kept; JSON.parse uses the last value of a duplicate key.
+Unknown critical extensions and an unencoded payload are not supported.
 
-| Поле токена | Runtime-тип / правило | Обязательность |
+| Token field | Runtime type / rule | Required |
 | --- | --- | --- |
-| header.alg | string, совпадает с algorithm.alg | да |
-| header.kid | string; совпадает с algorithm.keyId, если он задан | условная |
-| header.typ / header.cty | string при наличии; не определяют права | нет |
-| header.crit | неподдерживаемое расширение; наличие отвергается | не допускается |
-| header.b64 | допускается только true; false/unencoded payload не поддерживается | нет |
-| payload.exp | конечный NumericDate; now < exp + clockSkewSeconds | по умолчанию да |
-| payload.nbf | конечный NumericDate; now + clockSkewSeconds >= nbf | нет |
-| payload.iat | конечный NumericDate; проверяется тип, не возраст токена | нет |
-| payload.iss / sub / jti | string при наличии; без приведения типов | iss обязателен при options.issuer |
-| payload.aud | string или непустой массив строк; без приведения элементов | при options.audience |
-| payload.token_use | точное expectedTokenUse, если он задан | условная |
+| header.alg | string, matches algorithm.alg | yes |
+| header.kid | string; matches algorithm.keyId if it is set | conditional |
+| header.typ / header.cty | string when present; they do not grant rights | no |
+| header.crit | an unsupported extension; its presence is rejected | not allowed |
+| header.b64 | only true is allowed; false/an unencoded payload is not supported | no |
+| payload.exp | a finite NumericDate; now < exp + clockSkewSeconds | yes by default |
+| payload.nbf | a finite NumericDate; now + clockSkewSeconds >= nbf | no |
+| payload.iat | a finite NumericDate; the type is checked, not the token age | no |
+| payload.iss / sub / jti | string when present; no type coercion | iss is required with options.issuer |
+| payload.aud | a string or a non-empty array of strings; no element coercion | with options.audience |
+| payload.token_use | exactly expectedTokenUse if it is set | conditional |
 
-Для присутствующих перечисленных полей null не допускается. NumericDate —
-секунды Unix; дробные значения допустимы. Ограничений возраста по iat нет.
-Неизвестные custom claims не интерпретируются; приложения валидируют свои поля.
-Существующий JwtHeader описывает header, выпускаемый encoder (typ: JWT);
-проверка входного typ не заменяет прикладной профиль JWT.
+null is not allowed for the listed fields when present. NumericDate is Unix seconds;
+fractional values are allowed. There is no age limit by iat.
+Unknown custom claims are not interpreted; applications validate their own fields.
+The existing JwtHeader describes the header issued by the encoder (typ: JWT);
+checking the incoming typ does not replace an application JWT profile.
 
-Результат validate: Promise<VerifiedToken> с исходными декодированными header/payload.
-JwtMalformedError — формат/UTF-8/JOSE; JwtAlgorithmError — alg;
-JwtSignatureError — неверная подпись; JwtClaimError — тип/значение claim или kid;
-JwtExpiredError/JwtNotYetValidError — время. Криптографические операционные
-отказы проходят как ошибки провайдера. HTTP-адаптер переводит JwtError в 401.
+The validate result: Promise<VerifiedToken> with the original decoded header/payload.
+JwtMalformedError: format/UTF-8/JOSE; JwtAlgorithmError: alg;
+JwtSignatureError: a wrong signature; JwtClaimError: a claim or kid type/value;
+JwtExpiredError/JwtNotYetValidError: time. Cryptographic operational failures pass
+through as provider errors. The HTTP adapter maps JwtError to 401.
 
 ### TokenIssuer(config), issue(subject, claims?), verifyAccess, verifyRefresh, rotate
 
-config — обязательный объект; известные поля фиксируются при создании.
+config is a mandatory object; the known fields are fixed at creation.
 
-| Поле | Тип | Обязательно | null / default | Проверки |
+| Field | Type | Required | null / default | Checks |
 | --- | --- | --- | --- | --- |
-| config.issuer / audience | string | да | нет / нет | Непустые строки, без trim |
-| config.algorithm | SigningAlgorithm или JwtKeyRing | да | нет / нет | Стратегия с ключом подписи или подготовленный набор |
-| config.refreshAlgorithm | SigningAlgorithm или JwtKeyRing | нет | нет / algorithm | Отдельная стратегия или набор refresh-ключей |
-| config.accessTtlSeconds / refreshTtlSeconds | number, секунды | да | нет / нет | Конечные числа > 0; дробные допустимы |
-| config.clockSkewSeconds | number, секунды | нет | нет / 60 | Как у JwtValidator |
-| config.maxTokenLength | number | нет | нет / 16384 | Как у JwtValidator; также предел выдаваемого токена |
-| subject | string | да, issue | нет / нет | Непустая строка; серверная идентичность задаётся вызывающим |
-| claims | CustomClaims | нет | нет / отсутствует | Дополнительные поля access; встроенные sub/iss/aud/iat/exp/jti/token_use перекрывают одноимённые поля |
-| token / refreshToken | string, compact JWS | да, verify/rotate | нет / нет | Общие правила validate плюс issuer/audience/token_use |
+| config.issuer / audience | string | yes | no / none | Non-empty strings, without trim |
+| config.algorithm | SigningAlgorithm or JwtKeyRing | yes | no / none | A strategy with a signing key or a prepared set |
+| config.refreshAlgorithm | SigningAlgorithm or JwtKeyRing | no | no / algorithm | A separate strategy or a set of refresh keys |
+| config.accessTtlSeconds / refreshTtlSeconds | number, seconds | yes | no / none | Finite numbers > 0; fractions are allowed |
+| config.clockSkewSeconds | number, seconds | no | no / 60 | As in JwtValidator |
+| config.maxTokenLength | number | no | no / 16384 | As in JwtValidator; also the limit of the issued token |
+| subject | string | yes, issue | no / none | A non-empty string; the caller sets the server identity |
+| claims | CustomClaims | no | no / absent | Extra access fields; the built-in sub/iss/aud/iat/exp/jti/token_use override fields of the same name |
+| token / refreshToken | string, compact JWS | yes, verify/rotate | no / none | The general validate rules plus issuer/audience/token_use |
 
-CustomClaims — существующий словарь значений string, number, boolean,
-readonly string[] или null. Пользовательские зарегистрированные поля должны
-соблюдать runtime-правила валидатора; encoder не является их отдельным валидатором.
+CustomClaims is the existing dictionary of string, number, boolean, readonly string[]
+or null values. User registered fields must follow the validator's runtime rules; the
+encoder is not their separate validator.
 
-issue/rotate возвращают Promise<TokenPair>: accessToken и refreshToken —
-строки, tokenType — Bearer, expiresIn — accessTtlSeconds. verify возвращает
-VerifiedToken. Ошибки токена принадлежат JwtError; ошибка настроек/ключей
-не считается невалидной учётной записью. Отсутствующий subject при rotate
-также даёт JwtClaimError.
+issue/rotate return Promise<TokenPair>: accessToken and refreshToken are strings,
+tokenType is Bearer, expiresIn is accessTtlSeconds. verify returns VerifiedToken.
+Token errors are JwtError; a settings/keys error is not treated as an invalid account.
+A missing subject on rotate also gives JwtClaimError.
 
-Каждый выпуск создаёт новые jti. rotate не отзывает исходный refresh;
-идемпотентность, reuse detection и транзакции хранилища принадлежат приложению.
-Сигнатуры методов и TypeScript/DI-экспорты сохранены.
+Every issue creates new jti values. rotate does not revoke the original refresh;
+idempotency, reuse detection and storage transactions belong to the application.
+The method signatures and the TypeScript/DI exports are kept.
 
-`JwtEncoder(algorithm, { maxTokenLength? })` имеет тот же предел. Превышение
-при encode/issue даёт RangeError; превышение при validate/verify — JwtMalformedError.
-**Изменение поведения:** ранее библиотека принимала токены без предела размера.
-Потребитель токенов больше 16 KiB должен явно задать подходящий предел на обеих
-сторонах. Сериализация доверенных claims происходит до проверки размера выпуска;
-ограничение HTTP-body остаётся обязанностью транспорта.
+`JwtEncoder(algorithm, { maxTokenLength? })` has the same limit. Exceeding it on
+encode/issue gives RangeError; exceeding it on validate/verify gives JwtMalformedError.
+**Behavior change:** the library used to accept tokens without a size limit.
+A consumer of tokens larger than 16 KiB must set a suitable limit explicitly on both
+sides. Trusted claims are serialized before the issue size check; limiting the HTTP
+body stays the transport's job.
 
 ### Helpers base64url
 
-encode(Uint8Array)/encodeString(string) возвращают непаддированную base64url.
-decode(string) возвращает Uint8Array; пустая строка допустима только у helper.
-Невалидный алфавит, длина или pad bits дают ошибку формата. decodeToString
-принимает только корректный UTF-8, сохраняя BOM как символ. JwtValidator
-переводит ошибки этих helpers на своём недоверенном входе в JwtMalformedError.
-timingSafeEqual остаётся совместимым экспортом; HMAC verify использует Web Crypto.
+encode(Uint8Array)/encodeString(string) return unpadded base64url.
+decode(string) returns a Uint8Array; an empty string is allowed only in the helper.
+An invalid alphabet, length or pad bits give a format error. decodeToString accepts
+only valid UTF-8 and keeps a BOM as a character. JwtValidator maps the errors of these
+helpers on its untrusted input to JwtMalformedError.
+timingSafeEqual stays a compatible export; HMAC verify uses Web Crypto.
 
-## 5. Проверки и границы
+## 5. Checks and limits
 
-Текущий результат после подключения штатного Auth и bounded legacy migration:
+The current result after connecting the regular Auth and the bounded legacy migration:
 [INTEGRATION.md](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/INTEGRATION.md).
-Числа ниже относятся к предыдущему снимку квалификации до этого подключения.
+The numbers below refer to the earlier qualification snapshot before that connection.
 
-JWT, регрессии, HTTP-граница, config isolation/TTL и Admin access validation:
-**103 PASS / 0 FAIL / 388 assertions**. Существующий Admin HTTP/PostgreSQL suite:
-**8 PASS / 0 FAIL / 51 assertions**. Сценарий двух процессов с ключевой ротацией,
-reuse, отзывом, restart, ошибками БД и нагрузкой: **1 PASS / 0 FAIL / 289 assertions**
-как из TypeScript, так и на двух бинарниках. Самостоятельный JWT-бинарник
-HS256/RS256 также запущен вне исходного каталога. Это Auth host, не полный AppModule/CLI.
+JWT, regressions, the HTTP boundary, config isolation/TTL and Admin access validation:
+**103 PASS / 0 FAIL / 388 assertions**. The existing Admin HTTP/PostgreSQL suite:
+**8 PASS / 0 FAIL / 51 assertions**. The two-process scenario with key rotation,
+reuse, revocation, restart, database errors and load: **1 PASS / 0 FAIL / 289 assertions**
+both from TypeScript and on two binaries. A standalone HS256/RS256 JWT binary also ran
+outside the source directory. This is the Auth host, not the full AppModule/CLI.
 
-Фаззинг: **100000 ожидаемых отказов + 3334 корректных контроля, 0 неожиданных
-результатов**. Отдельный tsc затронутого графа и финальный полный tsc — PASS.
-Нагрузка c1/16/64 и soak HS256 120 s с 23 ротациями — PASS по заранее заданным
-локальным инженерным порогам, без объявления production SLA. Пиковый рост RSS
-после прогрева — 5.75 MiB; отсутствие всех утечек этим не доказывается.
+Fuzzing: **100000 expected rejections + 3334 valid controls, 0 unexpected results**.
+A separate tsc of the affected graph and the final full tsc: PASS.
+Load c1/16/64 and an HS256 soak of 120 s with 23 rotations: PASS against predefined
+local engineering thresholds, without claiming a production SLA. The peak RSS growth
+after warm-up was 5.75 MiB; this does not prove the absence of all leaks.
 
-Доказательства, команды, SHA-256 и границы:
-[квалификация](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/QUALIFICATION.md).
-История первоначальных шести исправлений и 30 audit-проб:
+Evidence, commands, SHA-256 and limits:
+[qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/QUALIFICATION.md).
+The history of the original six fixes and 30 audit probes:
 [FIXES.md](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/FIXES.md).
-Независимое внешнее заключение, production rollout ключей и SLO отсутствуют.
-DI-конструкторы не менялись, результаты codegen вручную не редактировались.
+There is no independent external review, production key rollout or SLO.
+The DI constructors did not change; codegen results were not edited by hand.
 
-## 6. Источники
+## 6. Sources
 
-- [Первичный аудит JWT](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/REPORT.md).
-- [Архитектура модулей](../../../../docs/architecture/MODULE_ARCHITECTURE.md).
+- [Initial JWT audit](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-jwt/REPORT.md).
+- [Module architecture](../../../../docs/architecture/MODULE_ARCHITECTURE.md).
 - [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519.html).
 - [RFC 7515](https://www.rfc-editor.org/rfc/rfc7515.html).
 - [RFC 7518](https://www.rfc-editor.org/rfc/rfc7518.html).

@@ -4,7 +4,7 @@ import {
   startHostedServices, stopHostedServices, type HostedService, type HostedServicePlanValidator,
 } from "../index";
 
-describe("hosted lifecycle audit regressions", () => {
+describe("hosted lifecycle regressions", () => {
   test("helpers stop the exact started transient instance and release its timer once", async () => {
     const events: string[] = [];
     const timers = new Set<ReturnType<typeof setInterval>>();

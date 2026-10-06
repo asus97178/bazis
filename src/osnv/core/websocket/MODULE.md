@@ -1,321 +1,321 @@
 # WebSocket
 
-Версия паспорта: 1.4. Дата: 2026-10-04. Статус: межузловая доставка реализована; квалификация — в отчёте ниже.
-Тип: атомарный технический модуль. Путь: `src/osnv/core/websocket`.
-Подключение: [websocketModule(config)](websocketModule.ts).
-Область паспорта: исправления аудита, replay и надёжная межузловая доставка. Полные существующие
-поля конфигурации находятся в исходных контрактах.
+Passport version: 1.4. Date: 2026-10-04. Status: cross-node delivery is implemented; the qualification is in the report below.
+Type: atomic technical module. Path: `src/osnv/core/websocket`.
+Connection: [websocketModule(config)](websocketModule.ts).
+Passport scope: audit fixes, replay and reliable cross-node delivery. The full existing
+configuration fields are in the source contracts.
 
-## Контракт межузловой доставки
+## Cross-node delivery contract
 
-Сохраняется существующий атомарный технический модуль. Компоненты находятся
-внутри него, CLI-каркас нового модуля не требуется. Redis adapter использует
-отдельный delivery store и ограничитель native операций; WebSocketServer выполняет
-доставку из общего store и предоставляет диагностику и readiness. ORM, DI-порты и владение
-host RedisClient сохраняются. Состояние очереди отделяется от revision сессии,
-чтобы публикация на другом узле не конфликтовала с lease/ACK владельца.
+The existing atomic technical module is kept. The components live inside it; no CLI
+scaffold of a new module is needed. The Redis adapter uses a separate delivery store and
+a limiter of native operations; WebSocketServer delivers from the shared store and
+provides diagnostics and readiness. ORM, DI ports and ownership of the host RedisClient
+are kept. The queue state is separate from the session revision, so a publication on
+another node does not conflict with the owner's lease/ACK.
 
-| Новый вход | Контракт / default | Проверки и эффект |
+| New input | Contract / default | Checks and effect |
 | --- | --- | --- |
-| `socket.to(room).emitReliable(event, data, options)` | Promise receipt; room и event обязательны, data JSON-совместимое или undefined | Доступ определяет gateway, namespace/excludeSid берутся с сервера. Требует capability адаптера и client-ack у получателей |
-| `options.messageId` | Обязательный UUID v4, null запрещён | Один ID на логическую публикацию; неизменный при повторе после неопределённого результата |
-| `options.expiresAt` | Обязательное Unix ms, safe integer | Deadline принятия операции, максимум 60 секунд вперёд по часам store; повтор сохраняет исходное значение |
-| Receipt | messageId, recipients, duplicate | Успех означает запись всем зафиксированным адресатам, не ACK клиента; очередь хранится до ACK/session TTL |
-| `adapter.reliableRooms` | Optional capability | Atomic global room fan-out, bounded reads и ACK с проверкой owner/connId; старые адаптеры сохраняют legacy режим |
-| `onDiagnostic` | Optional sync callback, без payload/секретов | События отказа/переполнения/конфликта и счётчики; исключение наблюдателя изолируется |
-| `limits.reliablePollIntervalMs` | Positive ms; 1000 | Polling дополняет pub/sub; пакетные чтения ограничены по числу сессий и байтам |
-| Redis `operationTimeoutMs`, `maxPendingOperations` | Positive integers; 2000 ms, 64 | Timeout не выдаётся за отмену native I/O; незавершённые операции продолжают занимать bounded slots |
-| Redis `deliveryClient` | Optional host-owned Bun RedisClient; default общий command client | Разделяет командные соединения доставки и session I/O. Initialize проверяет общий logical store nonce-пробой до записи policy. Оба клиента принадлежат host; общий native admission limit сохраняется. Сам по себе отдельный клиент не гарантирует пропускную способность |
-| Redis reliable limits | maxQueueMessages=100, maxQueueBytes=1MiB, maxRecipients=1000, maxFanoutBytes=8MiB, maxOperations=10000, maxReadBytes=1MiB | Жёсткие границы, отказ вместо вытеснения неподтверждённых данных; единая политика у узлов одного prefix |
-| Redis `reliable.requireAof` | boolean; true, null запрещён | При старте/readiness проверяет appendonly=yes, appendfsync=always, no-appendfsync-on-rewrite=no, noeviction и статус AOF. false снимает проверку durability; сохранность после аварии хранилища в этом режиме не гарантируется |
+| `socket.to(room).emitReliable(event, data, options)` | A Promise receipt; room and event are required, data is JSON-compatible or undefined | The gateway decides access, namespace/excludeSid come from the server. Needs the adapter capability and client-ack at the recipients |
+| `options.messageId` | A required UUID v4, null is forbidden | One ID per logical publication; unchanged when retried after an undetermined result |
+| `options.expiresAt` | Required Unix ms, a safe integer | The deadline for accepting the operation, at most 60 seconds ahead by the store clock; a retry keeps the original value |
+| Receipt | messageId, recipients, duplicate | Success means a write to all recorded recipients, not a client ACK; the queue is kept until ACK/session TTL |
+| `adapter.reliableRooms` | An optional capability | Atomic global room fan-out, bounded reads and ACK with an owner/connId check; older adapters keep the legacy mode |
+| `onDiagnostic` | An optional sync callback, without payloads/secrets | Failure/overflow/conflict events and counters; an observer exception is isolated |
+| `limits.reliablePollIntervalMs` | Positive ms; 1000 | Polling complements pub/sub; batch reads are bounded by the number of sessions and bytes |
+| Redis `operationTimeoutMs`, `maxPendingOperations` | Positive integers; 2000 ms, 64 | A timeout is not presented as cancelling native I/O; unfinished operations keep holding bounded slots |
+| Redis `deliveryClient` | An optional host-owned Bun RedisClient; the default is the shared command client | Separates the delivery command connections from session I/O. Initialize checks the shared logical store with a nonce probe before writing the policy. Both clients belong to the host; the shared native admission limit is kept. A separate client alone does not guarantee throughput |
+| Redis reliable limits | maxQueueMessages=100, maxQueueBytes=1MiB, maxRecipients=1000, maxFanoutBytes=8MiB, maxOperations=10000, maxReadBytes=1MiB | Hard bounds, rejection instead of evicting unacknowledged data; one policy for the nodes of one prefix |
+| Redis `reliable.requireAof` | boolean; true, null is forbidden | At startup/readiness checks appendonly=yes, appendfsync=always, no-appendfsync-on-rewrite=no, noeviction and the AOF status. false removes the durability check; surviving a storage crash is not guaranteed in that mode |
 
-Существующий emit остаётся transport API, но отклонение offline queue становится
-явной ошибкой и диагностическим событием. Для новой надёжной операции admission
-ошибки проверяются до fan-out; транспортный timeout означает неопределённый
-результат, повтор безопасен только с исходным messageId/expiresAt.
-Один Redis primary/replication group — атомарная граница. Redis Cluster с
-распределением ключей по shards не входит в этот контракт. Проверки: cross-node offline, потеря notification, отказ/рестарт Valkey с AOF,
-сетевой разрыв, rolling replacement, бинарный запуск и измеренный нагрузочный
-профиль. Фактические PASS/FAIL и ограничения приведены в отчёте квалификации.
+The existing emit stays a transport API, but rejection by the offline queue becomes an
+explicit error and a diagnostic event. For the new reliable operation, admission errors
+are checked before fan-out; a transport timeout means an undetermined result, and a
+retry is safe only with the original messageId/expiresAt.
+One Redis primary/replication group is the atomic boundary. Redis Cluster with keys
+spread across shards is outside this contract. Checks: cross-node offline, a lost
+notification, a Valkey failure/restart with AOF, a network split, a rolling replacement,
+a binary run and a measured load profile. The actual PASS/FAIL and limits are in the
+qualification report.
 
-## 1. Ответственность и компоненты
+## 1. Responsibility and components
 
-Приоритеты MOD-ARCH-001 §2.1: одна техническая функция, существующие DI/порты;
-отдельные классы для доставки и native I/O имеют самостоятельные обязанности
-внутри атомарного модуля. Heartbeat и массовый shutdown используют до 16
-параллельных операций; mailbox читаются партиями до 128 владельцев с лимитом
-байтов ответа. Исполненный бинарник использует тот же публичный runtime.
-Пустые результаты READ пропускаются до локального поиска сессии: idle polling
-не запускает полный expiry sweep для каждого пустого mailbox. Для непустого
-результата проверки текущего connId, lease и backpressure сохраняются.
-Компромисс: синхронная AOF-запись увеличивает задержку ради сохранности принятой
-очереди; Lua нужен для атомарного fan-out без нового ORM или брокера.
+MOD-ARCH-001 §2.1 priorities: one technical feature, the existing DI/ports; separate
+classes for delivery and native I/O have their own duties inside the atomic module.
+Heartbeat and mass shutdown use up to 16 parallel operations; mailboxes are read in
+batches of up to 128 owners with a response byte limit. The executed binary uses the
+same public runtime. Empty READ results are skipped before the local session lookup:
+idle polling does not run a full expiry sweep for every empty mailbox. For a non-empty
+result the checks of the current connId, lease and backpressure are kept.
+Trade-off: a synchronous AOF write increases latency for the sake of keeping the
+accepted queue; Lua is needed for atomic fan-out without a new ORM or broker.
 
-Модуль владеет WebSocket на общем HTTP listener: upgrade, gateways, пакеты,
-комнаты, сессии, replay и lifecycle. Использует существующие DI, HTTP-порт
-и интерфейс адаптера. Прикладная авторизация и эксплуатация хранилища принадлежат
-приложению. Новые модули, ORM, миграции и второй пул БД не создаются.
-Redis-адаптер — дополнительная реализация существующего порта.
+The module owns WebSocket on the shared HTTP listener: upgrade, gateways, packets,
+rooms, sessions, replay and lifecycle. It uses the existing DI, the HTTP port and the
+adapter interface. Application authorization and storage operations belong to the
+application. No new modules, ORM, migrations or second database pool are created.
+The Redis adapter is an extra implementation of the existing port.
 
-| Компонент | Ответственность |
+| Component | Responsibility |
 | --- | --- |
-| [WebSocketServer](ws-server.ts) | Deadlines, согласование replay, ACK и ownership, native drain, bounded close |
-| [SessionManager](session-manager.ts) | Локальный индекс сессий/комнат, ограниченная очередь, delivery IDs, упорядоченные записи с CAS |
-| [Dispatcher](ws-dispatch.ts) | Один ответ handler выбранным кодеком, deferred ACK и отмена |
-| [Socket wrapper](socket-wrapper.ts) | Публичный OsnvSocket, результат send, состояние физического соединения |
-| [In-memory adapter](adapter/in-memory.adapter.ts) | Отдельные лимиты живых сессий и истории удалений, защита от старых snapshots |
-| [Creation token](session-creation.ts) | Внутренний process-local порядок создания для компактизации истории |
-| [Redis adapter](adapter/redis.adapter.ts) | Межузловой live pub/sub и атомарное хранение сессий на существующем Bun RedisClient |
-| [Reliable delivery store](adapter/redis-delivery-store.ts) | Порт глобальных mailbox, idempotency, политика durability, canonical hash из существующего library/boundary |
-| [Redis operations](adapter/redis-operations.ts) | Ограничивает native I/O и ожидание; timed-out операция продолжает занимать слот до реального завершения |
-| [Lua scripts](adapter/redis-delivery-scripts.ts) | Атомарное обновление membership, admission, mailbox и ACK |
-| [Types](types.ts), [codecs](codec/packet-codec.interface.ts) | Аддитивное расширение wire v1; одинаковая семантика JSON и binary |
+| [WebSocketServer](ws-server.ts) | Deadlines, replay negotiation, ACK and ownership, native drain, bounded close |
+| [SessionManager](session-manager.ts) | The local session/room index, a bounded queue, delivery IDs, ordered writes with CAS |
+| [Dispatcher](ws-dispatch.ts) | One handler response with the chosen codec, deferred ACK and cancellation |
+| [Socket wrapper](socket-wrapper.ts) | The public OsnvSocket, the send result, the physical connection state |
+| [In-memory adapter](adapter/in-memory.adapter.ts) | Separate limits for live sessions and deletion history, protection from old snapshots |
+| [Creation token](session-creation.ts) | The internal process-local creation order for history compaction |
+| [Redis adapter](adapter/redis.adapter.ts) | Cross-node live pub/sub and atomic session storage on the existing Bun RedisClient |
+| [Reliable delivery store](adapter/redis-delivery-store.ts) | The port of global mailboxes, idempotency, the durability policy, the canonical hash from the existing library/boundary |
+| [Redis operations](adapter/redis-operations.ts) | Bounds native I/O and waiting; a timed-out operation keeps holding its slot until it actually finishes |
+| [Lua scripts](adapter/redis-delivery-scripts.ts) | Atomic updates of membership, admission, mailbox and ACK |
+| [Types](types.ts), [codecs](codec/packet-codec.interface.ts) | An additive extension of wire v1; the same semantics for JSON and binary |
 
-## 2. DI и публичные границы
+## 2. DI and public boundaries
 
-Фабрика регистрирует gateways как singleton; зависимости конструктора связывает
-существующий codegen. Resolver-фабрика singleton `WEBSOCKET_UPGRADE` собирает
-их через WebSocketExplorer. `WebSocketModule` глобален, явно экспортирует
-`[WEBSOCKET_UPGRADE]`. Направление зависимости — WebSocket → HTTP; HTTP обращается
-к порту upgrade. TypeScript-вход: [index.ts](index.ts), `osnv/core/websocket`.
-Новые TypeScript-экспорты: `ReplayDelivery`, `ReplayAcknowledgement`,
-`RedisWebSocketAdapter` и его options, `ReliableBroadcastOptions/Receipt`,
+The factory registers gateways as singletons; the existing codegen wires the constructor
+dependencies. The singleton resolver factory `WEBSOCKET_UPGRADE` collects them through
+WebSocketExplorer. `WebSocketModule` is global and explicitly exports
+`[WEBSOCKET_UPGRADE]`. The dependency direction is WebSocket → HTTP; HTTP calls the
+upgrade port. TypeScript entry: [index.ts](index.ts), `osnv/core/websocket`.
+New TypeScript exports: `ReplayDelivery`, `ReplayAcknowledgement`,
+`RedisWebSocketAdapter` and its options, `ReliableBroadcastOptions/Receipt`,
 `ReliableRoomDelivery/Publication`, `ReliableSessionOwner/DeliveryBatch`,
 `WebSocketDeliveryError`, `WebSocketDiagnostic`, `RedisReliableDeliveryOptions`.
-Новых DI-экспортов нет.
+There are no new DI exports.
 
-Адаптер конструируется вручную runtime или потребителем. WebSocket входит
-в `FRAMEWORK_INTERNAL_PREFIXES` генератора. Регистрации gateways и зависимости
-не менялись; codegen не требуется, generated-файлы этим исправлением не затронуты.
-Опубликованные входы — существующие upgrade-маршруты и WebSocket-пакеты;
-новых HTTP/AI endpoint нет.
+The runtime or the consumer constructs the adapter by hand. WebSocket is in the
+generator's `FRAMEWORK_INTERNAL_PREFIXES`. Gateway registrations and dependencies did not
+change; codegen is not needed, and generated files are not affected by this fix.
+The published inputs are the existing upgrade routes and WebSocket packets; there are
+no new HTTP/AI endpoints.
 
-## 3. Входные контракты
+## 3. Input contracts
 
-Поля ниже необязательны, кроме явно указанных; null не поддерживается.
+The fields below are optional unless stated otherwise; null is not supported.
 
-| Вход | Тип, default | Проверка и поведение |
+| Input | Type, default | Check and behavior |
 | --- | --- | --- |
-| Config `replayDelivery` / query `replay` | `transport` или `client-ack`; default `transport` | Неизвестное/повторное query — HTTP 400. Config `client-ack` требует этот режим; downgrade — 409 |
-| `ClientPacket.type` | Обязательно: `event`, `ping`, `reconnect`, новый `replay-ack` | Wire v1, namespace, payload, correlation id и ingress/control rate limits сохраняются |
-| `replay-ack.data.deliveryIds` | Обязательный непустой `string[]` | Не более `maxOutboundQueuePerSession`, UUID v4, каждый ID выдан этому физическому соединению; иначе error без изменения очереди |
-| `replay-ack.id` | Optional correlation string | После сохранения ACK: `{type:"ack", id, data:{acknowledged:number}}`; повтор недавно принятого ID на том же соединении даёт 0; remote ACK history ограничена maxOutboundQueuePerSession |
-| `ServerPacket.deliveryId` | UUID queued packet | Стабильный ID client-ack replay, отдельный от correlation id |
-| `connected/reconnected.replayDelivery` | `client-ack` при согласованном режиме | Клиент проверяет режим перед подтверждением |
-| `reconnected.replayCount` | Число пакетов текущей партии replay | Включает missed и последующие frames этой партии; оставшиеся global mailbox пакеты доставляются polling |
-| `SessionState.creationToken` | Optional immutable string | Runtime выдаёт process incarnation + монотонный номер; legacy-граница описана ниже |
-| `SessionState.replayDelivery` | Optional mode; legacy `transport` | Сохранённый client-ack не может быть понижен следующим reconnect |
-| `limits.maxBackpressureBytes` | Positive number bytes; 1 MiB | Native outgoing buffer; replay ждёт drain, переполнение закрывает получателя |
-| `limits.socketCloseTimeoutMs` | Positive number ms; 1000 | После runtime close принудительно завершает socket, если peer не закончил close handshake |
-| `limits.handshakeTimeoutMs` | Nonnegative ms; 10000 | Общий upgrade deadline с I/O; отдельный open/replay deadline; 0 отключает |
-| `limits.messageHandlingTimeoutMs` | Nonnegative ms; 30000 | Включает validation и deferred callback; 0 отключает |
-| `codec` | PacketCodec; JSON | Один codec для ACK, emit, replay и broadcast; binary framing сохраняется |
+| Config `replayDelivery` / query `replay` | `transport` or `client-ack`; default `transport` | An unknown/repeated query is HTTP 400. Config `client-ack` requires this mode; a downgrade is 409 |
+| `ClientPacket.type` | Required: `event`, `ping`, `reconnect`, the new `replay-ack` | Wire v1, namespace, payload, correlation id and ingress/control rate limits are kept |
+| `replay-ack.data.deliveryIds` | A required non-empty `string[]` | At most `maxOutboundQueuePerSession`, UUID v4, each ID issued to this physical connection; otherwise an error without changing the queue |
+| `replay-ack.id` | An optional correlation string | After the ACK is saved: `{type:"ack", id, data:{acknowledged:number}}`; repeating a recently accepted ID on the same connection gives 0; the remote ACK history is bounded by maxOutboundQueuePerSession |
+| `ServerPacket.deliveryId` | The UUID of a queued packet | A stable client-ack replay ID, separate from the correlation id |
+| `connected/reconnected.replayDelivery` | `client-ack` in the negotiated mode | The client checks the mode before acknowledging |
+| `reconnected.replayCount` | The number of packets in the current replay batch | Includes missed and the following frames of this batch; the remaining global mailbox packets are delivered by polling |
+| `SessionState.creationToken` | An optional immutable string | The runtime issues a process incarnation + a monotonic number; the legacy boundary is described below |
+| `SessionState.replayDelivery` | An optional mode; legacy `transport` | A saved client-ack cannot be downgraded by the next reconnect |
+| `limits.maxBackpressureBytes` | Positive number of bytes; 1 MiB | The native outgoing buffer; replay waits for drain, overflow closes the recipient |
+| `limits.socketCloseTimeoutMs` | Positive number of ms; 1000 | After a runtime close, forcibly ends the socket if the peer did not finish the close handshake |
+| `limits.handshakeTimeoutMs` | Non-negative ms; 10000 | A shared upgrade deadline with I/O; a separate open/replay deadline; 0 disables |
+| `limits.messageHandlingTimeoutMs` | Non-negative ms; 30000 | Includes validation and the deferred callback; 0 disables |
+| `codec` | PacketCodec; JSON | One codec for ACK, emit, replay and broadcast; binary framing is kept |
 
-Дополнения SessionManager: пятый optional аргумент `replayDelivery` у
-`createSession`; `enableReplayAcknowledgements(sid): void`;
-`acknowledgeDeliveries(sid, deliveryIds): number`. Это внутренние транспортные
-операции. Доступ к SID, namespace, principal и владельцу проверяет сервер.
+SessionManager additions: a fifth optional `replayDelivery` argument of `createSession`;
+`enableReplayAcknowledgements(sid): void`; `acknowledgeDeliveries(sid, deliveryIds): number`.
+These are internal transport operations. The server checks access to the SID,
+namespace, principal and owner.
 
-Миграция legacy queue присваивает IDs после claim; если они превысят byte limit,
-переход отклоняется без потери очереди. `acknowledgeDeliveries` снимает только
-названные IDs, предварительная проверка их выдачи обязательна.
-`peekOutbound` не меняет очередь. `acknowledgeOutbound(sid, count)` снимает только
-transport-префикс, без await между send и снятием; count=0 ничего не меняет.
-Некорректный count и положительный count для client-ack вызывают Error.
-`drainOutbound` тоже не может снять неподтверждённую client-ack очередь.
+Migrating a legacy queue assigns IDs after the claim; if they exceed the byte limit,
+the transition is rejected without losing the queue. `acknowledgeDeliveries` removes
+only the named IDs; checking that they were issued beforehand is mandatory.
+`peekOutbound` does not change the queue. `acknowledgeOutbound(sid, count)` removes only
+the transport prefix, with no await between send and removal; count=0 changes nothing.
+An invalid count and a positive count for client-ack throw an Error.
+`drainOutbound` cannot remove an unacknowledged client-ack queue either.
 
-## 4. Replay, очередь и lifecycle
+## 4. Replay, queue and lifecycle
 
-Входящие сообщения ждут open и `handleConnection`. Отмена прекращает ожидание
-и подавляет поздние эффекты, но не откатывает начатый I/O произвольного адаптера.
-Ответы об изменении состояния отправляются после `flushSession`.
-Активность физического соединения объединяется в периодические сохранения:
-не чаще одной записи на треть меньшего из session TTL и active lease. Между ними
-обновляется только локальный lastSeenAt; expiresAt/activeLeaseExpiresAt не
-продлеваются без записи. Истёкший lease по-прежнему отклоняет кадр. Изменения
-комнат, явный SessionManager.updateContext, очереди и ownership сохраняются через
-прежний CAS. Это не вводит автоматического сохранения произвольных socket.data mutations.
-Фоновая renewal распределяется детерминированным SID offset внутри безопасного
-TTL/lease окна. Runtime проверяет due сессии короткими тиками, а не сохраняет все
-сессии одной волной. Предел 16 native workers и CAS-порядок каждого SID сохраняются.
-Внутренний optional schedule у renewOwnedLeases задаёт неотрицательные safe integers
-afterMs/spreadMs; вызов без schedule сохраняет прежнюю немедленную renewal.
+Incoming messages wait for open and `handleConnection`. Cancellation stops waiting and
+suppresses late effects, but does not roll back I/O already started by an arbitrary
+adapter. State change responses are sent after `flushSession`.
+Physical connection activity is merged into periodic saves: at most one write per
+third of the smaller of the session TTL and the active lease. Between them only the
+local lastSeenAt is updated; expiresAt/activeLeaseExpiresAt are not extended without a
+write. An expired lease still rejects a frame. Room changes, an explicit
+SessionManager.updateContext, queues and ownership are saved through the same CAS.
+This introduces no automatic saving of arbitrary socket.data mutations.
+Background renewal is spread by a deterministic SID offset within the safe TTL/lease
+window. The runtime checks due sessions in short ticks instead of saving all sessions
+in one wave. The limit of 16 native workers and the CAS order of each SID are kept.
+An internal optional schedule of renewOwnedLeases sets non-negative safe integers
+afterMs/spreadMs; a call without a schedule keeps the former immediate renewal.
 
-Replay учитывает фактический размер закодированного кадра: помещающийся префикс
-идёт в `reconnected.missed`, остальные пакеты — по порядку отдельными кадрами.
-При backpressure сервер ждёт drain и продолжает на следующем event-loop turn
-после native callback. Deadline ограничивает ожидание, runtime close handshake
-ограничен `socketCloseTimeoutMs`.
+Replay accounts for the actual size of the encoded frame: the prefix that fits goes into
+`reconnected.missed`, the remaining packets follow in order as separate frames.
+On backpressure the server waits for drain and continues on the next event-loop turn
+after the native callback. A deadline bounds the wait; the runtime close handshake is
+bounded by `socketCloseTimeoutMs`.
 
-- `transport` сохраняет совместимость: снимается принятый транспортом префикс.
-  Это не доказательство получения клиентом.
-- `client-ack` хранит весь replay до клиентского подтверждения. Обрыв без ACK
-  повторяет те же IDs; частичный ACK допускает любой порядок. Клиент подтверждает
-  после обработки и дедуплицирует по deliveryId. Группы ACK ограничены payload
-  и control rate limit. Пример — [DESIGN.md](DESIGN.md).
+- `transport` keeps compatibility: the prefix accepted by the transport is removed.
+  This is not proof that the client received it.
+- `client-ack` keeps the whole replay until the client acknowledges it. A break
+  without ACK repeats the same IDs; a partial ACK allows any order. The client
+  acknowledges after processing and deduplicates by deliveryId. ACK groups are bounded
+  by the payload and the control rate limit. Example: [DESIGN.md](DESIGN.md).
 
-Reliable queue отклоняет новые пакеты при лимите числа/байтов, сохраняя старые.
-`enqueueOutbound` возвращает false. Внутренний offline fan-out возвращает
-`truncated`; runtime использует его строгий allOrNothing режим и выдаёт
-`OFFLINE_QUEUE_CAPACITY` до live публикации. Прежний необязательный режим
-SessionManager и transport enqueue сохраняют совместимость с вытеснением.
-Отказ больше не теряется за успешным ответом handler.
-Обычные сохранения используют CAS при наличии этой операции. Конфликт вызывает
-ошибку flush и удаляет устаревший локальный индекс, сохраняя нового владельца.
-Client-ack требует адаптер с CAS, иначе HTTP 503.
+A reliable queue rejects new packets at the count/byte limit and keeps the old ones.
+`enqueueOutbound` returns false. The internal offline fan-out returns `truncated`;
+the runtime uses its strict allOrNothing mode and raises `OFFLINE_QUEUE_CAPACITY`
+before the live publication. The former optional SessionManager mode and transport
+enqueue keep compatibility with eviction.
+A rejection is no longer lost behind a successful handler response.
+Regular saves use CAS when the operation is available. A conflict makes the flush fail
+and removes the stale local index, keeping the new owner.
+Client-ack needs an adapter with CAS, otherwise HTTP 503.
 
-Гарантия ограничена принятыми в очередь сообщениями, session TTL и хранилищем.
-Переживание падения процесса относится к уже сохранённой очереди:
-`enqueueOutbound=true` до завершения `flushSession` ещё не доказывает запись.
-Live emit/broadcast сам по себе не получает эту гарантию. Exactly-once внешнего
-побочного эффекта не обещается. Прикладная дедупликация принадлежит приложению.
+The guarantee is limited to the messages accepted into the queue, the session TTL and
+the storage. Surviving a process crash applies to an already saved queue:
+`enqueueOutbound=true` before `flushSession` finishes does not prove a write yet.
+A live emit/broadcast alone does not get this guarantee. Exactly-once of an external
+side effect is not promised. Application deduplication belongs to the application.
 
-Handler ACK отличается от replay ACK: третий аргумент handler и результат
-undefined означают deferred до callback/отмены. Непустой return или отсутствие
-третьего аргумента дают automatic ACK. Вместе callback и return порождают
-максимум один ответ; без packet.id dispatcher не ожидает callback.
+A handler ACK differs from a replay ACK: a third handler argument and an undefined
+result mean deferred until the callback/cancellation. A non-empty return or no third
+argument gives an automatic ACK. Together the callback and return produce at most one
+response; without packet.id the dispatcher does not wait for the callback.
 
-## 5. Адаптеры и данные
+## 5. Adapters and data
 
 ### In-memory
 
-Single-node, без сохранения после рестарта. Options — положительные целые:
+Single-node, no persistence across restarts. Options are positive integers:
 
-| Option | Default | Назначение |
+| Option | Default | Purpose |
 | --- | --- | --- |
-| `maxEntries` | 10000; runtime передаёт maxSessions | Только живые записи |
-| `maxTombstones` | maxEntries | Независимый предел истории удалений |
-| `tombstoneTtlMs` | 60000 ms | Legacy initial-write window и срок хранения маркеров |
+| `maxEntries` | 10000; the runtime passes maxSessions | Live records only |
+| `maxTombstones` | maxEntries | An independent limit of the deletion history |
+| `tombstoneTtlMs` | 60000 ms | The legacy initial-write window and the marker retention time |
 
-SID не переиспользуется, createdAt и creationToken неизменяемы. Удалённый SID
-не восстанавливает даже snapshot большей revision. Старые маркеры сворачиваются
-в границу поколений, не занимая живую ёмкость; новые runtime-сессии имеют больший
-номер, включая создание в ту же миллисекунду. Обновления имеющихся записей
-разрешены независимо от этой границы. Close также сохраняет границу против
-поздних записей после очистки.
+A SID is never reused; createdAt and creationToken are immutable. A deleted SID is not
+restored even by a snapshot with a higher revision. Old markers fold into a generation
+boundary without taking live capacity; new runtime sessions get a higher number,
+including those created in the same millisecond. Updates of existing records are
+allowed regardless of this boundary. Close also keeps the boundary against late writes
+after cleanup.
 
-Компактизация консервативна: отложенная первая запись, созданная до границы,
-может быть отвергнута. Для legacy/импортированных snapshots без локального token
-действуют граница createdAt и initial-write window; точное различение таких
-сессий одной миллисекунды не обещается. Runtime не импортирует их как новые SID.
-Заполнение живой ёмкости даёт SessionCapacityError и close 1013; история отдельно
-ограничена и не блокирует новые поколения.
+Compaction is conservative: a delayed first write created before the boundary may be
+rejected. Legacy/imported snapshots without a local token use the createdAt boundary and
+the initial-write window; telling such sessions apart within one millisecond is not
+promised. The runtime does not import them as new SIDs.
+Filling the live capacity gives SessionCapacityError and close 1013; the history is
+bounded separately and does not block new generations.
 
 ### Redis / Valkey
 
-`new RedisWebSocketAdapter(client, options)` использует native Bun RedisClient
-существующей инфраструктуры. Host создаёт/настраивает и закрывает командный
-клиент и необязательный deliveryClient. Адаптер владеет только duplicate для pub/sub;
-close снимает подписку и закрывает duplicate, не очищает ключи и не закрывает оба
-host client. Отдельный deliveryClient должен обращаться к той же logical DB;
-initialize проверяет это временным ключом connection-check с nonce и TTL.
+`new RedisWebSocketAdapter(client, options)` uses the native Bun RedisClient of the
+existing infrastructure. The host creates/configures and closes the command client and
+the optional deliveryClient. The adapter owns only the duplicate for pub/sub; close
+unsubscribes and closes the duplicate, does not clear keys and does not close either
+host client. A separate deliveryClient must address the same logical DB; initialize
+checks this with a temporary connection-check key with a nonce and a TTL.
 
-| Option | Default | Ограничение |
+| Option | Default | Limit |
 | --- | --- | --- |
-| `keyPrefix` | osnv:ws | 1–64 ASCII буквы/цифры/`:_-`; общий для узлов одного приложения, отдельный для других |
-| `writeProtectionMs` | 60000 ms | Положительное безопасное целое; защита первой записи/удаления |
-| `maxSessionBytes` | 8 MiB | Положительное безопасное целое; сериализованная сессия |
-| `maxPublishBytes` | 1 MiB | Положительное безопасное целое; pub/sub packet |
+| `keyPrefix` | osnv:ws | 1–64 ASCII letters/digits/`:_-`; shared by the nodes of one application, separate for others |
+| `writeProtectionMs` | 60000 ms | A positive safe integer; protection of the first write/deletion |
+| `maxSessionBytes` | 8 MiB | A positive safe integer; a serialized session |
+| `maxPublishBytes` | 1 MiB | A positive safe integer; a pub/sub packet |
 
-Один ключ на SID; revision/CAS и запись атомарны в одной Lua-команде. Первая
-запись требует revision 1 и допустимый createdAt по часам Redis. Record живёт
-до большего из expiresAt и конца creation window; удаление защищено до конца
-этого окна. Session JSON хранится непрозрачной строкой, сохраняя массивы/null.
-После истечения lease допустим новый владелец; CAS блокирует старого писателя.
-Pub/Sub исключает дубль на узле отправителя; local fan-out использует codec
-принимающего runtime.
+One key per SID; revision/CAS and the write are atomic in one Lua command. The first
+write requires revision 1 and an acceptable createdAt by the Redis clock. A record
+lives until the later of expiresAt and the end of the creation window; deletion is
+protected until the end of that window. Session JSON is stored as an opaque string,
+keeping arrays/null. After the lease expires a new owner is allowed; CAS blocks the old
+writer. Pub/Sub excludes a duplicate on the sender's node; the local fan-out uses the
+receiving runtime's codec.
 
-`emitReliable` использует общий индекс room → SID и отдельную LIST-очередь для
-каждого SID. CAS-сохранение сессии атомарно обновляет membership и TTL очереди;
-публикация/ACK очереди не меняют revision сессии. Получатели включают живые и
-offline сессии любого узла в этом prefix/namespace. Удаление сессии удаляет
-mailbox, истечение session TTL завершает гарантию хранения.
+`emitReliable` uses a shared room → SID index and a separate LIST queue per SID.
+A CAS session save atomically updates the membership and the queue TTL; publishing/ACK
+of the queue does not change the session revision. Recipients include live and offline
+sessions of any node in this prefix/namespace. Deleting a session deletes its mailbox;
+the session TTL expiry ends the storage guarantee.
 
-Lua publication проверяет все capacity условия до добавления пакетов; receipt
-фиксирует число адресатов. Операция с теми же ID/deadline/данными повторяется без
-второго fan-out, несовпадение даёт MESSAGE_ID_CONFLICT. Порядок JSON-полей не
-меняет fingerprint. Используется существующий canonicalJsonHashV1 и его лимиты
-структуры JSON. История операций ограничена maxOperations и acceptance deadline.
-Pub/Sub только ускоряет доставку; polling извлекает её при потере notification.
-Выданные этому соединению неподтверждённые ID исключаются из следующих чтений,
-чтобы не занимать бюджет ответа других получателей. READ/ACK проверяют owner,
-connId и действующий lease; после reconnect снова выдаются те же ID.
+The Lua publication checks all capacity conditions before adding packets; the receipt
+records the number of recipients. An operation with the same ID/deadline/data is
+repeated without a second fan-out; a mismatch gives MESSAGE_ID_CONFLICT. The order of
+JSON fields does not change the fingerprint. The existing canonicalJsonHashV1 and its
+JSON structure limits are used. The operation history is bounded by maxOperations and
+the acceptance deadline. Pub/Sub only speeds up delivery; polling picks it up when a
+notification is lost. Unacknowledged IDs issued to this connection are excluded from
+the next reads so they do not take the response budget of other recipients. READ/ACK
+check the owner, connId and the active lease; after a reconnect the same IDs are issued again.
 
-При старте и readiness strict режим требует AOF always/noeviction,
-no-appendfsync-on-rewrite=no (fsync не пропускается при compaction) и здоровый
-статус записи. Все узлы prefix обязаны иметь одну delivery policy. Host RedisClient
-должен разрешать CONFIG GET и INFO persistence, но приложению CONFIG SET не нужен.
-Изменение policy требует отдельного prefix либо управляемой миграции после drain;
-нельзя удалять policy при наличии сессий. Старый Redis без AOF больше не проходит
-strict initialize: явное reliable.requireAof=false снимает проверку durability,
-сохранность после аварии хранилища в этом режиме не гарантируется.
-Полный перечень ключей, ACL, ошибок и порядок эксплуатации — в runbook отчёта.
+At startup and readiness the strict mode requires AOF always/noeviction,
+no-appendfsync-on-rewrite=no (fsync is not skipped during compaction) and a healthy
+write status. All nodes of a prefix must have one delivery policy. The host RedisClient
+must allow CONFIG GET and INFO persistence, but the application does not need CONFIG SET.
+Changing the policy needs a separate prefix or a managed migration after drain; do not
+delete the policy while sessions exist. An old Redis without AOF no longer passes the
+strict initialize: an explicit reliable.requireAof=false removes the durability check,
+and surviving a storage crash is not guaranteed in that mode.
+The full list of keys, ACL, errors and the operating procedure are in the report's runbook.
 
-## 6. Проверки и граница готовности
+## 6. Checks and the readiness boundary
 
-Актуальные команды, PASS/FAIL, профиль нагрузки, хеши и эксплуатационные границы:
-[квалификация enterprise WebSocket](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
-Проверки используют закреплённый Bun 1.4.0; toolchain не менялся. Production и
-прикладная БД не изменялись. Отклонений от
-[MOD-ARCH-001](../../../../docs/architecture/MODULE_ARCHITECTURE.md) нет.
+Current commands, PASS/FAIL, the load profile, hashes and operational limits:
+[enterprise WebSocket qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
+The checks use the pinned Bun 1.4.0; the toolchain did not change. Production and the
+application database were not changed. There are no deviations from
+[MOD-ARCH-001](../../../../docs/architecture/MODULE_ARCHITECTURE.md).
 
-Исторические проверки: [надёжность replay](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-reliability/REPORT.md)
-и [семь исправлений аудита](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-fixes/REPORT.md).
-Они не заменяют квалификацию текущего состояния файлов.
+Historical checks: [replay reliability](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-reliability/REPORT.md)
+and [seven audit fixes](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-fixes/REPORT.md).
+They do not replace the qualification of the current state of the files.
 
-## Прикладная авторизация через DI и отдельный выходной лимит (2026-09-20)
+## Application authorization through DI and a separate output limit (2026-09-20)
 
-Аддитивные входы существующего модуля:
+Additive inputs of the existing module:
 
-| Вход | Default / проверка | Поведение |
+| Input | Default / check | Behavior |
 | --- | --- | --- |
-| config.middlewareFactory | отсутствует; функция обязана вернуть WsMiddleware | Resolver текущего kernel связывает upgrade-policy с DI; middleware выполняется после стандартных origin/auth и перед gateway middleware |
-| Gateway.maxOutboundPayloadBytes | maxPayloadBytes; положительное конечное число | Отдельный предел ACK, emit, broadcast и replay; входные frame и native ingress по-прежнему ограничены maxPayloadBytes |
+| config.middlewareFactory | absent; the function must return a WsMiddleware | The current kernel's resolver binds the upgrade policy to DI; the middleware runs after the standard origin/auth and before the gateway middleware |
+| Gateway.maxOutboundPayloadBytes | maxPayloadBytes; a positive finite number | A separate limit for ACK, emit, broadcast and replay; incoming frames and native ingress are still bounded by maxPayloadBytes |
 
-Не отменяет requireAuth/CORS и не меняет прежние defaults. Cookie-политика, проверка
-Origin, отзыв сессий и scopes принадлежат приложению. Реализация middlewareFactory
-не должна сохранять scoped-сервисы в singleton. При отсутствии фабрики прежняя
-композиция идентична. Неверный результат фабрики отклоняется до запуска listener.
-Проверки: `test/ws.chat-transport.test.ts`, существующие unit/e2e; реальная сборка
-AgentChat в бинарник и вызов через общий HTTP/WebSocket listener.
+This does not cancel requireAuth/CORS and does not change the existing defaults. The
+cookie policy, the Origin check, session revocation and scopes belong to the
+application. A middlewareFactory implementation must not keep scoped services in a
+singleton. Without the factory the former composition is identical. An invalid factory
+result is rejected before the listener starts.
+Checks: `test/ws.chat-transport.test.ts`, the existing unit/e2e tests; a real build of
+AgentChat into a binary and a call through the shared HTTP/WebSocket listener.
 
-## Учёт незавершённой работы и остановка (2026-10-04)
+## Accounting of unfinished work and shutdown (2026-10-04)
 
-В существующем WebSocketServer исправлен R6 повторного аудита. Публичные
-сигнатуры, DI и настройки не менялись. `maxConcurrentHandshakes` ограничивает
-реально незавершённые upgrade-операции, включая authenticator, middleware и
-session I/O. `maxConcurrentMessageHandlers` аналогично ограничивает валидацию
-и обработчики сообщений. Тайм-аут быстро возвращает HTTP 504 либо закрывает
-соединение, но слот возвращается только после завершения исходной операции,
-включая позднюю ошибку. До этого новые операции получают прежний отказ busy.
-Накопления очереди в обход лимита нет. Лимит upgrade не распространяется на
-`handleConnection` после upgrade; его жизненный цикл отслеживается отдельно.
+R6 of the repeated audit is fixed in the existing WebSocketServer. Public signatures,
+DI and settings did not change. `maxConcurrentHandshakes` bounds the actually
+unfinished upgrade operations, including the authenticator, middleware and session I/O.
+`maxConcurrentMessageHandlers` likewise bounds message validation and handlers.
+A timeout quickly returns HTTP 504 or closes the connection, but the slot is returned
+only after the original operation finishes, including a late error. Until then new
+operations get the existing busy rejection. There is no queue build-up around the
+limit. The upgrade limit does not cover `handleConnection` after the upgrade; its
+lifecycle is tracked separately.
 
-`close()` возвращает одну общую операцию для всех вызовов. Она запрещает
-новые запросы, подаёт отмену и принудительно закрывает физические соединения.
-`handleDisconnect` ждёт текущую работу своего соединения. Закрытие gateway
-и адаптера выполняется после фактического завершения callbacks и сохранений.
-Если `shutdownDrainTimeoutMs` истёк, close отклоняется с ошибкой timeout;
-повторный вызов сохраняет этот результат. Упорядоченная очистка продолжает
-ожидать исходные операции, а затем освобождает ресурсы ровно один раз.
-При 0 общий deadline отключён. Сбой каждого этапа очистки наблюдается;
-ошибки gateway не отменяют последующее закрытие адаптера.
+`close()` returns one shared operation for all calls. It forbids new requests, signals
+cancellation and forcibly closes the physical connections. `handleDisconnect` waits for
+the current work of its connection. The gateway and the adapter are closed after the
+callbacks and saves actually finish. If `shutdownDrainTimeoutMs` has expired, close
+rejects with a timeout error; a repeated call keeps this result. The ordered cleanup
+keeps waiting for the original operations and then releases the resources exactly once.
+With 0 the shared deadline is disabled. A failure of each cleanup stage is observed;
+gateway errors do not cancel the later adapter close.
 
-Компромисс: постоянно зависший пользовательский код удерживает свой слот и
-ресурсы до завершения процесса; быстрый timeout не выдаётся за физическую
-отмену. При остановке вызывающий host обязан обработать ошибку close и не
-объявлять успешное завершение прикладных эффектов. HTTP owner уже ловит её,
-закрывает listener и возвращает ошибку своей остановки. Откат внешних действий
-и принудительное завершение произвольного Promise не обещаются.
+Trade-off: permanently hung user code holds its slot and resources until the process
+ends; a fast timeout is not presented as a physical cancellation. On shutdown the
+calling host must handle the close error and must not declare the application effects
+finished successfully. The HTTP owner already catches it, closes the listener and
+returns its shutdown error. Rolling back external actions and forcibly ending an
+arbitrary Promise are not promised.
 
-Регрессии: [ws.unit.test.ts](test/ws.unit.test.ts) проверяет занятые слоты после
-timeout, поздние success/error, отсутствие поздних ACK, порядок handler →
-disconnect → gateway → adapter и повторный close. [ws.audit-regressions.test.ts](test/ws.audit-regressions.test.ts)
-проверяет тот же предел для незавершённого session load. Эти проверки используют
-подставной транспорт. [ws.e2e.test.ts](test/ws.e2e.test.ts) дополнительно проверяет
-реальный loopback HTTP/WebSocket: ошибка остановки по deadline, отказ нового
-TCP-подключения к закрытому listener и завершение gateway после обработчика.
-Redis и нагрузочная квалификация этим изменением не подтверждены.
-Новых зависимостей, ресурсов или dynamic imports нет; проверки собранной
-регрессионной fixture описаны в
-[отчёте об исправлениях](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-reaudit-2026-10-04/FIXES.md).
+Regressions: [ws.unit.test.ts](test/ws.unit.test.ts) checks held slots after a timeout,
+late success/error, no late ACKs, the handler → disconnect → gateway → adapter order and
+a repeated close. [ws.audit-regressions.test.ts](test/ws.audit-regressions.test.ts)
+checks the same limit for an unfinished session load. These checks use a stub
+transport. [ws.e2e.test.ts](test/ws.e2e.test.ts) additionally checks a real loopback
+HTTP/WebSocket: a shutdown error by deadline, rejection of a new TCP connection to the
+closed listener and the gateway finishing after the handler.
+Redis and load qualification are not confirmed by this change.
+There are no new dependencies, resources or dynamic imports; the checks of the built
+regression fixture are described in the
+[fixes report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/framework-reaudit-2026-10-04/FIXES.md).

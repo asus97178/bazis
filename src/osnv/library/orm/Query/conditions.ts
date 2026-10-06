@@ -1,12 +1,12 @@
 /**
- * AST условий WHERE и Proxy-DSL для его построения.
+ * AST of WHERE conditions and a Proxy DSL to build it.
  *
- * Вместо разбора JS-лямбд (небезопасно и медленно) предикат строится через
- * Proxy: `x => x.age.gt(18).and(x.name.startsWith("A"))`. `x.age` возвращает
- * операнд колонки, методы сравнения дают узлы AST, `.and()/.or()/.not()`
- * их комбинируют. Никаких строк от пользователя в SQL — только параметры.
+ * Instead of parsing JS lambdas (unsafe and slow), the predicate is built
+ * through a Proxy: `x => x.age.gt(18).and(x.name.startsWith("A"))`. `x.age`
+ * returns a column operand, comparison methods produce AST nodes, and
+ * `.and()/.or()/.not()` combine them. No user strings in the SQL, only parameters.
  *
- * Внимание: `&&`/`||` не перехватываются — используйте `.and()/.or()`.
+ * Note: `&&`/`||` are not intercepted; use `.and()/.or()`.
  */
 
 export type CompareOp = "=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE";
@@ -17,7 +17,7 @@ export type Condition =
       readonly property: string;
       readonly op: CompareOp;
       readonly value: unknown;
-      /** Для LIKE из startsWith/endsWith/contains: добавить `ESCAPE '\'`. */
+      /** For LIKE from startsWith/endsWith/contains: add `ESCAPE '\'`. */
       readonly escaped?: boolean;
     }
   | { readonly kind: "in"; readonly property: string; readonly values: readonly unknown[] }
@@ -26,7 +26,7 @@ export type Condition =
   | { readonly kind: "and" | "or"; readonly left: Condition; readonly right: Condition }
   | { readonly kind: "not"; readonly inner: Condition };
 
-/** Результат предиката: обёртка над узлом AST с логическими комбинаторами. */
+/** Predicate result: a wrapper over an AST node with logical combinators. */
 export class Predicate {
   constructor(readonly node: Condition) {}
 
@@ -41,7 +41,7 @@ export class Predicate {
   }
 }
 
-/** Операнд колонки — точка входа для построения условий по свойству. */
+/** Column operand: the entry point for building conditions on a property. */
 export class Operand<T = unknown> {
   constructor(readonly property: string) {}
 
@@ -49,7 +49,7 @@ export class Operand<T = unknown> {
     return new Predicate({ kind: "compare", property: this.property, op, value });
   }
 
-  /** LIKE с экранированными джокерами (нужен `ESCAPE '\'` в SQL). */
+  /** LIKE with escaped wildcards (needs `ESCAPE '\'` in SQL). */
   private likeEscaped(pattern: string): Predicate {
     return new Predicate({ kind: "compare", property: this.property, op: "LIKE", value: pattern, escaped: true });
   }
@@ -95,7 +95,7 @@ export class Operand<T = unknown> {
   }
 }
 
-/** `%` и `_` в startsWith/endsWith/contains не должны работать как джокеры. */
+/** `%` and `_` in startsWith/endsWith/contains must not act as wildcards. */
 function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, (char) => `\\${char}`);
 }
@@ -104,15 +104,15 @@ type OrderedValue<T> = unknown extends T ? unknown
   : NonNullable<T> extends string | number | bigint | Date ? NonNullable<T> : never;
 type TextValue<T> = unknown extends T ? string : NonNullable<T> extends string ? string : never;
 
-/** Селектор поля (для where/orderBy). Возвращает типизированный операнд свойства. */
+/** Field selector (for where/orderBy). Returns a typed property operand. */
 export type FieldSelector<T> = {
   readonly [K in keyof T]-?: Operand<T[K]>;
 };
 
-/** Предикат-функция, передаваемая в where. */
+/** Predicate function passed to where. */
 export type PredicateFn<T> = (entity: FieldSelector<T>) => Predicate;
 
-/** Для сортировки нужно только имя колонки, независимо от типа её значения. */
+/** Sorting needs only the column name, whatever the type of its value. */
 export type KeySelectorFn<T> = (entity: FieldSelector<T>) => Pick<Operand, "property">;
 
 const FIELD_PROXY: ProxyHandler<object> = {
@@ -121,7 +121,7 @@ const FIELD_PROXY: ProxyHandler<object> = {
   },
 };
 
-/** Создаёт Proxy-селектор полей сущности. */
+/** Creates a Proxy selector of the entity fields. */
 export function fieldSelector<T>(): FieldSelector<T> {
   return new Proxy({}, FIELD_PROXY) as FieldSelector<T>;
 }

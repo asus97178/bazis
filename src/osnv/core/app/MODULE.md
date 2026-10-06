@@ -1,31 +1,31 @@
-# Композиция приложения
+# Application composition
 
-Версия паспорта: 1.1. Дата: 2026-09-26. Тип: существующий технический модуль композиции.
-Путь: `src/osnv/core/app`. Точка входа: [runApp.ts](runApp.ts).
-Область: добавление `RunAppOptions.grpc`; остальные HTTP/UI/infra опции описаны
-в исходных контрактах. Модуль существовал до обязательной CLI-генерации.
+Passport version: 1.1. Date: 2026-09-26. Type: existing technical composition module.
+Path: `src/osnv/core/app`. Entry point: [runApp.ts](runApp.ts).
+Scope: adding `RunAppOptions.grpc`; the other HTTP/UI/infra options are described
+in the source contracts. The module existed before CLI generation became mandatory.
 
-runApp собирает feature root, инфраструктуру и явно включённые серверные
-транспорты в одном kernel. Добавлен optional `grpc?: GrpcModuleOptions`.
-Поля, defaults, ошибки и ограничения — в [паспорте gRPC](../grpc/MODULE.md).
-С 2026-09-20 gRPC использует собственные контракты/кодеки osnv и встроенный
-HTTP/2 без внешних библиотек; форма RunAppOptions.grpc сохранена. Типы и
-специфичные passthrough-опции стороннего SDK удалены по решению владельца.
-undefined не запускает gRPC; `{}` включает listener 127.0.0.1:50051 и контроллеры
-feature root; null не допускается.
+runApp assembles the feature root, the infrastructure and the explicitly enabled
+server transports in one kernel. An optional `grpc?: GrpcModuleOptions` was added.
+Fields, defaults, errors and limits are in the [gRPC passport](../grpc/MODULE.md).
+Since 2026-09-20 gRPC uses osnv's own contracts/codecs and the built-in HTTP/2
+without external libraries; the shape of RunAppOptions.grpc is kept. The types and
+SDK-specific passthrough options of the third-party SDK were removed by the owner's decision.
+undefined does not start gRPC; `{}` enables a 127.0.0.1:50051 listener and the
+controllers of the feature root; null is not allowed.
 
-При одновременных http и grpc серверы используют один контейнер и разные request
-scopes. grpc.imports расширяют опубликованное gRPC-дерево; http.imports сохраняют
-назначение. Владение providers, конфигурацией kernel и imports/exports сохраняется.
+With both http and grpc, the servers share one container and use separate request
+scopes. grpc.imports extend the published gRPC tree; http.imports keep their
+purpose. Ownership of providers, kernel configuration and imports/exports is unchanged.
 
-`RunAppOptions.validator` задаёт существующий синхронный ModelValidator для
-HTTP и gRPC; по умолчанию modelValidatorAdapter. gRPC-only также получает этот
-адаптер. Необязательный `grpc.validator` заменяет его только для gRPC (null
-запрещён). Каждый сервер фиксирует свой валидатор при создании: более поздний
-HTTP useModelValidator не переключает работающий gRPC. Для DTO нужна привязка
-по классу параметра через di:generate либо явный второй аргумент @GrpcMethod.
-Ошибки DTO отображаются в INVALID_ARGUMENT с ограниченными ошибками полей,
-а не в HTTP 400; детали и streaming-семантика — в паспорте gRPC.
+`RunAppOptions.validator` sets the existing synchronous ModelValidator for
+HTTP and gRPC; the default is modelValidatorAdapter. A gRPC-only app gets the same
+adapter. An optional `grpc.validator` replaces it for gRPC only (null is
+forbidden). Each server captures its validator when created: a later HTTP
+useModelValidator call does not switch a running gRPC server. A DTO needs a binding
+by parameter class through di:generate or an explicit second @GrpcMethod argument.
+DTO errors map to INVALID_ARGUMENT with bounded field errors, not to HTTP 400;
+details and streaming semantics are in the gRPC passport.
 
 ```ts
 await runApp(AppModule, {
@@ -34,14 +34,14 @@ await runApp(AppModule, {
 });
 ```
 
-Компоненты изменения: RunAppOptions и композиция перед osnv.run.
-Собственных новых providers/ORM/UI/AI-обработчиков нет. DI-экспорты и lifecycle
-принадлежат существующему kernel и транспортам. TS-фасад osnv также
-экспортирует gRPC-декораторы и контракты. Результат runApp остаётся Promise number
-по существующему контракту osnv.run; ошибки startup не считаются успехом.
+Components of the change: RunAppOptions and the composition before osnv.run.
+There are no new providers/ORM/UI/AI handlers of its own. DI exports and lifecycle
+belong to the existing kernel and transports. The osnv TS facade also exports the
+gRPC decorators and contracts. runApp still returns Promise<number> under the
+existing osnv.run contract; startup errors are never treated as success.
 
-Проверки HTTP + gRPC, приватного constructor DI и самостоятельного бинарника:
+Checks of HTTP + gRPC, private constructor DI and a standalone binary:
 [grpc.codegen-binary.test.ts](../grpc/test/grpc.codegen-binary.test.ts).
-Обычные проверки: [runApp.config.test.ts](test/runApp.config.test.ts).
-База до изменения: полный TypeScript check PASS. Итоги фиксируются в паспорте
-gRPC; изменение не квалифицирует внешнюю инфраструктуру приложения.
+Regular checks: [runApp.config.test.ts](test/runApp.config.test.ts).
+Baseline before the change: full TypeScript check PASS. Results are recorded in the
+gRPC passport; the change does not qualify the application's external infrastructure.

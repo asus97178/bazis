@@ -7,20 +7,21 @@ import type { HttpContext } from "../HttpContext/HttpContext";
 const AUTHORIZE_META = Symbol.for("osnv:http:authorize");
 
 /**
- * Проверка доступа для `@Authorize`. Получает контекст запроса и решает, можно
- * ли пустить. HTTP-ядро не знает, *что* именно проверяется (вид JWT, логин/
- * пароль, успешный вход через Telegram и т. д.) — это целиком внутри функции.
+ * Access check for `@Authorize`. Receives the request context and decides
+ * whether to let it through. The HTTP kernel does not know *what* is checked
+ * (JWT kind, login/password, a successful Telegram sign-in and so on): that
+ * is entirely inside the function.
  *
- * - `true` — доступ разрешён;
- * - `false` — доступ запрещён (ядро ответит `403 Forbidden`);
- * - `throw` — функция сама задаёт ответ, бросив `HttpError` (например,
- *   `UnauthorizedError` → `401`, когда кредов вовсе нет).
+ * - `true`: access granted;
+ * - `false`: access denied (the kernel answers `403 Forbidden`);
+ * - `throw`: the function defines the response itself by throwing an `HttpError`
+ *   (for example `UnauthorizedError` → `401` when there are no credentials at all).
  *
- * Зависимости (сервисы, БД) берутся из `ctx.services` (скоуп запроса).
+ * Dependencies (services, DB) come from `ctx.services` (the request scope).
  */
 export type AuthorizeCheck = (ctx: HttpContext) => boolean | Promise<boolean>;
 
-/** Требование авторизации: одна или несколько проверок (все должны пройти). */
+/** Authorization requirement: one or more checks (all must pass). */
 export interface AuthorizeOptions {
   readonly checks: readonly AuthorizeCheck[];
 }
@@ -66,9 +67,9 @@ function cloneMeta(source: AuthControllerMeta): AuthControllerMeta {
 }
 
 /**
- * Own (copy-on-write) метаданные авторизации для декорируемого класса. TC39
- * metadata наследуется прототипно от родителя — первая запись в подкласс
- * клонирует унаследованное состояние.
+ * Own (copy-on-write) authorization metadata of the decorated class. TC39
+ * metadata is inherited prototypically from the parent: the first write in a
+ * subclass clones the inherited state.
  */
 function ownMeta(metadata: object): AuthControllerMeta {
   const carrier = metadata as AuthMetadataCarrier;
@@ -121,15 +122,15 @@ export function setActionAllowAnonymous(metadata: object, methodName: string | s
   delete action.authorize;
 }
 
-/** Эффективное требование маршрута (метод перекрывает контроллер). */
+/** Effective route requirement (the method overrides the controller). */
 export interface ResolvedAuthorizeMeta {
   readonly allowAnonymous: boolean;
   readonly authorize?: AuthorizeOptions;
 }
 
 /**
- * Разрешает требование авторизации для конкретного действия. Приоритет:
- * `@AllowAnonymous`/`@Authorize` на методе перекрывают объявленные на классе.
+ * Resolves the authorization requirement of a specific action. Precedence:
+ * `@AllowAnonymous`/`@Authorize` on the method override those declared on the class.
  */
 export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol): ResolvedAuthorizeMeta {
   const metadata = (ctor as { [key: symbol]: unknown })[Symbol.metadata as unknown as symbol] as

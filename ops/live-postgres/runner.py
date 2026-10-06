@@ -21,7 +21,7 @@ IMAGE = 'postgres:17-alpine'
 LAUNCHER = str(ROOT / 'scripts/osnv-bun')
 IGNORES = ['--path-ignore-patterns=**/*.browser.spec.ts', '--path-ignore-patterns=**/bin/**']
 # Upstream driver defects documented elsewhere: reported, never counted as PASS.
-KNOWN_EXTERNAL = {'orm.qualification-20260913.native-cancel.live.test.ts':
+KNOWN_EXTERNAL = {'orm.bun-sql-native-cancel.postgres.live.test.ts':
                   'Bun.SQL cancel() does not cancel the server query; see https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-2026-09-14-qualification.md'}
 run_id = uuid.uuid4().hex[:12]
 label = 'osnv.orm-qualification-run=' + run_id
@@ -56,6 +56,9 @@ def gated(path):
         e_run = str(uuid.uuid4()); db = create_database('oe327_' + e_run.replace('-', ''))
         return db, {'OSNV_PG_URL': url(db), 'OSNV_OWNED_STORE_E_LIVE': 'wp-orm-3-e327-integrated-v1', 'OSNV_OWNED_STORE_E_DATABASE': db,
                     'OSNV_OWNED_STORE_E_ROLE': 'owned-store-e-child-v1', 'OSNV_OWNED_STORE_E_RUN': e_run}
+    if 'owned-store.uuid-v7' in name:
+        db = create_database(f'osnv_v7_{run_id}')
+        return db, {'OSNV_PG_URL': url(db), 'OSNV_OWNED_STORE_V7_LIVE': '1'}
     if 'orm.owned-store.postgres' in name:
         db = create_database(f'c3_{run_id}')
         return db, {'OSNV_PG_URL': url(db), 'OSNV_OWNED_STORE_C3_LIVE': 'owned-disposable-v1', 'OSNV_OWNED_STORE_C3_DATABASE': db}
@@ -64,13 +67,15 @@ def gated(path):
         return db, {'OSNV_PG_URL': url(db, 'worker', worker_password), 'OSNV_ORM_SERVER_CANCELLATION_LIVE': 'owned-disposable-v1',
                     'OSNV_SERVER_CANCEL_CA': str(BASE / 'server-ca.pem')}
     if 'json-native' in name:
-        db = create_database('orm_audit')
-        return db, {'OSNV_PG_URL': url(db), 'OSNV_ORM_REPEAT_AUDIT_LIVE': '1'}
+        db = create_database('orm_json_native')
+        return db, {'OSNV_PG_URL': url(db), 'OSNV_ORM_JSON_NATIVE_LIVE': '1'}
     if 'release-095' in name:
         db = create_database('osnv_release_095')
         return db, {'OSNV_RELEASE_095_PG': 'owned-disposable-v1', 'OSNV_RELEASE_095_PG_URL': url(db)}
-    flags = {'audit-20260913': {'OSNV_ORM_AUDIT_LIVE': '1'}, 'qualification-20260913': {'OSNV_ORM_QUALIFICATION_LIVE': '1'},
-             'cancellation-20260914': {'OSNV_ORM_CANCELLATION_LIVE': '1'},
+    flags = {'orm.regressions.postgres': {'OSNV_ORM_REGRESSIONS_LIVE': '1'},
+             'orm.pool-load.postgres': {'OSNV_ORM_QUALIFICATION_LIVE': '1'},
+             'orm.bun-sql-native-cancel.postgres': {'OSNV_ORM_QUALIFICATION_LIVE': '1'},
+             'orm.abort-signal.postgres': {'OSNV_ORM_CANCELLATION_LIVE': '1'},
              'bun-sql-hardening': {'OSNV_ORM_HARDENING_LIVE': '1', 'OSNV_ORM_HARDENING_CONTAINER': container,
                                    'OSNV_ORM_HARDENING_RUN': run_id, 'OSNV_ORM_TLS_CA_FILE': str(BASE / 'server-ca.pem')}}
     for key, extra in flags.items():

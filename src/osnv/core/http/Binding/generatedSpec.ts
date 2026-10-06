@@ -1,18 +1,18 @@
 /**
- * Формат сгенерированных конвенций привязки (`bun run di:generate`).
+ * Format of the generated binding conventions (`bun run di:generate`).
  *
- * Чистые данные без ссылок на классы: модель тела указана **именем** и
- * разрешается на старте через индекс классов generated target.
- * Спецификация хранит имя; отдельный generated target передаёт конструкторы.
+ * Plain data without class references: the body model is given **by name** and
+ * resolved at startup through the class index of the generated target.
+ * The spec stores the name; a separate generated target supplies the constructors.
  */
 export interface GeneratedBindingSpec {
   readonly source: "route" | "query" | "body" | "context" | "request" | "response" | "list";
-  /** Имя route-/query-параметра. */
+  /** Name of the route/query parameter. */
   readonly name?: string;
-  /** Конверсия примитива (для query и route без ограничения в шаблоне). */
+  /** Primitive conversion (for query, and route params without a constraint in the template). */
   readonly type?: "int" | "number" | "bool" | "string";
-  /** Параметр объявлен с `?` или default-значением. */
+  /** The parameter is declared with `?` or a default value. */
   readonly optional?: boolean;
-  /** Имя класса DTO (разрешается через generated target; старый реестр — fallback). */
+  /** DTO class name (resolved through the generated target; `@RequestModel()` classes are the fallback). */
   readonly model?: string;
 }

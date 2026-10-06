@@ -1,5 +1,5 @@
-// Распределённый кэш-бэкенд поверх Redis. Реализует абстракции `@/core/cache`
-// (DistributedCacheDriver/Backend), поэтому ядро кэша остаётся backend-agnostic.
+// Distributed cache backend on top of Redis. It implements the `@/core/cache`
+// abstractions (DistributedCacheDriver/Backend), so the cache core stays backend-agnostic.
 export {
   RedisDistributedCacheBackend,
   type RedisDistributedCacheTuning,

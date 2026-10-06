@@ -1,4 +1,4 @@
-import type { ColumnType, EntityModel, PropertyModel } from "../Metadata/types";
+import { isUuidKeyGeneration, type ColumnType, type EntityModel, type PropertyModel } from "../Metadata/types";
 
 /** Resolve the physical FK contract without changing logical converter types.
  * UUID storage follows referenced keys, including PK/FK chains and cycles. */
@@ -7,7 +7,7 @@ export function physicalColumnTypes(models: readonly EntityModel[]): ReadonlyMap
   const result = new Map<PropertyModel, ColumnType | "uuid">();
   const pairs: [PropertyModel, PropertyModel][] = [];
   for (const model of models) {
-    for (const property of model.properties) result.set(property, property.generation === "uuid" ? "uuid" : property.type);
+    for (const property of model.properties) result.set(property, isUuidKeyGeneration(property.generation) ? "uuid" : property.type);
     for (const fk of model.foreignKeys) {
       const target = byCtor.get(fk.target());
       if (!target) throw new Error("ORM_SCHEMA_CROSS_UNIT_FOREIGN_KEY");

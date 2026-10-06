@@ -60,7 +60,7 @@ function base(phase: "ready-model" | "pending-tools" | "terminal"): Record<strin
     },
     phase,
     steps: 0,
-    messages: [message("user", [{ kind: "text", text: "Здравствуйте" }])],
+    messages: [message("user", [{ kind: "text", text: "Hello" }])],
     responses: [],
     toolResults: [],
     seenToolCallIds: [],
@@ -111,7 +111,7 @@ function pending(): Record<string, unknown> {
 
 function terminal(): Record<string, unknown> {
   const checkpoint = base("terminal");
-  const final = message("assistant", [{ kind: "data", value: { answer: "готово" }, name: "answer" }]);
+  const final = message("assistant", [{ kind: "data", value: { answer: "done" }, name: "answer" }]);
   checkpoint.steps = 1;
   checkpoint.messages = [...checkpoint.messages as unknown[], final];
   checkpoint.responses = [{
@@ -172,7 +172,7 @@ describe("agent execution checkpoint state", () => {
     expect(partial.toolResults).toHaveLength(2);
     expect(partial.responses[0]?.toolCalls.map((item) => item.id)).toEqual(["call-1", "call-2", "call-3"]);
     expect(done.terminal?.output).toBeNull();
-    expect(done.terminal?.finalMessage?.content[0]).toMatchObject({ kind: "data", value: { answer: "готово" } });
+    expect(done.terminal?.finalMessage?.content[0]).toMatchObject({ kind: "data", value: { answer: "done" } });
   });
 
   test("admits only State-issued semantic checkpoints without traversing spoofed roots", () => {

@@ -13,9 +13,9 @@ interface Level {
 }
 
 /**
- * Жадная загрузка навигаций split-запросами: для каждого уровня пути грузим
- * связанные сущности одним запросом `WHERE ключ IN (...)` и сшиваем в память.
- * Это исключает декартово произведение (в отличие от JOIN коллекций).
+ * Eager loading of navigations with split queries: for each level of the path,
+ * related entities are loaded with one `WHERE key IN (...)` query and stitched
+ * together in memory. This avoids the Cartesian product of collection JOINs.
  */
 export class IncludeLoader {
   constructor(private readonly runtime: DbContextRuntime) {}
@@ -61,7 +61,7 @@ export class IncludeLoader {
     return this.loadCollection(parent, navigationName, relation.foreignKey, targetModel, noTracking);
   }
 
-  /** many-to-one: FK на родителе указывает на ключ цели. */
+  /** many-to-one: the FK on the parent points to the target's key. */
   private async loadReference(
     parent: Level,
     navigationName: string,
@@ -92,7 +92,7 @@ export class IncludeLoader {
     return { model: targetModel, entities: children };
   }
 
-  /** one-to-many: FK на цели указывает на ключ родителя. */
+  /** one-to-many: the FK on the target points to the parent's key. */
   private async loadCollection(
     parent: Level,
     navigationName: string,

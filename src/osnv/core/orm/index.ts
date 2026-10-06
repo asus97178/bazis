@@ -1,6 +1,6 @@
-// Слой интеграции ORM с фреймворком (DI/kernel). Чистый движок —
-// `@/library/orm`; здесь к нему добавляются DI-модуль, токены, lifecycle
-// и health-check. Для удобства движок реэкспортируется целиком.
+// Integration of the ORM with the framework (DI/kernel). The pure engine is
+// `@/library/orm`; this layer adds the DI module, tokens, lifecycle
+// and health check. The engine is re-exported in full for convenience.
 export * from "../../library/orm";
 
 export { ormModule, type OrmModuleConfig } from "./ormModule";

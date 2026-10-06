@@ -19,7 +19,7 @@ function gate() {
   return { promise, resolve };
 }
 
-describe("Agent audit: interrupted effects", () => {
+describe("Agent regressions: interrupted effects", () => {
   for (const hooks of ["none", "settlement", "observer", "both"] as const) {
     for (const sideEffect of ["read", "write", "external"] as const) {
       for (const boundary of ["timeout", "abort"] as const) {
@@ -104,7 +104,7 @@ describe("Agent audit: interrupted effects", () => {
   });
 });
 
-describe("Agent audit: structured contracts", () => {
+describe("Agent regressions: structured contracts", () => {
   const numberSchema = { type: "object", properties: { value: { type: "number" } }, required: ["value"], additionalProperties: false };
   const cases: ReadonlyArray<readonly [string, string, AgentOutputContract, boolean]> = [
     ["valid explicit schema", '{"value":3}', agentOutputContract({ mode: "json", schema: agentJsonSchema("Value", numberSchema) }), true],

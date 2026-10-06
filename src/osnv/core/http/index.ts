@@ -59,8 +59,8 @@ export type { BindingSource, ParameterBinding } from "./Binding/bindings";
 export type { ValueType } from "./Binding/convert";
 export { RequestModel } from "./Binding/RequestModel";
 
-// Универсальный list-запрос (сортировка/фильтрация/пагинация) — декларативный
-// класс-запрос по сигнатуре. Движок и типы — в `@/library/jsonapi`.
+// Universal list request (sorting/filtering/paging): a declarative
+// request class bound by signature. Engine and types live in `@/library/jsonapi`.
 export {
   ListRequest,
   Filterable,

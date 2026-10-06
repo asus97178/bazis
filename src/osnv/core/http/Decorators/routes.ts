@@ -5,29 +5,29 @@ import { ownActionMeta } from "./metadata";
 type MethodDecorator = (value: (...args: never[]) => unknown, context: ClassMethodDecoratorContext) => void;
 
 /**
- * Inline-опции действия — эквивалент отдельных атрибут-декораторов,
- * собранный в один объект (стиль `@Validator({...})`):
+ * Inline action options: the equivalent of separate attribute decorators
+ * gathered into one object (the `@Validator({...})` style):
  *
  * ```ts
  * @Post(":id(int)", { code: 201, produces: "application/json" })
  * update(id: number) { ... }
  *
- * @Post({ code: 202 })          // путь пустой — опции первым аргументом
+ * @Post({ code: 202 })          // empty path: options as the first argument
  * enqueue() { ... }
  * ```
  */
 export interface RouteOptions {
-  /** Статус успешного ответа (= `@HttpCode`). */
+  /** Status of a successful response (= `@HttpCode`). */
   readonly code?: number;
-  /** Content-Type ответа для plain-результатов (= `@Produces`). */
+  /** Response Content-Type for plain results (= `@Produces`). */
   readonly produces?: string;
-  /** Требуемый Content-Type запроса для body-привязок (= `@Consumes`). */
+  /** Required request Content-Type for body bindings (= `@Consumes`). */
   readonly consumes?: string;
-  /** Версия API действия (= `@ApiVersion` на методе). */
+  /** API version of the action (= `@ApiVersion` on the method). */
   readonly version?: string;
-  /** Middleware маршрута (= `@Middleware` на методе). */
+  /** Route middleware (= `@Middleware` on the method). */
   readonly middleware?: readonly HttpMiddleware[];
-  /** Максимальный размер body: целое число и binary unit слитно, например `4mb`. */
+  /** Maximum body size: an integer and a binary unit together, for example `4mb`. */
   readonly maxBodySize?: `${bigint}${"b" | "kb" | "mb" | "gb"}`;
 }
 
@@ -41,9 +41,9 @@ function route(httpMethod: string, templateOrOptions?: string | RouteOptions, ma
     const action = ownActionMeta(context.metadata, context.name);
     action.routes.push({ httpMethod, template });
     if (options) {
-      // Опции действуют на всё действие (как атрибут-декораторы); при
-      // нескольких декораторах маршрута скалярные поля перезаписываются,
-      // middleware накапливаются.
+      // Options apply to the whole action (like attribute decorators); with
+      // several route decorators scalar fields are overwritten and
+      // middleware accumulates.
       if (options.code !== undefined) {
         action.httpCode = options.code;
       }
@@ -108,17 +108,17 @@ function createRouteFactory(httpMethod: string): RouteFactory {
 }
 
 /**
- * Декораторы маршрутов. Шаблон относителен префикса контроллера и
- * поддерживает параметры с ограничениями и wildcard в конце:
+ * Route decorators. The template is relative to the controller prefix and
+ * supports constrained parameters and a trailing wildcard:
  *
- * - `":id"` — строковый параметр;
- * - `":id(int)"`, `":n(number)"`, `":f(bool)"`, `":u(uuid)"`, `":a(alpha)"` —
- *   параметр с ограничением и автоконверсией (несовпадение -> маршрут не матчится);
- * - `"*rest"` — catch-all, захватывает остаток пути (только последним сегментом).
+ * - `":id"`: a string parameter;
+ * - `":id(int)"`, `":n(number)"`, `":f(bool)"`, `":u(uuid)"`, `":a(alpha)"`:
+ *   a constrained parameter with auto-conversion (a mismatch -> the route does not match);
+ * - `"*rest"`: catch-all, captures the rest of the path (last segment only).
  *
- * Вторым аргументом (или первым, если путь пустой) принимаются inline-опции
- * действия — см. {@link RouteOptions}. На методе может быть несколько
- * декораторов маршрута — действие доступно по всем.
+ * The second argument (or the first, if the path is empty) takes inline action
+ * options, see {@link RouteOptions}. A method may have several route
+ * decorators; the action is reachable through all of them.
  */
 export const Get = createRouteFactory("GET");
 export const Post = createRouteFactory("POST");
@@ -127,5 +127,5 @@ export const Patch = createRouteFactory("PATCH");
 export const Delete = createRouteFactory("DELETE");
 export const Options = createRouteFactory("OPTIONS");
 export const Head = createRouteFactory("HEAD");
-/** Матчит любой HTTP-метод (низший приоритет при выборе). */
+/** Matches any HTTP method (lowest priority when choosing). */
 export const All = createRouteFactory("*");

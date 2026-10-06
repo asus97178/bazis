@@ -6,15 +6,15 @@ import { KeyTuple } from "../Metadata/KeyTuple";
 import { insertIfAbsent, type OrmInsertIfAbsentResultV1, type OrmUniqueKeySelectorV1 } from "./ImmediateMutations";
 
 /**
- * Точка доступа к таблице: запросы (наследуются от `EntityQuery`) плюс операции
- * трекера (add/update/remove/attach) и поиск по ключу `find`.
+ * Table access point: queries (inherited from `EntityQuery`) plus tracker
+ * operations (add/update/remove/attach) and key lookup with `find`.
  */
 export class DbSet<T extends object> extends EntityQuery<T> {
   constructor(model: EntityModel, runtime: DbContextRuntime) {
     super(model, runtime);
   }
 
-  /** Помечает сущность на вставку. */
+  /** Marks the entity for insertion. */
   add(entity: T): T {
     this.runtime.tracker.add(entity, this.model);
     return entity;
@@ -26,28 +26,28 @@ export class DbSet<T extends object> extends EntityQuery<T> {
     }
   }
 
-  /** Помечает сущность как изменённую (полное обновление). */
+  /** Marks the entity as modified (full update). */
   update(entity: T): T {
     this.runtime.tracker.update(entity, this.model);
     return entity;
   }
 
-  /** Помечает сущность на удаление. */
+  /** Marks the entity for deletion. */
   remove(entity: T): T {
     this.runtime.tracker.remove(entity, this.model);
     return entity;
   }
 
-  /** Прикрепляет существующую сущность как Unchanged (со снимком). */
+  /** Attaches an existing entity as Unchanged (with a snapshot). */
   attach(entity: T): T {
     this.runtime.tracker.attach(entity, this.model);
     return entity;
   }
 
   /**
-   * Поиск по первичному ключу с обычными query filters/soft-delete.
-   * Identity map по-прежнему возвращает канонический tracked instance,
-   * но запрос всегда идёт в БД, чтобы cached entity не обошла filters.
+   * Primary key lookup with the usual query filters/soft delete.
+   * The identity map still returns the canonical tracked instance, but the
+   * query always goes to the database so a cached entity cannot bypass filters.
    */
   find(key: unknown): Promise<T | null> {
     return this.byKey(key).firstOrDefault();

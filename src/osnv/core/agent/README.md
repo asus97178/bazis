@@ -32,22 +32,22 @@ class ProductRequirementsDocument {
 
 @Tool({
   name: "catalog.search",
-  description: "Ищет товары в каталоге.",
+  description: "Searches products in the catalog.",
   sideEffect: "read",
 })
 class SearchCatalogTool {}
 
 @Agent({
   name: "system-analyst",
-  role: "Системный аналитик",
+  role: "System analyst",
   sections: [
     {
       kind: "developer",
-      content: "Верни конкретные проверяемые требования.",
+      content: "Return concrete, testable requirements.",
     },
     {
       kind: "tool-policy",
-      content: "Используй read-инструменты перед предложением write-действий.",
+      content: "Use read tools before proposing write actions.",
     },
   ],
   tools: [SearchCatalogTool],
@@ -56,7 +56,7 @@ class SearchCatalogTool {}
 class SystemAnalystAgent {
   @Task({
     name: "prepare-requirements",
-    description: "Подготовить документ требований к продуктовой функции.",
+    description: "Prepare a requirements document for a product feature.",
   })
   prepareRequirements(input: CreateRequirementsRequest): ProductRequirementsDocument {
     return agentOutput();
@@ -97,10 +97,10 @@ adapters:
 ```ts
 const request = agentModelRequest({
   invocationId: "inv-1",
-  messages: [agentMessage("user", "Подготовь критерии приемки")],
+  messages: [agentMessage("user", "Prepare acceptance criteria")],
   tools: [agentToolContract({
     name: "catalog.search",
-    description: "Ищет товары.",
+    description: "Searches products.",
     sideEffect: "read",
   })],
 });
@@ -169,7 +169,7 @@ const runtime = new AgentRuntime(
 );
 
 const result = await runtime.invoke("product-designer", {
-  input: "Подготовь критерии приемки",
+  input: "Prepare acceptance criteria",
   maxSteps: 4,
 });
 ```
@@ -179,7 +179,7 @@ business operation contract; the method body is not called by user code:
 
 ```ts
 const result = await runtime.invokeTask("system-analyst", "prepare-requirements", {
-  feature: "Оформление заказа с промокодом",
+  feature: "Checkout with a promo code",
 });
 ```
 
@@ -196,7 +196,7 @@ const runtime = new AgentRuntime(container, registry, provider, {
 });
 
 const result = await runtime.invoke("product-designer", {
-  input: "Подготовь критерии приемки",
+  input: "Prepare acceptance criteria",
   contextLimits: { maxMessages: 12, maxTokens: 4_000 },
 });
 ```

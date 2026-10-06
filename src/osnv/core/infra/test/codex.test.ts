@@ -19,8 +19,8 @@ async function fixture(authorized = true) {
   return { client, home, directory, wire: async () => (await readFile(join(home, "fixture-wire.jsonl"), "utf8")).trim().split('\n').map(line => JSON.parse(line)),
     close: async () => { await client.dispose(); await rm(directory, { recursive: true, force: true }); } };
 }
-const input = (message = "привет", overrides: Partial<CodexRunInput> = {}): CodexRunInput => ({
-  instructions: "Отвечай кратко", messages: [{ role: "user", text: message }], signal: new AbortController().signal, onTextDelta() {}, ...overrides,
+const input = (message = "hello", overrides: Partial<CodexRunInput> = {}): CodexRunInput => ({
+  instructions: "Answer briefly", messages: [{ role: "user", text: message }], signal: new AbortController().signal, onTextDelta() {}, ...overrides,
 });
 
 test("disables bundled skills before admitting work and rechecks the catalog for every thread", async () => {
@@ -28,7 +28,7 @@ test("disables bundled skills before admitting work and rechecks the catalog for
   try {
     await f.client.connect();
     await f.client.run(input());
-    await f.client.run(input("ещё"));
+    await f.client.run(input("more"));
     const wire = await f.wire();
     const writes = wire.filter(item => item.method === "skills/config/write");
     expect(writes).toHaveLength(6);
@@ -77,7 +77,7 @@ test("dynamic tools round-trip through the host with thread isolation and stream
     const answers = await Promise.all([1, 2].map(index => f.client.run(input("tool", {
       tools: [tool], onToolCall: async call => { calls.push(call.id); return { success: true, text: "owner-" + index }; },
     }))));
-    expect(answers).toEqual(["Данные: owner-1", "Данные: owner-2"]);
+    expect(answers).toEqual(["Data: owner-1", "Data: owner-2"]);
     expect(new Set(calls).size).toBe(2);
     const wire = await f.wire();
     expect(wire.filter(item => item.method === "thread/start").every(item => item.params.dynamicTools[0].type === "function")).toBe(true);
@@ -150,9 +150,9 @@ test("managed shared login, idempotent pending login, cancel, models and logout"
 test("stream deltas precede completion; canonical final text is not duplicated", async () => {
   const f = await fixture(); const deltas: string[] = []; let finished = false;
   try {
-    const result = await f.client.run(input("привет", { onTextDelta: text => { expect(finished).toBe(false); deltas.push(text); } }));
+    const result = await f.client.run(input("hello", { onTextDelta: text => { expect(finished).toBe(false); deltas.push(text); } }));
     finished = true;
-    expect(deltas.length).toBeGreaterThan(1); expect(deltas.join('')).toBe(result); expect(result).toBe("Ответ: привет");
+    expect(deltas.length).toBeGreaterThan(1); expect(deltas.join('')).toBe(result); expect(result).toBe("Reply: hello");
     const wire = await f.wire(); expect(wire.filter(item => item.method === "turn/start")).toHaveLength(1);
     expect(wire.some(item => item.method === "thread/unsubscribe")).toBe(true);
     const start = wire.find(item => item.method === "thread/start").params;
@@ -164,9 +164,9 @@ test("stream deltas precede completion; canonical final text is not duplicated",
 test("model-specific reasoning choices reach turn/start; unsupported choices never start work", async () => {
   const f = await fixture();
   try {
-    expect(await f.client.run(input("выбор", { model: "fixture-fast", reasoningEffort: "high" }))).toBe("Ответ: выбор");
+    expect(await f.client.run(input("choice", { model: "fixture-fast", reasoningEffort: "high" }))).toBe("Reply: choice");
     for (const effort of ["xhigh", "missing", "", null, 123]) {
-      await expect(f.client.run(input("не отправлять", { model: "fixture-fast", reasoningEffort: effort as string }))).rejects.toMatchObject({ code: "REASONING_UNAVAILABLE" });
+      await expect(f.client.run(input("do not send", { model: "fixture-fast", reasoningEffort: effort as string }))).rejects.toMatchObject({ code: "REASONING_UNAVAILABLE" });
     }
     const wire = await f.wire(), starts = wire.filter(item => item.method === "turn/start");
     expect(starts).toHaveLength(1); expect(starts[0].params.effort).toBe("high");
@@ -182,9 +182,9 @@ test("cancel interrupts one thread, preserves other work, and locks account muta
     const first = f.client.run(input("slow-cancel", { signal: abort.signal, onTextDelta: () => early() })).catch(error => error);
     await partial;
     await expect(f.client.logout()).rejects.toMatchObject({ code: "BUSY" });
-    const second = f.client.run(input("другой диалог"));
+    const second = f.client.run(input("another dialog"));
     abort.abort(); expect(await first).toBeInstanceOf(Error);
-    expect(await second).toBe("Ответ: другой диалог");
+    expect(await second).toBe("Reply: another dialog");
     const wire = await f.wire(); expect(wire.filter(item => item.method === "turn/interrupt")).toHaveLength(1);
     expect((await f.client.status()).activeRuns).toBe(0);
   } finally { await f.close(); }
@@ -194,7 +194,7 @@ test.each(["failure", "dead", "large", "unsupported"])("fails honestly after par
   const f = await fixture(); const deltas: string[] = [];
   try {
     await expect(f.client.run(input(message, { onTextDelta: text => deltas.push(text) }))).rejects.toBeInstanceOf(Error);
-    expect(deltas.join('')).toBe("Ответ: ");
+    expect(deltas.join('')).toBe("Reply: ");
     if (message === "unsupported") expect((await f.wire()).some(item => item.id === "approval" && item.error)).toBe(true);
     expect((await f.client.status()).activeRuns).toBe(0);
   } finally { await f.close(); }
@@ -203,9 +203,9 @@ test.each(["failure", "dead", "large", "unsupported"])("fails honestly after par
 test("early events and concurrent conversations keep separate text and context", async () => {
   const f = await fixture();
   try {
-    expect(await f.client.run(input("early"))).toBe("Ранний ответ");
-    const values = await Promise.all([f.client.run(input("один")), f.client.run(input("два"))]);
-    expect(values).toEqual(["Ответ: один", "Ответ: два"]);
+    expect(await f.client.run(input("early"))).toBe("Early answer");
+    const values = await Promise.all([f.client.run(input("one")), f.client.run(input("two"))]);
+    expect(values).toEqual(["Reply: one", "Reply: two"]);
     await expect(f.client.run(input("x", { model: "missing-model" }))).rejects.toMatchObject({ code: "MODEL_UNAVAILABLE" });
     expect((await f.wire()).filter(item => item.method === "turn/start")).toHaveLength(3);
   } finally { await f.close(); }

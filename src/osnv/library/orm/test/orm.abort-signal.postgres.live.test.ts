@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, EntityState, Key, OrmTransactionScopeError, PostgresProvider, Schema } from "../index";
 
-// Opt in only on the explicitly authorized disposable runner. ENV_OFF has no SQL.
+// Opt in only on the explicitly authorized disposable runner. Without the opt-in env it runs no SQL.
 const url = process.env.OSNV_PG_URL;
 const enabled = !!url && process.env.OSNV_ORM_CANCELLATION_LIVE === "1";
 class Context extends DbContext {}

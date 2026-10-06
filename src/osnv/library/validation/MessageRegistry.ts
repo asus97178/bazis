@@ -1,6 +1,6 @@
 /**
- * Параметры для подстановки в плейсхолдеры сообщения.
- * Ключ — имя плейсхолдера без скобок: `{min}` -> `min`.
+ * Parameters substituted into message placeholders.
+ * The key is the placeholder name without braces: `{min}` -> `min`.
  */
 export type MessageParams = Readonly<Record<string, unknown>>;
 
@@ -72,25 +72,25 @@ export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.f
 });
 
 /**
- * Реестр шаблонов сообщений об ошибках.
+ * Registry of error message templates.
  *
- * Приоритет шаблона: локальный `message` декоратора > глобальный
- * (`setDefaults`) > встроенный. Плейсхолдеры вида `{name}` заменяются
- * значениями из параметров ошибки; неизвестные плейсхолдеры остаются
- * как есть (без исключений — отказоустойчивость важнее строгости).
+ * Template priority: the decorator's local `message` > global (`setDefaults`)
+ * > built-in. `{name}` placeholders are replaced with values from the error
+ * parameters; unknown placeholders stay as is (no exceptions: resilience
+ * matters more than strictness here).
  */
 export class MessageRegistry {
-  /** Текущие глобальные шаблоны: копия встроенных + переопределения. */
+  /** Current global templates: a copy of the built-in ones + overrides. */
   private static defaults: Record<string, string> = { ...BUILT_IN };
 
   /**
-   * Переопределяет глобальные сообщения для кодов ошибок.
-   * Неизвестные коды тоже принимаются — это позволяет задавать сообщения
-   * для собственных кодов из `custom`-функций.
+   * Overrides global messages for error codes.
+   * Unknown codes are accepted too, so messages can be set for custom codes
+   * from `custom` functions.
    */
   static setDefaults(messages: Partial<Record<string, string>>): void {
     for (const code of Object.keys(messages)) {
-      // hasOwnProperty: защита от prototype pollution через переданный объект.
+      // hasOwnProperty: protection against prototype pollution through the given object.
       if (!Object.prototype.hasOwnProperty.call(messages, code)) {
         continue;
       }
@@ -101,17 +101,17 @@ export class MessageRegistry {
     }
   }
 
-  /** Сбрасывает все глобальные переопределения к встроенным сообщениям. */
+  /** Resets all global overrides to the built-in messages. */
   static reset(): void {
     MessageRegistry.defaults = { ...BUILT_IN };
   }
 
   /**
-   * Строит итоговое сообщение для кода ошибки.
+   * Builds the final message for an error code.
    *
-   * @param code Код правила (например, `minLength`).
-   * @param localMessage Локальный `message` из опций декоратора (приоритетен).
-   * @param params Значения плейсхолдеров.
+   * @param code Rule code (for example `minLength`).
+   * @param localMessage Local `message` from the decorator options (takes priority).
+   * @param params Placeholder values.
    */
   static format(code: string, localMessage: string | undefined, params: MessageParams): string {
     const template =

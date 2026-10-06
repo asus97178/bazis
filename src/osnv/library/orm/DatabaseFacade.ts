@@ -10,8 +10,8 @@ import { physicalColumnTypes } from "./Schema/physicalColumnTypes";
 import { bindResolvedForeignKey } from "./Providers/resolvedForeignKey";
 
 /**
- * Управление самой базой данных: создание схемы, сырой SQL, транзакции, ping.
- * Доступно как `dbContext.database`.
+ * Management of the database itself: schema creation, raw SQL, transactions, ping.
+ * Available as `dbContext.database`.
  */
 export class DatabaseFacade {
   constructor(
@@ -37,8 +37,8 @@ export class DatabaseFacade {
       throw new SchemaAdmissionError("ORM_SCHEMA_PROVIDER_UNSUPPORTED", "Database defaults in exact schema admission require PostgreSQL.");
     }
     const dialect = this.provider.dialect;
-    // Таблицы создаём в порядке FK-зависимостей: СУБД со строгими FK (PostgreSQL)
-    // требуют, чтобы ссылаемая таблица уже существовала.
+    // Create tables in FK dependency order: databases with strict FKs (PostgreSQL)
+    // require the referenced table to exist already.
     for (const model of this.orderByDependencies(this.models.entities)) {
       await this.provider.execute(dialect.createTableSql(model, this.foreignKeysFor(model)), []);
       for (const indexSql of dialect.createIndexSql(model)) {
@@ -48,10 +48,11 @@ export class DatabaseFacade {
   }
 
   /**
-   * Аддитивная авто-миграция схемы для всех сущностей контекста (включается
-   * в модуле: `ormOsnv: { migrateOnStart: true }`): интроспектит БД, сравнивает с моделью и применяет недостающие
-   * таблицы/колонки/индексы в одной транзакции. Деструктивные расхождения не
-   * выполняются — возвращаются как `warnings`.
+   * Additive auto-migration of the schema for all context entities (enabled in
+   * the module: `ormOsnv: { migrateOnStart: true }`): introspects the database,
+   * compares it with the model and applies the missing tables/columns/indexes in
+   * one transaction. Destructive differences are not applied; they are
+   * returned as `warnings`.
    */
   async migrate(): Promise<MigrationResult> {
     this.assertNoPostgresOnlyDefaults();
@@ -66,7 +67,7 @@ export class DatabaseFacade {
   }
 
   private async migrateCore(): Promise<MigrationResult> {
-    // Дифф упорядочивает createTable по FK-зависимостям (referenced -> dependent).
+    // The diff orders createTable by FK dependencies (referenced -> dependent).
     const targets = this.orderByDependencies(this.models.entities);
     const types = this.provider.dialect.name === "postgres" ? physicalColumnTypes(this.models.entities) : undefined;
     const foreignKeys = new Map(targets.map((model) => [model, this.foreignKeysFor(model, types)]));
@@ -78,9 +79,9 @@ export class DatabaseFacade {
   }
 
   /**
-   * Топологическая сортировка сущностей: модель, на которую ссылается FK,
-   * идёт раньше зависимой. Самоссылки игнорируются; циклы (редкие, через
-   * nullable-FK) не зацикливают обход — порядок для них произвольный.
+   * Topological sort of entities: the model referenced by an FK comes before
+   * the dependent one. Self-references are ignored; cycles (rare, through
+   * nullable FKs) do not loop the traversal, their order is arbitrary.
    */
   private orderByDependencies(models: readonly EntityModel[]): EntityModel[] {
     const set = new Set(models);
@@ -118,7 +119,7 @@ export class DatabaseFacade {
     }
   }
 
-  /** Разрешает FK-метаданные модели в имена колонок/таблиц для DDL. */
+  /** Resolves the model's FK metadata into column/table names for DDL. */
   private foreignKeysFor(model: EntityModel, types?: ReturnType<typeof physicalColumnTypes>): ForeignKeyConstraint[] {
     const constraints: ForeignKeyConstraint[] = [];
     for (const fk of model.foreignKeys) {
@@ -147,7 +148,7 @@ export class DatabaseFacade {
     return constraints;
   }
 
-  /** Имя таблицы для FK/DDL: PostgreSQL uses `schema.table`. */
+  /** Table name for FK/DDL: PostgreSQL uses `schema.table`. */
   private referencedTableName(model: EntityModel): string {
     if (this.provider.dialect.name === "postgres" && model.schema !== undefined) {
       return `${model.schema}.${model.tableName}`;
@@ -156,8 +157,8 @@ export class DatabaseFacade {
   }
 
   /**
-   * Выполняет сырой изменяющий SQL с безопасной подстановкой параметров через
-   * плейсхолдеры `{0}`, `{1}`, ... — значения уходят в параметры, не в строку.
+   * Runs raw modifying SQL with safe parameter substitution through the
+   * `{0}`, `{1}`, ... placeholders: values go into parameters, not into the string.
    *
    * ```ts
    * await ctx.database.executeSqlRaw("UPDATE Users SET active = {0} WHERE id = {1}", false, id);
@@ -167,30 +168,30 @@ export class DatabaseFacade {
     return this.provider.execute(this.rewritePlaceholders(sql, params.length), params);
   }
 
-  /** Сырой SELECT с безопасной подстановкой параметров `{0}`. */
+  /** Raw SELECT with safe `{0}` parameter substitution. */
   querySqlRaw(sql: string, ...params: SqlParam[]): Promise<Row[]> {
     return this.provider.query(this.rewritePlaceholders(sql, params.length), params);
   }
 
   /**
-   * Применяет версионированные миграции с историей (`__OsnvMigrations`).
-   * Compile-safe: миграции передаются явным массивом.
+   * Applies versioned migrations with history (`__OsnvMigrations`).
+   * Compile-safe: migrations are passed as an explicit array.
    */
   migrateVersioned(migrations: readonly Migration[]): Promise<VersionedMigrationResult> {
     return new MigrationRunner(this.provider, migrations).migrate();
   }
 
-  /** Откатывает последние `steps` версионированных миграций (нужен `down`). */
+  /** Rolls back the last `steps` versioned migrations (requires `down`). */
   rollbackVersioned(migrations: readonly Migration[], steps = 1): Promise<VersionedMigrationResult> {
     return new MigrationRunner(this.provider, migrations).rollback(steps);
   }
 
-  /** Выполняет работу в транзакции БД (в callback — исполнитель транзакции). */
+  /** Runs work in a database transaction (the callback gets the transaction executor). */
   transaction<T>(work: (tx: DbExecutor) => Promise<T>): Promise<T> {
     return this.provider.transaction(work);
   }
 
-  /** Проверка соединения. */
+  /** Connection check. */
   canConnect(): Promise<boolean> {
     return this.provider.ping();
   }

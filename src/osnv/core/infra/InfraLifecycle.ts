@@ -7,12 +7,13 @@ import type { ConfigRegistry } from "../kernel/config/ConfigRegistry";
 const DEFAULT_INFRA_PHASE = -100;
 
 /**
- * Hosted-сервис, который оборачивает {@link InfraConnector} в жизненный цикл
- * ядра: открывает соединение на старте и закрывает на остановке. Один lifecycle
- * на коннектор. DI владеет lifecycle даже при разрешении клиента до старта.
+ * Hosted service that wraps an {@link InfraConnector} into the kernel
+ * lifecycle: opens the connection at start and closes it at shutdown. One
+ * lifecycle per connector. DI owns the lifecycle even when the client is
+ * resolved before start.
  *
- * Фаза берётся из коннектора (по умолчанию отрицательная), чтобы соединения
- * поднялись раньше HTTP-сервера и фоновых задач, а гасились — после них.
+ * The phase comes from the connector (negative by default), so connections
+ * come up before the HTTP server and background tasks and go down after them.
  */
 export class InfraLifecycle<TClient> implements HostedService {
   public readonly phase: number;
@@ -78,7 +79,7 @@ export class InfraLifecycle<TClient> implements HostedService {
     return this.disposePromise;
   }
 
-  /** Имя инстанса инфраструктуры (ключ в манифесте `@Infra`) — для диагностики. */
+  /** Infrastructure instance name (the key in the `@Infra` manifest), for diagnostics. */
   public get instanceName(): string {
     return this.name;
   }

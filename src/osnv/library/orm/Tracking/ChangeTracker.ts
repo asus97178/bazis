@@ -1,9 +1,9 @@
-import type { EntityModel, PropertyModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import { DbUpdateError, OrmError } from "../errors";
 import { KeyTuple } from "../Metadata/KeyTuple";
 import { EntityState } from "./EntityState";
 
-/** Снимок исходных значений свойств (для snapshot change tracking). */
+/** Snapshot of the original property values (for snapshot change tracking). */
 type Snapshot = Record<string, unknown>;
 
 interface SnapshotState {
@@ -11,48 +11,48 @@ interface SnapshotState {
   readonly jsonSignatures: Map<string, string>;
 }
 
-/** Запись трекера об одной сущности. */
+/** Tracker record for one entity. */
 export interface TrackedEntry {
   readonly entity: object;
   readonly model: EntityModel;
   state: EntityState;
-  /** Снимок на момент загрузки/attach; отсутствует у Added. */
+  /** Snapshot taken at load/attach time; Added entries have none. */
   snapshot?: Snapshot;
-  /** Предвычисленные JSON-подписи snapshot-а, чтобы DetectChanges не сериализовал его повторно. */
+  /** Precomputed JSON signatures of the snapshot, so DetectChanges does not serialize it again. */
   snapshotJsonSignatures?: Map<string, string>;
-  /** Имена свойств, изменившихся относительно снимка (после DetectChanges). */
+  /** Names of properties changed relative to the snapshot (after DetectChanges). */
   modifiedProperties: Set<string>;
 }
 
 /**
- * Snapshot change tracking + identity-map.
+ * Snapshot change tracking + identity map.
  *
- * При загрузке/attach сохраняем копию значений; на `DetectChanges` сравниваем
- * текущие значения со снимком. Дополнительно ведётся карта идентичности по
- * (модель, значение ключа): повторная материализация той же строки возвращает
- * уже отслеживаемый инстанс (как `Find`/identity resolution в EF Core), что
- * исключает дубли объектов и рассинхрон трекинга.
+ * On load/attach a copy of the values is kept; `DetectChanges` compares the
+ * current values with the snapshot. An identity map by (model, key value) is
+ * also maintained: materializing the same row again returns the already tracked
+ * instance (like `Find`/identity resolution in EF Core), which prevents
+ * duplicate objects and tracking drift.
  */
 export class ChangeTracker {
   private readonly entries = new Map<object, TrackedEntry>();
   /** Explicit Update is an instruction to write every non-key column, even if no snapshot diff exists. */
   private readonly explicitUpdateSets = new WeakSet<Set<string>>();
-  /** Вторичный индекс по ключу: model -> (keyValue -> entry). */
+  /** Secondary index by key: model -> (keyValue -> entry). */
   private readonly identity = new Map<EntityModel, Map<string, TrackedEntry>>();
 
   constructor() { trackerEntries.set(this, this.entries); }
 
   /**
-   * Регистрирует сущность, прочитанную из БД, как Unchanged. Возвращает
-   * КАНОНИЧЕСКИЙ инстанс: если строка с таким ключом уже отслеживается,
-   * вернётся ранее загруженный объект (а `entity` отбрасывается).
+   * Registers an entity read from the database as Unchanged. Returns the
+   * CANONICAL instance: if a row with this key is already tracked, the
+   * previously loaded object is returned (and `entity` is discarded).
    */
   trackLoaded(entity: object, model: EntityModel): object {
     const keyValue = KeyTuple.fromEntity(model, entity as Record<string, unknown>);
     if (keyValue) {
       const existing = this.identityMap(model).get(keyValue.toString());
       if (existing) {
-        return existing.entity; // уже отслеживается — канонический инстанс выигрывает
+        return existing.entity; // already tracked: the canonical instance wins
       }
     }
     if (this.entries.has(entity)) {
@@ -101,7 +101,7 @@ export class ChangeTracker {
   }
 
   add(entity: object, model: EntityModel): void {
-    // Ключ Added ещё не известен (генерируется БД) — индексируем после save.
+    // The Added key is not known yet (the database generates it); index it after save.
     this.set(entity, model, EntityState.Added, undefined);
   }
 
@@ -113,7 +113,7 @@ export class ChangeTracker {
     const entry = this.entries.get(entity) ?? this.set(entity, model, EntityState.Modified, this.snapshot(entity, model));
     this.assertKeyUnchanged(entry);
     entry.state = EntityState.Modified;
-    // Явный Update без снимка-источника: считаем изменёнными все не-ключевые колонки.
+    // Explicit Update without a source snapshot: treat all non-key columns as modified.
     entry.modifiedProperties = new Set(
       model.properties.filter((property) => !property.isKey).map((property) => property.propertyName),
     );
@@ -122,7 +122,7 @@ export class ChangeTracker {
 
   remove(entity: object, model: EntityModel): void {
     const existing = this.entries.get(entity);
-    // Удаление ещё не сохранённой (Added) сущности — просто открепляем.
+    // Removing a not yet saved (Added) entity just detaches it.
     if (existing?.state === EntityState.Added) {
       this.entries.delete(entity);
       this.unindexByKey(existing);
@@ -139,8 +139,8 @@ export class ChangeTracker {
   }
 
   /**
-   * Сравнивает текущие значения отслеживаемых Unchanged/Modified сущностей со
-   * снимками и помечает изменённые свойства. Вызывается перед SaveChanges.
+   * Compares the current values of tracked Unchanged/Modified entities with the
+   * snapshots and marks the changed properties. Called before SaveChanges.
    */
   detectChanges(): void {
     for (const entry of this.entries.values()) {
@@ -194,7 +194,7 @@ export class ChangeTracker {
     return this.entries.get(entity)?.state ?? EntityState.Detached;
   }
 
-  /** Возвращает отслеживаемую (не удалённую) сущность по ключу, если есть. */
+  /** Returns the tracked (not deleted) entity by key, if any. */
   tryGetByKey(model: EntityModel, key: unknown): object | undefined {
     if (key === null || key === undefined) {
       return undefined;
@@ -203,7 +203,7 @@ export class ChangeTracker {
     return entry && entry.state !== EntityState.Deleted ? entry.entity : undefined;
   }
 
-  /** Применяет результат успешного сохранения: фиксирует новый снимок/состояние. */
+  /** Applies the result of a successful save: commits the new snapshot/state. */
   acceptChanges(entry: TrackedEntry): void {
     if (entry.state === EntityState.Deleted) {
       this.entries.delete(entry.entity);
@@ -216,7 +216,7 @@ export class ChangeTracker {
     entry.state = EntityState.Unchanged;
     this.applySnapshot(entry, snapshot);
     entry.modifiedProperties = new Set();
-    // Added получил сгенерированный ключ — индексируем для identity resolution.
+    // The Added entry got a generated key: index it for identity resolution.
     this.indexByKey(entry, key);
   }
 
@@ -265,7 +265,7 @@ export class ChangeTracker {
       this.applySnapshot(entry, snapshot);
       this.entries.set(entity, entry);
     }
-    // Индексируем по ключу всё, кроме Added (его ключ ещё не определён).
+    // Index everything by key except Added (its key is not known yet).
     if (state !== EntityState.Added) {
       this.indexByKey(entry, key);
     }
@@ -314,8 +314,8 @@ export class ChangeTracker {
     const jsonSignatures = new Map<string, string>();
     for (const property of model.properties) {
       const value = source[property.propertyName];
-      // json-колонки мутабельны: клонируем снимок, иначе мутация "на месте"
-      // (entity.meta.x = 1) сделает снимок равным текущему и не задетектится.
+      // json columns are mutable: clone the snapshot, otherwise an in-place mutation
+      // (entity.meta.x = 1) would make the snapshot equal to the current value and go undetected.
       if (property.type === "json") {
         const cloned = cloneJson(value);
         snapshot[property.propertyName] = cloned;
@@ -384,6 +384,8 @@ export function assertUniqueTrackedKeys(tracker: ChangeTracker, generated: reado
   }
   for (const entry of trackerEntries.get(tracker)?.values() ?? []) {
     if (entry.state === EntityState.Added && hasGeneratedKey(entry.model) && !returned.has(entry)) continue;
+    // The ORM assigns an unset UUID v7 key during save; the preflight after that checks the real value.
+    if (entry.state === EntityState.Added && hasUnassignedUuidV7Key(entry)) continue;
     const key = KeyTuple.fromEntity(entry.model, entry.entity as Record<string, unknown>)?.toString();
     if (key === undefined) continue;
     let modelKeys = identities.get(entry.model);
@@ -395,14 +397,21 @@ export function assertUniqueTrackedKeys(tracker: ChangeTracker, generated: reado
 }
 
 function hasGeneratedKey(model: EntityModel): boolean {
-  return model.key.length === 1 && model.key[0].generation !== "none";
+  return model.key.length === 1 && isDatabaseGenerated(model.key[0].generation);
+}
+
+function hasUnassignedUuidV7Key(entry: TrackedEntry): boolean {
+  const key = entry.model.key;
+  if (key.length !== 1 || key[0].generation !== "uuidV7") return false;
+  const value = (entry.entity as Record<string, unknown>)[key[0].propertyName];
+  return value === undefined || value === null || value === "";
 }
 
 function duplicateIdentity(model: EntityModel): DbUpdateError {
   return new DbUpdateError(`Another instance of entity "${model.name}" with the same primary key is already tracked.`);
 }
 
-/** Сравнение значения свойства со снимком (структурное для json). */
+/** Compares a property value with the snapshot (structurally for json). */
 function valuesEqual(current: unknown, snapshot: unknown, property: PropertyModel, snapshotJsonSignature?: string): boolean {
   if (property.type === "json") {
     return jsonEqual(current, snapshot, snapshotJsonSignature);

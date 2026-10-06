@@ -2,8 +2,8 @@ import type { Class } from "../token";
 import type { OsnvModuleRef } from "./types";
 
 /**
- * Собирает классы контроллеров из дерева модулей (сам модуль + `imports`,
- * рекурсивно). Дубликаты по ссылке на класс отбрасываются.
+ * Collects controller classes from the module tree (the module itself plus `imports`,
+ * recursively). Duplicates by class reference are dropped.
  */
 export function collectModuleControllers(
   roots: readonly OsnvModuleRef[],
