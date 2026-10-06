@@ -154,5 +154,5 @@ startImport() { return { queued: true }; }
 
 ## Дальше
 
-- Модели запросов и валидация *(в работе)*
+- [Модели запросов и валидация](validation.md)
 - [Провайдеры и DI](providers.md)
