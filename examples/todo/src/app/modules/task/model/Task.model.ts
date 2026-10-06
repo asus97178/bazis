@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "osnv/core/orm";
+import { Column, Entity, Index, UUID } from "bazis/core/orm";
 
 @Entity({ table: "tasks" })
 export class Task {

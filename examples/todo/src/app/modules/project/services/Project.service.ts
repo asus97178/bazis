@@ -1,5 +1,5 @@
-import { paginate, UniqueViolationError, type PageResult } from "osnv/core/orm";
-import type { ListQuery } from "osnv/library/jsonapi";
+import { paginate, UniqueViolationError, type PageResult } from "bazis/core/orm";
+import type { ListQuery } from "bazis/library/jsonapi";
 import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/Project.requests";
 import { toProjectResponse, type ProjectResponse } from "../http/contracts/Project.responses";
 import { Project } from "../model/Project.model";

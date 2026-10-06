@@ -1,5 +1,5 @@
 # Runs scripts/ci.ts on a GitHub-hosted ubuntu-latest (glibc x64) with the
-# official Bun release; scripts/osnv-bun refuses it unless its hash matches
+# official Bun release; scripts/bazis-bun refuses it unless its hash matches
 # toolchain/bun.json. A cloud runner is also what npm --provenance requires.
 name: CI
 
@@ -33,21 +33,21 @@ jobs:
         run: |
           curl -fsSL -o "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip
           unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
-          echo "OSNV_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
+          echo "BAZIS_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
 
       - name: Toolchain check
-        run: ./scripts/osnv-bun --no-env-file run toolchain:check
+        run: ./scripts/bazis-bun --no-env-file run toolchain:check
 
       - name: Install dependencies
-        run: ./scripts/osnv-bun --no-env-file install --frozen-lockfile
+        run: ./scripts/bazis-bun --no-env-file install --frozen-lockfile
 
       - name: Pipeline
         if: ${{ !inputs.live }}
-        run: ./scripts/osnv-bun --no-env-file run ci
+        run: ./scripts/bazis-bun --no-env-file run ci
 
       - name: Pipeline with live PostgreSQL
         if: ${{ inputs.live }}
-        run: ./scripts/osnv-bun --no-env-file run ci -- --live "$RUNNER_TEMP/live-postgres-${{ github.run_id }}"
+        run: ./scripts/bazis-bun --no-env-file run ci -- --live "$RUNNER_TEMP/live-postgres-${{ github.run_id }}"
 
       - name: Keep live evidence
         if: ${{ inputs.live && always() }}
@@ -80,28 +80,28 @@ jobs:
         run: |
           curl -fsSL -o "$RUNNER_TEMP/bun.zip" https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip
           unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
-          echo "OSNV_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
+          echo "BAZIS_BUN_BIN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
 
       - name: Tag matches the package version and the changelog
         run: |
-          version="$(node -p "require('./src/osnv/package.json').version")"
+          version="$(node -p "require('./src/bazis/package.json').version")"
           test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != package version $version"; exit 1; }
           awk -v v="$version" '$0 ~ "^## " v " " {f=1; next} /^## / {f=0} f' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           test -s "$RUNNER_TEMP/notes.md" || { echo "CHANGELOG.md has no section for $version"; exit 1; }
 
       - name: Pack
         run: |
-          ./scripts/osnv-bun --no-env-file run toolchain:check
+          ./scripts/bazis-bun --no-env-file run toolchain:check
           mkdir -p "$RUNNER_TEMP/pkg"
-          (cd src/osnv && "$OSNV_BUN_BIN" pm pack --destination "$RUNNER_TEMP/pkg")
+          (cd src/bazis && "$BAZIS_BUN_BIN" pm pack --destination "$RUNNER_TEMP/pkg")
           ls -l "$RUNNER_TEMP/pkg"
 
       - name: Publish to npm with provenance
-        run: npm publish "$RUNNER_TEMP"/pkg/osnv-*.tgz --provenance --access public
+        run: npm publish "$RUNNER_TEMP"/pkg/bazis-*.tgz --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/pkg/osnv-*.tgz --title "osnv $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/pkg/bazis-*.tgz --title "bazis $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
         env:
           GH_TOKEN: ${{ github.token }}

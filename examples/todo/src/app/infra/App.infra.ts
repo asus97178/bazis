@@ -1,13 +1,13 @@
-import { Infra } from "osnv/core/infra";
-import { ormOsnvConnect } from "osnv/core/orm";
+import { Infra } from "bazis/core/infra";
+import { ormBazisConnect } from "bazis/core/orm";
 import { dbConfig } from "../config/db.config";
 
 /**
- * Infrastructure of the app. `ormOsnvConnect` opens the PostgreSQL pool
+ * Infrastructure of the app. `ormBazisConnect` opens the PostgreSQL pool
  * before the HTTP server starts and publishes it as DATABASE_PROVIDER;
- * feature modules attach their DbContext to it through `ormOsnv`.
+ * feature modules attach their DbContext to it through `ormBazis`.
  */
 @Infra({
-  db: ormOsnvConnect(dbConfig),
+  db: ormBazisConnect(dbConfig),
 })
 export class AppInfra {}
