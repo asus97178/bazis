@@ -68,7 +68,7 @@ auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 | `hostname` | Все интерфейсы | Адрес. Созданный CLI проект слушает `127.0.0.1`, если не задан `HOST` |
 | `prefix` | — | Общий префикс маршрутов: `prefix: "api"` → `/api/tasks` |
 | `health` | Выключено | `true` — маршрут `GET /health` |
-| `docs` | Выключено | `true` — документация API: `/docs` и `/docs/openapi.json` |
+| `docs` | Вне production | Документация API: `/docs` и `/docs/openapi.json`; `false` — выключить, `true` — включить и в production |
 | `middleware` | — | Глобальные [middleware](middleware.md) |
 | `accessLog` | Выключено | Журнал запросов |
 | `cors` | Выключено | [CORS](middleware.md#cors-и-журнал-запросов) |
