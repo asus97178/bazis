@@ -2,12 +2,17 @@ import { parseModuleName, type ModuleNaming } from "../naming";
 import { validatePackParts } from "../parseCli";
 import { buildModuleTemplates, type ModuleTemplateFiles } from "./module";
 
-export function buildPackTemplates(naming: ModuleNaming, partNames: readonly string[]): readonly ModuleTemplateFiles[] {
+/** The folder of a pack part: `prices` → `prices_module`. */
+export function packPartFolder(part: ModuleNaming): string {
+  return `${part.folder}_module`;
+}
+
+export function buildPackTemplates(naming: ModuleNaming, partNames: readonly string[], command?: string): readonly ModuleTemplateFiles[] {
   validatePackParts(partNames);
   const parts = partNames.map((name) => {
     const part = parseModuleName(name);
     // A part names a responsibility (Tables), not a CRUD entity (Table).
-    return { ...part, entity: part.module, folder: `${part.folder}_module` };
+    return { ...part, entity: part.module, folder: packPartFolder(part) };
   });
   if (parts.some((part) => part.moduleClass === naming.moduleClass)) {
     throw new Error("A pack and its parts must have distinct module class names.");
@@ -32,7 +37,7 @@ export class ${naming.moduleClass} {}
 Passport version: 1.0. Type: composite.
 Status: composition scaffold generated; the parts are not implemented yet.
 Entry: [${naming.module}.module.ts](${naming.module}.module.ts).
-Before changing it, read AGENTS.md and docs/architecture/MODULE_ARCHITECTURE.md.
+${command === undefined ? "" : `Created with: \`${command}\`.\n`}Before changing it, read AGENTS.md and docs/architecture/MODULE_ARCHITECTURE.md.
 
 ## Responsibility and parts
 
@@ -69,7 +74,7 @@ exports, no cycles or duplicate registrations, the parts' tests.
 A generated scaffold does not prove the pack is ready.
 `,
     },
-    ...parts.flatMap((part) => buildModuleTemplates(part, "empty").map((file) => ({
+    ...parts.flatMap((part) => buildModuleTemplates(part, "empty", undefined, { command, pack: naming.moduleClass }).map((file) => ({
       relativePath: `${part.folder}/${file.relativePath}`, content: file.content,
     }))),
   ];

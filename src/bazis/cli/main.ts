@@ -26,6 +26,8 @@ Generation options:
   --link-framework      Depend on that local checkout through a file: link (new only)
   --modules-root <path>  Modules root (default: src/app/modules)
   --app-module <path>    Host module (default: {modules-root}/App.module.ts)
+  --pack <Name>          Module only: add it as a part of the composite <Name>
+                         ({modules-root}/<name>_modules/<module>_module)
   --empty               Module entry and MODULE.md only
   --minimal             Compact example CRUD and MODULE.md (default)
   --full                Example CRUD/list/cache/auth/background/AI and MODULE.md;
@@ -47,6 +49,7 @@ Examples (from the project root):
   bunx bazis g m Guest --no-codegen
   bunx bazis g module Mailer --empty --no-register
   bunx bazis g pack DataManager --parts tables,fields,validators,records
+  bunx bazis g module Prices --empty --pack Catalog
   bunx bazis codegen --target production
   bunx bazis dev --watch
   bunx bazis test
@@ -106,7 +109,7 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
     const { generateModule, generateModulePack } = await import("./generateModule");
     const result = args.generator === "pack"
       ? await generateModulePack({ ...options, parts: args.parts })
-      : await generateModule({ ...options, profile: args.profile });
+      : await generateModule({ ...options, profile: args.profile, pack: args.pack });
     runtime.log(`[bazis] ${result.dryRun ? "planned" : "generated"} ${args.generator}: ${result.moduleDir}`);
     for (const change of result.changes) runtime.log(`  ${change.action === "create" ? "+" : "~"} ${change.path}`);
     for (const warning of result.warnings) runtime.log(`[bazis] ${warning}`);

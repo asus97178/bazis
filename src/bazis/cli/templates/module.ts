@@ -1,5 +1,5 @@
 import type { ModuleNaming } from "../naming";
-import { modulePassport } from "./passport";
+import { modulePassport, type PassportOrigin } from "./passport";
 
 export type ModuleTemplateProfile = "empty" | "minimal" | "full";
 
@@ -20,11 +20,12 @@ export function buildModuleTemplates(
   profile: ModuleTemplateProfile = "minimal",
   /** null: the host has no auth helpers, so `full` emits no @Authorize. */
   authImportPath: string | null = "../../auth",
+  origin: PassportOrigin = {},
 ): readonly ModuleTemplateFiles[] {
   if (profile === "empty") {
     return [
       { relativePath: `${naming.module}.module.ts`, content: `import { Module } from "bazis/core/di";\n\n@Module({ imports: [], exports: [] })\nexport class ${naming.moduleClass} {}\n` },
-      { relativePath: "MODULE.md", content: modulePassport(naming, profile) },
+      { relativePath: "MODULE.md", content: modulePassport(naming, profile, origin) },
     ];
   }
 
@@ -38,7 +39,7 @@ export function buildModuleTemplates(
     { relativePath: `http/contracts/${naming.module}.requests.ts`, content: requestFile(naming) },
     { relativePath: `http/contracts/${naming.module}.responses.ts`, content: responseFile(naming) },
     { relativePath: `http/contracts/${naming.module}List.query.ts`, content: listQueryFile(naming) },
-    { relativePath: "MODULE.md", content: modulePassport(naming, profile) },
+    { relativePath: "MODULE.md", content: modulePassport(naming, profile, origin) },
   ];
 
   if (profile === "minimal") {

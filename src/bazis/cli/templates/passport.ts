@@ -1,13 +1,22 @@
 import type { ModuleNaming } from "../naming";
 import type { ModuleTemplateProfile } from "./module";
 
-export function modulePassport(n: ModuleNaming, profile: ModuleTemplateProfile): string {
+/** Facts the generator knows about how the module was created. */
+export interface PassportOrigin {
+  /** The CLI command that created the module, recorded as the architecture rules require. */
+  readonly command?: string;
+  /** Module class of the composite module this one is a part of. */
+  readonly pack?: string;
+}
+
+export function modulePassport(n: ModuleNaming, profile: ModuleTemplateProfile, origin: PassportOrigin = {}): string {
+  const type = origin.pack === undefined ? "atomic" : `atomic, a part of the composite ${origin.pack} ([passport](../MODULE.md))`;
   const header = `# ${n.moduleClass}
 
-Passport version: 1.0. Type: atomic. CLI profile: ${profile}.
+Passport version: 1.0. Type: ${type}. CLI profile: ${profile}.
 Status: scaffold generated; the domain implementation and checks are not done.
 Entry: [${n.module}.module.ts](${n.module}.module.ts), class ${n.moduleClass}, no arguments.
-
+${origin.command === undefined ? "" : `Created with: \`${origin.command}\`.\n`}
 Before changing it, read AGENTS.md and docs/architecture/MODULE_ARCHITECTURE.md.
 This passport covers the scaffold files. The author defines the responsibility
 and fields before implementing the domain function and updates this passport

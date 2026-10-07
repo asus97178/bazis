@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.8 — 2026-10-08
+
+### Added
+
+- `bazis g module <Name> --pack <Pack>` adds a part to an existing composite
+  module: it goes into `<pack>_modules/<name>_module` like the parts made by
+  `g pack`, is connected in the pack root, and its passport names the pack.
+  The command reminds to add the part to the pack passport's parts table.
+  Before, a part had to be added with `--modules-root` and `--app-module`, and
+  it landed in `<name>/` without any link to the pack.
+- Generated `MODULE.md` passports record the creation command (`Created with:
+  \`bunx bazis g module Task --minimal\``), as the architecture rules require;
+  pack parts record the pack command. Before, the author had to add it by hand.
+
 ## 0.97.7 — 2026-10-08
 
 ### Fixed

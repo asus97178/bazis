@@ -2,7 +2,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, rename, rm, rmdir, writeFile } from "node:fs/promises";
 import { buildModuleTemplates, type ModuleTemplateFiles, type ModuleTemplateProfile } from "./templates/module";
-import { buildPackTemplates } from "./templates/pack";
+import { buildPackTemplates, packPartFolder } from "./templates/pack";
 import { parseModuleName, type ModuleNaming } from "./naming";
 import { moduleImportPath, registerModuleInSource } from "./moduleRegistration";
 
@@ -16,11 +16,16 @@ export interface GenerateModuleOptions {
   readonly register?: boolean;
   readonly force?: boolean;
   readonly profile?: ModuleTemplateProfile;
+  /**
+   * Composite module to add this module to as a part: `Catalog` puts it into
+   * `{modulesRoot}/catalog_modules/<name>_module` and connects it in the pack root.
+   */
+  readonly pack?: string;
   /** Validate and return the plan without writing files. */
   readonly dryRun?: boolean;
 }
 
-export interface GenerateModulePackOptions extends Omit<GenerateModuleOptions, "profile"> {
+export interface GenerateModulePackOptions extends Omit<GenerateModuleOptions, "profile" | "pack"> {
   readonly parts: readonly string[];
 }
 
@@ -44,7 +49,14 @@ export async function generateModule(options: GenerateModuleOptions): Promise<Ge
   const naming = parseModuleName(options.name);
   const profile = options.profile ?? "minimal";
   if (!["empty", "minimal", "full"].includes(profile)) throw new Error(`Unknown profile: ${profile}`);
+  const command = creationCommand("module", options, [`--${profile}`]);
   const modulesRoot = await canonicalDirectory(path.resolve(options.modulesRoot ?? "src/app/modules"));
+  // A part of a composite module lives in its pack and is connected in the pack root.
+  const pack = options.pack === undefined ? undefined : await findPack(modulesRoot, options.pack);
+  if (pack && options.appModulePath !== undefined) throw new Error("--pack connects the part in the pack root; do not combine it with --app-module.");
+  const targetRoot = pack?.dir ?? modulesRoot;
+  const folder = pack ? packPartFolder(naming) : naming.folder;
+  const target: GenerateModuleOptions = pack ? { ...options, modulesRoot: targetRoot, appModulePath: pack.entry } : options;
   let authImportPath: string | null | undefined;
   if (profile === "full") {
     // The host's auth helpers are optional: without them the controller is
@@ -52,18 +64,46 @@ export async function generateModule(options: GenerateModuleOptions): Promise<Ge
     const authDir = path.resolve("src/app/modules/auth");
     const helpers = await Promise.all(["tokenKinds.ts", "jwtAuth.ts"].map(async (helper) => (await fileInfo(path.join(authDir, helper)))?.isFile() === true));
     authImportPath = helpers.every(Boolean)
-      ? moduleImportPath(path.join(modulesRoot, naming.folder, "http", `${naming.module}.controller.ts`), await canonicalDirectory(authDir))
+      ? moduleImportPath(path.join(targetRoot, folder, "http", `${naming.module}.controller.ts`), await canonicalDirectory(authDir))
       : null;
   }
-  const result = await generateFiles(options, naming, naming.folder, buildModuleTemplates(naming, profile, authImportPath));
-  return authImportPath === null
-    ? { ...result, warnings: [...result.warnings, "No auth helpers in src/app/modules/auth: the full profile controller has no @Authorize. Protect its routes before exposing them."] }
-    : result;
+  const templates = buildModuleTemplates(naming, profile, authImportPath, { command, pack: pack?.moduleClass });
+  const result = await generateFiles(target, naming, folder, templates);
+  const warnings = [...result.warnings];
+  if (authImportPath === null) warnings.push("No auth helpers in src/app/modules/auth: the full profile controller has no @Authorize. Protect its routes before exposing them.");
+  if (pack) warnings.push(`Add ${naming.moduleClass} to the parts table in ${path.relative(process.cwd(), path.join(pack.dir, "MODULE.md"))}.`);
+  return { ...result, warnings };
 }
 
 export async function generateModulePack(options: GenerateModulePackOptions): Promise<GenerateModuleResult> {
   const naming = parseModuleName(options.name);
-  return generateFiles(options, naming, `${naming.folder}_modules`, buildPackTemplates(naming, options.parts));
+  const command = creationCommand("pack", options, ["--parts", options.parts.join(",")]);
+  return generateFiles(options, naming, `${naming.folder}_modules`, buildPackTemplates(naming, options.parts, command));
+}
+
+/** The existing composite module `name` under `modulesRoot`: `Catalog` → `catalog_modules/Catalog.module.ts`. */
+async function findPack(modulesRoot: string, name: string): Promise<{ readonly dir: string; readonly entry: string; readonly moduleClass: string }> {
+  const naming = parseModuleName(name);
+  const dir = path.join(modulesRoot, `${naming.folder}_modules`);
+  const entry = path.join(dir, `${naming.module}.module.ts`);
+  if ((await fileInfo(entry))?.isFile() !== true) {
+    throw new Error(`Pack ${naming.moduleClass} not found: ${path.relative(process.cwd(), entry)}. Create it with bazis g pack ${naming.module} --parts <a,b>.`);
+  }
+  return { dir, entry, moduleClass: naming.moduleClass };
+}
+
+/**
+ * The command recorded in the passport, as the architecture rules require. It is
+ * rebuilt from the options in a canonical form, so the passport shows the same
+ * text however the flags were ordered or aliased.
+ */
+function creationCommand(generator: "module" | "pack", options: GenerateModuleOptions, extra: readonly string[]): string {
+  const parts = ["bunx bazis g", generator, options.name, ...extra];
+  if (options.pack !== undefined) parts.push("--pack", options.pack);
+  if (options.modulesRoot !== undefined) parts.push("--modules-root", options.modulesRoot);
+  if (options.appModulePath !== undefined) parts.push("--app-module", options.appModulePath);
+  if (options.register === false) parts.push("--no-register");
+  return parts.join(" ");
 }
 
 async function generateFiles(options: GenerateModuleOptions, naming: ModuleNaming, folder: string, templates: readonly ModuleTemplateFiles[]): Promise<GenerateModuleResult> {

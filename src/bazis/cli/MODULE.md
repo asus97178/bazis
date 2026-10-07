@@ -150,6 +150,7 @@ In a created project the `dev`, `build`, `build:bin`, `codegen` scripts wrap
 | `--parts` | CSV string | Only pack, required | At least 2 non-empty distinct parts, names as for a module |
 | `--modules-root` | path string, cwd | `src/app/modules` | A non-empty value; an absolute path is allowed |
 | `--app-module` | path string, cwd | `{modules-root}/App.module.ts` | The import is computed relative to this file |
+| `--pack` | module name | — | `g module` only: adds the module as a part of the existing composite `{modules-root}/<pack>_modules`, in `<part>_module/`, connected in the pack root; not combined with `--app-module`. The part passport names the pack; the pack passport is the author's and is not rewritten (the command prints a reminder to add the part to its table) |
 | `--empty` | flag | false | Only module: the connection point and the passport |
 | `--minimal` | flag | true | Only module: CRUD and the passport |
 | `--full` | flag | false | Only module: CRUD/list/cache/auth/background/AI; the old alias is `--enterprise`. `@Authorize` is generated if the project has `src/app/modules/auth/{tokenKinds,jwtAuth}.ts`; otherwise the routes are public and the CLI warns. Running the host needs a cache (`runApp({ cache: memory() })`) and a database provider |
@@ -297,3 +298,7 @@ Regressions of query limits and cache saving:
 [codegen-dx.integration.test.ts](../core/scripts/test/codegen-dx.integration.test.ts).
 The commands ran through the qualified scripts/bazis-bun; compiler integrations use
 test --isolate --timeout 30000 with exact ./src/… paths.
+
+Generated passports record the creation command in a canonical form (`Created
+with: \`bunx bazis g module Task --minimal\``); the parts of a pack record the
+pack command. Since 0.97.8.
