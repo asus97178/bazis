@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.7 — 2026-10-08
+
+### Fixed
+
+- The 0.97.6 error for a token registered in two modules printed
+  `... one implementation per token: *** last registered ...` in the console:
+  the secret redaction applied to configuration errors read `token: the` as a
+  secret value. The text now reads `... one implementation per token, the last
+  registered one, from "AppModule" ...`, and the tests check the redacted text
+  the console shows.
+
 ## 0.97.6 — 2026-10-07
 
 ### Fixed
@@ -13,10 +24,10 @@ contain breaking changes, a patch version does not.
   registration wins), so the importer's registration replaces the imported
   module's, which that module cannot see. The error used to read `"Report"
   selects "IClock" from module "AppModule", which is not exported to this
-  consumer (key: undefined)`; now it names both modules and the fix:
-  `... "IClock" is registered in "ClockModule" and "AppModule", and the
-  application uses one implementation per token: the last registered, from
-  "AppModule", which "ClockModule" cannot see. Register "IClock" in one
+  consumer (key: undefined)`; now it names both modules and the fix (wording
+  corrected in 0.97.7): `... "IClock" is registered in "ClockModule" and
+  "AppModule", and the application uses one implementation per token, the last
+  registered one, from "AppModule", which "ClockModule" cannot see. Register "IClock" in one
   module, or give the implementations different keys (DI.keyedSingleton).`
 
 ### Changed

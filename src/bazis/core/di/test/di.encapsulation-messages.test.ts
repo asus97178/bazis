@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { DI, Module, ModuleEncapsulationError, createContainer, createToken, keyedDependency, singletonValue } from "../index";
+import { redactSensitiveText } from "../../../library/redaction";
 
 // The error tells why a provided service is not visible: the owner does not
 // export it, or the consumer does not import the owner. Both used to read
@@ -7,11 +8,13 @@ import { DI, Module, ModuleEncapsulationError, createContainer, createToken, key
 const CLOCK = createToken<string>("Clock");
 const REPORT = createToken<string>("Report");
 
+// The console prints DI errors through redactSensitiveText: check that text, so a
+// phrase like "token: the" cannot turn into "token: ***" unnoticed.
 function messageOf(build: () => unknown): string {
   try {
     build();
   } catch (error) {
-    if (error instanceof ModuleEncapsulationError) return error.message;
+    if (error instanceof ModuleEncapsulationError) return redactSensitiveText(error.message);
     throw error;
   }
   throw new Error("expected ModuleEncapsulationError");
@@ -52,7 +55,7 @@ test("a token registered in two modules names both and says how to fix it", () =
   @Module({ imports: [ClockModule], providers: [DI.singleton(DI.classProvider(IClock, FixedClock))], exports: [] })
   class AppModule {}
   expect(messageOf(() => createContainer(AppModule))).toContain(
-    `Module "ClockModule": "Report" depends on "IClock", but "IClock" is registered in "ClockModule" and "AppModule", and the application uses one implementation per token: the last registered, from "AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give the implementations different keys (DI.keyedSingleton).`,
+    `Module "ClockModule": "Report" depends on "IClock", but "IClock" is registered in "ClockModule" and "AppModule", and the application uses one implementation per token, the last registered one, from "AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give the implementations different keys (DI.keyedSingleton).`,
   );
 });
 
