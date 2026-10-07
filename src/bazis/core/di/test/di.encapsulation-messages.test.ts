@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { DI, Module, ModuleEncapsulationError, createContainer, createToken, singletonValue } from "../index";
+import { DI, Module, ModuleEncapsulationError, createContainer, createToken, keyedDependency, singletonValue } from "../index";
 
 // The error tells why a provided service is not visible: the owner does not
 // export it, or the consumer does not import the owner. Both used to read
@@ -36,5 +36,32 @@ test("imported, but the owner does not export it", () => {
   class ReportModule {}
   expect(messageOf(() => createContainer(ReportModule))).toContain(
     `Module "ReportModule": "Report" depends on "Clock", which module "ClockModule" provides but does not export. Add it to the exports of "ClockModule".`,
+  );
+});
+
+// One implementation per token for the whole application: a second registration
+// in the importer becomes the selected one, which the imported module cannot see.
+abstract class IClock { abstract now(): string; }
+class SystemClock implements IClock { now() { return "system"; } }
+class FixedClock implements IClock { now() { return "fixed"; } }
+class Report { constructor(readonly clock: IClock) {} }
+
+test("a token registered in two modules names both and says how to fix it", () => {
+  @Module({ providers: [DI.singleton(DI.classProvider(IClock, SystemClock)), DI.scoped(DI.classProvider(Report, Report, [IClock] as const))], exports: [IClock, Report] })
+  class ClockModule {}
+  @Module({ imports: [ClockModule], providers: [DI.singleton(DI.classProvider(IClock, FixedClock))], exports: [] })
+  class AppModule {}
+  expect(messageOf(() => createContainer(AppModule))).toContain(
+    `Module "ClockModule": "Report" depends on "IClock", but "IClock" is registered in "ClockModule" and "AppModule", and the application uses one implementation per token: the last registered, from "AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give the implementations different keys (DI.keyedSingleton).`,
+  );
+});
+
+test("the same for a keyed registration", () => {
+  @Module({ providers: [DI.keyedSingleton("main", DI.classProvider(IClock, SystemClock)), DI.scoped(DI.classProvider(Report, Report, [keyedDependency(IClock, "main")] as const))], exports: [IClock, Report] })
+  class ClockModule {}
+  @Module({ imports: [ClockModule], providers: [DI.keyedSingleton("main", DI.classProvider(IClock, FixedClock))], exports: [] })
+  class AppModule {}
+  expect(messageOf(() => createContainer(AppModule))).toContain(
+    `"Report" depends on "IClock" with key "main", but "IClock" with key "main" is registered in "ClockModule" and "AppModule"`,
   );
 });

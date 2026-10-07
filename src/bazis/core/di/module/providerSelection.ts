@@ -22,6 +22,8 @@ export function createProviderSelectionValidator(
 
   const selected = new Map<Token<unknown>, Map<ServiceKey | undefined, ModuleGraphRecord>>();
   const selectedFamilies = new Map<symbol, Map<ServiceKey | undefined, ModuleGraphRecord>>();
+  // Every module that registers a token (in registration order): the error names them all.
+  const registeredBy = new Map<Token<unknown>, Map<ServiceKey | undefined, ModuleGraphRecord[]>>();
   for (const definition of definitions) {
     const owner = recordOf.get(definition);
     if (!owner) continue;
@@ -29,6 +31,11 @@ export function createProviderSelectionValidator(
     const keys = selected.get(token) ?? new Map();
     keys.set(definition.key, owner);
     selected.set(token, keys);
+    const ownersByKey = registeredBy.get(token) ?? new Map<ServiceKey | undefined, ModuleGraphRecord[]>();
+    const owners = ownersByKey.get(definition.key) ?? [];
+    if (!owners.includes(owner)) owners.push(owner);
+    ownersByKey.set(definition.key, owners);
+    registeredBy.set(token, ownersByKey);
   }
   for (const registration of generics) {
     const owner = genericRecordOf.get(registration);
@@ -82,9 +89,34 @@ export function createProviderSelectionValidator(
       if (record.imports.some((imported) => exportsOwner(imported, owner, token))
         || globals.some((global) => exportsOwner(global, owner, token))) continue;
       throw new ModuleEncapsulationError([
-        `Module "${record.name}": "${tokenToDebugName(definition.provider.provide)}" selects "${tokenToDebugName(token)}"`
-        + ` from module "${owner.name}", which is not exported to this consumer (key: ${String(key)}).`,
+        selectionMessage(record, tokenToDebugName(definition.provider.provide), tokenToDebugName(token), key, owner,
+          registeredBy.get(token)?.get(key) ?? [owner]),
       ]);
     }
   };
+}
+
+/**
+ * Explains a selection the consumer cannot see. The usual cause: the token is
+ * registered in several modules, and the whole application uses the last
+ * registration, which comes from a module the consumer does not import.
+ */
+function selectionMessage(
+  record: ModuleGraphRecord,
+  consumer: string,
+  token: string,
+  key: ServiceKey | undefined,
+  owner: ModuleGraphRecord,
+  owners: readonly ModuleGraphRecord[],
+): string {
+  const subject = key === undefined ? `"${token}"` : `"${token}" with key ${JSON.stringify(String(key))}`;
+  const head = `Module "${record.name}": "${consumer}" depends on ${subject}`;
+  if (owners.length > 1) {
+    const modules = owners.map((item) => `"${item.name}"`).join(" and ");
+    return `${head}, but ${subject} is registered in ${modules}, and the application uses one implementation per token:`
+      + ` the last registered, from "${owner.name}", which "${record.name}" cannot see.`
+      + ` Register ${subject} in one module, or give the implementations different keys (DI.keyedSingleton).`;
+  }
+  return `${head}, but the application uses the implementation from "${owner.name}", which "${record.name}" cannot see.`
+    + ` Add "${owner.name}" to the imports of "${record.name}" and export ${subject} from it.`;
 }

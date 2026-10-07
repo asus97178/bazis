@@ -4,6 +4,26 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.6 — 2026-10-07
+
+### Fixed
+
+- A clear error when a token is registered in two modules and the imported
+  one uses it. The application has one implementation per token (the last
+  registration wins), so the importer's registration replaces the imported
+  module's, which that module cannot see. The error used to read `"Report"
+  selects "IClock" from module "AppModule", which is not exported to this
+  consumer (key: undefined)`; now it names both modules and the fix:
+  `... "IClock" is registered in "ClockModule" and "AppModule", and the
+  application uses one implementation per token: the last registered, from
+  "AppModule", which "ClockModule" cannot see. Register "IClock" in one
+  module, or give the implementations different keys (DI.keyedSingleton).`
+
+### Changed
+
+- Message text of that `ModuleEncapsulationError`; tests that match it in full
+  need an update.
+
 ## 0.97.5 — 2026-10-07
 
 ### Added
