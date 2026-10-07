@@ -5,7 +5,7 @@
 и фабрики, несколько реализаций одного контракта, ключи, ленивые
 зависимости и освобождение ресурсов.
 
-Все примеры проверены на одном модуле с bazis 0.97.3.
+Все примеры проверены на bazis 0.97.4.
 
 ## Способы регистрации
 
@@ -16,6 +16,7 @@
 | `singletonValue(TOKEN, value)` | Готовое значение |
 | `singletonFactory(TOKEN, [deps], factory)` | Результат функции |
 | `singletonFactoryWithResolver(TOKEN, [deps], factory)` | То же, функция получает ещё и контейнер |
+| `singletonAsyncFactory(TOKEN, [deps], async factory)` | Результат асинхронной функции; создаётся при запуске |
 | `DI.keyedSingleton(key, provider)` и др. | Реализацию под ключом |
 
 ## Значения
@@ -38,6 +39,16 @@ constructor(private readonly appName: AppName) {}   // "di-lab"
 
 Обычный `string` в конструкторе внедрить нельзя: строк в приложении много, и
 DI не знает, какая нужна. Нужен именованный тип с токеном, как `AppName`.
+Если оставить `string`, codegen остановится и подскажет оба выхода — токен
+или явный список зависимостей:
+
+```text
+[di:generate] ERROR: BAZIS_DI_DEPENDENCY_UNKNOWN: src/app/modules/Prim.ts:1: constructor parameter 1 "prefix"
+of "Greeter" has type "string", which cannot be injected: DI resolves dependencies by class, contract or token,
+and a plain type does not say which value to inject. Declare a token with the same name as a type alias
+(export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")) and register a value,
+or pass the deps explicitly: scoped(Greeter, Greeter, [TOKEN] as const).
+```
 
 ## Фабрики
 
@@ -196,7 +207,55 @@ middleware и проверках доступа он доступен как `ct
 параметр конструктора: зависимость видна в сигнатуре и проверяется до
 запуска.
 
-## Асинхронные фабрики *(в работе)*
+## Асинхронные фабрики
+
+Когда объект нельзя получить без `await` — подключение к базе, загрузка
+ключей, запрос к сервису настроек, — используйте асинхронную фабрику:
+
+```ts
+export interface Db { readonly connectedAt: string }
+export const Db = createToken<Db>("Db");
+
+providers: [
+  singletonAsyncFactory(Db, [] as const, async () => {
+    const connection = await connect(process.env.DATABASE_URL);
+    return connection;
+  }),
+],
+```
+
+Такой singleton создаётся **при запуске приложения** — до фоновых служб и
+HTTP-сервера. После этого его можно внедрять через конструктор, как любой
+другой сервис:
+
+```ts
+export class DbController {
+  constructor(private readonly db: Db) {}
+}
+```
+
+Если фабрика упала — база недоступна, ключ не найден, — приложение не
+запустится и завершится с кодом 1:
+
+```text
+[bazis] application failed: {
+  name: 'Error',
+  message: 'database is unreachable',
+  ...
+}
+```
+
+Это лучше, чем сервер, который стартовал и отвечает `500` на каждый запрос.
+
+Асинхронные фабрики могут зависеть друг от друга: bazis создаст их в нужном
+порядке. Тот же механизм работает для асинхронных фабрик с ключом
+(`DI.keyedSingleton(key, DI.asyncFactoryProvider(...))`).
+
+> [!NOTE]
+> Создание асинхронных singleton при запуске и ошибка codegen для
+> примитивных параметров — с версии 0.97.4. Раньше сервис из асинхронной
+> фабрики нельзя было внедрить через конструктор: каждый запрос падал с
+> `AsyncResolutionRequiredError`.
 
 ## Дальше
 
