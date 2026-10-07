@@ -16,7 +16,7 @@ Contracts of the lifecycle and configuration fixes: [partial passport](MODULE.md
 ## Lifecycle
 
 - `LifecycleCoordinator.ts`: boot/shutdown order: options fail-fast → `onInit` → hosted services by phase → `onBootstrap`; shutdown in reverse order with `shutdownTimeout`; rollback when startup fails.
-- `ApplicationLifetime.ts`: injectable lifetime: `onStarted/onStopping/onStopped` + programmatic `stop(exitCode)`.
+- `ApplicationLifetime.ts`: injectable lifetime: `onStarted/onStopping/onStopped` (a subscription made after its moment runs right away) + programmatic `stop(exitCode)`.
 - `lifecycleHooks.ts`: the `LIFECYCLE_HOOK` token (enumerable) + `addLifecycleHook`.
 - `Environment.ts`: the environment (`development|production|test`) from `BAZIS_ENV`/`NODE_ENV`, the `debug` flag.
 - `SupervisedHostedService.ts`: retry with exponential backoff; passes the startup signal and stops retrying on cancellation.

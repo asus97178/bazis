@@ -156,33 +156,35 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       const priority = Math.max(...candidates.map(candidate => candidate.priority));
       const winners = candidates.filter(candidate => candidate.priority === priority);
       const selected = winners[0];
-      if (winners.some(candidate => candidate.raw !== selected?.raw)) issues.push(`${fullKey(key)}: conflicting environment aliases`);
+      if (winners.some(candidate => candidate.raw !== selected?.raw)) issues.push(`${fullKey(key)} — conflicting environment aliases`);
       const raw = selected?.raw ?? (isSecret(cell) || isEnum(cell) ? cell.default : cell);
       let value: ConfigValueType | undefined;
       if (type === "secret") {
-        if (typeof raw !== "string" || !raw.trim()) issues.push(`${fullKey(key)}: required non-empty secret is not set (${names.get(key)!.join(", ")})`);
+        if (typeof raw !== "string" || !raw.trim()) issues.push(`${fullKey(key)} — required non-empty secret is not set (${names.get(key)!.join(", ")})`);
         else value = new Secret(raw);
       } else if (type === "number") {
         const parsed = Number(raw);
-        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)}: expected a finite number`);
+        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)} — expected a finite number`);
         else value = parsed;
       } else if (type === "boolean") {
         const normalized = String(raw).toLowerCase();
         if (normalized === "true" || normalized === "1") value = true;
         else if (normalized === "false" || normalized === "0") value = false;
-        else issues.push(`${fullKey(key)}: expected a boolean`);
+        else issues.push(`${fullKey(key)} — expected a boolean`);
       } else if (typeof raw === "string") value = raw;
-      else issues.push(`${fullKey(key)}: expected a string`);
+      else issues.push(`${fullKey(key)} — expected a string`);
       if (value === undefined) continue;
-      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)}: value is not one of the declared enum values`);
+      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)} — value is not one of the declared enum values`);
       try {
         const issue = validators[key]?.(value);
-        if (issue) issues.push(`${fullKey(key)}: ${issue}`);
-      } catch { issues.push(`${fullKey(key)}: validator failed`); }
+        if (issue) issues.push(`${fullKey(key)} — ${issue}`);
+      } catch { issues.push(`${fullKey(key)} — validator failed`); }
       values.set(key, value);
       inspection.push(Object.freeze({ key: fullKey(key), type: type as ConfigInspection["type"], env: names.get(key)!, source: selected?.source ?? (override === undefined ? "default" : environment), value: safeValue(fullKey(key), value) }));
     }
     if (issues.length) {
+      // "key — text", not "key: text": the console redaction would read
+      // "db.password: required" as a secret value and hide the word "required".
       let message = issues.join("; ");
       for (const [key, value] of values) {
         const sensitive = value instanceof Secret ? value.reveal() : typeof value === "string" && isSensitiveKey(key) ? value : undefined;
