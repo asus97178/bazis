@@ -4,6 +4,21 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.1 — 2026-10-07
+
+### Fixed
+
+- Unexpected (non-`HttpError`) errors are logged through the application
+  `LOGGER`, like the access log: one `error` line `"GET /tasks/7 failed"` with
+  `method`, `path`, `requestId` and the redacted error. Before, they always
+  went to a bare `console.error` without the request id. New
+  `ErrorHandlerOptions.logger`; `logError` still replaces the logging.
+- The documentation of `onUnexpectedError` and `HTTP_ERROR_HOOK` said they
+  replace the built-in logging; they are notifications and the error is
+  logged as well, as the code always did.
+- The development 500 response (`exposeErrorDetails`) redacts secrets in the
+  error message and stack, like the log.
+
 ## 0.97.0 — 2026-10-07
 
 ### Changed (breaking)

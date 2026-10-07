@@ -31,8 +31,8 @@ export const ROUTE_MIDDLEWARE_COMPOSER = createToken<RouteMiddlewareComposerRegi
 
 /**
  * Hook invoked by the built-in error boundary on a non-{@link HttpError}
- * failure. Self-wiring: e.g. the logging module registers one to record the
- * error, keeping `@/core/http` free of logging imports. Collected via `resolveAll`.
+ * failure, for example to report it to an error tracker. It is a notification:
+ * the error is still logged and answered with 500. Collected via `resolveAll`.
  */
 export type HttpErrorHook = (ctx: HttpContext, error: unknown) => void;
 
