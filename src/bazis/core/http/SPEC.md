@@ -804,8 +804,13 @@ Do not create a **new** middleware function per request, only at load/startup.
 `@Authorize(check, ...checks)` on a controller or a method compiles into the built-in
 authorization link [6]. A check is `(ctx) => boolean | Promise<boolean>`: `true` lets the
 request through, `false` gives `403`, and a thrown `HttpError` defines the response
-itself (for example `UnauthorizedError` → `401`). A method-level `@Authorize` or
-`@AllowAnonymous` overrides the controller's.
+itself (for example `UnauthorizedError` → `401`). Checks of the controller and of the
+method combine: the controller's run first, then the method's; a check repeated on both
+runs once. A method-level `@AllowAnonymous` removes every check, including the
+controller's. On an `@AllowAnonymous` controller only methods with their own
+`@Authorize` are protected. Inheritance replaces instead: a subclass's own class-level
+declaration replaces the base class's (since 0.97.0; before it a method-level
+`@Authorize` replaced the controller's checks).
 
 ```ts
 const isSignedIn: AuthorizeCheck = (ctx) => {

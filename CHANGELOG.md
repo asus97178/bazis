@@ -4,6 +4,18 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.0 — 2026-10-07
+
+### Changed (breaking)
+
+- `@Authorize` on a method adds its checks to the controller's instead of
+  replacing them: the controller checks run first, then the method checks; a
+  check repeated on both runs once. Before, `@Authorize(isAdmin)` on a method of
+  an `@Authorize(signedIn)` controller silently dropped `signedIn` for that
+  method. `@AllowAnonymous()` on a method still removes every check. To keep a
+  method with checks different from its controller's, move it to another
+  controller.
+
 ## 0.96.6 — 2026-10-06
 
 ### Fixed

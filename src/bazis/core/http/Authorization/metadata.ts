@@ -122,15 +122,22 @@ export function setActionAllowAnonymous(metadata: object, methodName: string | s
   delete action.authorize;
 }
 
-/** Effective route requirement (the method overrides the controller). */
+/** Effective route requirement: the class and method checks combined. */
 export interface ResolvedAuthorizeMeta {
   readonly allowAnonymous: boolean;
   readonly authorize?: AuthorizeOptions;
 }
 
 /**
- * Resolves the authorization requirement of a specific action. Precedence:
- * `@AllowAnonymous`/`@Authorize` on the method override those declared on the class.
+ * Resolves the authorization requirement of a specific action:
+ *
+ * - `@AllowAnonymous` on the method opens it, whatever the class declares;
+ * - `@Authorize` on the class and on the method combine: the class checks run
+ *   first, then the method checks (a check repeated on both runs once);
+ * - `@AllowAnonymous` on the class opens the methods without their own `@Authorize`.
+ *
+ * Inheritance is different: a subclass's own class-level declaration replaces
+ * the base class's, and an overriding method's declaration replaces the base method's.
  */
 export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol): ResolvedAuthorizeMeta {
   const metadata = (ctor as { [key: symbol]: unknown })[Symbol.metadata as unknown as symbol] as
@@ -145,14 +152,13 @@ export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol):
   if (action?.allowAnonymous) {
     return { allowAnonymous: true };
   }
-  if (action?.authorize) {
-    return { allowAnonymous: false, authorize: action.authorize };
-  }
-  if (meta.allowAnonymous) {
+  const classChecks = meta.authorize?.checks ?? [];
+  const actionChecks = action?.authorize?.checks ?? [];
+  if (actionChecks.length === 0 && meta.allowAnonymous) {
     return { allowAnonymous: true };
   }
-  if (meta.authorize) {
-    return { allowAnonymous: false, authorize: meta.authorize };
-  }
-  return { allowAnonymous: false };
+  const checks = [...new Set([...classChecks, ...actionChecks])];
+  return checks.length === 0
+    ? { allowAnonymous: false }
+    : { allowAnonymous: false, authorize: { checks } };
 }

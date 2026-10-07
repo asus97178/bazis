@@ -17,7 +17,8 @@ type ClassOrMethodDecorator = (
  * Protects a controller or a single action: the route gets the
  * {@link AuthorizeCheck} function. The HTTP kernel does not know *what* it
  * checks: JWT, login/password, Telegram sign-in and so on. Several checks
- * can be passed; all of them must pass.
+ * can be passed; all of them must pass. On a method of a protected controller
+ * the checks are added to the controller's ones: the class checks run first.
  *
  * ```ts
  * @Authorize(requireTokenKind(TokenKind.Admin))   // access token kind
@@ -40,7 +41,7 @@ export function Authorize(check: AuthorizeCheck, ...rest: AuthorizeCheck[]): Cla
   };
 }
 
-/** Public route: overrides `@Authorize` declared on the controller. */
+/** Public route: on a method, removes every check, including the controller's `@Authorize`. */
 export function AllowAnonymous(): ClassOrMethodDecorator {
   return (_value, context) => {
     if (context.kind === "class") {
