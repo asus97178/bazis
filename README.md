@@ -44,8 +44,19 @@ bunx bazis dev            # GET http://127.0.0.1:3000/health
 
 ```sh
 bun add bazis             # or a fixed version: bun add bazis@0.96.2
-bun add -d typescript@^6 @types/bun   # TypeScript 7 is not supported yet
+bun add -d typescript@^6 @types/bun
 ```
+
+TypeScript 7 also works. It ships no compiler API, which the code generator
+needs, so add Microsoft's TypeScript 6 API package next to it:
+
+```sh
+bun add -d typescript@^7 @typescript/typescript6 @types/bun
+```
+
+The project keeps type-checking with TypeScript 7; only codegen reads the
+sources through the TypeScript 6 API. Without `@typescript/typescript6`
+codegen stops with `BAZIS_TYPESCRIPT_API_MISSING` and this install command.
 
 Then take `tsconfig.json`, `bazis.config.json` and `src/index.ts` from a
 project made by `bazis new` as the starting point, and run `bunx bazis codegen`.

@@ -19,6 +19,9 @@ bunx bazis build --bin --outfile dist/app
 
 Implementation: [build.ts](build.ts). The entry point comes from `bazis.config.json`
 (the first entrypoint of the default target), TypeScript from the project's `node_modules`.
+With TypeScript 7, which has no compiler API, codegen and module registration load the
+TypeScript 6 API from `@typescript/typescript6` (`core/scripts/typescriptApi.ts`, preloaded into the
+codegen process); without it they stop with `BAZIS_TYPESCRIPT_API_MISSING`.
 `dev` forwards SIGINT/SIGTERM to the application and returns its exit code.
 `dev --watch` watches `src/` recursively (except `src/generated`, otherwise codegen
 would restart itself), merges events within 150 ms, stops the application, reruns

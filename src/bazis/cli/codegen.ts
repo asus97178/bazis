@@ -11,7 +11,10 @@ export async function runCodegen(cwd: string, target?: string): Promise<number> 
     const config = await configFile.json();
     if (target !== "all" && !Object.hasOwn(config.targets ?? {}, target)) throw new Error(`Unknown codegen target: ${target}`);
   }
-  const args = [await resolveBun(cwd), resolveGenerator(cwd), ...(target === undefined ? [] : ["--target", target])];
+  const generator = resolveGenerator(cwd);
+  // TypeScript 7 has no compiler API: the preload switches it to @typescript/typescript6.
+  const preload = path.join(path.dirname(generator), "typescriptApiPreload.ts");
+  const args = [await resolveBun(cwd), ...(existsSync(preload) ? ["--preload", preload] : []), generator, ...(target === undefined ? [] : ["--target", target])];
   return await Bun.spawn(args, { cwd, stdout: "inherit", stderr: "inherit" }).exited;
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { generateModule, generateModulePack } from "./generateModule";
+import { useTypeScriptCompilerApi } from "../core/scripts/typescriptApi";
 import { parseCliArgs } from "./parseCli";
 import { runCodegen } from "./codegen";
 import { generateProject } from "./generateProject";
@@ -100,6 +100,10 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
       name: args.name, modulesRoot: args.modulesRoot, appModulePath: args.appModule,
       register: args.register, force: args.force, dryRun: args.dryRun,
     };
+    // Module registration parses the host module with the TypeScript API: load it
+    // only after switching TypeScript 7 to @typescript/typescript6.
+    useTypeScriptCompilerApi(process.cwd());
+    const { generateModule, generateModulePack } = await import("./generateModule");
     const result = args.generator === "pack"
       ? await generateModulePack({ ...options, parts: args.parts })
       : await generateModule({ ...options, profile: args.profile });
