@@ -4,6 +4,21 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.2 — 2026-10-07
+
+### Fixed
+
+- `ApplicationLifetime.onStarted` / `onStopping` / `onStopped` called after
+  their moment run the callback right away, like .NET's ApplicationStarted.
+  Before, a service first created by a request subscribed to `onStarted` and
+  was silently never called. A failure of such a late callback is an
+  unhandled error (logged, graceful stop with exit code 1).
+- Configuration errors read `db.password — required non-empty secret is not
+  set (BAZIS_DB__PASSWORD)` instead of `db.password: …`: with a sensitive key
+  name (`password`, `token`, `apiKey`) the console redaction took the word
+  after the colon for a secret and printed `db.password: *** non-empty secret
+  is not set`. Secret values in the messages are still hidden.
+
 ## 0.97.1 — 2026-10-07
 
 ### Fixed

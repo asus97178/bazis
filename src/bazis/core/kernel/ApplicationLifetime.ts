@@ -14,6 +14,7 @@ export class ApplicationLifetime {
   private readonly stopRequestListeners: ((exitCode: number) => void)[] = [];
   private startedFlag = false;
   private stoppingFlag = false;
+  private stoppedFlag = false;
 
   public get isStarted(): boolean {
     return this.startedFlag;
@@ -23,15 +24,35 @@ export class ApplicationLifetime {
     return this.stoppingFlag;
   }
 
+  /**
+   * Runs `callback` once the application has started. A subscription made
+   * after that moment (for example in a service first created by a request)
+   * runs right away, like .NET's ApplicationStarted; a failure of such a late
+   * callback is an unhandled error (logged, graceful stop with exit code 1).
+   */
   public onStarted(callback: LifetimeCallback): void {
+    if (this.startedFlag) {
+      runLate(callback);
+      return;
+    }
     this.startedCallbacks.push(callback);
   }
 
+  /** Runs `callback` when graceful shutdown begins; right away if it already has. */
   public onStopping(callback: LifetimeCallback): void {
+    if (this.stoppingFlag) {
+      runLate(callback);
+      return;
+    }
     this.stoppingCallbacks.push(callback);
   }
 
+  /** Runs `callback` after the application has stopped; right away if it already has. */
   public onStopped(callback: LifetimeCallback): void {
+    if (this.stoppedFlag) {
+      runLate(callback);
+      return;
+    }
     this.stoppedCallbacks.push(callback);
   }
 
@@ -61,8 +82,15 @@ export class ApplicationLifetime {
 
   /** @internal */
   public async notifyStopped(): Promise<void> {
+    this.stoppedFlag = true;
     await runCallbacks(this.stoppedCallbacks);
   }
+}
+
+// A late subscription runs on its own: a rejection surfaces as an unhandled
+// error instead of disappearing silently.
+function runLate(callback: LifetimeCallback): void {
+  void Promise.resolve().then(callback);
 }
 
 // A failing subscriber must not break the rest of the lifecycle chain:
