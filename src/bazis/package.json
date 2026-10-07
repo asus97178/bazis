@@ -1,6 +1,6 @@
 {
   "name": "bazis",
-  "version": "0.97.4",
+  "version": "0.97.5",
   "description": "Modular backend framework for Bun in TypeScript: DI wired by codegen, HTTP, a PostgreSQL ORM, JWT, WebSocket, agents and a CLI.",
   "license": "MIT",
   "author": "Alexander Alenin",
@@ -71,10 +71,16 @@
     "bun": ">=1.4.0"
   },
   "peerDependencies": {
-    "typescript": "^5.9.3 || ^6.0.0"
+    "typescript": "^5.9.3 || ^6.0.0 || ^7.0.0",
+    "@typescript/typescript6": "^6.0.0"
   },
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "peerDependenciesMeta": {
+    "@typescript/typescript6": {
+      "optional": true
+    }
   }
 }

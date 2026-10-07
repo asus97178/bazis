@@ -653,8 +653,11 @@ export class OwnedStoreCatalogReader {
     readonly OwnedCatalogArrayTypeV1[]
   ]> {
     const relationOids = relations.filter(relation => relation.rowTypeOid !== null).map(relation => relation.oid);
-    if (!relationOids.length)
-      return Object.freeze([Object.freeze([]), Object.freeze([])]);
+    if (!relationOids.length) {
+      // An explicit tuple: TypeScript 7 infers Object.freeze([a, b]) as an array.
+      const empty: readonly [readonly OwnedCatalogRowTypeV1[], readonly OwnedCatalogArrayTypeV1[]] = [Object.freeze([]), Object.freeze([])];
+      return Object.freeze(empty);
+    }
     const rowTypes: OwnedCatalogRowTypeV1[] = [], arrayTypes: OwnedCatalogArrayTypeV1[] = [];
     for (let offset = 0; offset < relationOids.length; offset += 1024) {
       const batch = relationOids.slice(offset, offset + 1024), parameter = this.encodePgOidArrayParameter(batch), issuedLimit = Math.min(batch.length + 1, budget.remaining + 1);
@@ -693,7 +696,8 @@ export class OwnedStoreCatalogReader {
         this.source.drift();
       }
     }
-    return Object.freeze([Object.freeze(rowTypes), Object.freeze(arrayTypes)]);
+    const types: readonly [readonly OwnedCatalogRowTypeV1[], readonly OwnedCatalogArrayTypeV1[]] = [Object.freeze(rowTypes), Object.freeze(arrayTypes)];
+    return Object.freeze(types);
   }
   private async readColumns(relations: readonly OwnedCatalogRelationV1[], operation: "registry-read" | "catalog-read", budget: {
     remaining: number;

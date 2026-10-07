@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 const ROOT = path.resolve(import.meta.dir, "../../../../..");
 const SRC = path.join(ROOT, "src");
@@ -46,6 +47,24 @@ const ALLOWED_TYPESCRIPT_IMPORTS = new Set([
 const IGNORED_DIRS = new Set(["test", "generated", "node_modules"]);
 
 describe("runtime import boundary", () => {
+  test("only real imports count: import-like text in strings and comments is ignored", () => {
+    const content = [
+      'import { a } from "./value";',
+      'import type { B } from "./type-only";',
+      'import "./side-effect";',
+      'export * from "./reexport";',
+      'export type { C } from "./type-reexport";',
+      'const lazy = () => import("./dynamic");',
+      'const message = `module "${name}" does not import "forbidden-package"`;',
+      "const quoted = 'import x from \"also-forbidden\"';",
+      '// import { hidden } from "commented-out";',
+      '/* export * from "block-commented"; */',
+      'const url = "https://example.com//path";',
+    ].join("\n");
+    expect(valueImportSpecifiers(content)).toEqual(["./value", "./side-effect", "./reexport", "./dynamic"]);
+    expect(typeOnlyImportSpecifiers(content)).toEqual(["./type-only", "./type-reexport"]);
+  });
+
   test("runtime source and framework package have no external dependencies", () => {
     const manifest = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
       readonly private?: boolean;
@@ -63,7 +82,7 @@ describe("runtime import boundary", () => {
       if (!existsSync(base)) continue;
       for (const file of sourceFiles(base)) {
         if (shouldSkipBareImportCheck(file)) continue;
-        const content = stripComments(readFileSync(file, "utf8"));
+        const content = readFileSync(file, "utf8");
         for (const specifier of valueImportSpecifiers(content)) {
           if (!isAllowedRuntimeSpecifier(specifier)) {
             offenders.push(`${relative(file)} -> ${specifier}`);
@@ -81,7 +100,7 @@ describe("runtime import boundary", () => {
     for (const base of [path.join(SRC, "app"), path.join(ROOT, "examples/todo/src/app")].filter((dir) => existsSync(dir))) {
       for (const file of sourceFiles(base)) {
         if (file.includes(`${path.sep}test${path.sep}`) || file.endsWith(".test.ts")) continue;
-        const content = stripComments(readFileSync(file, "utf8"));
+        const content = readFileSync(file, "utf8");
         for (const specifier of allImportSpecifiers(content)) {
           const barrel = specifier.startsWith("bazis/") ? `bazis/${specifier.slice("bazis/".length)}` : specifier;
           if (barrel.startsWith("bazis/") && !isStableBazisBarrel(barrel)) {
@@ -108,7 +127,7 @@ describe("runtime import boundary", () => {
     const offenders: string[] = [];
     for (const base of [root, path.join(root, "test")]) {
       for (const file of sourceFiles(base)) {
-        for (const specifier of allImportSpecifiers(stripComments(readFileSync(file, "utf8")))) {
+        for (const specifier of allImportSpecifiers(readFileSync(file, "utf8"))) {
           if (!isAllowedRuntimeSpecifier(specifier)) offenders.push(relative(file) + " -> " + specifier);
         }
       }
@@ -123,7 +142,7 @@ describe("runtime import boundary", () => {
         // Additional target artifacts intentionally import their own
         // application slice. The default production surface must not.
         if (posix(file).includes("/generated/bazis/targets/")) continue;
-        const content = stripComments(readFileSync(file, "utf8"));
+        const content = readFileSync(file, "utf8");
         for (const specifier of allImportSpecifiers(content)) {
           if (specifier.includes("/demo/") || specifier.includes("../demo")) {
             offenders.push(`${relative(file)} -> ${specifier}`);
@@ -137,7 +156,7 @@ describe("runtime import boundary", () => {
   test("direct TypeScript compiler imports stay in explicit codegen and CLI tooling files", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(BAZIS)) {
-      const content = stripComments(readFileSync(file, "utf8"));
+      const content = readFileSync(file, "utf8");
       for (const specifier of allImportSpecifiers(content)) {
         if (specifier === "typescript" && !ALLOWED_TYPESCRIPT_IMPORTS.has(posix(file))) {
           offenders.push(relative(file));
@@ -162,7 +181,7 @@ describe("runtime import boundary", () => {
       }
       visited.add(key);
 
-      const content = stripComments(readFileSync(current.file, "utf8"));
+      const content = readFileSync(current.file, "utf8");
       for (const dependency of valueImportSpecifiers(content)) {
         if (dependency === "typescript") {
           offenders.push(current.via.join(" -> "));
@@ -184,7 +203,7 @@ describe("runtime import boundary", () => {
     const offenders: string[] = [];
 
     for (const file of sourceFiles(library)) {
-      const content = stripComments(readFileSync(file, "utf8"));
+      const content = readFileSync(file, "utf8");
       for (const specifier of allImportSpecifiers(content)) {
         if (specifier === "bazis" || specifier.startsWith("bazis/core/") || specifier.startsWith("@/core/")) {
           offenders.push(`${relative(file)} -> ${specifier}`);
@@ -305,39 +324,38 @@ function allImportSpecifiers(content: string): string[] {
   ];
 }
 
+// Parsed, not matched with regular expressions: an import-like phrase inside a
+// string or a comment (`does not import "x"`) is not an import.
 function valueImportSpecifiers(content: string): string[] {
-  const specifiers: string[] = [];
-  const importRegex = /\bimport\s+(?!type\b)(?:[^'"]*?\s+from\s+)?["']([^"']+)["']/g;
-  const exportRegex = /\bexport\s+(?!type\b)(?:\*|\*\s+as\s+\w+|\{[^}]*\})\s+from\s+["']([^"']+)["']/g;
-  const dynamicRegex = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
-  collectMatches(content, importRegex, specifiers);
-  collectMatches(content, exportRegex, specifiers);
-  collectMatches(content, dynamicRegex, specifiers);
-  return specifiers;
+  return importSpecifiers(content).filter((item) => !item.typeOnly).map((item) => item.specifier);
 }
 
 function typeOnlyImportSpecifiers(content: string): string[] {
-  const specifiers: string[] = [];
-  const importTypeRegex = /\bimport\s+type\s+[^'"]*?\s+from\s+["']([^"']+)["']/g;
-  const exportTypeRegex = /\bexport\s+type\s+(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["']/g;
-  collectMatches(content, importTypeRegex, specifiers);
-  collectMatches(content, exportTypeRegex, specifiers);
-  return specifiers;
+  return importSpecifiers(content).filter((item) => item.typeOnly).map((item) => item.specifier);
 }
 
-function collectMatches(content: string, regex: RegExp, output: string[]): void {
-  for (const match of content.matchAll(regex)) {
-    const specifier = match[1];
-    if (specifier !== undefined) {
-      output.push(specifier);
+interface ImportSpecifier { readonly specifier: string; readonly typeOnly: boolean }
+
+function importSpecifiers(content: string): ImportSpecifier[] {
+  const source = ts.createSourceFile("source.ts", content, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+  const found: ImportSpecifier[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.importClause?.isTypeOnly === true });
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
+    } else if (
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments[0] !== undefined
+      && ts.isStringLiteralLike(node.arguments[0])
+    ) {
+      found.push({ specifier: node.arguments[0].text, typeOnly: false });
     }
-  }
-}
-
-function stripComments(content: string): string {
-  return content
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
 }
 
 function relative(file: string): string {

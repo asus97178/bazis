@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.5 — 2026-10-07
+
+### Added
+
+- TypeScript 7 support. TypeScript 7 ships no compiler API (`import ts from
+  "typescript"` gives only the version), so codegen and `bazis g module` load
+  Microsoft's TypeScript 6 API from `@typescript/typescript6` when the
+  project's `typescript` is 7 or newer: `bun add -d typescript@^7
+  @typescript/typescript6`. The project keeps type-checking with TypeScript
+  7. Without the package they stop with `BAZIS_TYPESCRIPT_API_MISSING` and
+  the install command. Peer dependencies: `typescript` `^5.9.3 || ^6.0.0 ||
+  ^7.0.0`, optional `@typescript/typescript6`.
+
+### Fixed
+
+- Two type errors that TypeScript 7 reports in
+  `library/orm/Providers/OwnedStoreCatalog.reader.ts` (a frozen tuple inferred
+  as an array); the whole framework type-checks with TypeScript 6 and 7.
+- The runtime import boundary test parses sources with the TypeScript parser
+  instead of regular expressions: an import-like phrase inside a string or a
+  comment is no longer taken for an import.
+
 ## 0.97.4 — 2026-10-07
 
 ### Fixed
