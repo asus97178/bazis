@@ -115,7 +115,7 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
       runtime.log(`[bazis] codegen skipped: ${!args.codegen ? "--no-codegen" : "module is not connected by this command"}.`);
       return 0;
     }
-    runtime.log("[bazis] running di:generate...");
+    runtime.log("[bazis] running codegen...");
     const exitCode = await runtime.codegen(process.cwd(), args.target);
     if (exitCode !== 0) runtime.error("[bazis] codegen failed; scaffold files were kept. Fix the error and run bazis codegen.");
     return exitCode;

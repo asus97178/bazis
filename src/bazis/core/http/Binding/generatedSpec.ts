@@ -1,5 +1,5 @@
 /**
- * Format of the generated binding conventions (`bun run di:generate`).
+ * Format of the generated binding conventions (`bazis codegen`).
  *
  * Plain data without class references: the body model is given **by name** and
  * resolved at startup through the class index of the generated target.

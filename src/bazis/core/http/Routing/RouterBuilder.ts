@@ -1,6 +1,7 @@
 import type { Class, Token } from "../../di";
 import { bindArguments } from "../Binding/ParameterBinder";
 import { resolveGeneratedBindings } from "../Binding/autoBindings";
+import { generatedSourcesAreStale } from "../../generatedFingerprint";
 import { controllerMetaOf, type ActionMeta, type ControllerMeta } from "../Decorators/metadata";
 import { HttpSetupError } from "../Errors/HttpError";
 import type { HttpContext } from "../HttpContext/HttpContext";
@@ -108,6 +109,7 @@ export class RouterBuilder {
     const filters: readonly ActionFilterHooks[] = [...meta.filters, ...action.filters];
     const catches = meta.catches;
     const bindings = resolveGeneratedBindings(controllerClass, methodName);
+    assertBindingsFresh(controllerClass, methodName, bindings);
     const responseDefaults = { httpCode: action.httpCode, produces: action.produces };
     const bindingDefaults = { consumes: action.consumes };
     const token = controllerClass as unknown as Token<object>;
@@ -181,4 +183,29 @@ export class RouterBuilder {
 
     return { boundary, terminal };
   }
+}
+
+/**
+ * Without generated bindings a method receives only the HttpContext. When the
+ * generated code is older than the sources, a method that declares parameters
+ * but has no bindings was most likely added or changed after the last codegen:
+ * its arguments would silently get wrong values, so the server refuses to start.
+ */
+function assertBindingsFresh(
+  controllerClass: Class<object>,
+  methodName: string | symbol,
+  bindings: readonly unknown[] | undefined,
+): void {
+  if (bindings !== undefined || !generatedSourcesAreStale()) {
+    return;
+  }
+  const method = (controllerClass.prototype as Record<string | symbol, unknown>)[methodName];
+  if (typeof method !== "function" || method.length === 0) {
+    return;
+  }
+  throw new HttpSetupError(
+    `${controllerClass.name}.${String(methodName)} has parameters but no generated argument bindings: ` +
+      "the generated code is older than this controller. Run `bazis codegen` " +
+      "(bazis dev, bazis test and bazis build run it automatically).",
+  );
 }

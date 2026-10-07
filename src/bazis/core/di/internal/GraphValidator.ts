@@ -70,7 +70,7 @@ export class GraphValidator {
     const shape = this.context.classShape(registration.provider);
     if (shape && shape.required > shape.declared) {
       issues.add(
-        `Class provider "${tokenToDebugName(registration.token)}" requires at least ${shape.required} constructor deps, but only ${shape.declared} declared.`,
+        `Class provider "${tokenToDebugName(registration.token)}" requires at least ${shape.required} constructor deps, but only ${shape.declared} declared. Constructor dependencies are wired by codegen: if the constructor was added or changed after the last run, run \`bazis codegen\` (bazis dev, bazis test and bazis build run it automatically); otherwise pass the deps explicitly.`,
       );
     }
 

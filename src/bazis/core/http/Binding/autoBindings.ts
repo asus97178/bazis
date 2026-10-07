@@ -24,7 +24,7 @@ export function registerGeneratedBindings(
 }
 
 /**
- * Binding conventions inferred by codegen (`bun run di:generate`) from the
+ * Binding conventions inferred by codegen (`bazis codegen`) from the
  * controller method signature, the counterpart of DI auto deps:
  *
  * - a parameter named like a route `:name` -> from the route;
@@ -72,7 +72,7 @@ function toBinding(spec: GeneratedBindingSpec, controllerName: string, methodNam
       if (ctor === undefined) {
         throw new HttpSetupError(
           `${controllerName}.${methodName}: list model "${spec.model}" is not registered. ` +
-            `Make sure the class extends ListRequest and its module is imported, then run \`bun run di:generate\`.`,
+            `Make sure the class extends ListRequest and its module is imported, then run \`bazis codegen\`.`,
         );
       }
       if (ctor === AMBIGUOUS_LIST_MODEL) {

@@ -4,6 +4,30 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.3 — 2026-10-07
+
+### Fixed
+
+- `bazis dev`, `bazis test` and `bazis build` run codegen for every target of
+  `bazis.config.json`. Before, they generated only the default target, and a
+  second entrypoint (for example a worker) silently kept stale generated code.
+- Sources changed after the last codegen: a controller method that declares
+  parameters but has no generated argument bindings now stops the server at
+  startup — `PingController.upper has parameters but no generated argument
+  bindings ... Run \`bazis codegen\`` — instead of receiving the HttpContext
+  in place of its arguments and failing only on request. Methods without
+  parameters and up-to-date generated code behave as before.
+- The DI error `requires at least N constructor deps, but only M declared`
+  says that constructor dependencies come from codegen and to run
+  `bazis codegen` (or pass the deps explicitly).
+- Generated files and error messages name the application command
+  `bazis codegen` instead of the framework-internal `bun run di:generate`.
+
+### Changed
+
+- Message text: the DI error above gained a hint sentence. Tests that match
+  the full message text need an update.
+
 ## 0.97.2 — 2026-10-07
 
 ### Fixed

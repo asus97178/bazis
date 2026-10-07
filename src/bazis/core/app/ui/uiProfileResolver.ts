@@ -746,7 +746,7 @@ function resolveAndValidateResponseSchema(
     diagnostics.push(uiDiagnosticV1(
       "error",
       "UIV1_RESPONSE_MODEL_NOT_REGISTERED",
-      `${profileName} response class is not bound to a generated OpenAPI schema. Run bun run di:generate.`,
+      `${profileName} response class is not bound to a generated OpenAPI schema. Run \`bazis codegen\`.`,
       { profile: profileName, path: "response" },
     ));
     return actual;
