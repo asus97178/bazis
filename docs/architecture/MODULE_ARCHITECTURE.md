@@ -703,6 +703,7 @@ instead of running the CLI are forbidden.
 | Atomic with CRUD | `g module <Name>` or `g module <Name> --minimal` | A sample CRUD and the passport |
 | Extended atomic | `g module <Name> --full` | CRUD with extra adapters and the passport; this is one atomic module |
 | Composite | `g pack <Name> --parts <part-a,part-b,...>` | The composition root and empty atomic parts with their own passports |
+| A new part of an existing composite | `g module <Name> --pack <Pack>` with a profile | The part in `<pack>_modules/<name>_module`, connected in the pack root; its passport names the pack |
 
 Commands run from the repository root through
 `./scripts/bazis-bun run bazis <command>` with a qualified `BAZIS_BUN_BIN`.
@@ -711,9 +712,10 @@ Path, connection and codegen parameters are described in the
 plan; it does not replace actually creating the module.
 
 After a successful generation the author fills in the domain responsibility, the input
-fields and the other `MODULE.md` sections, records the actual creation command
-and finishes the scaffold sources. For pack parts, the pack creation command
-is recorded. The CLI sample fields do not become domain requirements.
+fields and the other `MODULE.md` sections and finishes the scaffold sources. The
+generator records the creation command in the passport (`Created with: ...`); for
+pack parts it records the pack creation command. A part added later with `--pack`
+is also added by the author to the parts table of the pack passport. The CLI sample fields do not become domain requirements.
 
 If the CLI does not support the needed variant, location or adding a part,
 first extend the generator and check the change, then run the creation

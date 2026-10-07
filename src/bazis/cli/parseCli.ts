@@ -8,6 +8,8 @@ export interface ParsedGenerateArgs {
   readonly parts: readonly string[];
   readonly modulesRoot?: string;
   readonly appModule?: string;
+  /** Composite module to add the new module to as a part (module generator only). */
+  readonly pack?: string;
   readonly register: boolean;
   readonly force: boolean;
   readonly profile: GenerateProfile;
@@ -30,7 +32,7 @@ const GENERATOR_ALIASES = new Map<string, "module" | "pack">([
   ["module", "module"], ["m", "module"],
   ["pack", "pack"], ["p", "pack"], ["module-pack", "pack"],
 ]);
-const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--parts", "--target", "--path", "--framework", "--outfile"]);
+const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--pack", "--parts", "--target", "--path", "--framework", "--outfile"]);
 const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--vendor", "--bin", "--watch"]);
 
 /** Parsing is pure: help and invalid input can never start generation. */
@@ -119,12 +121,15 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   if (profiles.length > 1) return error("Choose only one profile: --empty, --minimal or --full.");
   if (generator === "pack" && profiles.length > 0) return error("Pack parts start empty; module profile flags are not supported by pack.");
   if (generator === "module" && options.has("--parts")) return error("--parts is only supported by pack.");
+  if (generator === "pack" && options.has("--pack")) return error("--pack adds a part with g module; a pack is created with --parts.");
+  if (options.has("--pack") && options.has("--app-module")) return error("--pack connects the part in the pack root; do not combine it with --app-module.");
   if (options.has("--no-codegen") && target !== undefined) return error("--target cannot be used with --no-codegen.");
   if (options.has("--no-register") && target !== undefined) return error("Use bazis codegen --target separately after connecting the module.");
 
   const parts = options.get("--parts")?.split(",").map((part) => part.trim()) ?? [];
   try {
     parseModuleName(name);
+    if (options.has("--pack")) parseModuleName(options.get("--pack")!);
     if (generator === "pack") validatePackParts(parts);
   } catch (cause) {
     return error(cause instanceof Error ? cause.message : String(cause));
@@ -133,7 +138,7 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
     kind: "generate",
     args: {
       generator, name, parts,
-      modulesRoot: options.get("--modules-root"), appModule: options.get("--app-module"),
+      modulesRoot: options.get("--modules-root"), appModule: options.get("--app-module"), pack: options.get("--pack"),
       register: !options.has("--no-register"), force: options.has("--force"),
       profile: profiles[0] ?? "minimal", dryRun: options.has("--dry-run"),
       codegen: !options.has("--no-codegen"), target,
