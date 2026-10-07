@@ -195,6 +195,7 @@ and no extra runtime schema. The behavior on invalid JavaScript input is not ext
 | --- | --- | --- |
 | `resolve`, `resolveKeyed`, the matching `*ForScope` | `T` | Creation/reuse; the missing/cycle/lifetime/disposed/async-required errors are kept |
 | `resolveAsync`, `resolveKeyedAsync`, `resolveAsyncForScope` | `Promise<T>` | Waits for async factories, merges repeated cached-lifetime requests; factory and cycle errors propagate |
+| `initializeAsyncSingletons()` | `Promise<void>` | Creates every singleton with an async factory (keyed included) in registration order; afterwards sync `resolve` and constructor injection return them. The kernel calls it at startup, before hosted services (since 0.97.4) |
 | `resolveAll`, `resolveAllKeyed`, the matching `*ForScope` | `readonly T[]` | All matching registrations in the former order, an empty array when there are none; another key does not get into the current selection on a nested resolve |
 | `tryResolve`, `tryResolveForScope` | `T \| undefined` | Only a missing registration gives `undefined`; other errors propagate |
 | `has` | `boolean` | Checks for a registration; keeps the ability to materialize a closed generic |
