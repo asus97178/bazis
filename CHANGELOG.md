@@ -16,6 +16,18 @@ contain breaking changes, a patch version does not.
   method with checks different from its controller's, move it to another
   controller.
 
+### Added
+
+- A service contract can be an abstract class instead of an interface with a
+  `createToken` constant: `export abstract class IClock { abstract now(): Date }`,
+  `scoped(IClock, SystemClock)`, `exports: [IClock]`, and
+  `constructor(private readonly clock: IClock)`. It exists at runtime, so it
+  is the token itself. `Token<T>` accepts abstract classes (new type
+  `AbstractClass<T>`). An interface with `createToken` keeps working; both
+  forms can be mixed in one module.
+- `bazis g module` generates the service contract as an abstract class (the
+  recommended form); `examples/todo` uses it too.
+
 ## 0.96.6 — 2026-10-06
 
 ### Fixed

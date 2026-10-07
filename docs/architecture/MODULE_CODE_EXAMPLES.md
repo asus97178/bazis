@@ -142,20 +142,32 @@ export function toTaskResponse(task: Task): TaskResponse {
 }
 ```
 
-### 1.4. Public interface, DI token and input error
+### 1.4. Public contract and input error
+
+The contract is an abstract class without code. Unlike an interface it exists at
+runtime, so it is the DI token itself: `scoped(ITaskService, TaskService)`,
+`exports: [ITaskService]`, and consumers ask for `ITaskService` in the constructor.
+`bazis g module` generates contracts in this form.
 
 ```ts
 // file: src/app/modules/task/services/ITask.service.ts
-import { createToken } from "bazis/core/di";
 import type { CreateTaskInput } from "../contracts/CreateTaskInput";
 import type { TaskResponse } from "../contracts/TaskResponse";
 
-export interface ITaskService {
-  create(input: CreateTaskInput): Promise<TaskResponse>;
-  getById(id: number): Promise<TaskResponse | null>;
-  count(): Promise<number>;
+export abstract class ITaskService {
+  abstract create(input: CreateTaskInput): Promise<TaskResponse>;
+  abstract getById(id: number): Promise<TaskResponse | null>;
+  abstract count(): Promise<number>;
 }
+```
 
+An interface with a `createToken` constant of the same name works the same way and
+remains supported; prefer it when the contract must stay a pure type:
+
+```ts
+import { createToken } from "bazis/core/di";
+
+export interface ITaskService { /* … */ }
 export const ITaskService = createToken<ITaskService>("ITaskService");
 ```
 

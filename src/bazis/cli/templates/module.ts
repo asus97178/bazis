@@ -194,23 +194,24 @@ export class ${n.module}DbContext extends DbContext {
 }
 
 function serviceInterfaceFile(n: ModuleNaming): string {
-  return `import { createToken } from "bazis/core/di";
-import type { PageResult } from "bazis/core/orm";
+  return `import type { PageResult } from "bazis/core/orm";
 import type { ListQuery } from "bazis/library/jsonapi";
 import type { Create${n.entity}Request, Update${n.entity}Request } from "../http/contracts/${n.module}.requests";
 import type { ${n.entity}Response, ${n.module}Summary } from "../http/contracts/${n.module}.responses";
 
-export interface I${n.module}Service {
-  getAll(query: ListQuery): Promise<PageResult<${n.entity}Response>>;
-  summary(): Promise<${n.module}Summary>;
-  count(): Promise<number>;
-  getById(id: string): Promise<${n.entity}Response | null>;
-  create(body: Create${n.entity}Request): Promise<${n.entity}Response>;
-  update(id: string, body: Update${n.entity}Request): Promise<${n.entity}Response | null>;
-  delete(id: string): Promise<boolean>;
+/**
+ * Service contract. An abstract class, not an interface: it exists at runtime,
+ * so it is the DI token itself: \`scoped(I${n.module}Service, ${n.module}Service)\`.
+ */
+export abstract class I${n.module}Service {
+  abstract getAll(query: ListQuery): Promise<PageResult<${n.entity}Response>>;
+  abstract summary(): Promise<${n.module}Summary>;
+  abstract count(): Promise<number>;
+  abstract getById(id: string): Promise<${n.entity}Response | null>;
+  abstract create(body: Create${n.entity}Request): Promise<${n.entity}Response>;
+  abstract update(id: string, body: Update${n.entity}Request): Promise<${n.entity}Response | null>;
+  abstract delete(id: string): Promise<boolean>;
 }
-
-export const I${n.module}Service = createToken<I${n.module}Service>("I${n.module}Service");
 `;
 }
 

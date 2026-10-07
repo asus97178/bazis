@@ -75,6 +75,7 @@ export {
 export {
   createOpenGenericTokenFamily,
   createToken,
+  type AbstractClass,
   type Class,
   type InjectionToken,
   type OpenGenericTokenFamily,
