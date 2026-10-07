@@ -181,5 +181,5 @@ rateLimit({ windowMs: 60_000, max: 100, keyOf: (ctx) => ctx.header("x-api-key") 
 
 ## Дальше
 
-- Авторизация *(в работе)*
+- [Авторизация](authorization.md)
 - [Контроллеры](controllers.md)
