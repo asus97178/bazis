@@ -113,8 +113,9 @@ function selectionMessage(
   const head = `Module "${record.name}": "${consumer}" depends on ${subject}`;
   if (owners.length > 1) {
     const modules = owners.map((item) => `"${item.name}"`).join(" and ");
-    return `${head}, but ${subject} is registered in ${modules}, and the application uses one implementation per token:`
-      + ` the last registered, from "${owner.name}", which "${record.name}" cannot see.`
+    // No colon after "token": the console redaction would read "token: the" as a secret.
+    return `${head}, but ${subject} is registered in ${modules}, and the application uses one implementation per token,`
+      + ` the last registered one, from "${owner.name}", which "${record.name}" cannot see.`
       + ` Register ${subject} in one module, or give the implementations different keys (DI.keyedSingleton).`;
   }
   return `${head}, but the application uses the implementation from "${owner.name}", which "${record.name}" cannot see.`
