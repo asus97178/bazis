@@ -112,6 +112,23 @@ export class ServiceProvider implements ServiceResolver {
     return this.resolveSingleAsync(token, key, this.lifetime.root, []);
   }
 
+  /**
+   * Creates every singleton registered with an async factory (keyed ones
+   * included), in registration order. Afterwards `resolve` and constructor
+   * injection return the cached instances. The kernel calls it at startup, so a
+   * failing factory stops the start instead of failing every request.
+   */
+  public async initializeAsyncSingletons(): Promise<void> {
+    this.lifetime.assertLive(this.lifetime.root);
+    for (const group of this.registry.groups()) {
+      for (const registration of group) {
+        if (registration.lifetime === "singleton" && isAsyncFactoryProvider(registration.provider)) {
+          await this.resolveRegistrationAsync(registration, registration.key, this.lifetime.root, [], undefined);
+        }
+      }
+    }
+  }
+
   public tryResolve<T>(token: Token<T>, key?: ServiceKey): T | undefined {
     return this.tryResolveForScope(token, key, this.lifetime.root);
   }

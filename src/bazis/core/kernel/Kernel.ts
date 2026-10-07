@@ -13,6 +13,7 @@ import type { UnhandledErrorPolicy } from "./types";
 import { redactSensitive } from "../../library/redaction";
 import { validateTimeout } from "./internal/validateTimeout";
 import { awaitShutdown } from "./internal/awaitShutdown";
+import { awaitAbortable } from "./internal/awaitAbortable";
 import { reportDiagnosticFailure } from "./internal/reportDiagnosticFailure";
 
 export interface KernelTimings {
@@ -97,6 +98,9 @@ export class Kernel {
       );
     }
     try {
+      // Async singletons first: hosted services and controllers take them
+      // through constructors, which resolve synchronously.
+      await awaitAbortable(this.container.initializeAsyncSingletons(), abortController.signal);
       await this.coordinator.start(abortController.signal, this.options.shutdownTimeoutMs);
       coordinatorStarted = true;
       this.startupMs = performance.now() - this.timings.buildStartedAt;

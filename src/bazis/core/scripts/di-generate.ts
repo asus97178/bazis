@@ -156,6 +156,8 @@ interface CollectedDependency { readonly name: string; readonly target?: ts.Clas
 interface ConstructorDependencies {
   readonly deps: CollectedDependency[];
   readonly unsupportedInheritedParameter?: string;
+  /** An own constructor parameter whose type cannot name a DI dependency (`string`, `number`, an inline type). */
+  readonly unsupportedParameter?: { readonly index: number; readonly name: string; readonly type: string };
 }
 let classDeps = new Map<ts.ClassDeclaration, readonly CollectedDependency[]>();
 let inferredDiClasses = new Set<ts.ClassDeclaration>();
@@ -796,6 +798,10 @@ function collectClassDeps(source: ts.SourceFile): void {
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && node.name) {
       const result = readConstructorTypeNames(node);
+      if (result.unsupportedParameter !== undefined && needsInferredDiDeps(node)) {
+        const { index, name, type } = result.unsupportedParameter;
+        fatalErrors.push(`BAZIS_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(node)}: constructor parameter ${index + 1} "${name}" of "${node.name.text}" has type "${type}", which cannot be injected: DI resolves dependencies by class, contract or token, and a plain type does not say which value to inject. Declare a token with the same name as a type alias (export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")) and register a value, or pass the deps explicitly: scoped(${node.name.text}, ${node.name.text}, [TOKEN] as const).`);
+      }
       if (result.unsupportedInheritedParameter !== undefined && needsInferredDiDeps(node)) {
         fatalErrors.push(`BAZIS_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(node)}: cannot infer inherited constructor parameter "${result.unsupportedInheritedParameter}" for "${node.name.text}". The parameter needs a runtime DI token or an explicit value/factory binding.`);
       }
@@ -984,7 +990,7 @@ function readConstructorTypeNames(node: ts.ClassDeclaration): ConstructorDepende
     const paramType = param.type;
     const refName = paramType ? getDependencyTypeName(paramType) : undefined;
     if (!refName || BUILTIN_DEPENDENCY_NAMES.has(refName)) {
-      return { deps: [] };
+      return { deps: [], unsupportedParameter: { index, name: param.name.getText(), type: paramType?.getText() ?? "(no type)" } };
     }
 
     // `Lazy<X>` is a deferred dependency on X: encode it with a marker prefix

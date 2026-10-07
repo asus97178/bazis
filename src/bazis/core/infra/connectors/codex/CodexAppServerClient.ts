@@ -232,7 +232,7 @@ export class CodexAppServerClient implements CodexClient {
         if (method === "account/updated") this.modelCache = undefined;
       }, () => { this.clearLogin(); this.modelCache = undefined; });
       const initialized = await client.request("initialize", {
-        clientInfo: { name: "bazis", title: "Bazis", version: "0.97.3" }, capabilities: { experimentalApi: true },
+        clientInfo: { name: "bazis", title: "Bazis", version: "0.97.4" }, capabilities: { experimentalApi: true },
       }, 15_000, signal);
       if (resolve(text(initialized.codexHome, 4096)) !== this.paths.home) throw new CodexError("PROTOCOL_ERROR");
       client.notify("initialized");

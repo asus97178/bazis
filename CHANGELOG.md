@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.4 — 2026-10-07
+
+### Fixed
+
+- A singleton registered with `singletonAsyncFactory` (or another async
+  factory) can be injected through constructors: the kernel creates async
+  singletons at startup, before hosted services and the HTTP server. Before,
+  every request to a controller that took one failed with
+  `AsyncResolutionRequiredError` while the startup succeeded. A failing async
+  factory now stops the start (exit code 1). New
+  `ServiceProvider.initializeAsyncSingletons()`.
+- Codegen stops with `BAZIS_DI_DEPENDENCY_UNKNOWN` when a DI-constructed class
+  has a constructor parameter of a plain type (`string`, `number`, an inline
+  type). Before, the class silently got no dependencies and the start failed
+  later with a misleading "run codegen" hint. Classes with an explicit deps
+  list are not affected.
+
+### Changed
+
+- Async singleton factories run eagerly at startup instead of on first
+  `resolveAsync`.
+
 ## 0.97.3 — 2026-10-07
 
 ### Fixed
