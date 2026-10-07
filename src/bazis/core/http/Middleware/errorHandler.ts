@@ -1,4 +1,5 @@
-import { redactSensitive } from "../../../library/redaction";
+import { REQUEST_ID_STATE_KEY, type Logger } from "../../kernel";
+import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import { HttpError } from "../Errors/HttpError";
 import type { HttpMiddleware } from "./types";
@@ -9,10 +10,20 @@ export interface ErrorHandlerOptions {
    * never enable in production).
    */
   exposeDetails?: boolean;
-  /** Called for non-{@link HttpError} failures (self-wired via `HTTP_ERROR_HOOK`, e.g. the logging module). */
+  /**
+   * Notified of every non-{@link HttpError} failure, for example to send it to
+   * an error tracker; `HTTP_ERROR_HOOK` registrations are merged in. It does not
+   * replace logging: the error is logged as well.
+   */
   onUnexpectedError?: (ctx: HttpContext, error: unknown) => void;
-  /** Fallback when {@link onUnexpectedError} is omitted or does not handle the error. */
+  /** Replaces the built-in logging of unexpected errors. */
   logError?: (error: unknown) => void;
+  /**
+   * Logger for unexpected errors when {@link logError} is absent: one `error`
+   * line with the method, path, request id and the redacted error. The server
+   * passes the application `LOGGER`; without either, `console.error` is used.
+   */
+  logger?: Logger;
 }
 
 function jsonResponse(status: number, body: unknown, extraHeaders?: readonly [string, string][]): Response {
@@ -33,9 +44,30 @@ function safeJsonResponse(status: number, body: unknown, extraHeaders?: readonly
   }
 }
 
+type ErrorLog = (ctx: HttpContext, error: unknown) => void;
+
+function resolveErrorLog(options: ErrorHandlerOptions): ErrorLog {
+  const { logError, logger } = options;
+  if (logError) {
+    return (_ctx, error) => logError(error);
+  }
+  if (logger) {
+    return (ctx, error) => {
+      const requestId = ctx.state.get(REQUEST_ID_STATE_KEY);
+      logger.error(`${ctx.method} ${ctx.path} failed`, {
+        method: ctx.method,
+        path: ctx.path,
+        ...(typeof requestId === "string" ? { requestId } : {}),
+        error: redactSensitive(error),
+      });
+    };
+  }
+  return (_ctx, error) => console.error("[http] unhandled error:", redactSensitive(error));
+}
+
 function safelyReportUnexpected(
   options: ErrorHandlerOptions,
-  fallback: (error: unknown) => void,
+  log: ErrorLog,
   ctx: HttpContext,
   error: unknown,
 ): void {
@@ -43,13 +75,13 @@ function safelyReportUnexpected(
     options.onUnexpectedError?.(ctx, error);
   } catch (hookError) {
     try {
-      fallback(hookError);
+      log(ctx, hookError);
     } catch {
       // Logging hooks are best-effort; response safety is primary.
     }
   }
   try {
-    fallback(error);
+    log(ctx, error);
   } catch {
     // A broken sink must not escape the HTTP error boundary.
   }
@@ -61,7 +93,7 @@ function safelyReportUnexpected(
  * else becomes 500 Internal Server Error.
  */
 export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware {
-  const fallback = options.logError ?? ((error: unknown) => console.error("[http] unhandled error:", redactSensitive(error)));
+  const log = resolveErrorLog(options);
   return async (ctx, next) => {
     try {
       await next();
@@ -87,12 +119,14 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
         );
         return;
       }
-      safelyReportUnexpected(options, fallback, ctx, error);
+      safelyReportUnexpected(options, log, ctx, error);
       ctx.response = options.exposeDetails
         ? safeJsonResponse(500, {
             error: "Internal Server Error",
-            message: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
+            // Development only, but redacted like the log: a secret in an error
+            // message must not reach a browser or a shared screenshot.
+            message: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+            stack: error instanceof Error && error.stack !== undefined ? redactSensitiveText(error.stack) : undefined,
           })
         : safeJsonResponse(500, { error: "Internal Server Error" });
     }

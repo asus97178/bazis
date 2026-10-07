@@ -150,8 +150,15 @@ export class HttpServer implements HostedService {
     if (this.options.securityHeaders !== false) {
       serverChain.push(securityHeaders(this.options.securityHeaders ?? {}));
     }
+    // Unexpected errors go to the application logger, like the access log.
+    const errorLogger = this.resolver.tryResolve(LOGGER);
     serverChain.push(
-      errorHandler({ exposeDetails, ...this.options.errorHandler, onUnexpectedError: this.collectErrorHook() }),
+      errorHandler({
+        exposeDetails,
+        ...(errorLogger ? { logger: errorLogger } : {}),
+        ...this.options.errorHandler,
+        onUnexpectedError: this.collectErrorHook(),
+      }),
     );
     this.shortCircuitChain = [...serverChain];
     serverChain.push(...this.collectServerMiddleware());

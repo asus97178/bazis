@@ -405,9 +405,10 @@ Exported from `bazis/core/http`. They are connected through `@Middleware(...)`,
 
 | `ErrorHandlerOptions` field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `exposeDetails` | `boolean` | `httpModule({ exposeErrorDetails })` / environment | message/stack in 500 responses; never enable in production |
-| `onUnexpectedError` | `(ctx, error) => void` | DI `HTTP_ERROR_HOOK` hooks | called for non-`HttpError` failures |
-| `logError` | `(error) => void` | `console.error` | fallback when no hook handles the error |
+| `exposeDetails` | `boolean` | `httpModule({ exposeErrorDetails })` / environment | redacted message/stack in 500 responses; never enable in production |
+| `onUnexpectedError` | `(ctx, error) => void` | DI `HTTP_ERROR_HOOK` hooks | notification for non-`HttpError` failures (e.g. an error tracker); the error is still logged |
+| `logError` | `(error) => void` | — | replaces the built-in logging of unexpected errors |
+| `logger` | `Logger` | the application `LOGGER` | one `error` line: `"<METHOD> <path> failed"` with `method`, `path`, `requestId` and the redacted `error`; `console.error` when there is no logger |
 
 `HttpError` → JSON with its status; anything else → 500.
 
