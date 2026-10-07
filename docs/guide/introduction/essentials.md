@@ -58,18 +58,23 @@ Missing dependency "RequestState" for "Reader"
 Singleton "Reader" depends on scoped "RequestState"
 ```
 
-**Зависимость от интерфейса.** Интерфейсов в рантайме JavaScript нет, поэтому
-для них создают токен с тем же именем:
+**Зависимость от контракта.** Контракт сервиса описывают абстрактным
+классом без кода — он работает как интерфейс, но существует во время
+выполнения и поэтому сам служит ключом в DI:
 
 ```ts
-export interface IClock { now(): Date; }
-export const IClock = createToken<IClock>("IClock");
+export abstract class IClock { abstract now(): Date; }
+export class SystemClock implements IClock { now() { return new Date(); } }
 
 // в модуле:            scoped(IClock, SystemClock)
 // в конструкторе:      constructor(private readonly clock: IClock) {}
 ```
 
-Токен работает и для значений:
+Можно и чистый `interface`, но тогда рядом нужен токен с тем же именем —
+`export const IClock = createToken<IClock>("IClock")`. Подробнее — в главе
+[Провайдеры и DI](../overview/providers.md#регистрация-по-контракту).
+
+Токены `createToken` нужны и для значений:
 `singletonValue(APP_NAME, "my-app")`, `singletonFactory(TOKEN, [deps], factory)`.
 
 ## Контроллер
@@ -132,7 +137,7 @@ bazis перед запуском читает исходники и запис�
 `bazis dev`, `bazis test` и `bazis build` запускают её сами; вручную —
 `bunx bazis codegen`. Папку `src/generated` не правят руками и не хранят в
 Git. Если кодогенерация не может что-то понять, она останавливается и
-говорит, что именно. Например, у интерфейса `IMailer` забыли создать токен:
+говорит, что именно. Например, `IMailer` — интерфейс, а токен для него забыли:
 
 ```text
 BAZIS_DI_DEPENDENCY_UNKNOWN: src/app/modules/mail/Mail.service.ts:4:

@@ -52,10 +52,45 @@ Service graph validation failed:
 Singleton "Reader" depends on scoped "RequestState"
 ```
 
-## Регистрация по интерфейсу
+## Регистрация по контракту
 
-Чтобы зависеть от абстракции, а не от класса, объявите интерфейс и токен с
-тем же именем:
+Чтобы зависеть от абстракции, а не от конкретного класса, опишите контракт
+абстрактным классом без кода:
+
+```ts
+export abstract class IClock {
+  abstract now(): Date;
+}
+
+export class SystemClock implements IClock {
+  now() { return new Date(); }
+}
+```
+
+```ts
+// модуль: контракт → реализация
+providers: [scoped(IClock, SystemClock)],
+exports: [IClock],
+
+// потребитель: тип параметра — контракт
+constructor(private readonly clock: IClock) {}
+```
+
+Абстрактный класс работает как интерфейс: кода в нём нет, реализация
+подключает его через `implements`. Но в отличие от интерфейса он существует во
+время выполнения, поэтому сам служит ключом в DI. Отдельный токен не нужен, а
+сервис можно достать и там, где нет конструктора:
+`ctx.services.resolve(IClock)` в middleware или проверке доступа. В тестах
+вместо `SystemClock` регистрируют `FixedClock` — потребители этого не
+заметят. Так создаёт контракты и `bazis g module`.
+
+> [!NOTE]
+> Контракты-абстрактные классы работают с версии 0.97.0.
+
+### Интерфейс и токен
+
+Если контракт должен остаться чистым `interface`, рядом объявляют токен с тем
+же именем:
 
 ```ts
 import { createToken } from "bazis/core/di";
@@ -64,24 +99,16 @@ export interface IClock {
   now(): Date;
 }
 export const IClock = createToken<IClock>("IClock");
-
-export class SystemClock implements IClock {
-  now() { return new Date(); }
-}
 ```
 
-```ts
-// модуль: токен → реализация
-providers: [scoped(IClock, SystemClock)]
+Регистрация и конструктор пишутся так же: `scoped(IClock, SystemClock)`,
+`clock: IClock`. Здесь `IClock` в `scoped(...)` — константа-токен, а в
+конструкторе — интерфейс: TypeScript разрешает типу и значению носить одно
+имя. Без константы не обойтись: `interface` исчезает при компиляции, и
+`scoped(IClock, ...)` с одним только интерфейсом не скомпилируется.
 
-// потребитель: тип параметра — интерфейс
-constructor(private readonly clock: IClock) {}
-```
-
-Токен нужен потому, что интерфейсов в работающем JavaScript нет. Одинаковое
-имя у интерфейса и токена — это не ошибка, а приём: по имени типа
-кодогенерация находит токен. В тестах вместо `SystemClock` можно
-зарегистрировать `FixedClock` — потребители этого не заметят.
+Оба способа можно смешивать даже в одном модуле. Мы рекомендуем абстрактный
+класс: одна сущность вместо двух.
 
 ## Значения и фабрики
 
@@ -156,7 +183,7 @@ export class ReportWriter {
 | `Singleton "Y" depends on scoped "X"` | Долгоживущий сервис зависит от короткоживущего | Сделать `Y` `scoped` или `X` `singleton` |
 | `"Y" depends on "X", which module "A" provides but does not export` | `X` из модуля `A` не экспортирован | Добавить `X` в `exports` модуля `A` |
 | `"Y" depends on "X", which module "A" exports, but "B" does not list "A" in its imports` | Модуль `A` не импортирован | Добавить `A` в `imports` модуля `B` |
-| `BAZIS_DI_DEPENDENCY_UNKNOWN` (при кодогенерации) | Тип параметра конструктора — не класс и не токен | Создать токен `createToken` с тем же именем |
+| `BAZIS_DI_DEPENDENCY_UNKNOWN` (при кодогенерации) | Тип параметра конструктора — интерфейс без токена или неизвестный тип | Сделать контракт абстрактным классом или объявить токен `createToken` с тем же именем |
 
 ## Дальше
 
