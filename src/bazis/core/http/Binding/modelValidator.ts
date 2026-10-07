@@ -13,8 +13,19 @@ export interface ModelValidationIssue {
   readonly code?: string;
 }
 
+export interface ModelValidationResult {
+  readonly isValid: boolean;
+  readonly errors: readonly ModelValidationIssue[];
+}
+
 export interface ModelValidator {
-  validate(instance: object): { readonly isValid: boolean; readonly errors: readonly ModelValidationIssue[] };
+  validate(instance: object): ModelValidationResult;
+  /** Async rules (custom checks returning a Promise). HTTP binding prefers it when present. */
+  validateAsync?(instance: object): Promise<ModelValidationResult>;
+  /** Text for a JSON value of the wrong type; without it the binder uses its English default. */
+  typeMismatchMessage?(property: string, expected: string, actual: string): string;
+  /** Title of a 400 validation response; without it "Validation failed". */
+  failureTitle?(): string;
 }
 
 let activeValidator: ModelValidator | undefined;

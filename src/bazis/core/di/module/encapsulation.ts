@@ -170,6 +170,16 @@ export function validateModuleEncapsulation(
     }
   }
 
+  // Why a provided token is not visible: the owner does not export it, or the
+  // consumer module does not import the owner. Both used to read "not exported".
+  const explainHidden = (token: Token<unknown>, consumer: ModuleGraphRecord): string => {
+    const owner = records.find((record) => record !== consumer && record.providedTokens.has(token));
+    if (owner === undefined) return "which is provided by another module but not exported.";
+    return exportedTokens(owner).has(token)
+      ? `which module "${owner.name}" exports, but "${consumer.name}" does not list "${owner.name}" in its imports. Add "${owner.name}" to the imports of "${consumer.name}".`
+      : `which module "${owner.name}" provides but does not export. Add it to the exports of "${owner.name}".`;
+  };
+
   const contexts = new Map<ModuleGraphRecord, DependencyCheckContext>();
   for (let recordIndex = 0; recordIndex < records.length; recordIndex += 1) {
     const record = records[recordIndex] as ModuleGraphRecord;
@@ -183,7 +193,7 @@ export function validateModuleEncapsulation(
     }
 
     const context: DependencyCheckContext = {
-      visible, familiesVisible, tokensByName, allProvidedTokens, allProvidedFamilies, issues,
+      visible, familiesVisible, tokensByName, allProvidedTokens, allProvidedFamilies, issues, explainHidden,
     };
     contexts.set(record, context);
     for (const definition of record.definitions) {
@@ -214,6 +224,7 @@ interface DependencyCheckContext {
   readonly allProvidedTokens: ReadonlySet<Token<unknown>>;
   readonly allProvidedFamilies: ReadonlySet<symbol>;
   readonly issues: string[];
+  readonly explainHidden: (token: Token<unknown>, consumer: ModuleGraphRecord) => string;
 }
 
 function checkDefinition(
@@ -265,8 +276,9 @@ function checkDependency(
         return;
       }
     }
+    const provided = candidates.find((candidate) => context.allProvidedTokens.has(candidate as Token<unknown>)) as Token<unknown> | undefined;
     context.issues.push(
-      `Module "${record.name}": "${consumer}" depends on "${dep.name}", which is provided by another module but not exported.`,
+      `Module "${record.name}": "${consumer}" depends on "${dep.name}", ${provided ? context.explainHidden(provided, record) : "which is provided by another module but not exported."}`,
     );
     return;
   }
@@ -293,7 +305,7 @@ function checkDependency(
     return;
   }
   context.issues.push(
-    `Module "${record.name}": "${consumer}" depends on "${tokenToDebugName(token)}", which is provided by another module but not exported.`,
+    `Module "${record.name}": "${consumer}" depends on "${tokenToDebugName(token)}", ${context.explainHidden(token, record)}`,
   );
 }
 

@@ -114,6 +114,11 @@ Any of these rules requires the value to be a string (otherwise one `type` error
 `maxLength` and the upper bound of `length` limit the input of the later content checks
 **of the same decorator**: `contains`, `notContains`, `pattern`, `email`, `url`, `uuid`,
 `json`, `phone`. When exceeded, the length errors stay and the listed checks do not run.
+
+On an **array** value, `notEmpty`, `minLength`, `maxLength` and `length` count its
+items (codes `notEmpty`, `minItems`, `maxItems`, `itemCount`), as long as the decorator
+has no other string rule and no `type` hint. Any other string rule on an array is a
+`type` error (`got: array`).
 The lower length bound, the other fields/decorators and `custom` keep their behavior.
 For an untrusted `pattern`, set the upper bound in the same decorator; a separate
 limiting decorator does not change the neighboring rules.
@@ -480,7 +485,8 @@ from your own `ValidationError`.
 | Code | When |
 |---|---|
 | `required` | the value is `undefined`/`null` with `required: true` |
-| `notEmpty`, `minLength`, `maxLength`, `length` | the string length |
+| `notEmpty`, `minLength`, `maxLength`, `length` | the string length (`notEmpty` also an empty array) |
+| `minItems`, `maxItems`, `itemCount` | the array item count (`minLength`, `maxLength`, `length` on an array) |
 | `contains`, `notContains`, `pattern` | the string content |
 | `email`, `url`, `uuid`, `json`, `phone`, `date` | the format |
 | `type` | the value has the wrong type (including `NaN` for number rules) |

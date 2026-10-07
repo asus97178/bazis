@@ -1,6 +1,6 @@
 import type { Class } from "../../di";
 import { BadRequestError, ModelValidationError } from "../Errors/HttpError";
-import { getModelValidator, type ModelValidator } from "./modelValidator";
+import { getModelValidator, type ModelValidationIssue, type ModelValidationResult, type ModelValidator } from "./modelValidator";
 import {
   findRequestModelShape,
   type RequestModelClass,
@@ -17,6 +17,9 @@ const MAX_JSON_NODES = 100_000;
 interface BindingTraversal {
   readonly stack: WeakSet<object>;
   readonly options: ModelBindingOptions;
+  /** Per-field binding problems; a bad field does not stop the other fields. */
+  readonly issues: ModelValidationIssue[];
+  readonly typeMessage?: (property: string, expected: string, actual: string) => string;
   nodes: number;
 }
 
@@ -49,19 +52,48 @@ export interface ModelBindingOptions {
  * runtime fallback.
  */
 export function bindModel<T extends object>(model: Class<T>, data: unknown, validator?: ModelValidator, options: ModelBindingOptions = {}): T {
+  const activeValidator = validator ?? getModelValidator();
+  const { instance, traversal } = hydrate(model, data, activeValidator, options);
+  finish(traversal, activeValidator, activeValidator?.validate(instance));
+  return instance;
+}
+
+/**
+ * `bindModel` for callers that can wait: runs async `custom` rules through
+ * `ModelValidator.validateAsync` when the validator provides it.
+ */
+export async function bindModelAsync<T extends object>(model: Class<T>, data: unknown, validator?: ModelValidator, options: ModelBindingOptions = {}): Promise<T> {
+  const activeValidator = validator ?? getModelValidator();
+  const { instance, traversal } = hydrate(model, data, activeValidator, options);
+  const result = activeValidator?.validateAsync !== undefined
+    ? await activeValidator.validateAsync(instance)
+    : activeValidator?.validate(instance);
+  finish(traversal, activeValidator, result);
+  return instance;
+}
+
+function hydrate<T extends object>(model: Class<T>, data: unknown, validator: ModelValidator | undefined, options: ModelBindingOptions): { instance: T; traversal: BindingTraversal } {
   if (!isPlainJsonObject(data)) {
     throw new BadRequestError("Request body must be a JSON object");
   }
-  const traversal: BindingTraversal = { stack: new WeakSet(), nodes: 0, options };
+  const traversal: BindingTraversal = {
+    stack: new WeakSet(), nodes: 0, options, issues: [],
+    typeMessage: validator?.typeMismatchMessage?.bind(validator),
+  };
   const instance = hydrateModel(model as RequestModelClass, data, "", traversal, 0) as T;
-  const activeValidator = validator ?? getModelValidator();
-  if (activeValidator !== undefined) {
-    const result = activeValidator.validate(instance);
-    if (!result.isValid) {
-      throw new ModelValidationError(result.errors);
-    }
+  return { instance, traversal };
+}
+
+/**
+ * One 400 with every problem: binding issues first, then `@Validator` errors of
+ * the other fields (a field with a wrong JSON type gets only its type error).
+ */
+function finish(traversal: BindingTraversal, validator: ModelValidator | undefined, result: ModelValidationResult | undefined): void {
+  const bound = new Set(traversal.issues.map((issue) => issue.property));
+  const errors = [...traversal.issues, ...(result?.errors ?? []).filter((error) => !bound.has(error.property))];
+  if (errors.length > 0) {
+    throw new ModelValidationError(errors, validator?.failureTitle?.() ?? "Validation failed");
   }
-  return instance;
 }
 
 function hydrateModel(
@@ -84,7 +116,12 @@ function hydrateModel(
       }
       const target = instance as Record<string, unknown>;
       const fieldPath = path === "" ? key : `${path}.${key}`;
-      target[key] = bindField(model, key, target[key], source[key], fieldPath, traversal, depth + 1);
+      try {
+        target[key] = bindField(model, key, target[key], source[key], fieldPath, traversal, depth + 1);
+      } catch (error) {
+        if (!(error instanceof BindingTypeError) && !(error instanceof ModelValidationError && error.errors.every((issue) => issue.code === "unknownField"))) throw error;
+        traversal.issues.push(...(error instanceof BindingTypeError ? [error.issue(traversal.typeMessage)] : error.errors));
+      }
     }
     return instance;
   } finally {
@@ -117,13 +154,13 @@ function checkPrimitive(shape: RequestModelPrimitiveFieldShape, incoming: unknow
     return;
   }
   if (shape.array !== true) {
-    if (typeof incoming !== shape.primitive) throw bindingTypeError(path, shape.primitive);
+    if (typeof incoming !== shape.primitive) throw bindingTypeError(path, shape.primitive, incoming);
     return;
   }
-  if (!Array.isArray(incoming)) throw bindingTypeError(path, "array");
+  if (!Array.isArray(incoming)) throw bindingTypeError(path, "array", incoming);
   incoming.forEach((item, index) => {
     if (!(item === null && shape.elementNullable === true) && typeof item !== shape.primitive) {
-      throw bindingTypeError(`${path}[${index}]`, shape.primitive);
+      throw bindingTypeError(`${path}[${index}]`, shape.primitive, item);
     }
   });
 }
@@ -142,11 +179,11 @@ function hydrateField(
     if (shape.nullable === true) {
       return null;
     }
-    throw bindingTypeError(path, shape.array === true ? "array" : "object");
+    throw bindingTypeError(path, shape.array === true ? "array" : "object", incoming);
   }
   if (shape.array === true) {
     if (!Array.isArray(incoming)) {
-      throw bindingTypeError(path, "array");
+      throw bindingTypeError(path, "array", incoming);
     }
     enterContainer(incoming, path, traversal, depth);
     try {
@@ -156,7 +193,7 @@ function hydrateField(
           return null;
         }
         if (!isPlainJsonObject(item)) {
-          throw bindingTypeError(itemPath, "object");
+          throw bindingTypeError(itemPath, "object", item);
         }
         return hydrateModel(shape.model, item, itemPath, traversal, depth + 1);
       });
@@ -165,17 +202,25 @@ function hydrateField(
     }
   }
   if (!isPlainJsonObject(incoming)) {
-    throw bindingTypeError(path, "object");
+    throw bindingTypeError(path, "object", incoming);
   }
   return hydrateModel(shape.model, incoming, path, traversal, depth);
 }
 
-function bindingTypeError(property: string, expected: string): ModelValidationError {
-  return new ModelValidationError([{
-    property: property || "$",
-    message: `Field "${property || "$"}" must be a ${expected}`,
-    code: "type",
-  }]);
+/** A JSON value of the wrong type; the field is skipped and the binding goes on. */
+class BindingTypeError extends ModelValidationError {
+  constructor(readonly property: string, readonly expected: string, readonly actual: string) {
+    super([{ property, message: `Field "${property}" must be a ${expected}`, code: "type" }]);
+  }
+
+  issue(format?: (property: string, expected: string, actual: string) => string): ModelValidationIssue {
+    return { property: this.property, message: format?.(this.property, this.expected, this.actual) ?? this.errors[0]!.message, code: "type" };
+  }
+}
+
+function bindingTypeError(property: string, expected: string, value: unknown): BindingTypeError {
+  const actual = value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+  return new BindingTypeError(property || "$", expected, actual);
 }
 
 function isPlainJsonObject(value: unknown): value is Record<string, unknown> {
@@ -215,7 +260,7 @@ function sanitizeBoundValue(
 
   if (Array.isArray(incoming)) {
     if (isNestedModel(template) || isPlainJsonObject(template)) {
-      throw bindingTypeError(path, "object");
+      throw bindingTypeError(path, "object", incoming);
     }
     enterContainer(incoming, path, traversal, depth);
     try {
@@ -228,10 +273,10 @@ function sanitizeBoundValue(
   }
 
   if (!isPlainJsonObject(incoming)) {
-    throw bindingTypeError(path, "JSON object or array");
+    throw bindingTypeError(path, "JSON object or array", incoming);
   }
   if (Array.isArray(template)) {
-    throw bindingTypeError(path, "array");
+    throw bindingTypeError(path, "array", incoming);
   }
 
   enterContainer(incoming, path, traversal, depth);

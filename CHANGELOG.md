@@ -4,6 +4,23 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.96.6 — 2026-10-06
+
+### Fixed
+
+- Async `custom` rules in HTTP request models run: body binding uses async
+  validation, instead of answering 400 with `asyncCustomInSyncCall`.
+- A JSON type error no longer hides the other errors: the 400 response lists
+  the type errors and the `@Validator` errors of the other fields together.
+- `RU_VALIDATION_MESSAGES` also translates JSON type errors and the response
+  title (`"error"`); new message keys `validationFailed` and `invalid` (the
+  text for an unknown code was a hard-coded Russian string in every language).
+- `notEmpty`, `minLength`, `maxLength` and `length` on an array count its items
+  (codes `notEmpty`, `minItems`, `maxItems`, `itemCount`) instead of failing with
+  "must be of type string, got: object".
+- A module encapsulation error names the owner module and says whether the
+  service is not exported or the owner is not imported.
+
 ## 0.96.5 — 2026-10-06
 
 ### Added

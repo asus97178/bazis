@@ -6,11 +6,16 @@ export type MessageParams = Readonly<Record<string, unknown>>;
 
 /** Built-in default messages (English). */
 const BUILT_IN: Readonly<Record<string, string>> = {
+  validationFailed: "Validation failed",
+  invalid: 'Field "{property}" is invalid ({code})',
   required: 'Field "{property}" is required',
   notEmpty: 'Field "{property}" must not be empty',
   minLength: 'Field "{property}" must be at least {min} characters long',
   maxLength: 'Field "{property}" must be at most {max} characters long',
   length: 'Field "{property}" must be {min} to {max} characters long',
+  minItems: 'Field "{property}" must contain at least {min} items',
+  maxItems: 'Field "{property}" must contain at most {max} items',
+  itemCount: 'Field "{property}" must contain {min} to {max} items',
   contains: 'Field "{property}" must contain "{contains}"',
   notContains: 'Field "{property}" must not contain "{contains}"',
   pattern: 'Field "{property}" does not match the format {pattern}',
@@ -41,11 +46,16 @@ const BUILT_IN: Readonly<Record<string, string>> = {
  * `MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES)`.
  */
 export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  validationFailed: "Проверка данных не пройдена",
+  invalid: 'Поле "{property}" не прошло проверку ({code})',
   required: 'Поле "{property}" обязательно для заполнения',
   notEmpty: 'Поле "{property}" не должно быть пустым',
   minLength: 'Поле "{property}" должно содержать не менее {min} символов',
   maxLength: 'Поле "{property}" должно содержать не более {max} символов',
   length: 'Поле "{property}" должно содержать от {min} до {max} символов',
+  minItems: 'Поле "{property}" должно содержать не менее {min} элементов',
+  maxItems: 'Поле "{property}" должно содержать не более {max} элементов',
+  itemCount: 'Поле "{property}" должно содержать от {min} до {max} элементов',
   contains: 'Поле "{property}" должно содержать "{contains}"',
   notContains: 'Поле "{property}" не должно содержать "{contains}"',
   pattern: 'Поле "{property}" не соответствует формату {pattern}',
@@ -118,7 +128,7 @@ export class MessageRegistry {
       localMessage ??
       (Object.prototype.hasOwnProperty.call(MessageRegistry.defaults, code)
         ? MessageRegistry.defaults[code]!
-        : 'Поле "{property}" не прошло проверку ({code})');
+        : MessageRegistry.defaults.invalid ?? BUILT_IN.invalid!);
     return MessageRegistry.interpolate(template, params);
   }
 

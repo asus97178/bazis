@@ -115,11 +115,14 @@ export class RuleEngine {
 
     // 3. String rules: first one type check, then the rules themselves.
     if (rule.needsString) {
-      if (typeof value !== "string") {
+      if (Array.isArray(value) && RuleEngine.onlyLengthRules(o)) {
+        RuleEngine.applyArrayLengthRules(o, value, path, errors);
+      } else if (typeof value !== "string") {
         RuleEngine.failType(errors, path, value, o, "string");
         return;
+      } else {
+        RuleEngine.applyStringRules(rule, value, path, errors);
       }
-      RuleEngine.applyStringRules(rule, value, path, errors);
     }
 
     // 4. Number rules.
@@ -164,6 +167,27 @@ export class RuleEngine {
     // so several decorators on a field do not duplicate errors.
     if (rule.nested !== "none") {
       RuleEngine.applyNested(rule.nested === "explicit", value, instance, path, errors, jobs, seen);
+    }
+  }
+
+  /** notEmpty/minLength/maxLength/length also apply to arrays; any other string rule needs a string. */
+  private static onlyLengthRules(o: ValidatorOptions): boolean {
+    return o.type === undefined && o.contains === undefined && o.notContains === undefined && o.pattern === undefined
+      && o.email !== true && o.url !== true && o.uuid !== true && o.json !== true && o.phone !== true;
+  }
+
+  private static applyArrayLengthRules(o: ValidatorOptions, value: readonly unknown[], path: string, errors: ValidationError[]): void {
+    if (o.notEmpty === true && value.length === 0) {
+      RuleEngine.fail(errors, ValidationCodes.notEmpty, path, value, o, undefined);
+    }
+    if (o.minLength !== undefined && value.length < o.minLength) {
+      RuleEngine.fail(errors, ValidationCodes.minItems, path, value, o, { min: o.minLength });
+    }
+    if (o.maxLength !== undefined && value.length > o.maxLength) {
+      RuleEngine.fail(errors, ValidationCodes.maxItems, path, value, o, { max: o.maxLength });
+    }
+    if (o.length !== undefined && (value.length < o.length[0] || value.length > o.length[1])) {
+      RuleEngine.fail(errors, ValidationCodes.itemCount, path, value, o, { min: o.length[0], max: o.length[1] });
     }
   }
 
@@ -361,7 +385,7 @@ export class RuleEngine {
   }
 
   private static failType(errors: ValidationError[], path: string, value: unknown, o: ValidatorOptions, expected: string): void {
-    const actual = typeof value === "number" && Number.isNaN(value) ? "NaN" : value === null ? "null" : typeof value;
+    const actual = typeof value === "number" && Number.isNaN(value) ? "NaN" : value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
     RuleEngine.fail(errors, ValidationCodes.type, path, value, o, { expected, actual });
   }
 
