@@ -24,7 +24,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Контроллеры](overview/controllers.md) — `@Controller`, `@Get` / `@Post`, параметры маршрута
 - ✅ [Модели запросов и валидация](overview/validation.md) — `@RequestModel`, `@Validator`
 - ✅ [Ответы](overview/responses.md) — `Ok`, `Created`, `NotFound`, файлы
-- ⏳ Middleware — серверный и маршрутный уровни, порядок выполнения
+- ✅ [Middleware](overview/middleware.md) — серверный и маршрутный уровни, порядок выполнения
 - ⏳ Авторизация — `@Authorize`, `@AllowAnonymous`
 - ⏳ Обработка ошибок — `errorHandler`, `HttpError`
 - ⏳ Приложение — что делает `runApp`

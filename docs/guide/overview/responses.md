@@ -138,4 +138,5 @@ events() {
 ## Дальше
 
 - [Контроллеры](controllers.md)
+- [Middleware](middleware.md)
 - Обработка ошибок *(в работе)*
