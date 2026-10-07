@@ -186,4 +186,4 @@ Created with: `bunx bazis g module Prices --empty --pack Catalog`.
 
 - [Модули](../overview/modules.md)
 - [Инкапсуляция модулей](encapsulation.md)
-- Конфигурация *(в работе)*
+- [Конфигурация](configuration.md)

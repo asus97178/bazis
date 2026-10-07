@@ -35,7 +35,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [DI подробно](fundamentals/dependency-injection.md) — значения, фабрики, асинхронные фабрики, ключи, `Lazy`, освобождение ресурсов
 - ✅ [Инкапсуляция модулей](fundamentals/encapsulation.md) — видимость, реэкспорт, одна реализация на токен, модули с параметрами
 - ✅ [Архитектура модулей](fundamentals/module-architecture.md) — атомарные и составные модули, создание через CLI, паспорт `MODULE.md`
-- ⏳ Конфигурация — `defineConfig`, окружения, `Secret`, переменные `BAZIS_*`
+- ✅ [Конфигурация](fundamentals/configuration.md) — `defineConfig`, источники, переменные `BAZIS_*`, секреты, `inspect()`
 - ⏳ Жизненный цикл — фоновые службы, хуки, запуск и остановка
 - ⏳ События — `EventBus`, `onEvent`
 - ⏳ Логирование и correlation id
