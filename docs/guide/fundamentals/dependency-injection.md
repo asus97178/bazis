@@ -261,4 +261,4 @@ export class DbController {
 
 - [Провайдеры и DI](../overview/providers.md)
 - [Кодогенерация](codegen.md)
-- Инкапсуляция модулей *(в работе)*
+- [Инкапсуляция модулей](encapsulation.md)

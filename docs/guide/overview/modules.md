@@ -82,6 +82,9 @@ does not list "ClockModule" in its imports. Add "ClockModule" to the imports of 
 Add it to the exports of "ClockModule".
 ```
 
+Подробнее — цепочки импортов, реэкспорт, подмена реализации — в главе
+[Инкапсуляция модулей](../fundamentals/encapsulation.md).
+
 `exports` ограничивает только внедрение зависимостей. Контроллеры, фоновые
 службы и инструменты модуля работают в любом случае — доступ к ним
 настраивается отдельно, например через `@Authorize`.
