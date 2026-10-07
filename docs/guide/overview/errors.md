@@ -69,6 +69,47 @@ exposeErrorDetails: false } })`.
 `status: 418` всё равно даст `500`: так случайный объект ошибки из чужой
 библиотеки не управляет ответами вашего API.
 
+## Журнал ошибок
+
+Каждая неожиданная ошибка попадает в журнал приложения одной строкой уровня
+`error` — в том же формате, что и журнал запросов:
+
+```text
+error: GET /errors/crash failed {"method":"GET","path":"/errors/crash","requestId":"req-42","error":{"name":"Error","message":"connection to db lost: password=***","stack":"…"}}
+info: GET /errors/crash 500 1.2ms {"method":"GET","path":"/errors/crash","status":500,"durationMs":1.18,"requestId":"req-42"}
+```
+
+- `requestId` появляется, если подключён `createCorrelationIdMiddleware()`
+  (см. [Middleware](middleware.md#встроенные-middleware)): по нему строка
+  ошибки находится рядом со строкой запроса.
+- Пароли, токены и другие секреты в тексте ошибки маскируются — и в журнале,
+  и в подробном ответе для разработки.
+- Ошибки `HttpError` (404, 403 и т. д.) в журнал ошибок не пишутся: это
+  нормальные ответы API, они видны в журнале запросов.
+
+Чтобы ещё и отправлять ошибки в систему отслеживания (Sentry и подобные),
+подключите обработчик `onUnexpectedError`. Он получает контекст запроса и
+саму ошибку и **не отменяет** запись в журнал:
+
+```ts
+await runApp(AppModule, {
+  http: {
+    errorHandler: {
+      onUnexpectedError: (ctx, error) => tracker.capture(error, { path: ctx.path }),
+    },
+  },
+});
+```
+
+Ошибка приходит в обработчик как есть, без маскировки: что отправлять наружу,
+решает он сам. Полностью заменить запись в журнал можно опцией
+`errorHandler.logError: (error) => { ... }`.
+
+> [!NOTE]
+> Запись неожиданных ошибок через журнал приложения с `requestId` и маскировка
+> в ответе для разработки — с версии 0.97.1. Раньше ошибки писались
+> напрямую в `console.error`.
+
 ## Бросить ошибку или вернуть ответ
 
 `throw new NotFoundError()` и `return NotFound()` из
