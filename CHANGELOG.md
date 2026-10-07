@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.9 — 2026-10-08
+
+### Fixed
+
+- A wrong environment variable name in `defineConfig` (`env: { host: "SMTP_HOST" }`)
+  now names the key and the actual problem: `Configuration key "mail.host":
+  environment variable "SMTP_HOST" must start with BAZIS_: configuration reads
+  only BAZIS_* variables (for example BAZIS_SMTP_HOST).` Separate reasons for
+  an empty name, invalid characters and a name used twice. Before, all four
+  read `Invalid or duplicate configuration environment name: SMTP_HOST.`
+
 ## 0.97.8 — 2026-10-08
 
 ### Added

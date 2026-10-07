@@ -90,6 +90,19 @@ export function processConfiguration(): Configuration {
   }
   return new Configuration(values, origins);
 }
+/**
+ * Why an environment variable name cannot be used for a key, or undefined.
+ * Aliases are read from the same BAZIS_* variables as the generated names,
+ * so they share the prefix.
+ */
+function environmentNameProblem(name: string, claimed: ReadonlySet<string>): string | undefined {
+  if (!name.startsWith(ENV_PREFIX)) return `must start with ${ENV_PREFIX}: configuration reads only ${ENV_PREFIX}* variables (for example ${ENV_PREFIX}${name.replace(/^[^A-Za-z0-9]+/, "").toUpperCase() || "NAME"})`;
+  if (name.length === ENV_PREFIX.length) return `needs a name after ${ENV_PREFIX}`;
+  if (!/^[A-Z0-9_-]+$/.test(name)) return "may contain only A-Z, 0-9, _ and -";
+  if (claimed.has(name)) return "is already used by another key of this configuration";
+  return undefined;
+}
+
 function isSecret(cell: Cell): cell is SecretSpec { return typeof cell === "object" && cell !== null && "__secret" in cell; }
 function isEnum(cell: Cell): cell is ConfigEnum { return typeof cell === "object" && cell !== null && "__enum" in cell; }
 function copyCell(cell: Cell): Cell {
@@ -127,7 +140,8 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
     const alias = input.env?.[key];
     const env = [...new Set([`${ENV_PREFIX}${fullKey(key).replaceAll(".", "__").toUpperCase()}`, ...(typeof alias === "string" ? [alias] : alias ?? [])])];
     for (const name of env) {
-      if (!name.startsWith(ENV_PREFIX) || name.length === ENV_PREFIX.length || !/^[A-Z0-9_-]+$/.test(name) || claimed.has(name)) throw new KernelError(`Invalid or duplicate configuration environment name: ${name}.`);
+      const problem = environmentNameProblem(name, claimed);
+      if (problem) throw new KernelError(`Configuration key "${fullKey(key)}": environment variable "${name}" ${problem}.`);
       claimed.add(name);
     }
     names.set(key, Object.freeze(env));
