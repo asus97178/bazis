@@ -13,7 +13,7 @@ export interface BuildOptions {
 }
 
 /**
- * `bazis dev`: codegen, then run the default target's entrypoint from source.
+ * `bazis dev`: codegen of every target, then run the default target's entrypoint from source.
  * With `watch`, a change under src/ (except src/generated) stops the app,
  * reruns codegen and starts it again; a failed codegen waits for the next change.
  * The app runs as `development` unless BAZIS_ENV is set in the shell.
@@ -28,7 +28,7 @@ export async function runDev(cwd: string, codegen: Codegen, log: (message: strin
   const entry = await projectEntry(cwd);
   const env = devEnvironment(process.env);
   if (!options.watch) {
-    const generated = await codegen(cwd);
+    const generated = await codegen(cwd, "all");
     if (generated !== 0) return generated;
     const child = Bun.spawn([bun, "run", entry], { cwd, env, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
     // The app owns graceful shutdown; forward the signal instead of dying first.
@@ -55,7 +55,7 @@ export async function runDev(cwd: string, codegen: Codegen, log: (message: strin
     await running.exited;
   };
   const start = async () => {
-    if (await codegen(cwd) !== 0) { log("[bazis] codegen failed; waiting for changes..."); return; }
+    if (await codegen(cwd, "all") !== 0) { log("[bazis] codegen failed; waiting for changes..."); return; }
     child = Bun.spawn([bun, "run", entry], { cwd, env, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
   };
   const watcher = watch(path.join(cwd, "src"), { recursive: true }, (_event, file) => {
@@ -84,16 +84,16 @@ export async function runDev(cwd: string, codegen: Codegen, log: (message: strin
   }
 }
 
-/** `bazis test [args]`: codegen, then `bun test` with the given arguments. */
+/** `bazis test [args]`: codegen of every target, then `bun test` with the given arguments. */
 export async function runTest(cwd: string, args: readonly string[], codegen: Codegen): Promise<number> {
-  const generated = await codegen(cwd);
+  const generated = await codegen(cwd, "all");
   if (generated !== 0) return generated;
   return await Bun.spawn([await resolveBun(cwd), "test", ...args], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited;
 }
 
-/** `bazis build [--bin]`: codegen and typecheck; with `bin`, also compile. */
+/** `bazis build [--bin]`: codegen of every target and typecheck; with `bin`, also compile. */
 export async function runBuild(cwd: string, options: BuildOptions, codegen: Codegen, log: (message: string) => void): Promise<number> {
-  const generated = await codegen(cwd);
+  const generated = await codegen(cwd, "all");
   if (generated !== 0) return generated;
   const bun = await resolveBun(cwd);
   const tsc = path.join(cwd, "node_modules/typescript/bin/tsc");

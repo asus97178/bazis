@@ -37,6 +37,16 @@ export function frameworkVersion(): string | undefined {
  * (or with another framework version): new routes and dependencies would be
  * silently missing. A compiled binary carries no sources, so it is skipped.
  */
+let staleGeneratedSources = false;
+
+/**
+ * True when the loaded generated code was produced from older sources (or
+ * another bazis version) than the ones running now.
+ */
+export function generatedSourcesAreStale(): boolean {
+  return staleGeneratedSources;
+}
+
 export function warnIfGeneratedSourcesChanged(
   generatedDir: string,
   fingerprint: GeneratedSourceFingerprint,
@@ -49,6 +59,7 @@ export function warnIfGeneratedSourcesChanged(
   const version = frameworkVersion();
   if (version !== undefined && version !== fingerprint.framework) changes.push(`bazis ${fingerprint.framework} -> ${version}`);
   if (changes.length === 0) return false;
+  staleGeneratedSources = true;
   warn([
     "",
     `[bazis] WARNING: generated code is out of date (${changes.join("; ")}).`,

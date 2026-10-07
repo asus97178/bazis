@@ -13,7 +13,7 @@ export const AMBIGUOUS_REQUEST_MODEL: unique symbol = Symbol("ambiguous-request-
 export type RequestModelClass = new () => object;
 
 /**
- * Runtime hydration metadata emitted by `bun run di:generate` for a class-
+ * Runtime hydration metadata emitted by `bazis codegen` for a class-
  * typed request-model field. Standard TC39 decorators deliberately do not
  * expose design types, so this tiny registry is the dependency-free bridge
  * from TypeScript source types to the HTTP binder.

@@ -116,7 +116,7 @@ export interface HttpModuleOptions {
   readonly health?: HealthEndpointOptions | boolean;
   /**
    * Built-in generated API docs. No user-facing Swagger decorators are needed:
-   * `bun run di:generate` derives request models and schemas from controllers.
+   * `bazis codegen` derives request models and schemas from controllers.
    *
    * Default: enabled in debug environments, disabled in production. `true`
    * serves `/docs` and `/docs/openapi.json`; pass an object to change paths or

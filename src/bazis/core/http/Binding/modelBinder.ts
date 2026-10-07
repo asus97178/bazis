@@ -48,7 +48,7 @@ export interface ModelBindingOptions {
  *
  * The model class must have a parameterless constructor. Class-typed nested
  * DTOs (including arrays) are recursively hydrated from metadata emitted by
- * `bun run di:generate`; initialized nested DTO fields remain supported as a
+ * `bazis codegen`; initialized nested DTO fields remain supported as a
  * runtime fallback.
  */
 export function bindModel<T extends object>(model: Class<T>, data: unknown, validator?: ModelValidator, options: ModelBindingOptions = {}): T {
