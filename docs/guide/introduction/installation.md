@@ -57,12 +57,34 @@ bun add bazis
 bun add -d typescript@^6 @types/bun
 ```
 
-> [!WARNING]
-> Указывайте версию TypeScript: `typescript@^6`. Без версии
-> `bun add -d typescript` поставит TypeScript 7 — в нём нет программного API,
-> которым пользуется кодогенерация bazis, и она падает (`ts.sys` is
-> undefined). bazis поддерживает TypeScript 5.9 и 6. Проект, созданный
-> `bazis new`, уже содержит `"typescript": "^6"`.
+Подойдёт TypeScript 5.9, 6 или 7. Проект, созданный `bazis new`, получает
+`"typescript": "^6"`.
+
+### TypeScript 7
+
+В TypeScript 7 нет программного API компилятора, через который
+кодогенерация bazis читает исходники: `import ts from "typescript"` отдаёт
+только номер версии. Microsoft выпускает этот API отдельно, пакетом
+`@typescript/typescript6`. С TypeScript 7 поставьте его рядом:
+
+```sh
+bun add -d typescript@^7 @typescript/typescript6 @types/bun
+```
+
+Проверка типов (`bazis build`) идёт самим TypeScript 7, а кодогенерация
+читает исходники через API шестой версии. Без этого пакета кодогенерация
+остановится и подскажет команду:
+
+```text
+[bazis] BAZIS_TYPESCRIPT_API_MISSING: TypeScript 7 has no compiler API, and bazis codegen needs one.
+Install the TypeScript 6 API next to it: bun add -d @typescript/typescript6
+```
+
+Учтите: `bun add -d typescript` без версии ставит именно TypeScript 7 —
+тогда нужен и `@typescript/typescript6`.
+
+> [!NOTE]
+> TypeScript 7 поддерживается с версии bazis 0.97.5.
 
 Дальше проекту нужны четыре файла. Проще всего взять их из проекта,
 созданного `bazis new`, — ниже их минимальное содержимое.
