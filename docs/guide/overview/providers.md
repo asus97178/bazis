@@ -154,7 +154,8 @@ export class ReportWriter {
 | --- | --- | --- |
 | `Missing dependency "X" for "Y"` | `X` не зарегистрирован ни в одном доступном модуле | Добавить `X` в `providers` или импортировать модуль, который его экспортирует |
 | `Singleton "Y" depends on scoped "X"` | Долгоживущий сервис зависит от короткоживущего | Сделать `Y` `scoped` или `X` `singleton` |
-| `"Y" depends on "X", which is provided by another module but not exported` | `X` из другого модуля не экспортирован или этот модуль не импортирован | Добавить `X` в `exports` и модуль в `imports` |
+| `"Y" depends on "X", which module "A" provides but does not export` | `X` из модуля `A` не экспортирован | Добавить `X` в `exports` модуля `A` |
+| `"Y" depends on "X", which module "A" exports, but "B" does not list "A" in its imports` | Модуль `A` не импортирован | Добавить `A` в `imports` модуля `B` |
 | `BAZIS_DI_DEPENDENCY_UNKNOWN` (при кодогенерации) | Тип параметра конструктора — не класс и не токен | Создать токен `createToken` с тем же именем |
 
 ## Дальше

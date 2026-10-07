@@ -68,13 +68,19 @@ export class AppModule {}
 Нарушение границ останавливает запуск:
 
 ```text
-Module "OtherModule": "OtherController" depends on "TaskService",
-which is provided by another module but not exported.
+Module "OtherModule": "OtherController" depends on "TaskService", which module
+"TaskModule" provides but does not export. Add it to the exports of "TaskModule".
 ```
 
-Такая ошибка бывает в двух случаях: сервиса нет в `exports` своего модуля
-**или** модуль-потребитель не добавил этот модуль в `imports` (текст ошибки
-пока говорит только о первом).
+С версии 0.96.6 сообщение называет модуль-владелец и говорит, что исправить:
+
+```text
+... depends on "Clock", which module "ClockModule" exports, but "ReportModule"
+does not list "ClockModule" in its imports. Add "ClockModule" to the imports of "ReportModule".
+
+... depends on "Clock", which module "ClockModule" provides but does not export.
+Add it to the exports of "ClockModule".
+```
 
 `exports` ограничивает только внедрение зависимостей. Контроллеры, фоновые
 службы и инструменты модуля работают в любом случае — доступ к ним

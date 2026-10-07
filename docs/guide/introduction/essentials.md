@@ -26,8 +26,8 @@ export class GreetingModule {}
 недоступны. Попытка их внедрить остановит запуск:
 
 ```text
-Module "OtherModule": "OtherController" depends on "Counter",
-which is provided by another module but not exported.
+Module "OtherModule": "OtherController" depends on "Counter", which module
+"LabModule" provides but does not export. Add it to the exports of "LabModule".
 ```
 
 ## Провайдеры и внедрение зависимостей

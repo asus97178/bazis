@@ -33,14 +33,14 @@ create(body: CreateTaskRequest) {
 
 1. **Проверяет типы JSON.** Поле, объявленное как `string`, `number` или
    `boolean`, должно прийти с этим JSON-типом: `"42"` вместо `42` даст
-   ошибку `type`. Если есть ошибки типов, дальше проверка не идёт — клиент
-   получает только их.
+   ошибку `type`. Поле с ошибкой типа пропускается, остальные поля
+   проверяются дальше.
 2. **Создаёт экземпляр класса.** Вложенные объекты и элементы массивов,
    объявленные классами, тоже становятся экземплярами своих классов.
 3. **Отбрасывает лишние поля.** Поля, которых нет в классе, в модель не
    попадают.
 4. **Проверяет правила `@Validator`** всех полей, включая вложенные, и
-   возвращает **все** нарушения сразу.
+   возвращает **все** нарушения сразу — вместе с ошибками типов.
 
 Ответ на неверный запрос:
 
@@ -48,6 +48,7 @@ create(body: CreateTaskRequest) {
 {
   "error": "Validation failed",
   "details": [
+    { "property": "age", "message": "Field \"age\" must be of type number, got: string", "code": "type" },
     { "property": "email", "message": "Field \"email\" must be a valid email address", "code": "email" },
     { "property": "address.city", "message": "Field \"address.city\" must be at least 2 characters long", "code": "minLength" },
     { "property": "items[0].qty", "message": "Field \"items[0].qty\" must be at least 1", "code": "min" }
@@ -77,8 +78,8 @@ create(body: CreateTaskRequest) {
 
 | Правило | Что проверяет |
 | --- | --- |
-| `notEmpty: true` | Не пустая строка |
-| `minLength`, `maxLength`, `length: [min, max]` | Длина |
+| `notEmpty: true` | Не пустая строка (или массив) |
+| `minLength`, `maxLength`, `length: [min, max]` | Длина строки (или число элементов массива) |
 | `pattern: /…/` | Регулярное выражение |
 | `contains`, `notContains` | Подстрока |
 | `email`, `url`, `uuid`, `phone`, `json` | Формат |
@@ -98,16 +99,23 @@ create(body: CreateTaskRequest) {
 | `mustBeTrue`, `mustBeFalse` | Конкретное значение — например, согласие с условиями |
 | `enumType: MyEnum` | Значение входит в TypeScript-`enum` |
 
-Отдельного правила для длины массива нет. Проверить, что массив не пустой,
-можно через `custom`:
+**Массивы.** `notEmpty`, `minLength`, `maxLength` и `length` на массиве
+считают его элементы — со своими кодами:
 
 ```ts
-@Validator({ required: true, custom: (items) => (Array.isArray(items) && items.length > 0) || "{property}: нужен хотя бы один элемент" })
+@Validator({ required: true, notEmpty: true, maxLength: 50 })
 items!: ItemInput[];
 ```
 
-Не ставьте строковые правила (`notEmpty`, `minLength`) на массив — bazis
-примет поле за строку и вернёт непонятную ошибку типа.
+| Правило на массиве | Код ошибки | Текст |
+| --- | --- | --- |
+| `notEmpty` | `notEmpty` | must not be empty |
+| `minLength: 2` | `minItems` | must contain at least 2 items |
+| `maxLength: 50` | `maxItems` | must contain at most 50 items |
+| `length: [1, 3]` | `itemCount` | must contain 1 to 3 items |
+
+Другие строковые правила (`pattern`, `email` и т. п.) на массиве дают ошибку
+типа: `must be of type string, got: array`.
 
 ## Вложенные модели и массивы
 
@@ -154,11 +162,16 @@ export class TicketRequest {
 полями. Если функция вернула строку, она становится текстом ошибки с кодом
 `custom`.
 
-> [!WARNING]
-> Асинхронная `custom`-проверка (`async (value) => …`) в моделях HTTP-запросов
-> пока не поддерживается: клиент получит 400 с кодом
-> `asyncCustomInSyncCall`. Проверки, которым нужна база данных или сеть,
-> делайте в сервисе.
+`custom` может быть асинхронной — например, чтобы сходить в базу:
+
+```ts
+@Validator({ custom: async (email) => !(await users.exists(email as string)) || "{property}: адрес уже занят" })
+email!: string;
+```
+
+Модель запроса проверяется до вызова контроллера, поэтому такой проверке
+недоступны сервисы из DI. Проверки, которым нужна база данных приложения,
+обычно делают в сервисе, а в модели оставляют проверки формы данных.
 
 ## Свои тексты и русский язык
 
@@ -185,10 +198,20 @@ MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES);
 Поле "items[0].qty" должно быть не меньше 1
 ```
 
+Переводятся все тексты ответа: сообщения правил, ошибки типов JSON и
+заголовок:
+
+```json
+{
+  "error": "Проверка данных не пройдена",
+  "details": [{ "property": "age", "message": "Поле \"age\" должно иметь тип number, получено: string", "code": "type" }]
+}
+```
+
 > [!NOTE]
-> Пока переводятся только сообщения правил `@Validator`. Ошибки типов JSON
-> (`Field "qty" must be a number`) и заголовок `"error": "Validation failed"`
-> остаются на английском.
+> Асинхронные `custom`-проверки, ошибки типов вместе с остальными
+> нарушениями, правила длины для массивов и перевод всех текстов работают с
+> версии 0.96.6.
 
 ## Дальше
 
