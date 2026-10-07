@@ -144,4 +144,4 @@ export class AppModule {}
 
 - [Модули](../overview/modules.md)
 - [DI подробно](dependency-injection.md)
-- Архитектура модулей *(в работе)*
+- [Архитектура модулей](module-architecture.md)
