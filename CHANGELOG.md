@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.10 — 2026-10-08
+
+### Fixed
+
+- Background service failures go to the application logger, like HTTP errors
+  since 0.97.1: `error: background Crasher crashed {"service":"Crasher",
+  "restarts":0,"error":{...}}`, `... tick failed`. The kernel passes the logger
+  through the new optional `HostedService.useDiagnostics(diagnostics)` before
+  start. Without a logger the text still goes to the console.
+- A service whose restarts ran out says so: `background Crasher stopped after
+  2 restarts and will not run again` (or `stopped after a crash and will not
+  run again (no restart policy)`). Before, it just went quiet.
+- The slow-stop warning is honest: `did not stop within 300ms: shutdown
+  continues, but its unfinished work keeps the process alive until it ends`
+  instead of `...; continuing shutdown`.
+
+### Added
+
+- `BackgroundService.reportFailure(message, error, fields?)` (protected) for
+  subclasses that handle their own failures.
+
 ## 0.97.9 — 2026-10-08
 
 ### Fixed

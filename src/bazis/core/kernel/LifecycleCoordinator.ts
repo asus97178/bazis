@@ -1,6 +1,7 @@
 import { validateOptionsOnStart, type HostedService } from "../di";
 import type { Token } from "../di";
 import { LIFECYCLE_HOOK } from "./lifecycleHooks";
+import { LOGGER } from "./logging/Logger";
 import type { LifecycleHook } from "./types";
 import { ShutdownTimeoutError } from "./errors";
 import { awaitAbortable } from "./internal/awaitAbortable";
@@ -9,6 +10,7 @@ import { awaitShutdown } from "./internal/awaitShutdown";
 
 interface LifecycleResolver {
   resolveAll<T>(token: Token<T>): readonly T[];
+  tryResolve?<T>(token: Token<T>): T | undefined;
 }
 
 /**
@@ -57,6 +59,9 @@ export class LifecycleCoordinator {
     signal?.throwIfAborted();
     validateOptionsOnStart(this.resolver);
     const hosted = resolveHostedServices(this.resolver);
+    // Background failures go to the application logger, like HTTP errors.
+    const logger = this.resolver.tryResolve?.(LOGGER);
+    if (logger) for (const service of hosted) service.useDiagnostics?.(logger);
     const validation = validateHostedServicePlan(hosted, signal);
     if (validation) await awaitAbortable(validation, signal);
     this.hooks = this.resolver.resolveAll(LIFECYCLE_HOOK);

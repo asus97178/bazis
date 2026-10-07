@@ -13,9 +13,20 @@ export interface HostedServicePlanValidator {
   validate(services: readonly HostedService[], signal?: AbortSignal): void | Promise<void>;
 }
 
+/**
+ * Where a hosted service reports what it handles itself: crashes, restarts, a
+ * slow stop. The application logger fits it structurally.
+ */
+export interface HostedServiceDiagnostics {
+  error(message: string, fields?: Readonly<Record<string, unknown>>): void;
+  warn(message: string, fields?: Readonly<Record<string, unknown>>): void;
+}
+
 export interface HostedService {
   /** Shared validators see real service identities, including inside supervised wrappers. */
   readonly planValidator?: HostedServicePlanValidator;
+  /** Receives the application logger before start, when one is registered. */
+  useDiagnostics?(diagnostics: HostedServiceDiagnostics): void;
   start(signal?: AbortSignal): void | Promise<void>;
   stop(): void | Promise<void>;
   /**

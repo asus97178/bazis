@@ -1,4 +1,4 @@
-import type { HostedService } from "../di";
+import type { HostedService, HostedServiceDiagnostics } from "../di";
 import { backgroundOptionsOf } from "./decorator";
 import { delay } from "./delay";
 import { redactSensitive } from "../../library/redaction";
@@ -54,6 +54,9 @@ export abstract class BackgroundService implements HostedService {
   private controller?: AbortController;
   private runPromise?: Promise<void>;
 
+  /** The application logger, passed by the kernel; console until then. */
+  private diagnostics?: HostedServiceDiagnostics;
+
   public constructor(options?: BackgroundServiceOptions) {
     // Explicit `super(...)` options win over `@Background({...})` metadata.
     const resolved = { ...backgroundOptionsOf(this.constructor), ...options };
@@ -65,13 +68,22 @@ export abstract class BackgroundService implements HostedService {
   /** The background workload. Must observe `signal` for cooperative shutdown. */
   protected abstract execute(signal: AbortSignal): void | Promise<void>;
 
+  public useDiagnostics(diagnostics: HostedServiceDiagnostics): void {
+    this.diagnostics = diagnostics;
+  }
+
+  /** Reports a failure of this service: the application logger, or the console without one. */
+  protected reportFailure(message: string, error: unknown, fields: Readonly<Record<string, unknown>> = {}): void {
+    report(this.diagnostics, "error", this.constructor.name, message, { ...fields, error: redactSensitive(error) });
+  }
+
   public start(): void {
     if (this.controller) {
       return;
     }
     this.controller = new AbortController();
     this.runPromise = this.runSupervised(this.controller.signal)
-      .catch((error: unknown) => logBackgroundError(this.constructor.name, error));
+      .catch((error: unknown) => this.reportFailure("supervisor failed", error));
   }
 
   public async stop(): Promise<void> {
@@ -83,7 +95,9 @@ export abstract class BackgroundService implements HostedService {
     this.controller = undefined;
     this.runPromise = undefined;
     if (pending) {
-      await waitWithTimeout(pending, this.stopTimeoutMs, this.constructor.name);
+      await waitWithTimeout(pending, this.stopTimeoutMs, () => report(this.diagnostics, "warn", this.constructor.name,
+        `did not stop within ${this.stopTimeoutMs}ms: shutdown continues, but its unfinished work keeps the process alive until it ends`,
+        { stopTimeoutMs: this.stopTimeoutMs }));
     }
   }
 
@@ -104,6 +118,10 @@ export abstract class BackgroundService implements HostedService {
         }
         this.reportError(error, restarts);
         if (restarts >= maxRestarts) {
+          // Without this line the service would just go quiet.
+          report(this.diagnostics, "error", this.constructor.name, maxRestarts === 0
+            ? "stopped after a crash and will not run again (no restart policy)"
+            : `stopped after ${maxRestarts} restart${maxRestarts === 1 ? "" : "s"} and will not run again`, { restarts });
           return;
         }
         restarts += 1;
@@ -117,9 +135,9 @@ export abstract class BackgroundService implements HostedService {
 
   private reportError(error: unknown, restarts: number): void {
     if (this.restart.onError) {
-      observeDiagnostic(() => this.restart.onError!(error, restarts), this.constructor.name);
+      observeDiagnostic(() => this.restart.onError!(error, restarts), (failure) => this.reportFailure("onError callback failed", failure));
     } else {
-      logBackgroundError(this.constructor.name, error);
+      this.reportFailure("crashed", error, { restarts });
     }
   }
 }
@@ -162,7 +180,7 @@ export abstract class PeriodicBackgroundService extends BackgroundService {
 
   /** Hook for tick failures; default logs. The loop continues regardless. */
   protected onTickError(error: unknown): void {
-    logBackgroundError(this.constructor.name, error);
+    this.reportFailure("tick failed", error);
   }
 
   protected override async execute(signal: AbortSignal): Promise<void> {
@@ -176,7 +194,7 @@ export abstract class PeriodicBackgroundService extends BackgroundService {
         if (signal.aborted) {
           return;
         }
-        observeDiagnostic(() => this.onTickError(error), this.constructor.name);
+        observeDiagnostic(() => this.onTickError(error), (failure) => this.reportFailure("onTickError failed", failure));
       }
       if (signal.aborted) {
         return;
@@ -187,20 +205,34 @@ export abstract class PeriodicBackgroundService extends BackgroundService {
 }
 
 /** Diagnostics are best-effort; even an accidentally async observer cannot own the loop. */
-function observeDiagnostic(callback: () => unknown, name: string): void {
+function observeDiagnostic(callback: () => unknown, onFailure: (error: unknown) => void): void {
   try {
-    void Promise.resolve(callback()).catch((error: unknown) => logBackgroundError(name, error));
+    void Promise.resolve(callback()).catch(onFailure);
   } catch (error) {
-    logBackgroundError(name, error);
+    onFailure(error);
   }
 }
 
-function logBackgroundError(name: string, error: unknown): void {
-  try { console.error(`[background:${name}]`, redactSensitive(error)); }
-  catch { /* A broken diagnostic sink must not terminate the workload supervisor. */ }
+/** One line per event: "background Crasher crashed" with the service name in the fields. */
+function report(
+  diagnostics: HostedServiceDiagnostics | undefined,
+  level: "error" | "warn",
+  name: string,
+  message: string,
+  fields: Readonly<Record<string, unknown>>,
+): void {
+  try {
+    if (diagnostics) {
+      diagnostics[level](`background ${name} ${message}`, { service: name, ...fields });
+      return;
+    }
+    const { error, ...rest } = fields;
+    const details = error === undefined ? (Object.keys(rest).length ? [rest] : []) : [error];
+    (level === "error" ? console.error : console.warn)(`[background:${name}] ${message}`, ...details);
+  } catch { /* A broken diagnostic sink must not terminate the workload supervisor. */ }
 }
 
-async function waitWithTimeout(promise: Promise<void>, timeoutMs: number, name: string): Promise<void> {
+async function waitWithTimeout(promise: Promise<void>, timeoutMs: number, onTimeout: () => void): Promise<void> {
   const guarded = promise.catch(() => undefined);
   if (timeoutMs <= 0) {
     await guarded;
@@ -209,7 +241,7 @@ async function waitWithTimeout(promise: Promise<void>, timeoutMs: number, name: 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<void>((resolve) => {
     timer = setTimeout(() => {
-      console.warn(`[background:${name}] did not stop within ${timeoutMs}ms; continuing shutdown`);
+      onTimeout();
       resolve();
     }, timeoutMs);
   });
