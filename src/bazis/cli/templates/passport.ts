@@ -51,7 +51,7 @@ adapters that access it.
 | ${n.moduleClass} | [${n.module}.module.ts](${n.module}.module.ts) | host imports | ORM, DI, HTTP${profile === "full" ? ", background, AI" : ""} |
 | ${e} | [model/${m}.model.ts](model/${m}.model.ts) | Fields below | Table ${n.route} |
 | ${m}DbContext | [model/${m}.dbContext.ts](model/${m}.dbContext.ts) | Shared host ORM provider | DbSet ${n.collection} |
-| I${m}Service / ${m}Service | [services/${m}.service.ts](services/${m}.service.ts), [token](services/I${m}.service.ts) | ${m}DbContext${profile === "full" ? ", ICache" : ""} | CRUD, count, summary |
+| I${m}Service / ${m}Service | [services/${m}.service.ts](services/${m}.service.ts), [contract](services/I${m}.service.ts) | ${m}DbContext${profile === "full" ? ", ICache" : ""} | CRUD, count, summary |
 | ${m}Controller | [http/${m}.controller.ts](http/${m}.controller.ts) | I${m}Service, HTTP request | HTTP operations below |
 | Create${e}Request / Update${e}Request | [requests](http/contracts/${m}.requests.ts) | JSON body | RequestModel + Validator |
 | ${e}Response / ${m}Summary / to${e}Response | [responses](http/contracts/${m}.responses.ts) | ORM entity | Public data projection |

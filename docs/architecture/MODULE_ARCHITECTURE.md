@@ -221,7 +221,7 @@ task/
     Task.model.ts                  ORM entity
     TaskDbContext.ts               context and entity sets
   services/
-    ITask.service.ts               interface and DI token
+    ITask.service.ts               service contract (abstract class, also the DI token)
     Task.service.ts                domain operations
   contracts/                       contracts shared by several adapters
   http/
@@ -554,7 +554,7 @@ marked "not used" with a short reason, without creating stubs.
 | Component | Where it lives | What it gets as input | Responsibility / output |
 | --- | --- | --- | --- |
 | Module declaration / factory | `*.module.ts` | The §5 fields; typed factory options, if any | The dependency graph and public DI contracts |
-| Interface and DI token | `services/`, `contracts/` | The arguments of each public operation | Typed results and errors |
+| Service contract (abstract class or interface + DI token) | `services/`, `contracts/` | The arguments of each public operation | Typed results and errors |
 | Business service | `services/` | Constructor DI deps; DTO/command/query; operation context, if needed | Domain rules, transactions, ORM and external port calls |
 | ORM entity | `model/` | Model fields with types, keys, nullability, defaults and constraints | Data owned by the module; not an automatic HTTP model |
 | DbContext / repository | `model/` | Options, provider, entities; read and change criteria | Data access through the existing ORM |

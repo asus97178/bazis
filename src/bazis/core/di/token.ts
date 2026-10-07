@@ -3,6 +3,14 @@
 // constructor deps is still validated by the container.
 export type Class<T> = new (...args: any[]) => T;
 
+/**
+ * A class usable only as a key: an abstract class declared as a contract
+ * (`export abstract class IClock { abstract now(): Date }`) and registered with
+ * `scoped(IClock, SystemClock)`. Unlike an interface it exists at runtime, so it
+ * needs no `createToken`. The container never constructs it.
+ */
+export type AbstractClass<T> = abstract new (...args: any[]) => T;
+
 export interface InjectionToken<T> {
   readonly id: symbol;
   readonly description: string;
@@ -18,7 +26,7 @@ export function createToken<T>(description: string): InjectionToken<T> {
   };
 }
 
-export type Token<T> = Class<T> | InjectionToken<T>;
+export type Token<T> = Class<T> | AbstractClass<T> | InjectionToken<T>;
 
 export interface OpenGenericTokenFamily<TArg, TResult> {
   readonly id: symbol;

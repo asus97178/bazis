@@ -184,7 +184,7 @@ The inputs of the affected core are recorded here; the optional
 | constructor `openGenericRegistrations` | `readonly OpenGenericRegistration[]` | Required; an empty array is allowed | A family, factory, lifetime and an optional key |
 | `options.validateOnBuild` | `boolean` | Optional; `false` | Checks the existence of dependencies, cycles, lifetime and arity at build time |
 | `options.validateScopes` | `boolean` | Optional; `true` | Forbids scoped from the root or a singleton chain |
-| `token` of resolve/has/tryResolve | `Token<T>` | Required | A class or an injection token; identity selects the registration |
+| `token` of resolve/has/tryResolve | `Token<T>` | Required | A class, an abstract class (a service contract, since 0.97.0) or an injection token; identity selects the registration |
 | `key` of keyed methods | `string \| number \| symbol` | Required for keyed; `undefined` for a regular resolve/optional tryResolve | Selects the registration with this key |
 | `scopeState` of the `*ForScope` methods | `ResolutionScopeState` | Passed by `ServiceScope` | The internal context kept until the scope's work finishes |
 

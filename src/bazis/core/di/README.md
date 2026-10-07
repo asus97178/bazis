@@ -14,7 +14,7 @@ contracts are described in [MODULE.md](MODULE.md).
 - `ServiceCollection.ts`: service registration.
 - `ServiceScope.ts`: scoped resolve and scoped dispose.
 - `container.ts`: a compatible alias wrapper over `ServiceProvider`.
-- `token.ts`: DI tokens (`createToken`, open generic family).
+- `token.ts`: DI tokens: classes, abstract classes as service contracts, `createToken`, open generic family.
 
 ## Internals (do not use directly)
 
