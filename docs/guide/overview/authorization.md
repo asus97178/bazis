@@ -67,7 +67,7 @@ export const authConfig = defineConfig<AuthConfig>("auth", {
 
 ```text
 [bazis] configuration error: Invalid configuration (environment "production"):
-auth.jwtSecret: required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
+auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 ```
 
 Сервис оборачивает `TokenIssuer` из `bazis/library/jwt`:

@@ -182,7 +182,7 @@ greet(name: string) { return `${this.config.get("prefix")}, ${name}!`; }
 останавливает запуск:
 
 ```text
-Invalid configuration (environment "development"): greeting.times: expected a finite number.
+Invalid configuration (environment "development"): greeting.times — expected a finite number.
 ```
 
 Окружение выбирает переменная `BAZIS_ENV` (если её нет — `NODE_ENV`):
