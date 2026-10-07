@@ -216,4 +216,4 @@ MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES);
 ## Дальше
 
 - [Контроллеры](controllers.md)
-- Ответы *(в работе)*
+- [Ответы](responses.md)
