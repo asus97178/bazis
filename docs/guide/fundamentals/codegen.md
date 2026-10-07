@@ -29,12 +29,14 @@ export class TaskController {
 
 ## Когда запускается
 
+Все команды ниже генерируют код для всех [целей](#несколько-точек-входа).
+
 | Команда | Codegen |
 | --- | --- |
 | `bazis dev` | Перед запуском; с `--watch` — после каждого изменения в `src/` |
 | `bazis test` | Перед тестами |
 | `bazis build`, `bazis build --bin` | Перед проверкой типов и сборкой |
-| `bazis codegen` | Только codegen; `--target <имя>` или `--target all` — для [других целей](#несколько-точек-входа) |
+| `bazis codegen` | Только codegen для цели по умолчанию; `--target <имя>` — для одной цели, `--target all` — для всех |
 
 Если запускать приложение напрямую — `bun src/index.ts` — codegen сам не
 выполнится. Тогда bazis сравнивает исходники с тем, что было при последнем
@@ -46,23 +48,35 @@ codegen, и предупреждает:
 [bazis] Run: bunx bazis codegen   (bazis dev, bazis build and bazis test run it automatically)
 ```
 
-Предупреждение стоит воспринимать всерьёз. Новый параметр конструктора без
-codegen не пройдёт проверку графа сервисов, и приложение не стартует:
+Если устаревший код уже не соответствует исходникам, приложение не
+запускается и говорит, что делать. Новый параметр конструктора не пройдёт
+проверку графа сервисов:
 
 ```text
 [bazis] configuration error: Service graph validation failed:
 Class provider "PingController" requires at least 1 constructor deps, but only 0 declared.
+Constructor dependencies are wired by codegen: if the constructor was added or changed after
+the last run, run `bazis codegen` (bazis dev, bazis test and bazis build run it automatically);
+otherwise pass the deps explicitly.
 ```
 
-Хуже с новым методом контроллера: маршрут уже работает, а описания его
-аргументов ещё нет. Метод получит не те значения и упадёт только на запросе:
+Новый метод контроллера с параметрами — тоже:
 
 ```text
-GET /ping/ann/upper → 500 "name.toUpperCase is not a function"
+PingController.upper has parameters but no generated argument bindings: the generated code is
+older than this controller. Run `bazis codegen` (bazis dev, bazis test and bazis build run it automatically).
 ```
 
-После `bazis codegen` тот же запрос отвечает `{"pong":"ANN"}`. Поэтому в
-разработке запускайте приложение через `bazis dev`.
+Изменения, которые не касаются зависимостей и маршрутов, — например,
+новая логика внутри метода — работают и без codegen, остаётся только
+предупреждение. Проще всего в разработке запускать приложение через
+`bazis dev`: он выполняет codegen сам.
+
+> [!NOTE]
+> Остановка запуска при устаревшем codegen и генерация всех целей командами
+> `bazis dev`, `test` и `build` — с версии 0.97.3. Раньше новый метод
+> получал вместо аргументов контекст запроса и падал только на запросе, а
+> дополнительные цели нужно было генерировать вручную.
 
 ## Что генерируется
 
@@ -129,11 +143,6 @@ import { registerBazisGeneratedRuntime } from "./generated/bazis/targets/worker/
 await registerBazisGeneratedRuntime();
 await runApp(WorkerModule);
 ```
-
-> [!WARNING]
-> `bazis dev`, `bazis test` и `bazis build` генерируют только цель по
-> умолчанию. Для остальных запускайте `bazis codegen --target all` — иначе
-> их сгенерированный код останется прежним.
 
 ## Ошибки codegen
 
