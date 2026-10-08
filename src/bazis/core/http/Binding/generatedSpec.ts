@@ -13,6 +13,8 @@ export interface GeneratedBindingSpec {
   readonly type?: "int" | "number" | "bool" | "string";
   /** The parameter is declared with `?` or a default value. */
   readonly optional?: boolean;
+  /** A query array (`tag: string[]`): every `?tag=` value, each converted by `type`. */
+  readonly array?: boolean;
   /** DTO class name (resolved through the generated target; `@RequestModel()` classes are the fallback). */
   readonly model?: string;
 }

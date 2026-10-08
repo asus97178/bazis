@@ -17,6 +17,8 @@ export interface RouteAction {
 
 interface RouteEntry {
   readonly action: RouteAction;
+  /** The registered path, for diagnostics: `/tasks/:id`. */
+  readonly template: string;
   /** Names belong to the selected declaration, never to shared tree edges. */
   readonly bindings: readonly { readonly name: string; readonly index: number }[];
 }
@@ -58,6 +60,7 @@ export class Router {
   register(segments: readonly TemplateSegment[], httpMethod: string, versionKey: string, action: RouteAction): void {
     const entry: RouteEntry = {
       action,
+      template: renderTemplate(segments),
       bindings: segments.flatMap((segment, index) => segment.kind === "static" ? [] : [{ name: segment.name, index }]),
     };
     let node = this.root;
@@ -101,8 +104,11 @@ export class Router {
       leaf.set(httpMethod, versions);
     }
     if (versions.has(versionKey)) {
+      const existing = versions.get(versionKey)!;
+      const version = versionKey ? ` (version ${versionKey})` : "";
       throw new HttpSetupError(
-        `Duplicate route: ${httpMethod} (version "${versionKey || "-"}") already mapped to ${versions.get(versionKey)!.action.name}, cannot map ${entry.action.name}.`,
+        `Duplicate route: ${httpMethod} ${entry.template}${version} is mapped to both ${existing.action.name} (${existing.template}) and ${entry.action.name}. `
+          + "Routes that differ only in parameter names are the same route; change one of the paths.",
       );
     }
     versions.set(versionKey, entry);
@@ -198,4 +204,11 @@ function constraintPriority(constraint: SegmentConstraint | undefined): number {
     default:
       return 0;
   }
+}
+
+/** `/tasks/:id(int)/files/*path` from parsed segments. */
+function renderTemplate(segments: readonly TemplateSegment[]): string {
+  return `/${segments.map((segment) => segment.kind === "static" ? segment.value
+    : segment.kind === "param" ? `:${segment.name}${segment.constraint ? `(${segment.constraint.name})` : ""}`
+    : `*${segment.name}`).join("/")}`;
 }

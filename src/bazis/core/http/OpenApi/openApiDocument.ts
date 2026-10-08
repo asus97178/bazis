@@ -173,8 +173,8 @@ function collectParameters(
           parameters.push({
             name: binding.name,
             in: "query",
-            required: binding.optional !== true && binding.defaultValue === undefined,
-            schema: schemaForValueType(binding.type),
+            required: binding.array !== true && binding.optional !== true && binding.defaultValue === undefined,
+            schema: binding.array ? { type: "array", items: schemaForValueType(binding.type) } : schemaForValueType(binding.type),
           });
         }
         break;

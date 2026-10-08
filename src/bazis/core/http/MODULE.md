@@ -110,7 +110,11 @@ generated files stay in place; codegen returns a non-zero code, so the regular
 dev/build does not continue.
 
 Supported primitives, DTOs, ListRequest, Request/ResponseBuilder/HttpContext keep
-their contracts. For manual route assembly without codegen the old runtime
+their contracts. Since 0.98.1 a query parameter may also be an array of a
+primitive (`tag: string[]`, `Array<number>`, `readonly boolean[]`): every
+`?tag=` value, each converted like a scalar (a bad one is 400); without the
+parameter the default, `undefined` for `tag?: T[]`, or `[]`. OpenAPI describes
+it as an optional `array` parameter. For manual route assembly without codegen the old runtime
 HttpContext fallback is kept; the static check guarantees do not cover that way of
 running. There is no new analysis per request.
 
