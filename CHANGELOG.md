@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.1 — 2026-10-09
+
+### Added
+
+- Query arrays: a controller parameter `tag: string[]` (also `number[]`,
+  `boolean[]`, `Array<T>`, `readonly T[]`) takes every `?tag=` value, each
+  converted by the element type: `?tag=a&tag=b&status=1` gives
+  `["a", "b"]` and `[1]`. A bad element is 400 (`Parameter "status" must be
+  of type number, got: "abc"`); without the parameter the default,
+  `undefined` for `tag?: T[]`, or `[]`. OpenAPI describes it as an optional
+  `array` parameter. Before, codegen stopped with "no type annotation usable
+  for conventions".
+
+### Fixed
+
+- The duplicate-route error names both paths: `Duplicate route: GET
+  /tasks/:taskId is mapped to both TasksController.byId (/tasks/:id) and
+  TasksController.again. Routes that differ only in parameter names are the
+  same route; change one of the paths.` Before, it read `GET (version "-")`
+  without a path.
+
 ## 0.98.0 — 2026-10-08
 
 ### Added

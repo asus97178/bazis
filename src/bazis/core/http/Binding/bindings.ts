@@ -11,6 +11,8 @@ export interface ParameterBinding {
   readonly type?: ValueType;
   readonly defaultValue?: unknown;
   readonly optional?: boolean;
+  /** Query array: all values of the name (`?tag=a&tag=b`), each converted by `type`. */
+  readonly array?: boolean;
   /** Body model class (instantiated, sanitized and validated). */
   readonly model?: Class<object>;
   /** Whitelist/limits for the class-based list binding (JSON:API list query). */

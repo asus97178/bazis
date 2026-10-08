@@ -55,7 +55,7 @@ function toBinding(spec: GeneratedBindingSpec, controllerName: string, methodNam
     case "route":
       return { source: "route", name: spec.name, type: spec.type, optional: spec.optional };
     case "query":
-      return { source: "query", name: spec.name, type: spec.type, optional: spec.optional };
+      return { source: "query", name: spec.name, type: spec.type, optional: spec.optional, array: spec.array };
     case "context":
       return { source: "context" };
     case "request":

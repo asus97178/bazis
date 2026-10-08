@@ -178,6 +178,7 @@ interface HttpBindingSpec {
   type?: "int" | "number" | "bool" | "string";
   optional?: boolean;
   model?: string;
+  array?: boolean;
 }
 let httpBindings: Record<string, Record<string, HttpBindingSpec[]>> = {};
 interface GrpcRequestBinding {
@@ -1030,6 +1031,16 @@ function readConstructorTypeNames(node: ts.ClassDeclaration): ConstructorDepende
 }
 
 /** Resolve imported type aliases/re-exports; runtime named binding stays module-scoped. */
+/** The element keyword of an array type: `string[]`, `Array<string>`, `readonly string[]` -> "string". */
+function arrayElementKeyword(node: ts.TypeNode): string | undefined {
+  if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.ReadonlyKeyword) return arrayElementKeyword(node.type);
+  if (ts.isArrayTypeNode(node)) return node.elementType.getText().trim();
+  if (ts.isTypeReferenceNode(node) && ["Array", "ReadonlyArray"].includes(node.typeName.getText()) && node.typeArguments?.length === 1) {
+    return node.typeArguments[0]!.getText().trim();
+  }
+  return undefined;
+}
+
 function getDependencyTypeName(node: ts.TypeNode): string | undefined {
   if (!ts.isTypeReferenceNode(node)) return undefined;
   const symbol = checker.getSymbolAtLocation(node.typeName);
@@ -1423,6 +1434,13 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
         // Constraint conversion happens in the router; add type only for plain :params.
         const type = keywordType !== undefined ? PRIMITIVE_QUERY_TYPES[keywordType] : undefined;
         specs.push({ source: "route", name: paramName, type: type === "string" ? undefined : type, optional });
+        continue;
+      }
+      // `tag: string[]`, `Array<number>`, `readonly boolean[]` -> every ?tag= value.
+      const elementKeyword = typeNode ? arrayElementKeyword(typeNode) : undefined;
+      const elementType = elementKeyword !== undefined ? PRIMITIVE_QUERY_TYPES[elementKeyword] : undefined;
+      if (elementType !== undefined) {
+        specs.push({ source: "query", name: paramName, type: elementType === "string" ? undefined : elementType, optional, array: true });
         continue;
       }
       const primitiveType =

@@ -25,6 +25,21 @@ function bindValue(binding: ParameterBinding, raw: string | undefined, kind: str
 }
 
 /**
+ * `?tag=a&tag=b` → `["a", "b"]`, each value converted by the element type.
+ * Without the parameter: the default, `undefined` for `tag?: string[]`, or `[]`.
+ */
+function bindArray(binding: ParameterBinding, ctx: HttpContext): unknown {
+  const raw = ctx.url.searchParams.getAll(binding.name ?? "");
+  if (raw.length === 0) {
+    if (binding.defaultValue !== undefined) return binding.defaultValue;
+    return binding.optional ? undefined : [];
+  }
+  return binding.type && binding.type !== "string"
+    ? raw.map((value) => convertOr400(value, binding.type!, binding.name ?? "?"))
+    : raw;
+}
+
+/**
  * Resolves generated binding descriptors into the action's argument list.
  * All conversions fail with 400 (never 500); body parse errors and model
  * validation are handled by the body branch.
@@ -52,7 +67,7 @@ export async function bindArguments(
         break;
       }
       case "query":
-        args[index] = bindValue(binding, ctx.query(binding.name ?? ""), "query");
+        args[index] = binding.array ? bindArray(binding, ctx) : bindValue(binding, ctx.query(binding.name ?? ""), "query");
         break;
       case "body": {
         const contentType = ctx.header("content-type") ?? "";
