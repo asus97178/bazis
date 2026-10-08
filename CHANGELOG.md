@@ -4,6 +4,18 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.3 — 2026-10-09
+
+### Fixed
+
+- A route's `consumes` applies to every request with a body, however the
+  action reads it (a body model, `ctx.formData()`, `ctx.text()` or not at
+  all): `@Post("avatar", { consumes: "multipart/form-data" })` answers a JSON
+  request with `415 Unsupported Media Type: expected multipart/form-data`.
+  Before, `consumes` was checked only for body-model parameters, and such a
+  route answered `400 Malformed form data in request body`. `GET`, `HEAD`
+  and `OPTIONS` are not checked.
+
 ## 0.98.2 — 2026-10-09
 
 ### Added

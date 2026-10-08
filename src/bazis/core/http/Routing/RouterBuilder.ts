@@ -1,5 +1,5 @@
 import type { Class, Token } from "../../di";
-import { bindArguments } from "../Binding/ParameterBinder";
+import { assertConsumes, bindArguments } from "../Binding/ParameterBinder";
 import { resolveGeneratedBindings } from "../Binding/autoBindings";
 import { generatedSourcesAreStale } from "../../generatedFingerprint";
 import { controllerMetaOf, type ActionMeta, type ControllerMeta } from "../Decorators/metadata";
@@ -139,6 +139,7 @@ export class RouterBuilder {
 
     const boundary: HttpMiddleware = async (ctx, next) => {
       try {
+        assertConsumes(ctx, bindingDefaults.consumes);
         const args = bindings ? await bindArguments(bindings, ctx, bindingDefaults) : [ctx];
         for (const filter of filters) {
           await filter.before?.(ctx);
