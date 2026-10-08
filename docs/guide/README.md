@@ -37,7 +37,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Архитектура модулей](fundamentals/module-architecture.md) — атомарные и составные модули, создание через CLI, паспорт `MODULE.md`
 - ✅ [Конфигурация](fundamentals/configuration.md) — `defineConfig`, источники, переменные `BAZIS_*`, секреты, `inspect()`
 - ✅ [Жизненный цикл](fundamentals/lifecycle.md) — фоновые службы, перезапуск, хуки, порядок запуска и остановки
-- ⏳ События — `EventBus`, `onEvent`
+- ✅ [События](fundamentals/events.md) — `EventBus`, `onEvent`, `@OnEvent`, порядок, ошибки
 - ⏳ Логирование и correlation id
 - ⏳ Health checks
 - ⏳ Тестирование

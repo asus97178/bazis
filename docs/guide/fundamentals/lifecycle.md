@@ -215,4 +215,4 @@ lifetime: stopped
 
 - [Приложение](../overview/application.md)
 - [DI подробно](dependency-injection.md)
-- События *(в работе)*
+- [События](events.md)
