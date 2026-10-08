@@ -11,6 +11,20 @@ export interface BindingDefaults {
   consumes?: string;
 }
 
+const BODILESS_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * `consumes` of a route applies to every request with a body, however the
+ * action reads it: a body model, `ctx.formData()`, `ctx.text()` or nothing.
+ */
+export function assertConsumes(ctx: HttpContext, consumes: string | undefined): void {
+  if (consumes === undefined || BODILESS_METHODS.has(ctx.method)) return;
+  const contentType = ctx.header("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith(consumes.toLowerCase())) {
+    throw new UnsupportedMediaTypeError(consumes);
+  }
+}
+
 function bindValue(binding: ParameterBinding, raw: string | undefined, kind: string): unknown {
   if (raw === undefined) {
     if (binding.defaultValue !== undefined) {
