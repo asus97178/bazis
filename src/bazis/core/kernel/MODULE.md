@@ -42,7 +42,7 @@ database schema changes are out of scope.
 | EventBus | [events/EventBus.ts](events/EventBus.ts) | An optional signal to stop dispatch |
 | SupervisedHostedService | [SupervisedHostedService.ts](SupervisedHostedService.ts) | Passing the signal, cancelling retries/backoff |
 | KernelBuilder | [KernelBuilder.ts](KernelBuilder.ts) | Timeout checks; resolving declarations for its environment before DI clients are created |
-| ConsoleLogger | [logging/ConsoleLogger.ts](logging/ConsoleLogger.ts) | A safe representation of non-serializable fields |
+| ConsoleLogger | [logging/ConsoleLogger.ts](logging/ConsoleLogger.ts) | A safe representation of non-serializable fields; inside a request adds `requestId`/`traceparent` from the request context (since 0.97.11) |
 | Configuration | [config/Configuration.ts](config/Configuration.ts) | A copy of the input Map |
 | defineConfig / ConfigRegistry | [config/defineConfig.ts](config/defineConfig.ts), [config/ConfigRegistry.ts](config/ConfigRegistry.ts) | An immutable declaration and separate kernel views; the contract is in §7 |
 

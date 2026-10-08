@@ -1,5 +1,6 @@
 import { redactSensitive, type SensitiveRedactionOptions } from "../../../library/redaction";
 import type { LogFields, LogLevel, Logger } from "./Logger";
+import { getRequestId, getTraceparent } from "../correlation/requestContext";
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
@@ -17,6 +18,22 @@ export interface ConsoleLoggerOptions {
   readonly name?: string;
   /** Structured fields are redacted by default; pass false only for trusted local debugging. */
   readonly redaction?: SensitiveRedactionOptions | false;
+  /**
+   * Inside a request, add `requestId` (and `traceparent`, when the request
+   * brought one) to every line that does not pass them itself. Default: true.
+   */
+  readonly requestContext?: boolean;
+}
+
+/** The fields plus the correlation of the current request, without overriding explicit values. */
+function withRequestContext(fields: LogFields | undefined): LogFields | undefined {
+  const requestId = getRequestId();
+  if (requestId === undefined) return fields;
+  const traceparent = getTraceparent();
+  const extra: Record<string, unknown> = {};
+  if (fields?.requestId === undefined) extra.requestId = requestId;
+  if (traceparent !== undefined && fields?.traceparent === undefined) extra.traceparent = traceparent;
+  return Object.keys(extra).length === 0 ? fields : { ...fields, ...extra };
 }
 
 function formatFields(fields: LogFields | undefined, redaction: SensitiveRedactionOptions | false): string {
@@ -36,11 +53,13 @@ export class ConsoleLogger implements Logger {
   private readonly threshold: number;
   private readonly prefix: string;
   private readonly redaction: SensitiveRedactionOptions | false;
+  private readonly requestContext: boolean;
 
   public constructor(options: ConsoleLoggerOptions = {}) {
     this.threshold = LEVEL_ORDER[options.minLevel ?? "info"];
     this.prefix = options.name ? `[${options.name}] ` : "";
     this.redaction = options.redaction ?? {};
+    this.requestContext = options.requestContext ?? true;
   }
 
   public debug(message: string, fields?: LogFields): void {
@@ -63,6 +82,7 @@ export class ConsoleLogger implements Logger {
     if (LEVEL_ORDER[level] < this.threshold) {
       return;
     }
-    LEVEL_SINK[level](`${this.prefix}${level}: ${message}${formatFields(fields, this.redaction)}`);
+    const line = this.requestContext ? withRequestContext(fields) : fields;
+    LEVEL_SINK[level](`${this.prefix}${level}: ${message}${formatFields(line, this.redaction)}`);
   }
 }

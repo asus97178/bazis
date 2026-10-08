@@ -4,6 +4,19 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.97.11 — 2026-10-08
+
+### Fixed
+
+- Application log lines written inside an HTTP request carry its `requestId`
+  (and `traceparent`, when the request brought one): the default
+  `ConsoleLogger` reads them from the request context that
+  `createCorrelationIdMiddleware` binds. Before, only the access log and the
+  HTTP error lines had the id, so a service's `logger.info(...)` could not be
+  matched to its request. Explicit `requestId` fields win; lines outside a
+  request are unchanged; `new ConsoleLogger({ requestContext: false })` turns
+  it off. Custom loggers can read `getRequestId()` themselves.
+
 ## 0.97.10 — 2026-10-08
 
 ### Fixed
