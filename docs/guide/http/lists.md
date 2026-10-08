@@ -168,4 +168,4 @@ GET /tasks?filter[createdAt][gt]=2020&filter[name][gte]=A&page[number]=0
 
 - [Маршрутизация и привязка параметров](routing.md)
 - [Ответы](../overview/responses.md)
-- Файлы и загрузка *(в работе)*
+- [Файлы и загрузка](files.md)
