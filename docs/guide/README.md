@@ -40,7 +40,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [События](fundamentals/events.md) — `EventBus`, `onEvent`, `@OnEvent`, порядок, ошибки
 - ✅ [Логирование и correlation id](fundamentals/logging.md) — `Logger`, уровни, маскировка, журнал запросов, `x-request-id`
 - ✅ [Health checks](fundamentals/health-checks.md) — `/health`, свои проверки, подробности, тайм-ауты
-- ⏳ Тестирование
+- ✅ [Тестирование](fundamentals/testing.md) — `bazis test`, `createTestContainer`, `startTestApp`, подмена зависимостей
 
 ## 4. HTTP
 
