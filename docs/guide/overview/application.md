@@ -184,5 +184,5 @@ await runApp(WorkerModule);
 
 - [Модули](modules.md)
 - [Обработка ошибок](errors.md)
-- Жизненный цикл — фоновые службы и хуки *(в работе)*
+- [Жизненный цикл](../fundamentals/lifecycle.md) — фоновые службы и хуки
 - [Конфигурация](../fundamentals/configuration.md)

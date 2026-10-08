@@ -223,4 +223,4 @@ mailConfig.get("port");
 
 - [Приложение](../overview/application.md)
 - [DI подробно](dependency-injection.md)
-- Жизненный цикл *(в работе)*
+- [Жизненный цикл](lifecycle.md)
