@@ -4,6 +4,19 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.4 — 2026-10-09
+
+### Fixed
+
+- API versioning options that had no effect are rejected at startup instead
+  of being silently ignored. `versioning: { source: "url", defaultVersion: "1" }`
+  stops the server with `versioning.defaultVersion has no effect with source
+  "url": the version is part of the path (/v1/...)`; before, the option was
+  ignored and `/tasks/7` answered `404`. The same applies to `parameterName`
+  with a source other than `"query"`, `headerName` with a source other than
+  `"header"`, and an unknown `source`. An application with such options must
+  remove them.
+
 ## 0.98.3 — 2026-10-09
 
 ### Fixed

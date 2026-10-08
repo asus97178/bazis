@@ -37,11 +37,15 @@ export interface ApiVersioningOptions {
    * - `"header"` — custom header (default `x-api-version`).
    */
   readonly source: "url" | "query" | "header";
-  /** Query parameter name for `source: "query"` (default "api-version"). */
+  /** Query parameter name for `source: "query"` (default "api-version"); other sources reject it. */
   readonly parameterName?: string;
-  /** Header name for `source: "header"` (default "x-api-version"). */
+  /** Header name for `source: "header"` (default "x-api-version"); other sources reject it. */
   readonly headerName?: string;
-  /** Version assumed when the request does not specify one. */
+  /**
+   * Version assumed when the request does not specify one. Only for the
+   * `"query"` and `"header"` sources: with `"url"` the version is part of the
+   * path, and the server refuses to start.
+   */
   readonly defaultVersion?: string;
 }
 

@@ -16,7 +16,7 @@ import type { PreparedOpenApiDocs } from "../../library/openapi";
 import { RouterBuilder } from "./Routing/RouterBuilder";
 import type { Router } from "./Routing/Router";
 import { parseRequestPath } from "./Routing/template";
-import { createVersionReader, type VersionReader } from "./Versioning/VersionReader";
+import { assertVersioningOptions, createVersionReader, type VersionReader } from "./Versioning/VersionReader";
 import { HTTP_ERROR_HOOK, ROUTE_MIDDLEWARE_COMPOSER, SERVER_MIDDLEWARE, sortByOrder } from "./middlewareTokens";
 import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions } from "./options";
 import { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
@@ -102,6 +102,7 @@ export class HttpServer implements HostedService {
     this.phase = options.phase ?? 10;
     this.modelValidator = options.validator ?? getModelValidator();
     assertHttpLimits(options);
+    assertVersioningOptions(options.versioning);
     if (options.inspectableRedirects !== undefined && typeof options.inspectableRedirects !== "boolean") {
       throw new HttpSetupError("inspectableRedirects must be a boolean.");
     }
