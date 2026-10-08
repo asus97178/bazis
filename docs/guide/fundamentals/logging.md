@@ -182,4 +182,4 @@ await runApp(AppModule, { http: { port: 3000 }, configure: (kernel) => kernel.us
 
 - [Обработка ошибок](../overview/errors.md)
 - [Middleware](../overview/middleware.md)
-- Health checks *(в работе)*
+- [Health checks](health-checks.md)
