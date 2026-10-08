@@ -1,6 +1,6 @@
 import type { HttpMiddleware } from "../Middleware/types";
 import { HttpSetupError } from "../Errors/HttpError";
-import { ownActionMeta } from "./metadata";
+import { ownActionMeta, ownRoutes } from "./metadata";
 
 type MethodDecorator = (value: (...args: never[]) => unknown, context: ClassMethodDecoratorContext) => void;
 
@@ -39,7 +39,7 @@ function route(httpMethod: string, templateOrOptions?: string | RouteOptions, ma
       throw new Error(`HTTP route decorators support public instance methods only ("${String(context.name)}").`);
     }
     const action = ownActionMeta(context.metadata, context.name);
-    action.routes.push({ httpMethod, template });
+    ownRoutes(action).push({ httpMethod, template });
     if (options) {
       // Options apply to the whole action (like attribute decorators); with
       // several route decorators scalar fields are overwritten and

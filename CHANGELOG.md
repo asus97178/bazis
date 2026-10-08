@@ -4,6 +4,23 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.5 — 2026-10-09
+
+### Fixed
+
+- Controller inheritance, the natural way to build `NotesV2Controller` on
+  `NotesV1Controller`:
+  - Route decorators on an overriding method replace the base method's
+    routes. Before, they were added to them, and the application failed at
+    startup with `Duplicate route: GET /v2/notes/:id is mapped to both
+    NotesV2Controller.getById … and NotesV2Controller.getById`. Other settings
+    of the base method (status code, middleware, version) stay inherited.
+  - Codegen follows the `extends` chain and generates argument bindings for
+    inherited routes, with the parameters of the nearest override. Before, an
+    override without route decorators kept the base route but received
+    `HttpContext` instead of its parameters (`500` on serialization), and
+    inherited methods of a subclass had no bindings at all.
+
 ## 0.98.4 — 2026-10-09
 
 ### Fixed

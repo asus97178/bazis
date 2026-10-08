@@ -1089,12 +1089,11 @@ function hasDecorator(node: ts.HasDecorators, name: string): boolean {
  * template, parsed like `Routing/template.ts` (`:name`, `:name(int)`, `*name`,
  * and a bare `*` named `rest`).
  */
-function routeParamNames(method: ts.MethodDeclaration): Set<string> {
+function routeParamNames(controller: ts.ClassDeclaration, method: ts.MethodDeclaration): Set<string> {
   const names = new Set<string>();
   const templates: string[] = [];
-  const owner = method.parent;
   const sources: readonly [readonly ts.Decorator[], (name: string) => boolean][] = [
-    [ts.isClassDeclaration(owner) ? ts.getDecorators(owner) ?? [] : [], (name) => name === "Controller"],
+    [ts.getDecorators(controller) ?? [], (name) => name === "Controller"],
     [ts.getDecorators(method) ?? [], (name) => ROUTE_DECORATORS.has(name)],
   ];
   for (const [decorators, accepts] of sources) {
@@ -1394,23 +1393,9 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
   }
   httpControllerFiles[controllerName] = filePath;
 
-  for (const member of node.members) {
-    if (!ts.isMethodDeclaration(member) || !ts.isIdentifier(member.name)) {
-      continue;
-    }
-    const decorators = ts.getDecorators(member) ?? [];
-    const hasRoute = decorators.some((decorator) => {
-      const info = decoratorCall(decorator);
-      return info !== undefined && ROUTE_DECORATORS.has(info.name);
-    });
-    if (hasRoute) {
-      collectOpenApiOperation(controllerName, member);
-    }
-    if (!hasRoute) {
-      continue;
-    }
-
-    const routeParams = routeParamNames(member);
+  for (const { name, routes, member } of controllerActions(node)) {
+    collectOpenApiOperation(controllerName, member);
+    const routeParams = routeParamNames(node, routes);
     const specs: HttpBindingSpec[] = [];
     let bodyCount = 0;
     let failed: string | undefined;
@@ -1469,13 +1454,57 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
 
     if (failed) {
       fatalErrors.push(
-        `BAZIS_HTTP_BINDING_UNRESOLVED: controller "${controllerName}.${member.name.text}" (${filePath}): cannot infer bindings (${failed}). ` +
+        `BAZIS_HTTP_BINDING_UNRESOLVED: controller "${controllerName}.${name}" (${filePath}): cannot infer bindings (${failed}). ` +
           `Use supported parameter types; read headers or raw bodies through HttpContext, and inject services in the constructor.`,
       );
       continue;
     }
-    (httpBindings[controllerName] ??= {})[member.name.text] = specs;
+    (httpBindings[controllerName] ??= {})[name] = specs;
   }
+}
+
+interface ControllerAction {
+  readonly name: string;
+  /** Declaration whose route decorators give the routes. */
+  readonly routes: ts.MethodDeclaration;
+  /** Declaration that runs: its parameters are bound. */
+  readonly member: ts.MethodDeclaration;
+}
+
+/**
+ * Route methods of a controller, including those inherited from base classes,
+ * as the runtime sees them: the nearest declaration with route decorators
+ * gives the routes (a subclass's own decorators replace the base's), the
+ * nearest implementation gives the parameters (an override without
+ * decorators keeps the base routes with its own signature).
+ */
+function controllerActions(node: ts.ClassDeclaration): ControllerAction[] {
+  const routes = new Map<string, ts.MethodDeclaration>();
+  const members = new Map<string, ts.MethodDeclaration>();
+  const seen = new Set<ts.ClassDeclaration>();
+  for (let current: ts.ClassDeclaration | undefined = node; current && !seen.has(current); current = baseClassDeclaration(current)) {
+    seen.add(current);
+    for (const member of current.members) {
+      if (!ts.isMethodDeclaration(member) || !ts.isIdentifier(member.name)) continue;
+      const name = member.name.text;
+      if (!members.has(name) && member.body !== undefined) members.set(name, member);
+      if (!routes.has(name) && hasRouteDecorator(member)) routes.set(name, member);
+    }
+  }
+  return [...routes].map(([name, declaration]) => ({ name, routes: declaration, member: members.get(name) ?? declaration }));
+}
+
+function hasRouteDecorator(member: ts.MethodDeclaration): boolean {
+  return (ts.getDecorators(member) ?? []).some((decorator) => {
+    const info = decoratorCall(decorator);
+    return info !== undefined && ROUTE_DECORATORS.has(info.name);
+  });
+}
+
+function baseClassDeclaration(node: ts.ClassDeclaration): ts.ClassDeclaration | undefined {
+  const clause = node.heritageClauses?.find((item) => item.token === ts.SyntaxKind.ExtendsKeyword);
+  const base = clause?.types[0]?.expression;
+  return base === undefined ? undefined : classDeclarationForExpression(base);
 }
 
 /** `limit = 100` has no type annotation — infer the primitive from the default value. */
