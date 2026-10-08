@@ -22,6 +22,7 @@ export {
 } from "./errors";
 export {
   createContainer,
+  type CreateContainerOptions,
   collectModuleControllers,
   collectModuleConfigs,
   collectModuleUiProfiles,

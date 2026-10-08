@@ -4,6 +4,31 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.0 — 2026-10-08
+
+### Added
+
+- `bazis/core/testing`:
+  - `createTestContainer(root, { overrides })`: a container for module tests.
+    It loads the project's generated code first; without it constructor
+    dependencies are missing and such a test passes for the wrong reason.
+  - `startTestApp(root, { overrides, ...runAppOptions })`: the application in
+    the test process the way `runApp` builds it, on 127.0.0.1 and a free port,
+    environment `test`; `app.fetch("/tasks/1")`, `app.container`,
+    `app.stop()`. Startup errors throw to the test.
+- `createContainer(root, { overrides })` and `KernelBuilder.useOverrides(...)`:
+  test replacements of providers. They are registered after the whole module
+  graph and visible to every module, so a fake replaces a provider even when
+  its own module consumes it; an override that replaces nothing is an error.
+  Before, a replacement in the importing module failed with "registered in two
+  modules", and a `@Global` workaround depended on the order of imports.
+
+### Fixed
+
+- The generated code is looked up in the project's working directory first.
+  With a framework linked from another checkout (`bazis new --link-framework`)
+  the framework found that checkout's own `src/generated` next to its sources.
+
 ## 0.97.11 — 2026-10-08
 
 ### Fixed

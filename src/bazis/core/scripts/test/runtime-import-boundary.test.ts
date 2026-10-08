@@ -22,6 +22,7 @@ const STABLE_BAZIS_BARRELS = new Set([
   "bazis/core/infra",
   "bazis/core/kernel",
   "bazis/core/orm",
+  "bazis/core/testing",
   "bazis/core/websocket",
   "bazis/library/http-client",
   "bazis/library/boundary",
