@@ -103,7 +103,7 @@ search(q: string, limit = 10, done = false, tag?: string) { ... }
 
 Целые числа в строке запроса отдельно не проверяются: если нужен целый
 `limit`, проверьте его в методе или используйте модель списка — о ней в
-главе «Списки и JSON:API» *(в работе)*.
+главе [Списки и JSON:API](lists.md).
 
 ### Массивы
 
@@ -161,4 +161,4 @@ list(tag: string[] = [], status?: number[]) { ... }
 
 - [Контроллеры](../overview/controllers.md)
 - [Модели запросов и валидация](../overview/validation.md)
-- Списки и JSON:API *(в работе)*
+- [Списки и JSON:API](lists.md)
