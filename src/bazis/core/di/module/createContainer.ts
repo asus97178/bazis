@@ -4,9 +4,9 @@ import { HOSTED_SERVICE, type HostedService } from "../extensions/hosted-service
 import { SERVICE_PROVIDER, SERVICE_PROVIDER_BY_TYPE } from "../extensions/service-provider-token";
 import { isClassProvider, ProviderDefinition, type Provider } from "../provider";
 import { getClassDeps } from "../internal/classDeps";
-import { ModuleEncapsulationError } from "../errors";
+import { DiError, ModuleEncapsulationError } from "../errors";
 import { OpenGenericRegistration } from "../internal/OpenGenericRegistration";
-import type { Class } from "../token";
+import { tokenToDebugName, type Class } from "../token";
 import type { BuildServiceProviderOptions } from "../types";
 import { DI } from "./DI";
 import { Global } from "./Global";
@@ -36,7 +36,17 @@ function moduleDiagnosticName(moduleRef: BazisModuleRef, fallbackIndex: number):
   return `module#${fallbackIndex}`;
 }
 
-export function createContainer(rootModule: BazisModuleRef, options?: BuildServiceProviderOptions): DiContainer {
+export interface CreateContainerOptions extends BuildServiceProviderOptions {
+  /**
+   * Replacements for registered providers, for tests: `singleton(ITaskStore,
+   * FakeStore)`. They are registered after the whole module graph, so they win
+   * regardless of `imports` order, and they are visible to every module. Each
+   * one must replace an existing registration of its token (and key).
+   */
+  readonly overrides?: readonly ProviderDefinition[];
+}
+
+export function createContainer(rootModule: BazisModuleRef, options?: CreateContainerOptions): DiContainer {
   // The container itself is injectable (SERVICE_PROVIDER, .NET-style). The
   // instance does not exist until the end of this function, so the factory
   // closes over a ref that is assigned right after construction.
@@ -187,6 +197,9 @@ export function createContainer(rootModule: BazisModuleRef, options?: BuildServi
 
   loadModule(diInfraModule);
   loadModule(rootModule);
+  if (options?.overrides !== undefined && options.overrides.length > 0) {
+    loadModule(overridesModule(rootModule, options.overrides, collection.toArray()));
+  }
   const recordList = Array.from(records.values());
   const collectedDefinitions = collection.toArray();
   const classProviderHooks = collectClassProviderHooks(collectedDefinitions);
@@ -245,6 +258,30 @@ export function createContainer(rootModule: BazisModuleRef, options?: BuildServi
   });
   built = new DiContainer(boundDefinitions, openGenerics, options, moduleOwnedContributions);
   return built;
+}
+
+/**
+ * A global module loaded last: its registrations win and are exported to every
+ * module. It imports the root, so a replacement may use the root's exports.
+ */
+function overridesModule(
+  rootModule: BazisModuleRef,
+  overrides: readonly ProviderDefinition[],
+  registered: readonly ProviderDefinition[],
+): BazisModuleRef {
+  for (const override of overrides) {
+    const token = override.provider.provide;
+    if (!registered.some((definition) => definition.provider.provide === token && definition.key === override.key)) {
+      const subject = override.key === undefined ? `"${tokenToDebugName(token)}"` : `"${tokenToDebugName(token)}" with key ${JSON.stringify(String(override.key))}`;
+      throw new DiError(`Override of ${subject} replaces nothing: no module registers it. Check the token, or register it in a module first.`);
+    }
+  }
+  return {
+    imports: [rootModule],
+    providers: overrides,
+    exports: [...new Set(overrides.map((override) => override.provider.provide))],
+    global: true,
+  };
 }
 
 function normalizeLateGeneratedClassDeps(definition: ProviderDefinition): ProviderDefinition {

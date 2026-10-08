@@ -1,4 +1,4 @@
-import { DI, Global, Module, collectModuleConfigs, createContainer, type BazisModule, type BazisModuleRef } from "../di";
+import { DI, Global, Module, collectModuleConfigs, createContainer, type BazisModule, type BazisModuleRef, type ProviderDefinition } from "../di";
 import { isBazisModuleClass } from "../di/module/Module";
 import { ApplicationLifetime } from "./ApplicationLifetime";
 import { Configuration, loadConfiguration } from "./config/Configuration";
@@ -44,6 +44,7 @@ export class KernelBuilder {
   private signals: readonly NodeJS.Signals[] = DEFAULT_SIGNALS;
   private unhandledErrorPolicy: UnhandledErrorPolicy = "shutdown";
   private validateOnBuild = true;
+  private overrides: readonly ProviderDefinition[] = [];
   private startupReport?: boolean;
   private logger?: Logger;
 
@@ -100,6 +101,15 @@ export class KernelBuilder {
     return this;
   }
 
+  /**
+   * Replacements for registered providers, for tests (see `createContainer`
+   * `overrides`): registered after the whole graph and visible to every module.
+   */
+  public useOverrides(overrides: readonly ProviderDefinition[]): this {
+    this.overrides = [...this.overrides, ...overrides];
+    return this;
+  }
+
   /** Sources are merged in registration order: later sources override earlier ones. */
   public addConfigSource(source: ConfigSource): this {
     this.configSources.push(source);
@@ -152,7 +162,7 @@ export class KernelBuilder {
     const kernelRootModule = BazisKernelModule;
 
     const containerStartedAt = performance.now();
-    const container = createContainer(kernelRootModule, { validateOnBuild: this.validateOnBuild });
+    const container = createContainer(kernelRootModule, { validateOnBuild: this.validateOnBuild, overrides: this.overrides });
     const containerMs = performance.now() - containerStartedAt;
 
     const timings: KernelTimings = {

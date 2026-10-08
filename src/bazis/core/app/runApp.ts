@@ -238,9 +238,16 @@ function normalizeAbsolutePath(path: string): string {
  * The root module stays clean: `@Module({ imports: [UsersModule] })`.
  */
 export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}): Promise<number> {
-  const configure = options.configure;
   await loadBazisGeneratedRuntime();
+  return Bazis.run(composeApp(root, options), options.kernel, options.configure);
+}
 
+/**
+ * @internal The application root `runApp` starts: infrastructure, cache and
+ * configs next to the feature root, wrapped in the HTTP/gRPC/UI hosts the
+ * options ask for. Shared with `startTestApp`, so tests run the same graph.
+ */
+export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): BazisModuleRef {
   // Infrastructure and cache are global modules; add them to the graph next to the feature root.
   const globals: BazisModuleRef[] = [];
   if (options.infra !== undefined) {
@@ -277,17 +284,15 @@ export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}):
       validator,
       imports: [httpAppRoot],
     });
-    const runtimeRoot = options.grpc === undefined ? httpRoot : {
+    return options.grpc === undefined ? httpRoot : {
       imports: [httpRoot, grpcModule({ ...options.grpc, validator: options.grpc.validator === undefined ? validator : options.grpc.validator, imports: [appRoot, ...(options.grpc.imports ?? [])] })],
     };
-    return Bazis.run(runtimeRoot, options.kernel, configure);
   }
 
   if (options.validator) {
     useModelValidator(options.validator);
   }
   const runtimeRoot = withUiRuntime(appRoot, options.ui, undefined);
-  const transportRoot = options.grpc === undefined ? runtimeRoot
+  return options.grpc === undefined ? runtimeRoot
     : grpcModule({ ...options.grpc, validator: options.grpc.validator === undefined ? options.validator ?? modelValidatorAdapter : options.grpc.validator, imports: [runtimeRoot, ...(options.grpc.imports ?? [])] });
-  return Bazis.run(transportRoot, options.kernel, configure);
 }

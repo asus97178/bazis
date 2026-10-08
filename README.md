@@ -91,6 +91,7 @@ connection, the CLI commands and the public entry points;
 | Configuration and kernel | `bazis/core/kernel` | `defineConfig`, per-environment values, `BAZIS_*` overrides, secrets, lifecycle | [README](src/bazis/core/kernel/README.md), [config](src/bazis/core/kernel/config/README.md) |
 | Infrastructure | `bazis/core/infra` | `@Infra` connectors: PostgreSQL, Redis, OpenSearch, LLM, Codex | [MODULE](src/bazis/core/infra/MODULE.md) |
 | Cache | `bazis/core/cache` | Output cache, `@Cacheable`, in-memory and distributed (Redis) | [SPEC](src/bazis/core/cache/SPEC.md) |
+| Testing | `bazis/core/testing` | `createTestContainer` and `startTestApp`: provider overrides, an in-process HTTP app on a free port | [MODULE](src/bazis/core/testing/MODULE.md) |
 | WebSocket | `bazis/core/websocket` | Gateways, acknowledgements, replay, a Redis adapter | [MODULE](src/bazis/core/websocket/MODULE.md) |
 | gRPC | `bazis/core/grpc` | `@GrpcController` server and `GrpcClient`; `.proto` files are parsed at runtime, no generated stubs | [MODULE](src/bazis/core/grpc/MODULE.md) |
 | Background | `bazis/core/background` | Hosted services with managed start and stop | [MODULE](src/bazis/core/background/MODULE.md) |

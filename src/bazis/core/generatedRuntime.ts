@@ -165,12 +165,14 @@ async function loadRuntimeOnce(): Promise<void> {
 
 /**
  * The project's generated module `name`, or undefined when it does not exist.
- * Framework sources inside the project (`src/bazis`) find `src/generated`
- * next to them; an installed package (`node_modules/bazis`) cannot, so the
- * project root is the working directory, as for `bazis dev` and `bazis test`.
+ * The project root is the working directory, as for `bazis dev` and `bazis
+ * test`; it comes first, because a framework linked from another checkout
+ * (`bazis new --link-framework`) would otherwise find that checkout's own
+ * `src/generated` next to its sources. Framework sources inside the project
+ * (`src/bazis`) find the same directory either way.
  */
 async function importGeneratedModule<T>(name: string): Promise<T | undefined> {
-  const candidates = [`../../generated/bazis/${name}`, path.join(process.cwd(), "src/generated/bazis", name)];
+  const candidates = [path.join(process.cwd(), "src/generated/bazis", name), `../../generated/bazis/${name}`];
   for (const candidate of candidates) {
     try {
       return (await import(candidate)) as T;
