@@ -154,5 +154,6 @@ startImport() { return { queued: true }; }
 
 ## Дальше
 
+- [Маршрутизация и привязка параметров](../http/routing.md)
 - [Модели запросов и валидация](validation.md)
 - [Провайдеры и DI](providers.md)
