@@ -77,7 +77,9 @@ function parseSort(
   problems: ListQueryProblem[],
 ): SortField[] {
   const result: SortField[] = [];
-  for (const token of splitCsv(params.getAll("sort"))) {
+  const requested = splitCsv(params.getAll("sort"));
+  const tokens = requested.length === 0 && options.defaultSort !== undefined ? splitCsv([options.defaultSort]) : requested;
+  for (const token of tokens) {
     const dir: SortDirection = token.startsWith("-") ? "desc" : "asc";
     const field = token.replace(/^[-+]/, "");
     if (field === "") {

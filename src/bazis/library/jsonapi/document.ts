@@ -38,6 +38,12 @@ export interface BuildListDocumentOptions {
    * `links` are not built.
    */
   readonly basePath?: string;
+  /**
+   * JSON:API resource type for sparse fieldsets: `?fields[tasks]=name` keeps
+   * only `id` and `name` in every item. Default: the last segment of
+   * `basePath` (`"/api/tasks"` → `"tasks"`).
+   */
+  readonly type?: string;
 }
 
 /**
@@ -59,10 +65,29 @@ export function buildListDocument<T>(
   const pageCount = size > 0 ? Math.max(1, Math.ceil(total / size)) : 1;
   const meta: ListMeta = { total, page: query.page.number, size, pageCount };
 
+  const data = sparseFieldset(items, query, options.type ?? lastSegment(options.basePath));
   if (options.basePath === undefined) {
-    return { data: items, meta };
+    return { data, meta };
   }
-  return { data: items, meta, links: buildLinks(query, options.basePath, meta) };
+  return { data, meta, links: buildLinks(query, options.basePath, meta) };
+}
+
+/** Items reduced to `id` and the fields requested with `fields[type]`; unchanged without it. */
+function sparseFieldset<T>(items: readonly T[], query: ListQuery, type: string | undefined): readonly T[] {
+  const fields = type === undefined ? undefined : query.fields[type];
+  if (fields === undefined || fields.length === 0) {
+    return items;
+  }
+  const keep = new Set(["id", ...fields]);
+  return items.map((item) => {
+    if (item === null || typeof item !== "object") return item;
+    return Object.fromEntries(Object.entries(item as Record<string, unknown>).filter(([key]) => keep.has(key))) as T;
+  });
+}
+
+function lastSegment(basePath: string | undefined): string | undefined {
+  const segment = basePath?.split("?")[0]?.split("/").filter(Boolean).at(-1);
+  return segment === undefined || segment === "" ? undefined : segment;
 }
 
 /**

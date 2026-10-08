@@ -355,7 +355,7 @@ function listQueryFile(n: ModuleNaming): string {
   return `import { Filterable, ListOptions, ListRequest, Sortable } from "bazis/core/http";
 import type { ${n.entity} } from "../../model/${n.module}.model";
 
-@ListOptions({ defaultSize: 20, maxSize: 100 })
+@ListOptions({ defaultSize: 20, maxSize: 100, defaultSort: "-createdAt" })
 export class ${n.module}ListQuery extends ListRequest<${n.entity}> {
   @Sortable()
   @Filterable("eq", "contains", "startsWith")

@@ -18,6 +18,7 @@ export interface ListSchema {
   readonly fields: Record<string, FieldSchema>;
   page?: PageOptions;
   include?: readonly string[];
+  defaultSort?: string;
 }
 
 interface SchemaMetadata {
@@ -32,6 +33,11 @@ export interface ListOptionsConfig {
   readonly maxSize?: number;
   /** Allowed include paths (`?include=`). */
   readonly include?: readonly string[];
+  /**
+   * Sorting when the request has no `sort`: `"-createdAt"`, `"-createdAt,name"`.
+   * Every field must be `@Sortable()`. The primary key still breaks ties.
+   */
+  readonly defaultSort?: string;
 }
 
 /**
@@ -43,7 +49,7 @@ function ensureOwnSchema(metadata: SchemaMetadata): ListSchema {
   if (!Object.prototype.hasOwnProperty.call(metadata, LIST_SCHEMA)) {
     const inherited = metadata[LIST_SCHEMA];
     metadata[LIST_SCHEMA] = inherited
-      ? { fields: cloneFields(inherited.fields), page: inherited.page, include: inherited.include }
+      ? { fields: cloneFields(inherited.fields), page: inherited.page, include: inherited.include, defaultSort: inherited.defaultSort }
       : { fields: {} };
   }
   return metadata[LIST_SCHEMA]!;
@@ -124,6 +130,16 @@ export function ListOptions(config: ListOptionsConfig) {
     if (config.include !== undefined) {
       schema.include = config.include;
     }
+    if (config.defaultSort !== undefined) {
+      // Field decorators have already run: check the declared fields now, at import time.
+      for (const token of config.defaultSort.split(",").map((part) => part.trim()).filter(Boolean)) {
+        const field = token.replace(/^[-+]/, "");
+        if (schema.fields[field]?.sortable !== true) {
+          throw new Error(`@ListOptions on ${String(context.name)}: defaultSort field "${field}" is not @Sortable().`);
+        }
+      }
+      schema.defaultSort = config.defaultSort;
+    }
   };
 }
 
@@ -157,5 +173,5 @@ export function optionsFromSchema(ctor: unknown): ListQueryOptions {
       filter[name] = field.filterOps;
     }
   }
-  return { sort, filter, include: schema.include, page: schema.page };
+  return { sort, filter, include: schema.include, page: schema.page, defaultSort: schema.defaultSort };
 }

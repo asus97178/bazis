@@ -141,7 +141,8 @@ test("minimal and full lists bound SQL and return data; summary counts all rows 
         expect(statements[0]!.sql).toMatch(/COUNT\(/i);
         expect(statements[1]!.sql).toContain("LIMIT $1 OFFSET $2");
         expect(statements[1]!.params).toEqual([limit, offset]);
-        expect(statements[1]!.sql).toContain('ORDER BY "id" ASC');
+        // The template list sorts newest first by default; the key breaks ties.
+        expect(statements[1]!.sql).toContain('ORDER BY "createdAt" DESC, "id" ASC');
       }
       expect(db.changeTracker.tryGetByKey(ModelBuilder.build(Entity), "123e4567-e89b-42d3-a456-426614174000")).toBeUndefined();
       statements.length = 0;
