@@ -54,15 +54,24 @@ function emptyMeta(): ControllerMeta {
   return { isController: false, middleware: [], filters: [], catches: [], actions: new Map() };
 }
 
+/**
+ * Actions of a subclass whose routes are still the base class's. The first
+ * route decorator of the subclass on such a method replaces them instead of
+ * adding a second, duplicate route.
+ */
+const inheritedRoutes = new WeakSet<ActionMeta>();
+
 function cloneMeta(source: ControllerMeta): ControllerMeta {
   const actions = new Map<string | symbol, ActionMeta>();
   for (const [name, action] of source.actions) {
-    actions.set(name, {
+    const copy: ActionMeta = {
       ...action,
       routes: [...action.routes],
       middleware: [...action.middleware],
       filters: [...action.filters],
-    });
+    };
+    if (copy.routes.length > 0) inheritedRoutes.add(copy);
+    actions.set(name, copy);
   }
   return {
     ...source,
@@ -96,6 +105,17 @@ export function ownActionMeta(metadata: object, methodName: string | symbol): Ac
     meta.actions.set(methodName, action);
   }
   return action;
+}
+
+/**
+ * Routes of an action for a route decorator to add to. Routes inherited from
+ * the base class are dropped first: a subclass that declares routes on an
+ * overriding method replaces the base method's routes. Other settings of the
+ * base method (status code, middleware, version) stay inherited.
+ */
+export function ownRoutes(action: ActionMeta): RouteDeclaration[] {
+  if (inheritedRoutes.delete(action)) action.routes = [];
+  return action.routes;
 }
 
 /** Reads controller metadata from a class (undefined if not decorated). */

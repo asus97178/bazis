@@ -228,6 +228,26 @@ class DerivedController extends BaseController {}
 // DerivedController inherits sharedMiddleware
 ```
 
+Routes are inherited too, which is how a new API version is built on the old one:
+
+```ts
+@Controller("notes") @ApiVersion("2")
+class NotesV2Controller extends NotesV1Controller {
+  @Get(":noteId") override getById(noteId: string) { ... } // replaces GET :id of v1
+  override text(id: string) { ... }                         // keeps the v1 route
+}
+```
+
+- A method the subclass does not override keeps its routes, served by the base implementation.
+- An override without route decorators keeps the base method's routes; its own parameters are bound.
+- Route decorators on an override replace the base method's routes (since 0.98.5; before, they
+  were added to them, and startup failed with a duplicate route). Other settings of the base
+  method — status code, middleware, version — stay inherited.
+
+Codegen follows the `extends` chain, so inherited actions get argument bindings for the subclass
+(since 0.98.5; before, a subclass without own route decorators got none, and an override received
+`HttpContext` in place of its parameters).
+
 ### The equivalent through inline route options
 
 `RouteOptions.middleware` on `@Get`/`@Post` writes into the same `ActionMeta.middleware`:
