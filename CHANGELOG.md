@@ -4,6 +4,22 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.2 — 2026-10-09
+
+### Added
+
+- `@ListOptions({ defaultSort: "-createdAt" })`: the sorting of a list when the
+  request has no `sort`, in the same syntax as the parameter. Every field must
+  be `@Sortable()`; otherwise the class declaration throws. The primary key
+  still breaks ties. Modules from `bazis g module` sort newest first.
+
+### Fixed
+
+- Sparse fieldsets: `?fields[tasks]=name` keeps only `id` and `name` in every
+  list item. Before, `fields` was parsed and only repeated in the paging links.
+  The resource type comes from the new `type` option of `buildListDocument`,
+  by default the last segment of `basePath` (`/api/tasks` → `tasks`).
+
 ## 0.98.1 — 2026-10-09
 
 ### Added

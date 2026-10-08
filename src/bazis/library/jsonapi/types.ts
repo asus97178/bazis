@@ -122,4 +122,6 @@ export interface ListQueryOptions {
   readonly include?: readonly string[];
   /** Paging limits. */
   readonly page?: PageOptions;
+  /** Sorting when the request has no `sort`, in the same syntax: `"-createdAt,name"`. */
+  readonly defaultSort?: string;
 }
