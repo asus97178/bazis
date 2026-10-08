@@ -27,6 +27,19 @@ layers, dependencies or DI tokens. Observer error handling is separate from task
 control. Each failure adds bounded work to observe the callback result; no
 performance improvement is claimed.
 
+## Diagnostics (since 0.97.10)
+
+Failures the service handles itself go to the application logger: the kernel
+passes it through `HostedService.useDiagnostics` before start (also through
+`SupervisedHostedService`). One line per event, the class name in `service`,
+the error redacted: `background <Name> crashed`, `... tick failed`,
+`... stopped after N restarts and will not run again` (or `... after a crash
+... (no restart policy)`), and the warning `... did not stop within Nms:
+shutdown continues, but its unfinished work keeps the process alive until it
+ends`. Without a logger the same text goes to the console as
+`[background:<Name>] ...`. Subclasses report their own failures with the
+protected `reportFailure(message, error, fields?)`.
+
 ## Connection and DI
 
 `backgroundModule({ services })` registers the classes as singletons and publishes

@@ -1,4 +1,4 @@
-import type { HostedService, HostedServicePlanValidator } from "../di";
+import type { HostedService, HostedServiceDiagnostics, HostedServicePlanValidator } from "../di";
 import { validateHostedServicePlan, registerHostedServiceWrapper, type HostedServicePlanAdmission } from "../di/extensions/hosted-service";
 import { awaitAbortable } from "./internal/awaitAbortable";
 import { reportDiagnosticFailure } from "./internal/reportDiagnosticFailure";
@@ -34,6 +34,7 @@ export class SupervisedHostedService implements HostedService {
   private admittedPhase?: number;
   private starting?: Promise<void>;
   private stopping?: Promise<void>;
+  private diagnostics?: HostedServiceDiagnostics;
 
   public constructor(
     private readonly factory: () => HostedService,
@@ -44,6 +45,11 @@ export class SupervisedHostedService implements HostedService {
       prepare: () => this.inner ?? (this.prepared ??= this.factory()),
       bind: admission => { this.admission = admission; this.admittedPhase = admission.phase; },
     });
+  }
+
+  /** Passed on to every attempt's service before it starts. */
+  public useDiagnostics(diagnostics: HostedServiceDiagnostics): void {
+    this.diagnostics = diagnostics;
   }
 
   public start(signal?: AbortSignal): Promise<void> {
@@ -71,6 +77,7 @@ export class SupervisedHostedService implements HostedService {
       this.prepared = undefined;
       try {
         signal?.throwIfAborted();
+        if (this.diagnostics) service.useDiagnostics?.(this.diagnostics);
         await service.start(signal);
         signal?.throwIfAborted();
         this.inner = service;

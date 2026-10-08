@@ -81,7 +81,9 @@ describe("BackgroundService: restart-on-crash", () => {
       await Bun.sleep(0); // Observe the final asynchronously rejected notification as well.
       expect(service.runs).toBe(3);
       if (failure !== "broken-sink") {
-        expect(logged).toHaveLength(3);
+        // Three failed observer notifications, then the line that restarts ran out.
+        expect(logged).toHaveLength(4);
+        expect(logged.map((line) => line[0])).toContain("[background:Crasher] stopped after 2 restarts and will not run again");
         expect(JSON.stringify(logged)).not.toContain("observer-secret");
       }
     } finally { await service.stop(); console.error = original; }
