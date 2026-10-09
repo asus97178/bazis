@@ -56,7 +56,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 ## 5. База данных (ORM)
 
-- ⏳ Подключение PostgreSQL
+- ✅ [Подключение PostgreSQL](database/postgresql.md) — настройки, `@Infra`, ошибки подключения, TLS, пул и тайм-ауты
 - ⏳ Сущности и ключи — включая UUID v7
 - ⏳ `DbContext` и `DbSet`
 - ⏳ Запросы
