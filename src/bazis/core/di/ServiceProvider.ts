@@ -36,6 +36,7 @@ import {
   isFactoryProvider,
   isKeyedDependency,
   isLazyDependency,
+  isOptionalDependency,
   isNamedDependency,
   isValueProvider,
 } from "./provider";
@@ -78,6 +79,7 @@ export class ServiceProvider implements ServiceResolver {
           ? { required: provider.useClass.length, declared: this.getClassProviderDeps(provider).length }
           : undefined,
       describeDependency: (dependency) => this.getDependencyDescriptor(dependency),
+      hasName: (name) => this.registry.lookupName(name) !== undefined,
       findRegistration: (token, key) => this.registry.find(token, key),
     };
   }
@@ -417,6 +419,9 @@ export class ServiceProvider implements ServiceResolver {
         resolved[index] = this.createLazy(dependency.token, dependency.key, scopeState, ownerLifetime, stack);
         continue;
       }
+      if (dependency.optional && !this.registry.find(dependency.token, dependency.key)) {
+        continue;
+      }
       resolved[index] = await this.resolveSingleAsync(dependency.token, dependency.key, scopeState, stack, ownerLifetime);
     }
     return resolved;
@@ -560,6 +565,9 @@ export class ServiceProvider implements ServiceResolver {
       if (dependency === undefined) {
         continue;
       }
+      if (dependency.optional && !this.registry.find(dependency.token, dependency.key)) {
+        continue;
+      }
       resolved[index] = dependency.lazy
         ? this.createLazy(dependency.token, dependency.key, scopeState, ownerLifetime, stack)
         : this.resolveSingle(dependency.token, dependency.key, scopeState, stack, ownerLifetime);
@@ -584,8 +592,14 @@ export class ServiceProvider implements ServiceResolver {
         continue;
       }
       const lazy = isLazyDependency(dep);
-      const descriptor = this.getDependencyDescriptor(lazy ? dep.inner : dep);
-      plan[index] = { token: descriptor.token, key: descriptor.key, lazy };
+      const optional = isOptionalDependency(dep);
+      if (optional && isNamedDependency(dep.inner) && !this.registry.lookupName(dep.inner.name)) {
+        // An optional dependency on a name nothing registered stays unset.
+        plan[index] = undefined;
+        continue;
+      }
+      const descriptor = this.getDependencyDescriptor(lazy || optional ? dep.inner : dep);
+      plan[index] = { token: descriptor.token, key: descriptor.key, lazy, ...(optional ? { optional } : {}) };
     }
     this.planCache.set(provider, plan);
     return plan;

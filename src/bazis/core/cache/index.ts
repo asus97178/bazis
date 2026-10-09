@@ -59,7 +59,7 @@ export {
   DISTRIBUTED_SERVICE_CACHE,
 } from "./tokens/DISTRIBUTED_CACHE";
 
-export { memory } from "./cacheModule";
+export { memory, type MemoryCacheOptions } from "./cacheModule";
 /** @internal Advanced builder used by the hosting layer. */
 export {
   buildCacheModule,

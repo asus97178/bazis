@@ -8,6 +8,7 @@ import {
   type BazisModuleRef,
 } from "../di";
 import { loadBazisGeneratedRuntime } from "../generatedRuntime";
+import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
 import { httpModule, useModelValidator, type HttpModuleOptions, type ModelValidator } from "../http";
 import { grpcModule, type GrpcModuleOptions } from "../grpc";
 import { buildHttpOpenApiDocument } from "../http/OpenApi/openApiDocument";
@@ -255,6 +256,10 @@ export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): B
   }
   if (options.cache !== undefined) {
     globals.push(options.cache);
+  }
+  if (options.http !== undefined) {
+    // Warns about @OutputCache routes when no cache module is installed.
+    globals.push({ global: true, providers: [missingCacheModuleCheck()] });
   }
   const appRoot: BazisModuleRef =
     globals.length > 0 || options.config !== undefined

@@ -79,7 +79,7 @@ export function outputCacheMiddleware(options: OutputCacheMiddlewareOptions): Ht
     const key = buildOutputCacheKey(ctx, routeName, config);
     const cached = cache.get(key);
     if (cached !== undefined) {
-      ctx.response = applyClientCacheHeaders(cachedPayloadToResponse(cached), clientCache);
+      ctx.response = applyClientCacheHeaders(cachedPayloadToResponse(cached, { hit: true }), clientCache);
       return;
     }
 

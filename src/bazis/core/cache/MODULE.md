@@ -127,6 +127,14 @@ The limit belongs to MemoryCache; the configuration and local in-flight accounti
 DistributedCache are not affected by this change.
 The other inputs (TTL, key length, values and policies) stay as in SPEC.md.
 
+Since 0.98.10 `memory(options)` takes `policies` and `outputCache` (`MemoryCacheOptions`),
+so named policies need no internal builder. A cache hit of `@OutputCache` /
+`@OutputRedisCache` carries `Age` from the payload's `storedAt` (older payloads without it
+get no `Age`). `missingCacheModuleCheck()` is a route composer the application composition
+installs with HTTP: without a registered `ICache` it warns once per `@OutputCache` route
+at startup and adds no middleware.
+Regression: [output-cache-dx.integration.test.ts](../scripts/test/output-cache-dx.integration.test.ts).
+
 ## 4. Checks
 
 ### Distributed backend: uniqueness and ownership

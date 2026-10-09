@@ -3,7 +3,9 @@ import { getProviderDeps, withProviderDeps } from "../internal/providerDeps";
 import {
   isLazyDependency,
   isNamedDependency,
+  isOptionalDependency,
   lazyDependency,
+  optionalDependency,
   ProviderDefinition,
 } from "../provider";
 import type { ProviderDependencyList } from "../provider";
@@ -115,6 +117,14 @@ function rebindDependency(dep: Dependency, nameMap: Map<string, Token<unknown>[]
     if (isNamedDependency(inner)) {
       const token = resolveName(inner.name, nameMap);
       return token ? lazyDependency(token) : dep;
+    }
+    return dep;
+  }
+  if (isOptionalDependency(dep)) {
+    const inner = dep.inner;
+    if (isNamedDependency(inner)) {
+      const token = resolveName(inner.name, nameMap);
+      return token ? optionalDependency(token) : dep;
     }
     return dep;
   }

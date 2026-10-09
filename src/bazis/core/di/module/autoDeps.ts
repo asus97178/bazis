@@ -1,7 +1,8 @@
-import { lazyDependency, namedDependency, type ProviderDependencyList } from "../provider";
+import { lazyDependency, namedDependency, optionalDependency, type ProviderDependencyList } from "../provider";
 import type { Class } from "../token";
 
 const LAZY_PREFIX = "lazy:";
+const OPTIONAL_PREFIX = "optional:";
 // These registrations live for the process lifetime just like their
 // constructors. A Map, rather than a WeakMap, lets the generated-runtime
 // owner take an exact rollback snapshot before publishing a target slice.
@@ -24,7 +25,9 @@ export function getGeneratedClassDeps(useClass: Class<unknown>): ProviderDepende
     typeof dependency !== "string" ? dependency
       : dependency.startsWith(LAZY_PREFIX)
         ? lazyDependency(namedDependency(dependency.slice(LAZY_PREFIX.length)))
-        : namedDependency(dependency),
+        : dependency.startsWith(OPTIONAL_PREFIX)
+          ? optionalDependency(namedDependency(dependency.slice(OPTIONAL_PREFIX.length)))
+          : namedDependency(dependency),
   );
 }
 

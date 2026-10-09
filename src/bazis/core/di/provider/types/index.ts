@@ -4,6 +4,7 @@ export type { FactoryProvider } from "./FactoryProvider";
 export { keyedDependency, isKeyedDependency, type KeyedDependency } from "./KeyedDependency";
 export { namedDependency, isNamedDependency, type NamedDependency } from "./NamedDependency";
 export { lazyDependency, isLazyDependency, type Lazy, type LazyDependency } from "./LazyDependency";
+export { optionalDependency, isOptionalDependency, type OptionalDependency } from "./OptionalDependency";
 export type { ProviderDependencyList } from "./ProviderDependencyList";
 export { ProviderDefinition } from "./ProviderDefinition";
 export type { ProviderLifetime } from "./ProviderLifetime";

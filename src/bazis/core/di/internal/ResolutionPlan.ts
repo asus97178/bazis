@@ -13,6 +13,8 @@ export interface PlannedDependency {
   readonly token: Token<unknown>;
   readonly key: ServiceKey | undefined;
   readonly lazy: boolean;
+  /** Resolve to `undefined` when the token has no registration. */
+  readonly optional?: boolean;
 }
 
 export type ResolutionPlan = readonly (PlannedDependency | undefined)[];

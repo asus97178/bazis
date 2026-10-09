@@ -2,7 +2,7 @@ import { ModuleEncapsulationError } from "../errors";
 import { getProviderDeps } from "../internal/providerDeps";
 import { NamedTokenIndex } from "../internal/NamedTokenIndex";
 import type { OpenGenericRegistration } from "../internal/OpenGenericRegistration";
-import { isKeyedDependency, isLazyDependency, isNamedDependency, type ProviderDefinition } from "../provider";
+import { isKeyedDependency, isLazyDependency, isNamedDependency, isOptionalDependency, type ProviderDefinition } from "../provider";
 import { tokenToDebugName, type Token } from "../token";
 import type { ServiceKey } from "../types";
 import { isFamilyExport, type ModuleGraphRecord } from "./encapsulation";
@@ -78,7 +78,7 @@ export function createProviderSelectionValidator(
   return (definition, record) => {
     for (const dependency of getProviderDeps(definition.provider)) {
       if (dependency === undefined) continue;
-      const dep = isLazyDependency(dependency) ? dependency.inner : dependency;
+      const dep = isLazyDependency(dependency) || isOptionalDependency(dependency) ? dependency.inner : dependency;
       const token = isNamedDependency(dep) ? names.lookup(dep.name) : isKeyedDependency(dep) ? dep.token : dep;
       if (!token) continue; // Missing dependencies retain their normal DI error.
       const key = isKeyedDependency(dep) ? dep.key : undefined;

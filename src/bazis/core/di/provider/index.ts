@@ -18,9 +18,12 @@ export {
   isNamedDependency,
   lazyDependency,
   isLazyDependency,
+  optionalDependency,
+  isOptionalDependency,
   ProviderDefinition,
   type KeyedDependency,
   type Lazy,
   type LazyDependency,
+  type OptionalDependency,
 } from "./types";
 export { isAsyncFactoryProvider, isClassProvider, isFactoryProvider, isValueProvider } from "./providerGuards";
