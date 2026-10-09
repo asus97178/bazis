@@ -182,3 +182,13 @@ not renamed; `DatabaseFacade.ensureCreated()` returns `{ warnings }` and `OrmLif
 Queries never use the key name (`ON CONFLICT` names columns), and `migrateOnStart` already
 accepted such tables, so both modes now agree. Owned-store catalogs keep exact names.
 Regression: `library/orm/test/orm.ensure-created.postgres.live.test.ts` (needs `BAZIS_PG_URL`).
+
+## Column type vs initial value (2026-10-10, 0.98.14)
+
+`ModelBuilder` instantiates the entity once (`new ctor()`; a throwing constructor skips the
+check) and compares each property without an explicit `type`, convention or converter with
+its initial value. Without a type a column maps to `text` and a key to an integer identity;
+a number, boolean, `Date`, object or array initial value on a column, or a non-number on a
+key, now fails the model build and names the type to set. Before 0.98.14 such columns were
+silently `text` (a number came back as a string) and a string key became a bigint identity
+that dropped the assigned value. Regression: `library/orm/test/orm.column-type-initializer.test.ts`.

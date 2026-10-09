@@ -38,8 +38,10 @@ export class ModelBuilder {
     const indexes: IndexModel[] = [];
     const foreignKeys: ForeignKeyModel[] = [];
     let explicitKey: PropertyModel | undefined;
+    const sample = ModelBuilder.sampleOf(ctor);
 
     for (const rawProp of raw.properties.values()) {
+      ModelBuilder.assertTypeMatchesInitializer(ctor.name, rawProp, sample);
       const property = ModelBuilder.buildProperty(ctor.name, rawProp);
       properties.push(property);
       if (property.isKey) {
@@ -182,6 +184,43 @@ export class ModelBuilder {
       indexNames.add(index.name);
     }
     return model;
+  }
+
+  /** A fresh instance shows the initial values; an entity whose constructor throws skips the check. */
+  private static sampleOf(ctor: new () => object): Record<string, unknown> | undefined {
+    try {
+      return new ctor() as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * A column without an explicit type maps to `text` (a key to an integer
+   * identity). When the initial value says otherwise (`pages = 0`,
+   * `code = ""` on a key), the mapping would silently change the value's type
+   * or drop it, so the model refuses to build and names the type to set.
+   */
+  private static assertTypeMatchesInitializer(entityName: string, raw: RawProperty, sample: Record<string, unknown> | undefined): void {
+    if (sample === undefined || raw.type !== undefined || raw.convention !== undefined || raw.converter !== undefined) return;
+    const initial = sample[raw.propertyName];
+    if (initial === undefined || initial === null) return;
+    const kind = initial instanceof Date ? "Date" : Array.isArray(initial) ? "array" : typeof initial;
+    if (raw.isKey === true) {
+      if (kind === "number" || kind === "bigint") return;
+      throw new ModelBuildError(
+        `Entity "${entityName}": key "${raw.propertyName}" has no column type and maps to an integer identity, but its initial value is a ${kind}. `
+          + `For a text key add @Column({ type: "text" }) next to @Key(); for a UUID key use @UUID().`,
+      );
+    }
+    if (kind === "string") return;
+    const suggestion = kind === "number" || kind === "bigint" ? `@Column({ type: "integer" }) or @Column({ type: "real" })`
+      : kind === "boolean" ? `@Column({ type: "boolean" })`
+      : kind === "Date" ? `@Column({ type: "datetime" })`
+      : `@Column({ type: "json" })`;
+    throw new ModelBuildError(
+      `Entity "${entityName}": property "${raw.propertyName}" has no column type and maps to text, but its initial value is a ${kind}. Set the type: ${suggestion}.`,
+    );
   }
 
   private static buildProperty(entityName: string, raw: RawProperty): PropertyModel {
