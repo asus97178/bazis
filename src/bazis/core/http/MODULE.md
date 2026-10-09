@@ -180,6 +180,18 @@ Exceeding `maxLength`/`length` keeps HTTP 400 with `Validation failed` and the
 public `details`, but does not run `pattern` beyond the upper bound in the same
 decorator. Check: [validation-admission.test.ts](test/validation-admission.test.ts).
 
+## Rate limit client address and headers (2026-10-09, 0.98.9)
+
+Behind trusted proxies `rateLimit` takes the client address the proxies appended:
+`trustProxy: true` — the last `X-Forwarded-For` entry, `trustProxy: n` — the entry `n`
+hops from the end (the first one when there are fewer). Entries before them are written
+by the client and are never used as the key; before 0.98.9 the first entry was used, so
+a client bypassed the limit by varying it. Responses carry `RateLimit-Limit`,
+`RateLimit-Remaining` and `RateLimit-Reset` (set-if-absent; `headers: false` turns them
+off); the 429 gets them through `TooManyRequestsError.headers`, which the error handler
+writes next to `Retry-After`.
+Regressions: [test/rateLimit.security.test.ts](test/rateLimit.security.test.ts).
+
 ## Removal of manual HTTP binding and target isolation (2026-10-03)
 
 `@Bind`, the manual descriptor factories and their HTTP exports are removed.

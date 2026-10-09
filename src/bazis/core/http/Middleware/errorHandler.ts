@@ -112,6 +112,10 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
         if (challenge !== undefined) {
           extra.push(["www-authenticate", challenge]);
         }
+        const headers = (error as { headers?: Readonly<Record<string, string>> }).headers;
+        if (headers !== undefined) {
+          extra.push(...Object.entries(headers));
+        }
         ctx.response = safeJsonResponse(
           error.status,
           error.details === undefined ? { error: error.message } : { error: error.message, details: error.details },

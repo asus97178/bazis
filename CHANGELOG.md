@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.9 — 2026-10-09
+
+### Security
+
+- `rateLimit({ trustProxy: true })` keys a client by the address the proxy
+  appended to `X-Forwarded-For` — the last entry — instead of the first one.
+  The first entries are written by the client, so before a client bypassed the
+  limit by sending a different `X-Forwarded-For: 1.1.1.N, …` with every
+  request. Behind several proxies pass their number: `trustProxy: 2` takes the
+  address two hops from the end. With two appending proxies and
+  `trustProxy: true`, every client now shares one key (the nearer proxy's
+  address) until `trustProxy: 2` is set; a proxy that overwrites the header
+  keeps working unchanged.
+
+### Added
+
+- `rateLimit` responses carry `RateLimit-Limit`, `RateLimit-Remaining` and
+  `RateLimit-Reset` (seconds until the window resets), the `429` included next
+  to `Retry-After`. `headers: false` turns them off. `TooManyRequestsError`
+  takes the extra headers as its second argument.
+
 ## 0.98.8 — 2026-10-09
 
 ### Fixed
