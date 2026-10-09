@@ -235,4 +235,4 @@ and TasksDupController.again. Routes that differ only in parameter names are the
 
 - [Маршрутизация и привязка параметров](routing.md)
 - [Контроллеры](../overview/controllers.md)
-- OpenAPI *(в работе)*
+- [OpenAPI](openapi.md)
