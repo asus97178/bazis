@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { HOSTED_SERVICE, Module, createContainer, type DiContainer } from "@/core/di";
 import {
+  Authorize,
   Controller,
   Get,
   HttpServer,
   Middleware,
+  NotFoundError,
   Post,
   cors,
   createCorrelationIdMiddleware,
@@ -16,7 +18,8 @@ import {
 // A route's own cors() answers preflights (before: 405), a global
 // correlation middleware covers responses produced before routing (before:
 // no x-request-id on 404/405/413/preflight), and access log durations are
-// rounded to 0.01 ms.
+// rounded to 0.01 ms. Since 0.98.8 error responses (401/403, a thrown
+// HttpError, 500) carry the correlation id too.
 
 @Controller("public")
 @Middleware(cors({ origin: "*" }))
@@ -29,6 +32,9 @@ class PublicController {
 @Controller("private")
 class PrivateController {
   @Post() post() { return { posted: true }; }
+  @Get("secret") @Authorize(() => false) secret() { return {}; }
+  @Get("missing") missing(): never { throw new NotFoundError("no such thing"); }
+  @Get("boom") boom(): never { throw new Error("boom"); }
 }
 
 @Module({ controllers: [PublicController, PrivateController] })
@@ -108,6 +114,14 @@ describe("global middleware", () => {
     expect(generated.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
     expect(entries.find((entry) => entry.status === 404 && entry.requestId === "req-404")).toBeDefined();
     expect(entries.find((entry) => entry.status === 413)?.requestId).toBe("req-413");
+  });
+
+  test("error responses carry the correlation id", async () => {
+    for (const [path, status] of [["secret", 403], ["missing", 404], ["boom", 500]] as const) {
+      const response = await fetch(`${app.base}/private/${path}`, { headers: { "x-request-id": `req-${status}` } });
+      expect(response.status).toBe(status);
+      expect(response.headers.get("x-request-id")).toBe(`req-${status}`);
+    }
   });
 
   test("access log durations are rounded to 0.01 ms", () => {

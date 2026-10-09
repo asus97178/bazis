@@ -164,9 +164,11 @@ and `Access-Control-Request-Method`. Otherwise the request is routed as before (
 explicit `@Options` handler).
 
 `createCorrelationIdMiddleware()` tags its middleware too. Tagged instances among the
-server middleware are also appended to the short-circuit chain, so 404/405/413, preflight,
-docs and health responses carry the request id. The middleware only reads the request
-and decorates the response, so running it before routing is safe.
+server middleware are moved in front of the error handler (since 0.98.8; in 0.98.7 they were
+only appended to the short-circuit chain), so error responses, 404/405/413, preflight,
+docs and health responses carry the request id, and the error log runs in the request
+context. The middleware only reads the request and decorates the response, so running it
+before routing and outside the error boundary is safe.
 Regressions: [test/http.cors-correlation.test.ts](test/http.cors-correlation.test.ts).
 
 ## Rate limiting before DTO checks (2026-10-02)
