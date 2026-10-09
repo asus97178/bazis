@@ -61,7 +61,11 @@ export class PayloadTooLargeError extends HttpError {
 }
 
 export class TooManyRequestsError extends HttpError {
-  constructor(readonly retryAfterSeconds: number) {
+  constructor(
+    readonly retryAfterSeconds: number,
+    /** Extra response headers, for example `RateLimit-*` from {@link rateLimit}. */
+    readonly headers?: Readonly<Record<string, string>>,
+  ) {
     super(429, "Too Many Requests");
   }
 }
