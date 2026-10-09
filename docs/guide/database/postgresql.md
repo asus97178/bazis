@@ -191,4 +191,4 @@ docker run -d --name app-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=app -p 
 
 - [Конфигурация](../fundamentals/configuration.md)
 - [Health checks](../fundamentals/health-checks.md)
-- Сущности и ключи *(в работе)*
+- [Сущности и ключи](entities.md)
