@@ -42,6 +42,19 @@ test("imported, but the owner does not export it", () => {
   );
 });
 
+test("an import sees the token through its own imports but does not export it (0.98.15)", () => {
+  // As `ormBazis` does: an unnamed inner module registers and exports the
+  // token to its parent; the parent does not pass it on.
+  const inner = { providers: [singletonValue(CLOCK, "now")], exports: [CLOCK] };
+  @Module({ imports: [inner], exports: [] })
+  class ClockModule {}
+  @Module({ imports: [ClockModule], providers: [DI.singleton(DI.factoryProvider(REPORT, [CLOCK], (clock) => clock))], exports: [] })
+  class ReportModule {}
+  expect(messageOf(() => createContainer(ReportModule))).toContain(
+    `Module "ReportModule": "Report" depends on "Clock", which its import "ClockModule" receives from its own imports but does not export. Add it to the exports of "ClockModule".`,
+  );
+});
+
 // One implementation per token for the whole application: a second registration
 // in the importer becomes the selected one, which the imported module cannot see.
 abstract class IClock { abstract now(): string; }

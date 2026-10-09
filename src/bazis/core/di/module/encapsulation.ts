@@ -173,6 +173,14 @@ export function validateModuleEncapsulation(
   // Why a provided token is not visible: the owner does not export it, or the
   // consumer module does not import the owner. Both used to read "not exported".
   const explainHidden = (token: Token<unknown>, consumer: ModuleGraphRecord): string => {
+    // A module the consumer imports already sees the token but does not pass it
+    // on. That export is the fix, whatever inner module (an `ormBazis` feature
+    // module, say) registered the token.
+    const blocking = consumer.imports.find((imported) => !imported.providedTokens.has(token)
+      && !exportedTokens(imported).has(token) && visibleTokens(imported).has(token));
+    if (blocking !== undefined) {
+      return `which its import "${blocking.name}" receives from its own imports but does not export. Add it to the exports of "${blocking.name}".`;
+    }
     const owner = records.find((record) => record !== consumer && record.providedTokens.has(token));
     if (owner === undefined) return "which is provided by another module but not exported.";
     return exportedTokens(owner).has(token)

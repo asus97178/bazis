@@ -110,7 +110,9 @@ export class GraphValidator {
 
         if (this.context.validateScopes && rootLifetime === "singleton" && depRegistration.lifetime === "scoped") {
           issues.add(
-            `Singleton "${tokenToDebugName(registration.token)}" depends on scoped "${tokenToDebugName(descriptor.token)}"`,
+            `Singleton "${tokenToDebugName(registration.token)}" depends on scoped "${tokenToDebugName(descriptor.token)}". `
+              + `A scoped service lives for one request or scope: make "${tokenToDebugName(registration.token)}" scoped too, `
+              + `or inject ServiceProvider and resolve "${tokenToDebugName(descriptor.token)}" in a scope you create (provider.createScope()).`,
           );
         }
 
