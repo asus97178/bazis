@@ -14,6 +14,14 @@ export interface CorrelationIdMiddlewareOptions {
   readonly validateIncomingId?: (value: string) => boolean;
 }
 
+/** Marks the middleware so the server also applies it to responses produced before routing. */
+const CORRELATION_ID_MIDDLEWARE = Symbol("bazis:http:correlation-id");
+
+/** True for a middleware created by {@link createCorrelationIdMiddleware}. */
+export function isCorrelationIdMiddleware(middleware: HttpMiddleware): boolean {
+  return (middleware as HttpMiddleware & { [CORRELATION_ID_MIDDLEWARE]?: true })[CORRELATION_ID_MIDDLEWARE] === true;
+}
+
 const DEFAULT_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+\-=]{0,127}$/;
 const TRACEPARENT = /^[\da-f]{2}-([\da-f]{32})-([\da-f]{16})-[\da-f]{2}(?:-[\x21-\x7e]+)?$/i;
 
@@ -21,6 +29,8 @@ const TRACEPARENT = /^[\da-f]{2}-([\da-f]{32})-([\da-f]{16})-[\da-f]{2}(?:-[\x21
  * Ensures one correlation ID per HTTP request: reads `x-request-id` or
  * generates a UUID, stores it on {@link HttpContext.state}, echoes it on the
  * response, and binds it to async local storage for application logs.
+ * Registered among the server's global middleware, it also applies to the
+ * responses the server produces before routing (404, 405, 413, preflight).
  */
 export function createCorrelationIdMiddleware(
   options: CorrelationIdMiddlewareOptions = {},
@@ -29,7 +39,7 @@ export function createCorrelationIdMiddleware(
   const generateId = options.generateId ?? (() => crypto.randomUUID());
   const validateIncomingId = options.validateIncomingId ?? ((value: string) => DEFAULT_REQUEST_ID.test(value));
 
-  return async (ctx, next) => {
+  const middleware: HttpMiddleware = async (ctx, next) => {
     const incoming = ctx.header(headerName);
     const trimmedIncoming = incoming?.trim();
     const generated = (): string => {
@@ -64,6 +74,8 @@ export function createCorrelationIdMiddleware(
       });
     }
   };
+  Object.defineProperty(middleware, CORRELATION_ID_MIDDLEWARE, { value: true });
+  return middleware;
 }
 
 function normalizeTraceparent(value: string | undefined): string | undefined {

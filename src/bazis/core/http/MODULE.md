@@ -154,6 +154,21 @@ error handler writes. Errors thrown by called services are not visible to the an
 Old generated metadata without these fields keeps the previous document.
 Regressions: [openapi-accuracy.integration.test.ts](../scripts/test/openapi-accuracy.integration.test.ts).
 
+## Preflights of route-level CORS and early correlation id (2026-10-09, 0.98.7)
+
+`cors()` tags the middleware it returns with its options (`corsOptionsOf`). RouterBuilder
+stores the options of the action's, else the controller's, `cors()` on the `RouteAction`.
+A preflight is answered before routing with the `cors` option or a global `cors()` among
+the server middleware; without them, with the options of the route that matches the path
+and `Access-Control-Request-Method`. Otherwise the request is routed as before (405 or an
+explicit `@Options` handler).
+
+`createCorrelationIdMiddleware()` tags its middleware too. Tagged instances among the
+server middleware are also appended to the short-circuit chain, so 404/405/413, preflight,
+docs and health responses carry the request id. The middleware only reads the request
+and decorates the response, so running it before routing is safe.
+Regressions: [test/http.cors-correlation.test.ts](test/http.cors-correlation.test.ts).
+
 ## Rate limiting before DTO checks (2026-10-02)
 
 Server/controller/action middleware runs before DTO binding. The limiter is

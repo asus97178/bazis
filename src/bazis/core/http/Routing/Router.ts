@@ -1,4 +1,5 @@
 import type { HttpMiddleware } from "../Middleware/types";
+import type { CorsOptions } from "../Middleware/cors";
 import { HttpSetupError } from "../Errors/HttpError";
 import { INVALID } from "../Binding/convert";
 import type { SegmentConstraint, TemplateSegment } from "./template";
@@ -13,6 +14,8 @@ export interface RouteAction {
   readonly name: string;
   /** Action-specific body cap in bytes; undefined inherits the server cap. */
   readonly maxBodyBytes?: number;
+  /** Options of the action's or controller's `cors()` middleware, for preflights. */
+  readonly cors?: CorsOptions;
 }
 
 interface RouteEntry {

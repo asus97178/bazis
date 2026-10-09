@@ -6,7 +6,8 @@ import { HttpContext } from "./HttpContext/HttpContext";
 import { holdResponseScope } from "./HttpContext/responseLifetime";
 import { inspectableRedirectResponse } from "./HttpContext/inspectableRedirects";
 import { accessLog } from "./Middleware/accessLog";
-import { cors, isPreflight, preflightResponse } from "./Middleware/cors";
+import { cors, corsOptionsOf, isPreflight, preflightResponse, type CorsOptions } from "./Middleware/cors";
+import { isCorrelationIdMiddleware } from "./correlation/createCorrelationIdMiddleware";
 import { errorHandler } from "./Middleware/errorHandler";
 import { runPipeline } from "./Middleware/pipeline";
 import { applySecurityHeaders, securityHeaders } from "./Middleware/securityHeaders";
@@ -75,6 +76,8 @@ export class HttpServer implements HostedService {
   private server?: ReturnType<typeof Bun.serve>;
   private router?: Router;
   private readVersion: VersionReader = () => undefined;
+  /** CORS options for every preflight: `cors` or a `cors()` among the global middleware. */
+  private globalCors: CorsOptions | undefined;
   /** Body cap in bytes; `undefined` when the limit is disabled (`maxBodyBytes: 0`). */
   private readonly maxBodyBytes?: number;
   private readonly requestScopeDisposeTimeoutMs?: number;
@@ -161,8 +164,13 @@ export class HttpServer implements HostedService {
         onUnexpectedError: this.collectErrorHook(),
       }),
     );
-    this.shortCircuitChain = [...serverChain];
-    serverChain.push(...this.collectServerMiddleware());
+    const serverMiddleware = this.collectServerMiddleware();
+    // Responses produced before routing (404, 405, 413, preflight, docs,
+    // health) still carry the correlation id of a global correlation middleware.
+    this.shortCircuitChain = [...serverChain, ...serverMiddleware.filter(isCorrelationIdMiddleware)];
+    // A global `cors()` among the middleware answers preflights like `cors`.
+    this.globalCors = this.options.cors || serverMiddleware.map(corsOptionsOf).find((options) => options !== undefined);
+    serverChain.push(...serverMiddleware);
 
     const builder = new RouterBuilder(
       serverChain,
@@ -367,9 +375,11 @@ export class HttpServer implements HostedService {
       }
     }
 
-    if (this.options.cors && isPreflight(request)) {
-      const corsOptions = this.options.cors;
-      return this.runShortCircuit(request, url, clientIp, () => preflightResponse(corsOptions, request));
+    if (isPreflight(request)) {
+      const corsOptions = this.globalCors ?? this.routeCors(request, url);
+      if (corsOptions !== undefined) {
+        return this.runShortCircuit(request, url, clientIp, () => preflightResponse(corsOptions, request));
+      }
     }
 
     const segments = parseRequestPath(url.pathname);
@@ -428,6 +438,15 @@ export class HttpServer implements HostedService {
       // Disposal must never replace the response with Bun's bare 500.
       if (!scopeTransferred) await disposeRequestScope(scope, this.requestScopeDisposeTimeoutMs);
     }
+  }
+
+  /** CORS options of the route a preflight asks about (its `Access-Control-Request-Method`). */
+  private routeCors(request: Request, url: URL): CorsOptions | undefined {
+    const segments = parseRequestPath(url.pathname);
+    const method = request.headers.get("access-control-request-method")?.trim().toUpperCase();
+    if (!segments || !method) return undefined;
+    const match = this.router!.match(method, segments, this.readVersion(request, url));
+    return match.kind === "matched" ? match.action.cors : undefined;
   }
 
   private async runShortCircuit(
