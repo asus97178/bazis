@@ -18,6 +18,9 @@ With both http and grpc, the servers share one container and use separate reques
 scopes. grpc.imports extend the published gRPC tree; http.imports keep their
 purpose. Ownership of providers, kernel configuration and imports/exports is unchanged.
 
+With `http`, the composition also installs the cache module's `missingCacheModuleCheck()`
+(since 0.98.10): an `@OutputCache` route without a cache module is reported at startup.
+
 `RunAppOptions.validator` sets the existing synchronous ModelValidator for
 HTTP and gRPC; the default is modelValidatorAdapter. A gRPC-only app gets the same
 adapter. An optional `grpc.validator` replaces it for gRPC only (null is

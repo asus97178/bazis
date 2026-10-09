@@ -25,6 +25,8 @@ export interface CachedHttpPayload {
   readonly status: number;
   readonly headers: Readonly<Record<string, string>>;
   readonly body: Uint8Array;
+  /** When the response was stored (epoch ms); a cache hit derives `Age` from it. */
+  readonly storedAt?: number;
 }
 
 export interface CachedHttpPayloadReadOptions {
@@ -105,8 +107,9 @@ export async function responseToCachedPayload(
       headers[lower] = value;
     }
   });
+  const storedAt = Date.now();
   if (response.body === null) {
-    return { status: response.status, headers, body: new Uint8Array() };
+    return { status: response.status, headers, body: new Uint8Array(), storedAt };
   }
 
   let clone: ReturnType<Response["clone"]>;
@@ -124,13 +127,21 @@ export async function responseToCachedPayload(
   // The cached payload replaces the original response. Release its tee branch
   // after the clone has been fully materialized.
   await response.body.cancel().catch(() => undefined);
-  return { status: response.status, headers, body };
+  return { status: response.status, headers, body, storedAt };
 }
 
-export function cachedPayloadToResponse(payload: CachedHttpPayload): Response {
+/**
+ * Rebuilds the stored response. `hit: true` marks a response served from the
+ * cache with `Age` — seconds since it was stored (RFC 9111).
+ */
+export function cachedPayloadToResponse(payload: CachedHttpPayload, options: { readonly hit?: boolean } = {}): Response {
+  const headers = stripSensitiveResponseHeaders(payload.headers);
+  if (options.hit && payload.storedAt !== undefined) {
+    headers.age = String(Math.max(0, Math.floor((Date.now() - payload.storedAt) / 1000)));
+  }
   return new Response(payload.body as unknown as ConstructorParameters<typeof Response>[0], {
     status: payload.status,
-    headers: stripSensitiveResponseHeaders(payload.headers),
+    headers,
   });
 }
 

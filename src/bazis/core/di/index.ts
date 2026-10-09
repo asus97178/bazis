@@ -82,7 +82,7 @@ export {
   type OpenGenericTokenFamily,
   type Token,
 } from "./token";
-export { ProviderDefinition, keyedDependency, lazyDependency, namedDependency } from "./provider";
+export { ProviderDefinition, keyedDependency, lazyDependency, namedDependency, optionalDependency } from "./provider";
 export type {
   AsyncFactoryProvider,
   ClassProvider,
@@ -90,6 +90,7 @@ export type {
   KeyedDependency,
   Lazy,
   LazyDependency,
+  OptionalDependency,
   NamedDependency,
   Provider,
   ProviderDependencyList,

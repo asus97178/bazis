@@ -1,7 +1,7 @@
 import { ModuleEncapsulationError } from "../errors";
 import { getProviderDeps } from "../internal/providerDeps";
 import type { ProviderDefinition, ProviderDependencyList } from "../provider";
-import { isKeyedDependency, isLazyDependency, isNamedDependency } from "../provider";
+import { isKeyedDependency, isLazyDependency, isNamedDependency, isOptionalDependency } from "../provider";
 import type { OpenGenericTokenFamily, Token } from "../token";
 import { tokenToDebugName } from "../token";
 import { applyNamedDependencyEncapsulationHooks } from "./encapsulationHooks";
@@ -249,7 +249,7 @@ function checkDependency(
 
   // Laziness changes "when" a dependency is created, not "whether" the module
   // may see it — validate the inner descriptor with the same rules.
-  if (isLazyDependency(dep)) {
+  if (isLazyDependency(dep) || isOptionalDependency(dep)) {
     checkDependency(record, definition, dep.inner, context);
     return;
   }

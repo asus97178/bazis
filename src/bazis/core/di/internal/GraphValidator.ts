@@ -1,5 +1,5 @@
 import { ServiceValidationError } from "../errors";
-import { isLazyDependency } from "../provider";
+import { isLazyDependency, isNamedDependency, isOptionalDependency } from "../provider";
 import type {
   KeyedDependency,
   NamedDependency,
@@ -24,6 +24,8 @@ export interface GraphValidationContext {
   dependencies(provider: Provider<unknown>): ProviderDependencyList;
   /** Constructor arity vs declared deps for class providers; `undefined` for non-class providers. */
   classShape(provider: Provider<unknown>): { readonly required: number; readonly declared: number } | undefined;
+  /** True when some registration carries this name (for optional named dependencies). */
+  hasName(name: string): boolean;
   describeDependency(
     dependency: Token<unknown> | KeyedDependency<unknown> | NamedDependency<unknown>,
   ): { readonly token: Token<unknown>; readonly key: ServiceKey | undefined };
@@ -88,8 +90,17 @@ export class GraphValidator {
           continue;
         }
         const isLazy = isLazyDependency(dependency);
-        const descriptor = this.context.describeDependency(isLazy ? dependency.inner : dependency);
+        const isOptional = isOptionalDependency(dependency);
+        const inner = isLazy || isOptional ? dependency.inner : dependency;
+        // An optional dependency on a name nothing registered is simply absent.
+        if (isOptional && isNamedDependency(inner) && !this.context.hasName(inner.name)) {
+          continue;
+        }
+        const descriptor = this.context.describeDependency(inner);
         const depRegistration = this.context.findRegistration(descriptor.token, descriptor.key);
+        if (!depRegistration && isOptional) {
+          continue;
+        }
         if (!depRegistration) {
           issues.add(
             `Missing dependency "${tokenToDebugName(descriptor.token)}" for "${tokenToDebugName(registration.token)}"`,

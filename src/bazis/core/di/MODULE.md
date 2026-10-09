@@ -202,6 +202,16 @@ and no extra runtime schema. The behavior on invalid JavaScript input is not ext
 | `createScope()` | `ServiceScope` | No arguments; creates a scope owned by the container |
 | `dispose()`, `disposeScope(scopeState)` | `Promise<void>` | Releases resources; the public dispose takes no manual arguments |
 
+Optional dependencies (since 0.98.10): `optionalDependency(token)` — in a deps list or
+emitted by codegen for an optional constructor parameter (`cache?: ICache`, or one with a
+default value) — resolves the token when it is registered and leaves the argument unset
+otherwise, so a default value applies. Validation skips a missing optional registration
+and checks a present one like any other edge (lifetime, cycles, module visibility). An
+optional trailing parameter of a type DI does not know (`options: Options = {}`) is not
+injected, as before. Before 0.98.10 codegen dropped trailing optional parameters while
+validation counted them through `Function.length`, so `cache?: ICache` failed to start.
+Regression: [optional-dependency.integration.test.ts](../scripts/test/optional-dependency.integration.test.ts).
+
 ## 5. Substitution and extension
 
 The [module contributions](module/moduleOwnedProviderContributors.ts) context got

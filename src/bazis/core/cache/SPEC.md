@@ -299,11 +299,11 @@ Infra separately publishes `DISTRIBUTED_CACHE_BACKEND`, `DISTRIBUTED_OUTPUT_CACH
 
 ## 5. Named policies
 
-Policies are reusable presets in `buildCacheModule({ policies })`. A decorator refers to one with `policy: "name"`.
+Policies are reusable presets in `memory({ policies })` (since 0.98.10; before only the internal `buildCacheModule`). A decorator refers to one with `policy: "name"`.
 Inline decorator fields **override** the policy (policy → inline, inline wins).
 
 ```ts
-buildCacheModule({
+memory({
   policies: {
     catalog: {
       seconds: 60,
@@ -340,7 +340,7 @@ Caches the **full HTTP response** after the action runs. On a cache hit the cont
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `seconds` | `number` | — | **Required** (inline or in the policy). The entry TTL |
-| `policy` | `string` | — | A policy name from `buildCacheModule({ policies })` |
+| `policy` | `string` | — | A policy name from `memory({ policies })` |
 | `tags` | `string[]` | — | Tags for `ICache.evictByTag(tag)` |
 | `enabled` | `boolean` | `true` | `false`: the middleware is not attached (the metadata is kept) |
 | `noStore` | `boolean` | `false` | `true`: neither read nor write the cache |
@@ -439,6 +439,8 @@ Sensitive response headers are **neither stored nor replayed**:
 `Set-Cookie`, `Authorization`, `Cookie`, `WWW-Authenticate`, `Proxy-Authenticate`, `Proxy-Authorization`.
 
 The body is read whole (`arrayBuffer`): **streaming responses are not supported**.
+
+A response served from the cache carries `Age`: seconds since it was stored (since 0.98.10).
 
 ---
 
@@ -1007,7 +1009,7 @@ without varyByUser or unlessAuthenticated — …
 ```
 
 For a migration you can temporarily enable the warning mode:
-`buildCacheModule({ outputCache: { insecureAuthorizedRouteBehavior: "warn" } })`.
+`memory({ outputCache: { insecureAuthorizedRouteBehavior: "warn" } })`.
 Disabling it fully (`"ignore"`) is acceptable only with an external security policy.
 
 ### 17.2. Recommendations by scenario

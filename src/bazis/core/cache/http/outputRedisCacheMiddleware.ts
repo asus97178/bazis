@@ -83,7 +83,7 @@ export function outputRedisCacheMiddleware(options: OutputRedisCacheMiddlewareOp
     const key = buildRedisOutputCacheKey(ctx, routeName, config);
     const cached = await cache.get(key);
     if (cached !== undefined) {
-      ctx.response = applyClientCacheHeaders(cachedPayloadToResponse(cached), clientCache);
+      ctx.response = applyClientCacheHeaders(cachedPayloadToResponse(cached, { hit: true }), clientCache);
       return;
     }
 

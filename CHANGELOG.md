@@ -4,6 +4,31 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.10 — 2026-10-09
+
+### Fixed
+
+- Optional constructor dependencies work: `constructor(private readonly cache?: ICache)`
+  gets the service when it is registered and `undefined` otherwise; a parameter
+  with a default (`clock: Clock = new SystemClock()`) gets the registered
+  service or keeps its default. Before, codegen skipped such parameters while
+  validation counted them, and the application failed to start with
+  `requires at least 1 constructor deps … run bazis codegen`. An optional
+  trailing parameter of a type DI does not know (`options: Options = {}`) is
+  still not injected. New `optionalDependency(token)` for explicit deps lists.
+- `@OutputCache` without a cache module is reported at startup:
+  ``[cache] @OutputCache on TasksController.getAll has no effect: no cache module
+  is installed, so every request runs the action. Add `cache: memory()` to the
+  runApp options.`` Before, the decorator silently did nothing.
+
+### Added
+
+- `memory({ policies, outputCache })`: named cache policies and output-cache
+  settings through the public API. Before, they were available only through the
+  internal `buildCacheModule`.
+- A response served from the output cache (`@OutputCache`, `@OutputRedisCache`)
+  carries `Age` — seconds since it was stored.
+
 ## 0.98.9 — 2026-10-09
 
 ### Security
