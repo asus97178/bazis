@@ -217,4 +217,4 @@ featured() { ... }
 
 - [Ограничение частоты запросов](rate-limit.md)
 - [Авторизация](../overview/authorization.md)
-- HTTP-клиент *(в работе)*
+- [HTTP-клиент](http-client.md)
