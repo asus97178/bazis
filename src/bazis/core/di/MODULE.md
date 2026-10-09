@@ -212,6 +212,15 @@ injected, as before. Before 0.98.10 codegen dropped trailing optional parameters
 validation counted them through `Function.length`, so `cache?: ICache` failed to start.
 Regression: [optional-dependency.integration.test.ts](../scripts/test/optional-dependency.integration.test.ts).
 
+Since 0.98.15 two diagnostics say how to fix them. An encapsulation error where a module the
+consumer imports sees the token through its own imports (an `ormBazis` feature module, any
+nested module) but does not export it names that import: `which its import "CatalogModule"
+receives from its own imports but does not export. Add it to the exports of "CatalogModule".`
+Before, it named the inner, often unnamed, owner (`module#10`) and advised importing it.
+A singleton depending on a scoped service adds: make it scoped too, or resolve the scoped
+service in a scope it creates. Regressions: [test/di.encapsulation-messages.test.ts](test/di.encapsulation-messages.test.ts),
+[test/di.scope-messages.test.ts](test/di.scope-messages.test.ts).
+
 ## 5. Substitution and extension
 
 The [module contributions](module/moduleOwnedProviderContributors.ts) context got

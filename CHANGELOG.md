@@ -4,6 +4,25 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.15 — 2026-10-10
+
+### Fixed
+
+- The DI encapsulation error names the module to fix when an import sees a
+  service through its own imports but does not export it. With
+  `ormBazis: { context: CatalogDbContext }` in `CatalogModule` and
+  `OrdersModule` importing `CatalogModule`, a missing export now reads
+  `"OrdersService" depends on "CatalogDbContext", which its import
+  "CatalogModule" receives from its own imports but does not export. Add it to
+  the exports of "CatalogModule".` Before, it named the inner module `ormBazis`
+  creates (`module#10`), said that module exports the context and advised
+  importing it.
+- A singleton depending on a scoped service says what to do:
+  `Singleton "PriceCache" depends on scoped "CatalogDbContext". A scoped service
+  lives for one request or scope: make "PriceCache" scoped too, or inject
+  ServiceProvider and resolve "CatalogDbContext" in a scope you create
+  (provider.createScope()).`
+
 ## 0.98.14 — 2026-10-10
 
 ### Fixed
