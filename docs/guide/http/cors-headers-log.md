@@ -220,4 +220,4 @@ accessLog: { log: (entry) => metrics.observe(entry.path, entry.status, entry.dur
 
 - [Middleware](../overview/middleware.md)
 - [Логирование и correlation id](../fundamentals/logging.md)
-- Ограничение частоты запросов *(в работе)*
+- [Ограничение частоты запросов](rate-limit.md)
