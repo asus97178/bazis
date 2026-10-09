@@ -159,3 +159,14 @@ only for a throwaway PostgreSQL: `BAZIS_RELEASE_095_PG=owned-disposable-v1`,
 `bazis_release_095` database. The test creates a unique `release_095_<uuid>` schema
 and its own tables, checks the actual query and drops only this schema in `finally`.
 A regular run without the guard gives SKIP and does not confirm physical qualification.
+
+## Startup connection error (2026-10-09, 0.98.12)
+
+`ormBazisConnect` checks the database at start with the provider's optional `probe(signal)`,
+which rejects with the driver's error (`PostgresProvider` implements it; `ping` uses it and
+keeps returning a boolean for health checks). The startup error names the target and the
+reason, never the password: `Infra connector "database": cannot connect to PostgreSQL at
+db:5432 (database "app", user "app"): password authentication failed for user "app"
+(28P01)`. A provider without `probe` keeps the boolean check and names the target.
+Before 0.98.12 every failure was `postgres is not reachable.`
+Regression: [test/orm.infra.test.ts](test/orm.infra.test.ts).

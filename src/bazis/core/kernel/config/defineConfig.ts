@@ -154,18 +154,22 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
     const values = new Map<string, ConfigValueType>();
     const inspection: ConfigInspection[] = [];
     const issues: string[] = [];
+    // A wrong value names what came and where to change it: the variable that
+    // supplied it, or the variables that can override the value from the code.
+    const got = (raw: unknown) => raw === undefined ? "" : `, got ${JSON.stringify(String(raw)).slice(0, 80)}`;
+    const source = (key: string, selected: { readonly name: string } | undefined) => ` (${selected ? selected.name : names.get(key)!.join(", ")})`;
     for (const key of keys) {
       const base = schema.default[key]!;
       const override = schema[environment]?.[key];
       const cell = override ?? base;
       const type = isSecret(base) ? "secret" : isEnum(base) ? typeof base.default : typeof base;
-      const candidates: { raw: string; source: string; priority: number }[] = [];
+      const candidates: { raw: string; source: string; priority: number; name: string }[] = [];
       for (const name of names.get(key)!) {
         const sourceKey = name.slice(ENV_PREFIX.length).toLowerCase().replaceAll("__", ".");
         const raw = configuration.get(sourceKey);
         if (raw === undefined) continue;
         const origin = configuration.origin(sourceKey);
-        candidates.push({ raw, ...origin });
+        candidates.push({ raw, ...origin, name });
       }
       const priority = Math.max(...candidates.map(candidate => candidate.priority));
       const winners = candidates.filter(candidate => candidate.priority === priority);
@@ -178,17 +182,17 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
         else value = new Secret(raw);
       } else if (type === "number") {
         const parsed = Number(raw);
-        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)} — expected a finite number`);
+        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)} — expected a finite number${got(raw)}${source(key, selected)}`);
         else value = parsed;
       } else if (type === "boolean") {
         const normalized = String(raw).toLowerCase();
         if (normalized === "true" || normalized === "1") value = true;
         else if (normalized === "false" || normalized === "0") value = false;
-        else issues.push(`${fullKey(key)} — expected a boolean`);
+        else issues.push(`${fullKey(key)} — expected a boolean (true, false, 1, 0)${got(raw)}${source(key, selected)}`);
       } else if (typeof raw === "string") value = raw;
       else issues.push(`${fullKey(key)} — expected a string`);
       if (value === undefined) continue;
-      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)} — value is not one of the declared enum values`);
+      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)} — ${JSON.stringify(value)} is not allowed, use one of: ${base.values.join(", ")}${source(key, selected)}`);
       try {
         const issue = validators[key]?.(value);
         if (issue) issues.push(`${fullKey(key)} — ${issue}`);

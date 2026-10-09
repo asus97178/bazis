@@ -96,6 +96,7 @@ export function createObservedProvider(provider: DatabaseProvider, observe: Tran
     afterCommit: provider.afterCommit?.bind(provider),
     afterRollback: provider.afterRollback?.bind(provider),
     ping: (signal?: AbortSignal): Promise<boolean> => observe(() => provider.ping(signal)),
+    probe: provider.probe ? (signal?: AbortSignal): Promise<void> => observe(() => provider.probe!(signal)) : undefined,
     introspect: () => observe(() => provider.introspect()),
     schemaAdmissionCapability: schema ? {
       version: schema.version,

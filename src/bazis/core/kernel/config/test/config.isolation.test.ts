@@ -58,7 +58,7 @@ describe("configuration views and validation", () => {
     const config = defineConfig("rules", { default: { port: 3000, key: secret("synthetic"), mode: configEnum(["primary", "replica"], "primary") }, validate: { port: value => Number.isInteger(value) && value > 0 && value <= 65535 ? undefined : "port range" } });
     for (const raw of ["", " ", "Infinity", "NaN", "-1", "65536", "1.5"]) expect(() => config.resolve("test", new Configuration(new Map([["rules.port", raw]])))).toThrow();
     for (const raw of ["", " \t"]) expect(() => config.resolve("test", new Configuration(new Map([["rules.key", raw]])))).toThrow();
-    expect(() => config.resolve("test", new Configuration(new Map([["rules.mode", "other"]])))).toThrow(/enum/);
+    expect(() => config.resolve("test", new Configuration(new Map([["rules.mode", "other"]])))).toThrow(/"other" is not allowed, use one of: primary, replica/);
     expect(config.resolve("test", new Configuration(new Map([["rules.mode", "replica"]]))).get("mode")).toBe("replica");
   });
 

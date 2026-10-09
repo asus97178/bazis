@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { Secret } from "../Secret";
-import { defineConfig, secret } from "../defineConfig";
+import { configEnum, defineConfig, secret } from "../defineConfig";
 
 const TOUCHED_ENV_KEYS = [
   "BAZIS_ENV",
@@ -10,6 +10,8 @@ const TOUCHED_ENV_KEYS = [
   "BAZIS_DB__HOST",
   "BAZIS_WORKER__MAXRETRIES",
   "BAZIS_WORKER__MAX_RETRIES",
+  "BAZIS_DB__TLS",
+  "BAZIS_FEATURE__ON",
 ];
 
 afterEach(() => {
@@ -90,6 +92,19 @@ describe("defineConfig", () => {
     process.env.BAZIS_HTTP__PORT = "abc";
     const config = defineConfig({ default: { "http.port": 3000 } });
     expect(() => config.ensureValid()).toThrow(/expected a finite number/);
+  });
+
+  test("a wrong value names what came, what is allowed and the variable (0.98.12)", () => {
+    process.env.BAZIS_HTTP__PORT = "abc";
+    process.env.BAZIS_DB__TLS = "strict";
+    process.env.BAZIS_FEATURE__ON = "yes";
+    const config = defineConfig({
+      default: { "http.port": 3000, "db.tls": configEnum(["disable", "require"], "disable"), "feature.on": false },
+    });
+    const message = (() => { try { config.ensureValid(); return ""; } catch (error) { return (error as Error).message; } })();
+    expect(message).toContain('http.port — expected a finite number, got "abc" (BAZIS_HTTP__PORT)');
+    expect(message).toContain('db.tls — "strict" is not allowed, use one of: disable, require (BAZIS_DB__TLS)');
+    expect(message).toContain('feature.on — expected a boolean (true, false, 1, 0), got "yes" (BAZIS_FEATURE__ON)');
   });
 
   test("camelCase numeric schema key reads the conventional lowercased environment key", () => {

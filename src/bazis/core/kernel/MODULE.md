@@ -213,6 +213,12 @@ Reading a declaration through `get()` and `ensureValid(environment)` does not fi
 environment and does not change future reads. The host uses a separate `resolve`, and
 services use the view from DI/ConfigRegistry of their kernel.
 
+Since 0.98.12 a configuration value of the wrong shape names what came, what is
+allowed and where it came from: `db.tls — "strict" is not allowed, use one of:
+disable, … (BAZIS_DB__TLS)`, `http.port — expected a finite number, got "abc"
+(BAZIS_HTTP__PORT)`. A value from the code lists the variables that override it.
+Secret values never appear. Regression: [config/test/defineConfig.test.ts](config/test/defineConfig.test.ts).
+
 ## 6. Historical checks of the K01–K08 fixes
 
 | Check | Result |

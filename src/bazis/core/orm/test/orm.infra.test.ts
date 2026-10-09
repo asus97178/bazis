@@ -30,6 +30,32 @@ describe("ORM @Infra pure contracts", () => {
   });
 });
 
+describe("ORM database connector startup errors (0.98.12)", () => {
+  const config = defineConfig("conn-db", {
+    default: { host: "db.local", port: 5433, database: "shop", username: "app", password: secret("x") },
+  });
+
+  test("a failed connection names the target and the driver's reason", async () => {
+    const connector = ormBazisConnect(config);
+    connector.create();
+    const provider = {
+      ping: async () => false,
+      probe: async () => { throw Object.assign(new Error('password authentication failed for user "app"'), { errno: "28P01" }); },
+    } as never;
+    await expect(Promise.resolve(connector.connect!(provider, new AbortController().signal))).rejects.toThrow(
+      'Infra connector "database": cannot connect to PostgreSQL at db.local:5433 (database "shop", user "app"): password authentication failed for user "app" (28P01)',
+    );
+  });
+
+  test("a provider without probe still names the target", async () => {
+    const connector = ormBazisConnect(config);
+    connector.create();
+    await expect(Promise.resolve(connector.connect!({ ping: async () => false } as never, new AbortController().signal))).rejects.toThrow(
+      'Infra connector "database": cannot connect to PostgreSQL at db.local:5433 (database "shop", user "app").',
+    );
+  });
+});
+
 describe("ORM interprets Infra lifecycle evidence", () => {
   function database(events: string[]): InfraConnector {
     return {

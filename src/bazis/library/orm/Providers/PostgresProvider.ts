@@ -409,11 +409,15 @@ export class PostgresProvider implements DatabaseProvider {
 
   async ping(signal?: AbortSignal): Promise<boolean> {
     try {
-      await withPostgresScopeOptions({ signal }, () => this.pooledOperation((session) => this.runQuery(session, "SELECT 1", [])));
+      await this.probe(signal);
       return true;
     } catch {
       return false;
     }
+  }
+
+  async probe(signal?: AbortSignal): Promise<void> {
+    await withPostgresScopeOptions({ signal }, () => this.pooledOperation((session) => this.runQuery(session, "SELECT 1", [])));
   }
 
   async introspect(): Promise<IntrospectedSchema> {
