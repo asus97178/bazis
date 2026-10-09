@@ -16,8 +16,8 @@ import { DI, Module, createToken, type BazisModule, type ProviderDefinition } fr
 import { getOutboundCorrelationHeaders } from "../kernel";
 import {
   HttpClient,
+  HttpClientFactory,
   HttpClientFactoryBuilder,
-  type HttpClientFactory,
   type HeaderBag,
   type RequestConfig,
 } from "../../library/http-client";
@@ -44,9 +44,10 @@ export interface HttpClientModuleConfig {
 
 /**
  * Registers the outbound HTTP client in DI with correlation propagation wired
- * to the kernel request context:
- * - {@link HTTP_CLIENT_FACTORY} — named clients (fail-fast on unknown names);
- * - {@link HTTP_CLIENT} — the default injectable {@link HttpClient}.
+ * to the kernel request context. A service takes it by type:
+ * - `HttpClient` (or the {@link HTTP_CLIENT} token) — the default client;
+ * - `HttpClientFactory` (or {@link HTTP_CLIENT_FACTORY}) — named clients
+ *   (fail-fast on unknown names).
  */
 export function httpClientModule(config: HttpClientModuleConfig = {}): BazisModule {
   const correlationHeaders = config.correlationHeaders ?? getOutboundCorrelationHeaders;
@@ -83,11 +84,14 @@ export function httpClientModule(config: HttpClientModuleConfig = {}): BazisModu
   }
   const factory = builder.build();
 
+  const client = factory.createClient();
+  // One factory and one default client, under the class (injection by type)
+  // and under the original tokens.
   const providers: ProviderDefinition[] = [
+    DI.singleton(DI.valueProvider(HttpClientFactory, factory)),
     DI.singleton(DI.valueProvider(HTTP_CLIENT_FACTORY, factory)),
-    DI.singleton(
-      DI.factoryProvider(HTTP_CLIENT, [HTTP_CLIENT_FACTORY], (resolved: HttpClientFactory) => resolved.createClient()),
-    ),
+    DI.singleton(DI.valueProvider(HttpClient, client)),
+    DI.singleton(DI.valueProvider(HTTP_CLIENT, client)),
   ];
 
   @Module({ providers })

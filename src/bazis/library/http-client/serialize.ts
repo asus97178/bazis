@@ -8,6 +8,20 @@ const ABSOLUTE_URL = /^[a-z][a-z0-9+.-]*:\/\//i;
  * prefix), `baseUrl: "https://api/v1"` + `"/users"` → `…/v1/users`.
  * Absolute URLs and missing baseUrl pass through.
  */
+export function isAbsoluteUrl(url: string): boolean {
+  return ABSOLUTE_URL.test(url);
+}
+
+/**
+ * The address of the current page in a browser (or worker), else undefined.
+ * A relative `baseUrl` such as `"/api"` is resolved against it, like axios's
+ * `baseURL` in a browser app.
+ */
+export function pageUrl(): string | undefined {
+  const location = (globalThis as { location?: { href?: unknown } }).location;
+  return typeof location?.href === "string" ? location.href : undefined;
+}
+
 export function resolveUrl(baseUrl: string | undefined, url: string): string {
   if (!baseUrl || ABSOLUTE_URL.test(url)) {
     return url;

@@ -192,6 +192,15 @@ off); the 429 gets them through `TooManyRequestsError.headers`, which the error 
 writes next to `Retry-After`.
 Regressions: [test/rateLimit.security.test.ts](test/rateLimit.security.test.ts).
 
+## Unhandled outbound HTTP failures (2026-10-09, 0.98.11)
+
+The error handler answers an unhandled `HttpClientError` (from `bazis/core/http-client`)
+with `504 Gateway Timeout` when its code is `ETIMEDOUT` and `502 Bad Gateway` otherwise,
+instead of `500`. The upstream response never reaches the client; the error is logged
+and reported to `onUnexpectedError` like any unexpected error, and `exposeDetails` adds the
+redacted message in development as for 500. An `HttpClientError` the application catches
+is unaffected. Regression: [http-client-di.integration.test.ts](../scripts/test/http-client-di.integration.test.ts).
+
 ## Removal of manual HTTP binding and target isolation (2026-10-03)
 
 `@Bind`, the manual descriptor factories and their HTTP exports are removed.

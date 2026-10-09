@@ -12,7 +12,7 @@
  */
 export { HttpClient } from "./HttpClient";
 export { InspectableRedirectProtocol } from "./redirectProtocol";
-export { HttpClientFactoryBuilder, type HttpClientFactory } from "./HttpClientFactory";
+export { HttpClientFactoryBuilder, HttpClientFactory } from "./HttpClientFactory";
 export { HttpClientError, HttpClientConfigError, HttpErrorCode } from "./errors";
 export { InterceptorManager, type FulfilledFn, type RejectedFn } from "./interceptors";
 export {

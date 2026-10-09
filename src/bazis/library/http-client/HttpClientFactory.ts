@@ -2,9 +2,32 @@ import { HttpClient } from "./HttpClient";
 import { HttpClientConfigError } from "./errors";
 import type { RequestConfig } from "./types";
 
-/** Resolves pre-configured named clients (à la .NET `IHttpClientFactory`). */
-export interface HttpClientFactory {
-  createClient(name?: string): HttpClient;
+/**
+ * Resolves pre-configured named clients (à la .NET `IHttpClientFactory`).
+ * An abstract class, so a service can take it by type in its constructor.
+ */
+export abstract class HttpClientFactory {
+  public abstract createClient(name?: string): HttpClient;
+}
+
+class ConfiguredHttpClientFactory extends HttpClientFactory {
+  public constructor(
+    private readonly defaults: RequestConfig,
+    private readonly named: ReadonlyMap<string, RequestConfig>,
+  ) {
+    super();
+  }
+
+  public createClient(name?: string): HttpClient {
+    if (name === undefined) {
+      return new HttpClient(this.defaults);
+    }
+    const config = this.named.get(name);
+    if (config === undefined) {
+      throw new HttpClientConfigError(name, [...this.named.keys()]);
+    }
+    return new HttpClient(this.defaults).create(config);
+  }
 }
 
 /**
@@ -27,19 +50,6 @@ export class HttpClientFactoryBuilder {
   }
 
   public build(): HttpClientFactory {
-    const named = new Map(this.named);
-    const defaults = this.defaults;
-    return {
-      createClient(name?: string): HttpClient {
-        if (name === undefined) {
-          return new HttpClient(defaults);
-        }
-        const config = named.get(name);
-        if (config === undefined) {
-          throw new HttpClientConfigError(name, [...named.keys()]);
-        }
-        return new HttpClient(defaults).create(config);
-      },
-    };
+    return new ConfiguredHttpClientFactory(this.defaults, new Map(this.named));
   }
 }
