@@ -178,6 +178,11 @@ export interface DatabaseProvider {
   afterRollback?(callback: TransactionCallback): void;
   /** Connection check for the health check. */
   ping(signal?: AbortSignal): Promise<boolean>;
+  /**
+   * Connection check that rejects with the driver's error instead of `false`,
+   * so a startup failure can say why (wrong password, missing database, …).
+   */
+  probe?(signal?: AbortSignal): Promise<void>;
   /** Introspection of the actual database schema (for the auto-migration). */
   introspect(): Promise<IntrospectedSchema>;
   /**

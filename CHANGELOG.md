@@ -4,6 +4,25 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.12 — 2026-10-09
+
+### Fixed
+
+- A failed database connection at startup says why and where:
+  `Infra connector "database": cannot connect to PostgreSQL at 127.0.0.1:5432
+  (database "guide", user "postgres"): password authentication failed for user
+  "postgres" (28P01)`. Before, a wrong password, a missing database, a stopped
+  server, an unknown host and an unsupported TLS mode all failed with the same
+  `postgres is not reachable.` The password is never shown. Database providers
+  get an optional `probe(signal)` that rejects with the driver's error.
+- A configuration value of the wrong shape names what came, what is allowed and
+  the variable: `db.tls — "strict" is not allowed, use one of: disable, allow,
+  prefer, require, verify-ca, verify-full (BAZIS_DB__TLS)`,
+  `db.port — expected a finite number, got "abc" (BAZIS_DB__PORT)`,
+  `feature.on — expected a boolean (true, false, 1, 0), got "yes" (…)`.
+  Before, the messages were `value is not one of the declared enum values`,
+  `expected a finite number` and `expected a boolean`.
+
 ## 0.98.11 — 2026-10-09
 
 ### Fixed

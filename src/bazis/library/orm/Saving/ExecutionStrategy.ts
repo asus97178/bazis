@@ -103,6 +103,7 @@ export function withRetry(provider: DatabaseProvider, options?: ExecutionStrateg
     afterCommit: provider.afterCommit ? (callback) => provider.afterCommit!(callback) : undefined,
     afterRollback: provider.afterRollback ? (callback) => provider.afterRollback!(callback) : undefined,
     ping: (signal) => provider.ping(signal),
+    probe: provider.probe ? (signal) => provider.probe!(signal) : undefined,
     introspect: () => provider.introspect(),
     schemaAdmissionCapability: provider.schemaAdmissionCapability,
     withMigrationLock: provider.withMigrationLock ? (work) => provider.withMigrationLock!(work) : undefined,

@@ -1,4 +1,4 @@
-import { InfraError, reader, requireValue, postgresConnectionOptions, type InfraConnector, type PostgresConfigShape } from "../infra";
+import { errorMessage, InfraError, reader, requireValue, postgresConnectionOptions, type InfraConnector, type PostgresConfigShape } from "../infra";
 import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
@@ -86,16 +86,26 @@ export function ormBazisConnect<T extends PostgresOrmConfigShape>(config: AppCon
 export function ormBazisConnect(
   config: AppConfig<PostgresOrmConfigShape>,
 ): InfraConnector<DatabaseProvider> {
+  // Where the connection goes, for the startup error; never the password.
+  let target = "PostgreSQL";
   return {
     token: DATABASE_PROVIDER,
     config,
     phase: DATABASE_PHASE,
     create(configs) {
+      const c = reader(config, configs);
+      target = `PostgreSQL at ${String(c.get("host"))}:${String(c.get("port"))} (database "${String(c.get("database"))}", user "${String(c.get("username"))}")`;
       return buildPostgresProvider(config, configs);
     },
     async connect(provider, signal) {
-      if (!(await provider.ping(signal))) {
-        throw new InfraError('Infra connector "database": postgres is not reachable.');
+      if (provider.probe === undefined) {
+        if (!(await provider.ping(signal))) throw new InfraError(`Infra connector "database": cannot connect to ${target}.`);
+        return;
+      }
+      try {
+        await provider.probe(signal);
+      } catch (error) {
+        throw new InfraError(`Infra connector "database": cannot connect to ${target}: ${connectionFailure(error)}`);
       }
     },
     async dispose(provider) {
@@ -105,4 +115,13 @@ export function ormBazisConnect(
       return provider.ping(signal);
     },
   };
+}
+
+/** The driver's reason with its code: `password authentication failed for user "app" (28P01)`. */
+function connectionFailure(error: unknown): string {
+  const details = error as { errno?: unknown; code?: unknown };
+  const code = typeof details.errno === "string" && details.errno ? details.errno
+    : typeof details.code === "string" && details.code ? details.code : undefined;
+  const message = errorMessage(error);
+  return code === undefined || message.includes(code) ? message : `${message} (${code})`;
 }
