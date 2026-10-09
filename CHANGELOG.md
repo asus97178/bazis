@@ -4,6 +4,24 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.14 — 2026-10-10
+
+### Fixed
+
+- A column without an explicit `type` whose initial value says otherwise stops
+  the model build instead of silently changing the data:
+  `@Column() pages = 0` was a `text` column, so `pages` came back from the
+  database as the string `"412"`; `@Key() code = ""` was a bigint identity, so
+  an assigned `"RU"` was dropped and `find("RU")` returned nothing. Now:
+  `Entity "Book": property "pages" has no column type and maps to text, but its
+  initial value is a number. Set the type: @Column({ type: "integer" }) or
+  @Column({ type: "real" }).` and `Entity "Country": key "code" has no column
+  type and maps to an integer identity, but its initial value is a string. For a
+  text key add @Column({ type: "text" }) next to @Key(); for a UUID key use
+  @UUID().` Booleans, dates, objects and arrays get the matching hint.
+  **Breaking** for models that relied on the silent mapping: add the type —
+  `type: "text"` keeps the existing column.
+
 ## 0.98.13 — 2026-10-10
 
 ### Fixed
