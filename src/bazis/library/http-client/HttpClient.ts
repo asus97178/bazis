@@ -6,7 +6,9 @@ import {
   appendQuery,
   basicAuthHeader,
   isBodyInit,
+  isAbsoluteUrl,
   mergeHeaderBags,
+  pageUrl,
   resolveUrl,
   shouldPropagateCorrelation,
 } from "./serialize";
@@ -188,7 +190,8 @@ export class HttpClient {
     return { ...merged, method: String(override.method ?? base.method ?? "GET").toUpperCase() };
   }
 
-  private async dispatch<T>(config: ResolvedRequestConfig): Promise<HttpResponse<T>> {
+  private async dispatch<T>(requested: ResolvedRequestConfig): Promise<HttpResponse<T>> {
+    const config = withAbsoluteBaseUrl(requested);
     if (config.inspectableRedirects !== undefined && typeof config.inspectableRedirects !== "boolean") {
       throw new HttpClientError("inspectableRedirects must be a boolean", { config });
     }
@@ -648,6 +651,26 @@ function isReplayableBody(body: RequestInit["body"]): boolean {
   }
   return !(typeof (body as { getReader?: unknown }).getReader === "function"
     || (typeof ReadableStream !== "undefined" && body instanceof ReadableStream));
+}
+
+/**
+ * A relative `baseUrl` (`"/api"`) is resolved against the page address once,
+ * so URL building and every origin check below see an absolute base. Outside
+ * a page there is nothing to resolve it against.
+ */
+function withAbsoluteBaseUrl(config: ResolvedRequestConfig): ResolvedRequestConfig {
+  const { baseUrl } = config;
+  if (!baseUrl || isAbsoluteUrl(baseUrl)) {
+    return config;
+  }
+  const page = pageUrl();
+  if (page === undefined) {
+    throw new HttpClientError(
+      `baseUrl "${baseUrl}" is relative: outside a browser page it must be absolute, for example "http://localhost:3000${baseUrl.startsWith("/") ? "" : "/"}${baseUrl}"`,
+      { config },
+    );
+  }
+  return { ...config, baseUrl: new URL(baseUrl, page).toString() };
 }
 
 function sameOrigin(left: string, right: string): boolean {

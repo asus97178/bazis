@@ -15,6 +15,15 @@ Checks: `test/http-client.bodyless.test.ts`, a real logout of the Vue client.
 
 `HttpClient` runs HTTP requests on top of Fetch and is responsible for the URL, redirects, retries, response limits and error representation. It owns the instance configuration and the request attempts. ORM, application authorization and DI registrations are outside the library. No atomic submodules are used: it implements one feature.
 
+Addendum 2026-10-09 (0.98.11): `HttpClientFactory` is an abstract class instead of an
+interface, so a service takes it by type; `HttpClientFactoryBuilder.build()` returns an
+instance of it and the call shape (`createClient(name?)`) does not change. The core
+integration registers the factory and the default client under their classes and under
+`HTTP_CLIENT_FACTORY` / `HTTP_CLIENT`. A relative `baseUrl` (`"/api"`) is resolved
+against the page address once per dispatch (`withAbsoluteBaseUrl`), so URL building and
+all origin checks see an absolute base; without a page it is an `HttpClientError` without
+a code. Regression: `test/http-client.relative-base.test.ts`.
+
 ## 2. Components
 
 | Component | Source | Input → result |

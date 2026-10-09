@@ -4,6 +4,33 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.11 — 2026-10-09
+
+### Fixed
+
+- A service takes the outbound HTTP client by type:
+  `constructor(private readonly http: HttpClient)` gets the client of
+  `httpClientModule`. Before, the module registered it only under the
+  `HTTP_CLIENT` token, and the application failed with
+  `Missing dependency "HttpClient"`.
+- `HttpClientFactory` is an abstract class, so `clients: HttpClientFactory`
+  in a constructor gets the named-clients factory. Before, it was an interface
+  and codegen stopped with `BAZIS_DI_DEPENDENCY_UNKNOWN`. The call shape and
+  `HttpClientFactoryBuilder` do not change; `HTTP_CLIENT` and
+  `HTTP_CLIENT_FACTORY` keep working.
+- An unhandled `HttpClientError` answers `504 Gateway Timeout` (the outbound
+  request timed out) or `502 Bad Gateway` (any other outbound failure) instead
+  of `500 Internal Server Error`. The upstream response is not passed to the
+  client; the log line keeps the full error. A client error without a code (a
+  misconfigured request) stays `500`.
+- A relative `baseUrl` (`new HttpClient({ baseUrl: "/api" })`) works in a
+  browser app: it is resolved against the page address, as axios's `baseURL`
+  is, and the same-origin checks for secret headers and correlation use the
+  resolved address. Before, every request failed with
+  `Failed to construct 'URL': Invalid base URL`. Outside a page a relative
+  `baseUrl` is a clear error: `baseUrl "/api" is relative: outside a browser
+  page it must be absolute, for example "http://localhost:3000/api"`.
+
 ## 0.98.10 — 2026-10-09
 
 ### Fixed

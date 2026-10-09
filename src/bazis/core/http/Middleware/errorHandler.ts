@@ -1,5 +1,6 @@
 import { REQUEST_ID_STATE_KEY, type Logger } from "../../kernel";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
+import { HttpClientError, HttpErrorCode } from "../../../library/http-client/errors";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import { HttpError } from "../Errors/HttpError";
 import type { HttpMiddleware } from "./types";
@@ -124,15 +125,30 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
         return;
       }
       safelyReportUnexpected(options, log, ctx, error);
+      const [status, title] = unexpectedStatus(error);
       ctx.response = options.exposeDetails
-        ? safeJsonResponse(500, {
-            error: "Internal Server Error",
+        ? safeJsonResponse(status, {
+            error: title,
             // Development only, but redacted like the log: a secret in an error
             // message must not reach a browser or a shared screenshot.
             message: redactSensitiveText(error instanceof Error ? error.message : String(error)),
             stack: error instanceof Error && error.stack !== undefined ? redactSensitiveText(error.stack) : undefined,
           })
-        : safeJsonResponse(500, { error: "Internal Server Error" });
+        : safeJsonResponse(status, { error: title });
     }
   };
+}
+
+/**
+ * An unhandled outbound HTTP failure is the upstream's fault, not ours:
+ * 504 when the call timed out, 502 otherwise. A client error without a code
+ * is a misconfiguration of our request (for example an invalid maxRedirects)
+ * and stays 500, like everything else. Upstream details never reach the
+ * client; the log keeps the full error.
+ */
+function unexpectedStatus(error: unknown): readonly [number, string] {
+  if (error instanceof HttpClientError && error.code !== undefined) {
+    return error.code === HttpErrorCode.Timeout ? [504, "Gateway Timeout"] : [502, "Bad Gateway"];
+  }
+  return [500, "Internal Server Error"];
 }
