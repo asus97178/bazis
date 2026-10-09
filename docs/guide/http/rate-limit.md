@@ -156,4 +156,4 @@ positive integer.`
 
 - [Middleware](../overview/middleware.md)
 - [Авторизация](../overview/authorization.md)
-- Кэширование ответов *(в работе)*
+- [Кэширование ответов](output-cache.md)

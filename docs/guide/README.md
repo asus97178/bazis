@@ -51,7 +51,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [OpenAPI](http/openapi.md) — документ из кода, коды ответов и ошибки, JSDoc
 - ✅ [CORS, заголовки безопасности, журнал запросов](http/cors-headers-log.md) — источники и preflight, CORS для части маршрутов, HSTS и CSP, `accessLog`
 - ✅ [Ограничение частоты запросов](http/rate-limit.md) — `rateLimit`, ключи, работа за прокси, заголовки `RateLimit-*`
-- ⏳ Кэширование ответов
+- ✅ [Кэширование ответов](http/output-cache.md) — `@OutputCache`, ключи, сброс по тегам, защищённые маршруты, политики
 - ⏳ HTTP-клиент
 
 ## 5. База данных (ORM)

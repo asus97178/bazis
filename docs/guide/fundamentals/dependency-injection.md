@@ -162,6 +162,37 @@ export class ReportController {
 Регистрировать `HeavyService` нужно как обычно; codegen сам распознаёт
 `Lazy<...>` в конструкторе.
 
+## Необязательные зависимости
+
+Параметр конструктора со знаком `?` или значением по умолчанию —
+необязательная зависимость:
+
+```ts
+import { ICache } from "bazis/core/cache";
+
+export class Reporter {
+  constructor(
+    private readonly clock: Clock = new FixedClock(),
+    private readonly cache?: ICache,
+  ) {}
+}
+```
+
+| Параметр | Сервис зарегистрирован | Не зарегистрирован |
+| --- | --- | --- |
+| `cache?: ICache` | Внедряется | `undefined` |
+| `clock: Clock = new FixedClock()` | Внедряется зарегистрированный | Значение по умолчанию |
+| `options: Options = {}` — тип, не известный DI | Не внедряется | Значение по умолчанию |
+
+Так сервис работает и с модулем кэша, и без него. В явном списке
+зависимостей то же самое записывается как `optionalDependency(ICache)`
+из `bazis/core/di`.
+
+> [!NOTE]
+> Необязательные зависимости — с версии 0.98.10. Раньше `cache?: ICache`
+> не давал приложению запуститься с ошибкой `requires at least 1
+> constructor deps … run bazis codegen`.
+
 ## Освобождение ресурсов
 
 Если у сервиса есть метод `dispose()`, `[Symbol.dispose]()` или
