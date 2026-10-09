@@ -144,7 +144,8 @@ await runApp(AppModule, {
 Ответ получает `Access-Control-Allow-Origin` только для разрешённых
 источников, preflight-запрос `OPTIONS` получает `204`. Настройки CORS:
 `origin` (строка, список или функция), `methods`, `allowedHeaders`,
-`exposedHeaders`, `credentials`, `maxAgeSeconds`.
+`exposedHeaders`, `credentials`, `maxAgeSeconds`. Подробнее — в главе
+[CORS, заголовки безопасности, журнал запросов](../http/cors-headers-log.md).
 
 Строка журнала на каждый запрос:
 
