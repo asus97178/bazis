@@ -4,7 +4,7 @@ import type { DatabaseProvider, DbExecutor, ExecuteResult, ForeignKeyConstraint,
 import { Migrator, type MigrationResult } from "./Schema/Migrator";
 import { MigrationRunner, type Migration, type VersionedMigrationResult } from "./Schema/MigrationRunner";
 import { SchemaDiffer } from "./Schema/SchemaDiffer";
-import { SchemaAdmissionEngine } from "./Schema/SchemaAdmission";
+import { SchemaAdmissionEngine, type EnsureCreatedResult } from "./Schema/SchemaAdmission";
 import { SchemaAdmissionError } from "./errors";
 import { physicalColumnTypes } from "./Schema/physicalColumnTypes";
 import { bindResolvedForeignKey } from "./Providers/resolvedForeignKey";
@@ -26,10 +26,9 @@ export class DatabaseFacade {
    * whole tables, then exact-verifies again before commit. Existing tables are
    * never altered or repaired.
    */
-  async ensureCreated(): Promise<void> {
+  async ensureCreated(): Promise<EnsureCreatedResult> {
     if (this.provider.name === "postgres") {
-      await new SchemaAdmissionEngine(this.provider, this.models).ensureCreated();
-      return;
+      return new SchemaAdmissionEngine(this.provider, this.models).ensureCreated();
     }
     // The physical default contract belongs exclusively to exact PostgreSQL
     // admission. Other providers must reject it rather than silently ignore it.
@@ -45,6 +44,7 @@ export class DatabaseFacade {
         await this.provider.execute(indexSql, []);
       }
     }
+    return { warnings: [] };
   }
 
   /**
