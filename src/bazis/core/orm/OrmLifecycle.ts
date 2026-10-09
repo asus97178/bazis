@@ -65,7 +65,10 @@ export class OrmLifecycle implements HostedService {
     const database = new DatabaseFacade(this.options.provider, this.options.model);
     try {
       if (this.ensureCreated) {
-        await database.ensureCreated();
+        const result = await database.ensureCreated();
+        for (const warning of result.warnings) {
+          console.warn(`[orm:schema] ${warning}`);
+        }
       }
       if (this.migrateOnStart) {
         const result = await database.migrate();

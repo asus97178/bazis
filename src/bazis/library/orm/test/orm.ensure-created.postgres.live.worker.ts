@@ -149,8 +149,9 @@ try {
     const poisonedContext = new LiveContext(new DbContextOptions({ provider: poisoned, entities }));
     await poisonedContext.database.ensureCreated().then(() => { throw new Error("final drift was not rejected"); }, (error) => { if ((error as { code?: string }).code !== "ORM_SCHEMA_DRIFT") throw error; });
   } else {
-    await context.database.ensureCreated();
-    await context.database.ensureCreated();
+    for (const result of [await context.database.ensureCreated(), await context.database.ensureCreated()]) {
+      for (const warning of result.warnings) console.log(`orm-schema-warning=${warning}`);
+    }
   }
   if (mode === "trace-additive") console.log(`admission-trace=${JSON.stringify(admissionTrace)}`);
 } catch (error) {

@@ -170,3 +170,15 @@ db:5432 (database "app", user "app"): password authentication failed for user "a
 (28P01)`. A provider without `probe` keeps the boolean check and names the target.
 Before 0.98.12 every failure was `postgres is not reachable.`
 Regression: [test/orm.infra.test.ts](test/orm.infra.test.ts).
+
+## Primary key name drift in ensureCreated (2026-10-10, 0.98.13)
+
+Exact admission (`ensureCreated` on PostgreSQL) tolerates one difference: a primary key that
+differs from the model only by name (`tasks_pkey` from a schema created by an older version,
+the model's `pk_tasks`). Columns and order of the key are still verified exactly. The table is
+not renamed; `DatabaseFacade.ensureCreated()` returns `{ warnings }` and `OrmLifecycle` prints
+`[orm:schema] table "public"."tasks": primary key is named "tasks_pkey", the model expects
+"pk_tasks". It works as is; to align the name run: ALTER TABLE … RENAME CONSTRAINT …;`.
+Queries never use the key name (`ON CONFLICT` names columns), and `migrateOnStart` already
+accepted such tables, so both modes now agree. Owned-store catalogs keep exact names.
+Regression: `library/orm/test/orm.ensure-created.postgres.live.test.ts` (needs `BAZIS_PG_URL`).

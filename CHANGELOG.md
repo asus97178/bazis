@@ -4,6 +4,22 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.13 — 2026-10-10
+
+### Fixed
+
+- `ensureCreated` no longer refuses a table whose primary key differs from the
+  model only by name — for example `tasks_pkey`, which PostgreSQL gave the key
+  of a table created by an older version, while the model expects `pk_tasks`.
+  The application starts and prints
+  `[orm:schema] table "public"."tasks": primary key is named "tasks_pkey", the
+  model expects "pk_tasks". It works as is; to align the name run: ALTER TABLE
+  "public"."tasks" RENAME CONSTRAINT "tasks_pkey" TO "pk_tasks";`. Nothing is
+  renamed. Before, startup failed with `PostgreSQL schema change requires an
+  explicit migration … primary key name differs`, while `migrateOnStart`
+  accepted the same table. The key's columns are still verified exactly.
+  `DatabaseFacade.ensureCreated()` now resolves to `{ warnings }`.
+
 ## 0.98.12 — 2026-10-09
 
 ### Fixed

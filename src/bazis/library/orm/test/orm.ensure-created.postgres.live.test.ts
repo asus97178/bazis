@@ -232,7 +232,6 @@ describe.skipIf(!url)("PostgreSQL ensure-created admission (live)", () => {
         { mode: "hard-default", table: "hard_default_vectors", ddl: `CREATE TABLE ${qualified("hard_default_vectors")} ("id" bigint NOT NULL, "code" text, CONSTRAINT "pk_hard_default_vectors" PRIMARY KEY ("id"))` },
         { mode: "hard-null", table: "hard_null_vectors", ddl: `CREATE TABLE ${qualified("hard_null_vectors")} ("id" bigint NOT NULL, "code" text DEFAULT 'safe', CONSTRAINT "pk_hard_null_vectors" PRIMARY KEY ("id"))` },
         { mode: "hard-generation", table: "hard_generation_vectors", ddl: `CREATE TABLE ${qualified("hard_generation_vectors")} ("id" bigint NOT NULL, CONSTRAINT "pk_hard_generation_vectors" PRIMARY KEY ("id"))` },
-        { mode: "hard-pk-name", table: "hard_pk_name_vectors", ddl: `CREATE TABLE ${qualified("hard_pk_name_vectors")} ("id" bigint NOT NULL, CONSTRAINT "pk_hard_pk_name_actual" PRIMARY KEY ("id"))` },
         { mode: "hard-pk-order", table: "hard_pk_order_vectors", ddl: `CREATE TABLE ${qualified("hard_pk_order_vectors")} ("tenant" text NOT NULL, "id" text NOT NULL, CONSTRAINT "pk_hard_pk_order_expected" PRIMARY KEY ("id", "tenant"))` },
         { mode: "hard-pk-components", table: "hard_pk_components_vectors", ddl: `CREATE TABLE ${qualified("hard_pk_components_vectors")} ("tenant" text NOT NULL, "id" text NOT NULL, CONSTRAINT "pk_hard_pk_components_expected" PRIMARY KEY ("id"))` },
       ];
@@ -247,6 +246,26 @@ describe.skipIf(!url)("PostgreSQL ensure-created admission (live)", () => {
       }
     } finally { await provider.close(); }
   }, 60_000);
+
+  test("a primary key that differs only by name is reported, not refused, and is never renamed (0.98.13)", async () => {
+    schema = freshSchema("bazis_additive_pk_name");
+    const provider = postgres({ url });
+    try {
+      // The ORM creates the table, then the key gets PostgreSQL's default name,
+      // as in a schema created by an older version.
+      expect((await runWorker(schema, "hard-pk-name")).exit).toBe(0);
+      await provider.execute(`ALTER TABLE ${qualified("hard_pk_name_vectors")} RENAME CONSTRAINT "pk_hard_pk_name_expected" TO "hard_pk_name_vectors_pkey"`, []);
+      const before = await tableSnapshot(provider, "hard_pk_name_vectors");
+      const admitted = await runWorker(schema, "hard-pk-name");
+      expect(admitted.exit, safeOutput(admitted.output)).toBe(0);
+      const warning = `orm-schema-warning=table "${schema}"."hard_pk_name_vectors": primary key is named "hard_pk_name_vectors_pkey", the model expects "pk_hard_pk_name_expected". `
+        + `It works as is; to align the name run: ALTER TABLE "${schema}"."hard_pk_name_vectors" RENAME CONSTRAINT "hard_pk_name_vectors_pkey" TO "pk_hard_pk_name_expected";`;
+      expect(admitted.output.split("\n").filter((line) => line === warning)).toHaveLength(2);
+      // Nothing is renamed or repaired.
+      expect(await tableSnapshot(provider, "hard_pk_name_vectors")).toEqual(before);
+      expect(JSON.stringify(before.constraints)).toContain("hard_pk_name_vectors_pkey");
+    } finally { await provider.close(); }
+  }, 30_000);
 
   test("rolls back real staged DDL when final PostgreSQL catalog verification is incompatible", async () => {
     schema = freshSchema("bazis_additive_final_drift");
