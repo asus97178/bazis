@@ -148,7 +148,7 @@ export function renderOpenApiHtml(title: string, specPath: string): string {
       method.textContent = row.method;
       const summary = document.createElement("span");
       summary.className = "summary";
-      summary.textContent = row.operation.operationId || row.operation.summary || "";
+      summary.textContent = row.operation.summary || row.operation.operationId || "";
       line.append(method, summary);
       node.appendChild(line);
       const meta = document.createElement("div");

@@ -4,6 +4,33 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.6 — 2026-10-09
+
+### Fixed
+
+- The generated OpenAPI document describes what the server answers:
+  - The success status comes from the result helper the method returns:
+    `return Created(...)` is documented as `201`, `Accepted(...)` as `202`,
+    `NoContent()` as `204` (when every success return uses the same helper;
+    `@HttpCode` still wins). Before, such operations were documented as `200`.
+  - A declared return type is the response schema: `getById(id): TaskResponse`
+    references `TaskResponse` even when the method returns an object literal.
+    Before, the literal produced an anonymous schema.
+- The built-in docs page labels operations with their summary instead of the
+  generated `operationId`.
+
+### Added
+
+- Error responses in OpenAPI with a shared `HttpErrorResponse` schema
+  (`{ "error": "...", "details": ... }`): `400` for operations with a body,
+  query parameters, a list query or typed route parameters; `401` and `403`
+  under `@Authorize`; and the errors the method body returns (`NotFound(...)`,
+  `StatusCode(409, ...)`) or throws (`throw new NotFoundError()`, including
+  subclasses). Errors thrown inside called services are not visible.
+- JSDoc in OpenAPI: the first line of a controller method's comment is the
+  operation `summary`, the rest is its `description`; comments on classes,
+  interfaces and their properties become schema `description`s.
+
 ## 0.98.5 — 2026-10-09
 
 ### Fixed

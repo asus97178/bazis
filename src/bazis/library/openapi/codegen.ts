@@ -5,6 +5,14 @@ export type OpenApiCodegenSchema = Record<string, unknown>;
 
 export interface OpenApiCodegenOperationSpec {
   readonly response?: OpenApiCodegenSchema;
+  /** Success status when every success return uses the same result helper (`Created` -> 201). */
+  readonly status?: number;
+  /** Error statuses returned (`NotFound(...)`) or thrown (`throw new NotFoundError()`) in the method body. */
+  readonly errors?: readonly number[];
+  /** First line of the method's JSDoc. */
+  readonly summary?: string;
+  /** The rest of the method's JSDoc. */
+  readonly description?: string;
 }
 
 export interface OpenApiCodegenAnalyzer {
@@ -15,6 +23,8 @@ export interface OpenApiCodegenAnalyzer {
   schemaFromDeclaration(declaration: ts.ClassDeclaration | ts.InterfaceDeclaration): OpenApiCodegenSchema;
   schemaNameForDeclaration(name: string, declaration: ts.Declaration | undefined): string;
   responseSchemaFromMethod(method: ts.MethodDeclaration): OpenApiCodegenSchema | undefined;
+  /** Response schema, statuses and JSDoc of a controller method. */
+  operationFromMethod(method: ts.MethodDeclaration): OpenApiCodegenOperationSpec;
 }
 
 export interface OpenApiCodegenAnalyzerInput {
@@ -32,6 +42,14 @@ const SUCCESS_RESULT_HELPERS = new Set(["Ok", "Accepted"]);
 const CREATED_RESULT_HELPERS = new Set(["Created"]);
 const EMPTY_SUCCESS_RESULT_HELPERS = new Set(["NoContent", "Redirect", "File"]);
 const ERROR_RESULT_HELPERS = new Set(["BadRequest", "Unauthorized", "Forbidden", "NotFound", "Conflict", "InternalServerError"]);
+const SUCCESS_HELPER_STATUS: Readonly<Record<string, number>> = { Ok: 200, Accepted: 202, Created: 201, NoContent: 204 };
+const ERROR_HELPER_STATUS: Readonly<Record<string, number>> = {
+  BadRequest: 400, Unauthorized: 401, Forbidden: 403, NotFound: 404, Conflict: 409,
+};
+const ERROR_CLASS_STATUS: Readonly<Record<string, number>> = {
+  BadRequestError: 400, UnauthorizedError: 401, ForbiddenError: 403, NotFoundError: 404,
+  PayloadTooLargeError: 413, UnsupportedMediaTypeError: 415, TooManyRequestsError: 429,
+};
 const OPENAPI_EMPTY_TYPE_NAMES = new Set(["HttpResult", "Response", "Blob", "ReadableStream", "Uint8Array"]);
 const OPENAPI_BUILTIN_TYPE_NAMES = new Set([
   "Array",
@@ -77,7 +95,8 @@ export function createOpenApiCodegenAnalyzer(input: OpenApiCodegenAnalyzerInput)
       const baseSchema = typeNode ? schemaFromTypeNode(typeNode) : schemaFromInitializer(schemaInitializer(member));
       const validators = validatorOptionsOf(member);
       const schema = validators.reduce((current, options) => applyValidatorOptions(current, options), baseSchema);
-      properties[name] = schema;
+      const description = documentationOf(member.name);
+      properties[name] = description === undefined ? schema : { ...schema, description };
       if (isRequiredProperty(member, ownerKind, validators)) {
         required.push(name);
       }
@@ -89,12 +108,95 @@ export function createOpenApiCodegenAnalyzer(input: OpenApiCodegenAnalyzerInput)
     return schema;
   };
 
-  const responseSchemaFromMethod = (method: ts.MethodDeclaration): OpenApiCodegenSchema | undefined => {
-    const inferred = responseSchemaFromReturnExpressions(method);
-    if (inferred !== undefined) {
-      return inferred;
+  /** JSDoc text of a declaration name, without tags; undefined when there is none. */
+  const documentationOf = (name: ts.Node): string | undefined => {
+    const symbol = checker.getSymbolAtLocation(name);
+    const text = symbol === undefined ? "" : ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim();
+    return text.length > 0 ? text : undefined;
+  };
+
+  const operationFromMethod = (method: ts.MethodDeclaration): OpenApiCodegenOperationSpec => {
+    const response = responseSchemaFromMethod(method);
+    const { status, errors } = statusesFromMethod(method);
+    const documentation = documentationOf(method.name);
+    const [summary, ...rest] = documentation?.split(/\r?\n/) ?? [];
+    const description = rest.join("\n").trim();
+    return {
+      ...(response !== undefined ? { response } : {}),
+      ...(status !== undefined ? { status } : {}),
+      ...(errors.length > 0 ? { errors } : {}),
+      ...(summary !== undefined && summary.trim().length > 0 ? { summary: summary.trim() } : {}),
+      ...(description.length > 0 ? { description } : {}),
+    };
+  };
+
+  /**
+   * Success and error statuses visible in the method body: result helpers in
+   * `return` statements and `throw new <HttpError subclass>`. Errors thrown
+   * by called services are not visible here.
+   */
+  const statusesFromMethod = (method: ts.MethodDeclaration): { status?: number; errors: number[] } => {
+    const success = new Set<number>();
+    const errors = new Set<number>();
+    const addReturn = (expression: ts.Expression): void => {
+      const unwrapped = unwrapExpression(expression);
+      if (ts.isConditionalExpression(unwrapped)) {
+        addReturn(unwrapped.whenTrue);
+        addReturn(unwrapped.whenFalse);
+        return;
+      }
+      const name = ts.isCallExpression(unwrapped) ? callExpressionName(unwrapped) : undefined;
+      if (name !== undefined && SUCCESS_HELPER_STATUS[name] !== undefined) {
+        success.add(SUCCESS_HELPER_STATUS[name]);
+      } else if (name !== undefined && ERROR_HELPER_STATUS[name] !== undefined) {
+        errors.add(ERROR_HELPER_STATUS[name]);
+      } else if (name === "StatusCode" && ts.isCallExpression(unwrapped)) {
+        const status = numericLiteralValue(unwrapped.arguments[0]);
+        if (status === undefined) success.add(-1);
+        else if (status >= 400 && status < 500) errors.add(status);
+        else if (status >= 200 && status < 300) success.add(status);
+      } else if (name === undefined || !EMPTY_SUCCESS_RESULT_HELPERS.has(name) && !ERROR_RESULT_HELPERS.has(name)) {
+        success.add(200);
+      } else {
+        success.add(-1);
+      }
+    };
+    const visit = (node: ts.Node): void => {
+      if (node !== method.body && isNestedFunctionLike(node)) return;
+      if (ts.isReturnStatement(node)) {
+        if (node.expression !== undefined) addReturn(node.expression);
+        return;
+      }
+      if (ts.isThrowStatement(node) && ts.isNewExpression(unwrapExpression(node.expression))) {
+        const status = httpErrorStatus(checker.getTypeAtLocation(node.expression));
+        if (status !== undefined) errors.add(status);
+      }
+      ts.forEachChild(node, visit);
+    };
+    if (method.body !== undefined) ts.forEachChild(method.body, visit);
+    const [only] = success;
+    return {
+      ...(success.size === 1 && only !== undefined && only !== 200 && only !== -1 ? { status: only } : {}),
+      errors: [...errors].sort((a, b) => a - b),
+    };
+  };
+
+  /** Status of an HttpError subclass by its class chain (`class TaskNotFound extends NotFoundError`). */
+  const httpErrorStatus = (type: ts.Type): number | undefined => {
+    let current: ts.Type | undefined = type;
+    for (let depth = 0; current !== undefined && depth < 16; depth += 1) {
+      const name = current.getSymbol()?.getName();
+      if (name !== undefined && ERROR_CLASS_STATUS[name] !== undefined) return ERROR_CLASS_STATUS[name];
+      current = current.isClass() ? checker.getBaseTypes(current)[0] : undefined;
     }
-    return method.type ? responseSchemaFromType(method.type) : undefined;
+    return undefined;
+  };
+
+  const responseSchemaFromMethod = (method: ts.MethodDeclaration): OpenApiCodegenSchema | undefined => {
+    // A declared return type is the contract; result-helper types
+    // (HttpResult, Response) carry no schema and fall back to the returns.
+    const declared = method.type ? responseSchemaFromType(method.type) : undefined;
+    return declared ?? responseSchemaFromReturnExpressions(method);
   };
 
   const schemaFromTypeNode = (node: ts.TypeNode): OpenApiCodegenSchema => {
@@ -418,21 +520,28 @@ export function createOpenApiCodegenAnalyzer(input: OpenApiCodegenAnalyzerInput)
   return {
     schemaFromMembers,
     schemaFromDeclaration(declaration) {
-      if (!declaration.heritageClauses?.some(clause => clause.token === ts.SyntaxKind.ExtendsKeyword)) {
-        return schemaFromMembers(declaration.members, ts.isClassDeclaration(declaration) ? "class" : "interface");
-      }
-      // Effective instance properties include imported and indirect base classes.
-      // Keep original property declarations so their Validator rules remain visible.
-      const properties = checker.getPropertiesOfType(checker.getTypeAtLocation(declaration));
-      const members = properties.flatMap(property => {
-        const member = property.valueDeclaration ?? property.declarations?.[0];
-        return member !== undefined && (ts.isPropertyDeclaration(member) || ts.isPropertySignature(member)) ? [member] : [];
-      });
-      return schemaFromMembers(members, ts.isClassDeclaration(declaration) ? "class" : "interface");
+      const schema = schemaFromDeclarationMembers(declaration);
+      const description = declaration.name === undefined ? undefined : documentationOf(declaration.name);
+      return description === undefined ? schema : { description, ...schema };
     },
     schemaNameForDeclaration,
     responseSchemaFromMethod,
+    operationFromMethod,
   };
+
+  function schemaFromDeclarationMembers(declaration: ts.ClassDeclaration | ts.InterfaceDeclaration): OpenApiCodegenSchema {
+    if (!declaration.heritageClauses?.some(clause => clause.token === ts.SyntaxKind.ExtendsKeyword)) {
+      return schemaFromMembers(declaration.members, ts.isClassDeclaration(declaration) ? "class" : "interface");
+    }
+    // Effective instance properties include imported and indirect base classes.
+    // Keep original property declarations so their Validator rules remain visible.
+    const properties = checker.getPropertiesOfType(checker.getTypeAtLocation(declaration));
+    const members = properties.flatMap(property => {
+      const member = property.valueDeclaration ?? property.declarations?.[0];
+      return member !== undefined && (ts.isPropertyDeclaration(member) || ts.isPropertySignature(member)) ? [member] : [];
+    });
+    return schemaFromMembers(members, ts.isClassDeclaration(declaration) ? "class" : "interface");
+  }
 }
 
 function collectSchemaNameIndex(sourceFiles: readonly ts.SourceFile[]): Map<string, Set<string>> {

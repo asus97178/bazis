@@ -136,6 +136,24 @@ merged into one operation, the intersection of allowed fields is published: any 
 these versions accepts every offered field. There are no new DI registrations.
 Regressions: [openApi.sort-contract.test.ts](test/openApi.sort-contract.test.ts).
 
+## Statuses, errors and JSDoc in OpenAPI (2026-10-09, 0.98.6)
+
+Codegen (`library/openapi/codegen.ts`, `operationFromMethod`) records per action, in the
+existing generated OpenAPI metadata: the success `status` when every success `return`
+uses the same result helper (`Created` → 201, `Accepted` → 202, `NoContent` → 204,
+`StatusCode(2xx)`), the `errors` returned (`NotFound(...)`, `StatusCode(4xx)`) or thrown
+(`throw new NotFoundError()` and subclasses, by class chain) in the method body, and the
+method JSDoc (`summary` — first line, `description` — the rest). A declared return type
+is the response schema; result-helper types carry none and fall back to the returns.
+Class, interface and property JSDoc become schema `description`s.
+
+`openApiDocument.ts` builds the status as `@HttpCode` → generated status → method
+default, adds `400` for body/list/query/typed route bindings, `401`/`403` under
+`@Authorize`, and references the shared `HttpErrorResponse` schema — the body the
+error handler writes. Errors thrown by called services are not visible to the analysis.
+Old generated metadata without these fields keeps the previous document.
+Regressions: [openapi-accuracy.integration.test.ts](../scripts/test/openapi-accuracy.integration.test.ts).
+
 ## Rate limiting before DTO checks (2026-10-02)
 
 Server/controller/action middleware runs before DTO binding. The limiter is
