@@ -150,7 +150,7 @@ startImport() { return { queued: true }; }
 | `consumes` | Обязательный `Content-Type` запроса для методов с телом |
 | `maxBodySize` | Предельный размер тела, например `"4mb"` |
 | `middleware` | Middleware только для этого метода |
-| `version` | Версия API метода |
+| `version` | Версия API метода — см. [Версионирование API](../http/versioning.md) |
 
 ## Дальше
 

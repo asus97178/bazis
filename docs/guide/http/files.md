@@ -143,4 +143,4 @@ GET /files/report.txt            → 200
 
 - [Ответы](../overview/responses.md)
 - [Маршрутизация и привязка параметров](routing.md)
-- Версионирование API *(в работе)*
+- [Версионирование API](versioning.md)
