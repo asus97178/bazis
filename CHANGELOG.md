@@ -4,6 +4,19 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.8 — 2026-10-09
+
+### Fixed
+
+- Error responses carry the correlation id: with
+  `createCorrelationIdMiddleware()` among the global `middleware`, a `401`/`403`
+  from `@Authorize`, a thrown `NotFoundError` or other `HttpError`, and a `500`
+  have `x-request-id`. Before (also in 0.98.7), the error handler built these
+  responses outside the correlation middleware, so only successful and
+  pre-routing responses had the header. The correlation middleware now wraps
+  the error handler; its position among the other global middleware no
+  longer matters.
+
 ## 0.98.7 — 2026-10-09
 
 ### Fixed

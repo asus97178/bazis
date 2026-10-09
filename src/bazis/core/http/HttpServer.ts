@@ -154,6 +154,12 @@ export class HttpServer implements HostedService {
     if (this.options.securityHeaders !== false) {
       serverChain.push(securityHeaders(this.options.securityHeaders ?? {}));
     }
+    const serverMiddleware = this.collectServerMiddleware();
+    // A global correlation middleware wraps the error boundary, so error
+    // responses (401, 403, 500, a thrown NotFoundError) and the responses
+    // produced before routing (404, 405, 413, preflight, docs, health) carry
+    // the request id, and the error log line runs inside its request context.
+    serverChain.push(...serverMiddleware.filter(isCorrelationIdMiddleware));
     // Unexpected errors go to the application logger, like the access log.
     const errorLogger = this.resolver.tryResolve(LOGGER);
     serverChain.push(
@@ -164,13 +170,10 @@ export class HttpServer implements HostedService {
         onUnexpectedError: this.collectErrorHook(),
       }),
     );
-    const serverMiddleware = this.collectServerMiddleware();
-    // Responses produced before routing (404, 405, 413, preflight, docs,
-    // health) still carry the correlation id of a global correlation middleware.
-    this.shortCircuitChain = [...serverChain, ...serverMiddleware.filter(isCorrelationIdMiddleware)];
+    this.shortCircuitChain = [...serverChain];
     // A global `cors()` among the middleware answers preflights like `cors`.
     this.globalCors = this.options.cors || serverMiddleware.map(corsOptionsOf).find((options) => options !== undefined);
-    serverChain.push(...serverMiddleware);
+    serverChain.push(...serverMiddleware.filter((middleware) => !isCorrelationIdMiddleware(middleware)));
 
     const builder = new RouterBuilder(
       serverChain,
