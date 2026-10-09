@@ -25,12 +25,28 @@ export interface HttpOpenApiDocumentBuildInput {
   readonly version: string;
 }
 
+/** Body of every error response: `{ "error": "...", "details": ... }` (see Middleware/errorHandler). */
+const ERROR_SCHEMA_NAME = "HttpErrorResponse";
+const ERROR_SCHEMA: OpenApiSchema = {
+  type: "object",
+  description: "Error response of the bazis HTTP server.",
+  properties: {
+    error: { type: "string", description: "Human-readable error message." },
+    details: { description: "Error details, for example the list of validation errors." },
+  },
+  required: ["error"],
+};
+const ERROR_DESCRIPTIONS: Readonly<Record<number, string>> = {
+  400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict",
+  413: "Payload Too Large", 415: "Unsupported Media Type", 429: "Too Many Requests",
+};
+
 export function buildHttpOpenApiDocument(input: HttpOpenApiDocumentBuildInput): OpenApiSchema {
   const generated = getGeneratedOpenApiMetadata(input.controllers);
   const documentInput: LibraryOpenApiDocumentBuildInput = {
     title: input.title,
     version: input.version,
-    schemas: generated.schemas,
+    schemas: { [ERROR_SCHEMA_NAME]: ERROR_SCHEMA, ...generated.schemas },
     operations: collectOpenApiOperations(input, generated),
     generatedBy: "bazis:di-generate",
   };
@@ -89,16 +105,18 @@ function createOperation(input: CreateOperationInput): OpenApiCatalogOperation {
   const version = input.action.version ?? input.meta.version;
   const auth = resolveAuthorizeMeta(input.controllerClass, input.methodName);
   const generatedOperation = input.generated.operations[input.controllerClass.name]?.[methodName];
-  const status = String(successStatus(input.httpMethod, input.action));
+  const status = String(successStatus(input.httpMethod, input.action, generatedOperation?.status));
   const responseSchema = generatedOperation?.response;
   const contentType = input.action.produces ?? "application/json";
+  const authorized = !auth.allowAnonymous && auth.authorize !== undefined;
 
   return {
     path: input.path,
     httpMethod: input.httpMethod,
     tag: tagName(input.meta, input.controllerClass),
     operationId: stableHttpOperationId(input.httpMethod, input.path),
-    summary: `${normalizedMethod(input.httpMethod)} ${input.path}`,
+    summary: generatedOperation?.summary ?? `${normalizedMethod(input.httpMethod)} ${input.path}`,
+    ...(generatedOperation?.description !== undefined ? { description: generatedOperation.description } : {}),
     parameters: collectParameters(
       input.bindings,
       input.versioning,
@@ -117,8 +135,9 @@ function createOperation(input: CreateOperationInput): OpenApiCatalogOperation {
             },
           }
         : { description: "Success" },
+      ...errorResponses(errorStatuses(input.bindings, authorized, generatedOperation?.errors)),
     },
-    authorized: !auth.allowAnonymous && auth.authorize !== undefined,
+    authorized,
     ...(version !== undefined ? { versions: [version] } : {}),
   };
 }
@@ -305,11 +324,42 @@ function schemaForConstraint(constraint: string | undefined): OpenApiSchema {
   }
 }
 
-function successStatus(method: string, action: ActionMeta): number {
-  if (action.httpCode !== undefined) {
-    return action.httpCode;
+function successStatus(method: string, action: ActionMeta, generated: number | undefined): number {
+  return action.httpCode ?? generated ?? (method === "DELETE" ? 204 : 200);
+}
+
+/**
+ * Errors the operation can answer with: 400 when the request carries values
+ * that are converted or validated (body, list query, query, typed route
+ * parameters), 401/403 under @Authorize, and the errors the method body
+ * returns or throws itself.
+ */
+function errorStatuses(
+  bindings: readonly ParameterBinding[],
+  authorized: boolean,
+  generated: readonly number[] | undefined,
+): number[] {
+  const statuses = new Set(generated ?? []);
+  const validated = bindings.some((binding) =>
+    binding.source === "body" || binding.source === "list" || binding.source === "query"
+    || (binding.source === "route" && binding.type !== undefined && binding.type !== "string"));
+  if (validated) statuses.add(400);
+  if (authorized) {
+    statuses.add(401);
+    statuses.add(403);
   }
-  return method === "DELETE" ? 204 : 200;
+  return [...statuses].sort((a, b) => a - b);
+}
+
+function errorResponses(statuses: readonly number[]): Record<string, OpenApiSchema> {
+  const responses: Record<string, OpenApiSchema> = {};
+  for (const status of statuses) {
+    responses[String(status)] = {
+      description: ERROR_DESCRIPTIONS[status] ?? "Error",
+      content: { "application/json": { schema: { $ref: `#/components/schemas/${ERROR_SCHEMA_NAME}` } } },
+    };
+  }
+  return responses;
 }
 
 function tagName(meta: ControllerMeta, controllerClass: Class<object>): string {

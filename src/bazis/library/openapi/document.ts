@@ -4,6 +4,7 @@ type OpenApiOperation = {
   tags: string[];
   operationId: string;
   summary: string;
+  description?: string;
   parameters?: OpenApiParameter[];
   requestBody?: OpenApiSchema;
   responses: Record<string, OpenApiSchema>;
@@ -152,6 +153,9 @@ function operationFromCatalog(item: OpenApiCatalogOperation): OpenApiOperation {
     summary: item.summary ?? `${normalizedMethod(item.httpMethod)} ${item.path}`,
     responses: { ...item.responses },
   };
+  if (item.description !== undefined) {
+    operation.description = item.description;
+  }
   const parameters = mergeParameters(item.parameters ?? []);
   if (parameters.length > 0) {
     operation.parameters = parameters;

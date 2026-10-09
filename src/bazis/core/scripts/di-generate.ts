@@ -1360,8 +1360,7 @@ function collectOpenApiOperation(controllerName: string, method: ts.MethodDeclar
   if (!ts.isIdentifier(method.name)) {
     return;
   }
-  const response = openApiCodegen.responseSchemaFromMethod(method);
-  (openApiOperations[controllerName] ??= {})[method.name.text] = response === undefined ? {} : { response };
+  (openApiOperations[controllerName] ??= {})[method.name.text] = openApiCodegen.operationFromMethod(method);
 }
 
 /** True if the class has an `extends ListRequest` (with or without type args). */

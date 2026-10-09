@@ -2,6 +2,14 @@ export type OpenApiSchema = Readonly<Record<string, unknown>>;
 
 export interface GeneratedOpenApiOperationMetadata {
   readonly response?: OpenApiSchema;
+  /** Success status from the method's result helpers (`Created` -> 201). */
+  readonly status?: number;
+  /** Error statuses returned or thrown in the method body. */
+  readonly errors?: readonly number[];
+  /** First line of the method's JSDoc. */
+  readonly summary?: string;
+  /** The rest of the method's JSDoc. */
+  readonly description?: string;
 }
 
 export interface GeneratedOpenApiMetadata {
@@ -53,6 +61,7 @@ export interface OpenApiCatalogOperation {
   readonly tag: string;
   readonly operationId: string;
   readonly summary?: string;
+  readonly description?: string;
   readonly parameters?: readonly OpenApiParameter[];
   readonly requestBody?: OpenApiSchema;
   readonly responses: Readonly<Record<string, OpenApiSchema>>;
