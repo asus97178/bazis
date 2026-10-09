@@ -229,5 +229,5 @@ export class OrderLine { ... }
 ## Дальше
 
 - [Подключение PostgreSQL](postgresql.md)
-- `DbContext` и `DbSet` *(в работе)*
+- [`DbContext` и `DbSet`](dbcontext.md)
 - Управление схемой *(в работе)*

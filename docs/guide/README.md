@@ -58,7 +58,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 - ✅ [Подключение PostgreSQL](database/postgresql.md) — настройки, `@Infra`, ошибки подключения, TLS, пул и тайм-ауты
 - ✅ [Сущности и ключи](database/entities.md) — таблицы, типы столбцов и NULL, ключи и UUID v7, индексы, `@Check`
-- ⏳ `DbContext` и `DbSet`
+- ✅ [`DbContext` и `DbSet`](database/dbcontext.md) — контекст модуля, время жизни, несколько модулей, методы `DbSet`, сырой SQL
 - ⏳ Запросы
 - ⏳ Сохранение и отслеживание изменений
 - ⏳ Транзакции
