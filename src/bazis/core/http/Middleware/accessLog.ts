@@ -7,7 +7,7 @@ export interface AccessLogEntry {
   readonly method: string;
   readonly path: string;
   readonly status: number;
-  /** Wall-clock time spent in the pipeline, in milliseconds. */
+  /** Wall-clock time spent in the pipeline, in milliseconds, rounded to 0.01. */
   readonly durationMs: number;
   /** Correlation id from {@link createCorrelationIdMiddleware}, if present. */
   readonly requestId?: string;
@@ -73,7 +73,7 @@ export function accessLog(options: AccessLogOptions = {}): HttpMiddleware {
             method: ctx.method,
             path: ctx.path,
             status: ctx.response?.status ?? 0,
-            durationMs: performance.now() - startedAt,
+            durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
             ...(typeof requestId === "string" ? { requestId } : {}),
           });
         }

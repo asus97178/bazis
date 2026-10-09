@@ -4,6 +4,25 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.7 — 2026-10-09
+
+### Fixed
+
+- `cors()` on a controller or a method answers CORS preflights of its routes:
+  `@Middleware(cors({ origin: "*" }))` makes `OPTIONS` with
+  `Access-Control-Request-Method` answer `204` with the CORS headers. Before,
+  the preflight got `405 Method Not Allowed`, so a browser could not send a
+  JSON `POST` or an `Authorization` header to such a route. A method's `cors()`
+  wins over the controller's; a `cors()` among the global `middleware` answers
+  every preflight like the `cors` option. Routes without `cors()` keep their
+  previous answer.
+- A `createCorrelationIdMiddleware()` among the global `middleware` also
+  covers the responses the server produces before routing — `404`, `405`,
+  `413`, preflights, docs and health: they carry `x-request-id`, and their
+  access log lines carry `requestId`. Before, only routed requests had it.
+- Access log `durationMs` is rounded to 0.01 ms (`1.31`, not
+  `1.3119999999999834`), in the log line fields and in custom `log` sinks.
+
 ## 0.98.6 — 2026-10-09
 
 ### Fixed

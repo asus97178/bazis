@@ -6,6 +6,7 @@ import { controllerMetaOf, type ActionMeta, type ControllerMeta } from "../Decor
 import { HttpSetupError } from "../Errors/HttpError";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import type { ActionFilterHooks, HttpMiddleware } from "../Middleware/types";
+import { corsOptionsOf } from "../Middleware/cors";
 import { normalizeResult } from "../Results/normalize";
 import type { ApiVersioningOptions, RouteMiddlewareComposer } from "../options";
 import { createAuthorizeComposer } from "../Authorization/authorizeComposer";
@@ -84,6 +85,7 @@ export class RouterBuilder {
         version,
         name: `${controllerClass.name}.${String(methodName)}`,
         maxBodyBytes: action.maxBodyBytes,
+        cors: routeCors(meta, action),
       };
       for (const declaration of action.routes) {
         const versionSegment = useUrlVersioning && version !== undefined ? `v${version}` : undefined;
@@ -192,6 +194,19 @@ export class RouterBuilder {
  * but has no bindings was most likely added or changed after the last codegen:
  * its arguments would silently get wrong values, so the server refuses to start.
  */
+/** The action's own `cors()` wins over the controller's. */
+function routeCors(meta: ControllerMeta, action: ActionMeta): ReturnType<typeof corsOptionsOf> {
+  for (const middleware of [...action.middleware].reverse()) {
+    const options = corsOptionsOf(middleware);
+    if (options !== undefined) return options;
+  }
+  for (const middleware of [...meta.middleware].reverse()) {
+    const options = corsOptionsOf(middleware);
+    if (options !== undefined) return options;
+  }
+  return undefined;
+}
+
 function assertBindingsFresh(
   controllerClass: Class<object>,
   methodName: string | symbol,

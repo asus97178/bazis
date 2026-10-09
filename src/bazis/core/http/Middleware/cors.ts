@@ -22,6 +22,14 @@ export interface CorsOptions {
 
 const DEFAULT_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"] as const;
 
+/** Options of a middleware created by {@link cors}; the server answers preflights with them. */
+const CORS_OPTIONS = Symbol("bazis:http:cors-options");
+
+/** Options of a {@link cors} middleware, or undefined for any other middleware. */
+export function corsOptionsOf(middleware: HttpMiddleware): CorsOptions | undefined {
+  return (middleware as HttpMiddleware & { [CORS_OPTIONS]?: CorsOptions })[CORS_OPTIONS];
+}
+
 function assertSafeCorsOptions(options: CorsOptions): void {
   if (!options.credentials) {
     return;
@@ -119,12 +127,14 @@ export function preflightResponse(options: CorsOptions, request: Request): Respo
 
 /**
  * CORS middleware: adds response headers for cross-origin requests.
- * Use globally via `httpModule({ cors })` (which also answers preflights)
- * or per controller/route via `@Middleware(cors({...}))`.
+ * Use globally via `httpModule({ cors })` or per controller/route via
+ * `@Middleware(cors({...}))`. Either way the server answers preflights
+ * (`OPTIONS` with `Access-Control-Request-Method`) with these options: a
+ * route's own `cors()` applies to preflights of that route.
  */
 export function cors(options: CorsOptions = {}): HttpMiddleware {
   assertSafeCorsOptions(options);
-  return async (ctx, next) => {
+  const middleware: HttpMiddleware = async (ctx, next) => {
     await next();
     const requestOrigin = ctx.header("origin");
     if (!ctx.response) {
@@ -157,4 +167,6 @@ export function cors(options: CorsOptions = {}): HttpMiddleware {
       }
     }
   };
+  Object.defineProperty(middleware, CORS_OPTIONS, { value: options });
+  return middleware;
 }
