@@ -420,3 +420,34 @@ covers an owned store with a v7 key and a uuid foreign key (admission, saving,
 exact replay); it runs only against a dedicated `bazis_v7_*` database with
 `BAZIS_OWNED_STORE_V7_LIVE=1`. It passed on PostgreSQL 17 in a throwaway local
 container, together with the existing `orm.owned-store.core.postgres.live.test.ts`.
+
+## 13. ensureCreated with versioned migrations (2026-10-10)
+
+`ormBazis: { ensureCreated: true, migrations, runMigrationsOnStart: true }` is
+allowed since 0.98.21; before it was rejected as mutually exclusive, so a change
+that `ensureCreated` refuses (a column type, a rename, a data move) had no
+in-framework path. `ensureCreated` + `migrateOnStart` stays rejected.
+
+`DatabaseFacade.ensureCreatedWithMigrations(migrations)` runs under the
+migration advisory lock (session-reentrant, so the nested `MigrationRunner`
+calls reuse it and concurrent starts do not race):
+
+- none of the context tables exist (introspection, the same lookup as
+  `SchemaDiffer`): `ensureCreated` creates the current model, then
+  `MigrationRunner.baseline()` records every pending migration as applied
+  without running it. The model already contains their result; running an
+  `ALTER` on a table that does not exist yet would fail. A seed `INSERT` in a
+  migration is skipped on such a database as well, so initial data does not
+  belong in migrations;
+- otherwise pending migrations run first, each in its own transaction, then
+  `ensureCreated` adds the remaining safe changes and exact-verifies.
+
+`OrmLifecycle` keeps phase -105 and no legacy schema authority for this
+combination, so other modules may use plain `ensureCreated`; mixing with
+`migrateOnStart` or migrations without `ensureCreated` in another module is
+still rejected by the hosted-plan validator. Checks:
+[orm.ensure-created-migrations.postgres.live.test.ts](test/orm.ensure-created-migrations.postgres.live.test.ts)
+covers the baseline, the existing-database order, three racing starts and a
+failed migration;
+[orm.schema-plan-messages.test.ts](../../core/orm/test/orm.schema-plan-messages.test.ts)
+covers the module options and the hosted plan.

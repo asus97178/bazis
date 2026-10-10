@@ -1,6 +1,6 @@
 import { ormHostedPlanValidator } from "./OrmHostedPlan.validator";
 import type { HostedService } from "../di";
-import { DatabaseFacade, type DbContextOptions, type Migration } from "../../library/orm";
+import { DatabaseFacade, type DbContextOptions, type EnsureCreatedWithMigrationsResult, type Migration } from "../../library/orm";
 import { compileExpectedSchema } from "../../library/orm/Schema/ExpectedSchema";
 
 /**
@@ -29,6 +29,8 @@ export class OrmLifecycle implements HostedService {
   };
   /** Internal hosted-plan marker: the context and its startup schema mode, for readable plan errors. */
   readonly __bazisSchemaOwner: { readonly context: string; readonly mode: string };
+  /** `ensureCreated` owns the versioned migrations of this context (run or baselined before the check). */
+  private readonly withMigrations: boolean;
   private connectionClosed = false;
   private closePromise?: Promise<void>;
 
@@ -48,6 +50,7 @@ export class OrmLifecycle implements HostedService {
     contextName = "DbContext",
   ) {
     const modes = [ensureCreated && "ensureCreated", migrateOnStart && "migrateOnStart", runMigrationsOnStart && migrations.length > 0 && "migrations"].filter(Boolean);
+    this.withMigrations = ensureCreated && runMigrationsOnStart && migrations.length > 0;
     this.__bazisSchemaOwner = Object.freeze({ context: contextName, mode: modes.join(" + ") || "none" });
     this.phase = ensureCreated && options.provider.name === "postgres" ? -105 : -100;
     this.__bazisLegacySchemaAuthority = this.phase === -100 && (ensureCreated || migrateOnStart || (runMigrationsOnStart && migrations.length > 0));
@@ -72,9 +75,16 @@ export class OrmLifecycle implements HostedService {
     const database = new DatabaseFacade(this.options.provider, this.options.model);
     try {
       if (this.ensureCreated) {
-        const result = await database.ensureCreated();
+        const result: Partial<EnsureCreatedWithMigrationsResult> & Pick<EnsureCreatedWithMigrationsResult, "warnings"> = this.withMigrations ? await database.ensureCreatedWithMigrations(this.migrations) : await database.ensureCreated();
+        // Logged in execution order: migrations, schema changes, then the baseline record.
+        if (result.migrated && result.migrated.length > 0) {
+          console.info(`[orm:migrations] applied: ${result.migrated.join(", ")}`);
+        }
         if (result.applied && result.applied.length > 0) {
           console.info(`[orm:schema] applied ${result.applied.length} operation(s): ${result.applied.join(", ")}`);
+        }
+        if (result.baselined && result.baselined.length > 0) {
+          console.info(`[orm:migrations] baseline: the schema was created from the model, recorded as applied without running: ${result.baselined.join(", ")}`);
         }
         for (const warning of result.warnings) {
           console.warn(`[orm:schema] ${warning}`);
@@ -89,7 +99,7 @@ export class OrmLifecycle implements HostedService {
           console.warn(`[orm:migrate] ${warning}`);
         }
       }
-      if (this.runMigrationsOnStart && this.migrations.length > 0) {
+      if (this.runMigrationsOnStart && this.migrations.length > 0 && !this.withMigrations) {
         const result = await database.migrateVersioned(this.migrations);
         if (result.applied.length > 0) {
           console.info(`[orm:migrations] applied: ${result.applied.join(", ")}`);

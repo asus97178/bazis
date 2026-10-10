@@ -4,6 +4,24 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.21 — 2026-10-10
+
+### Added
+
+- `ensureCreated` works together with versioned migrations:
+  `ormBazis: { ensureCreated: true, migrations, runMigrationsOnStart: true }`.
+  On an existing database pending migrations run first (a column type change,
+  a rename, a data move), then `ensureCreated` adds the remaining safe changes
+  and verifies the schema. On a database without the context tables
+  `ensureCreated` creates the current model and records the migrations as
+  applied without running them (`[orm:migrations] baseline: …`): the model
+  already contains their result. Seed data therefore does not belong in
+  migrations. Before, the combination was rejected with `ensureCreated is
+  mutually exclusive with ORM migration startup options.`
+  `DatabaseFacade.ensureCreatedWithMigrations(migrations)` does the same from
+  code. `ensureCreated` with `migrateOnStart` is still rejected, now with the
+  reason.
+
 ## 0.98.20 — 2026-10-10
 
 ### Fixed

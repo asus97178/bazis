@@ -50,7 +50,7 @@ function validateOrmHostedPlan(services: readonly HostedService[]): void {
       const owner = (service as { __bazisSchemaOwner?: { context: string; mode: string } }).__bazisSchemaOwner;
       return owner ? `${owner.context} uses ${owner.mode}` : "a module uses migrateOnStart or migrations";
     };
-    throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", `Schema admission and legacy ORM schema authority cannot be composed together: ${[...strict, ...legacy].map(describe).join(", ")}. Use one schema mode in the application: ensureCreated in every module, or migrateOnStart/migrations in every module.`);
+    throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", `Schema admission and legacy ORM schema authority cannot be composed together: ${[...strict, ...legacy].map(describe).join(", ")}. Use one schema mode in the application: ensureCreated (with or without migrations) in every module, or migrateOnStart/migrations without ensureCreated in every module.`);
   }
   for (const service of services) {
     const framework = isOrmProviderLifecycle(service)

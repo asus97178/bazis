@@ -5,6 +5,15 @@ import { Migrator, type MigrationResult } from "./Schema/Migrator";
 import { MigrationRunner, type Migration, type VersionedMigrationResult } from "./Schema/MigrationRunner";
 import { SchemaDiffer } from "./Schema/SchemaDiffer";
 import { SchemaAdmissionEngine, type EnsureCreatedResult } from "./Schema/SchemaAdmission";
+import { entityStorageKey } from "./Schema/tableKey";
+
+/** Result of `ensureCreated` together with versioned migrations. */
+export interface EnsureCreatedWithMigrationsResult extends EnsureCreatedResult {
+  /** Migrations run before the schema check. */
+  readonly migrated: readonly string[];
+  /** Migrations recorded as applied without running, because the schema was created from the model. */
+  readonly baselined: readonly string[];
+}
 import { SchemaAdmissionError } from "./errors";
 import { physicalColumnTypes } from "./Schema/physicalColumnTypes";
 import { bindResolvedForeignKey } from "./Providers/resolvedForeignKey";
@@ -45,6 +54,32 @@ export class DatabaseFacade {
       }
     }
     return { warnings: [] };
+  }
+
+  /**
+   * `ensureCreated` with versioned migrations, under the migration lock so that
+   * starting instances do not race:
+   *
+   * - none of the context tables exist yet: `ensureCreated` creates the current
+   *   model and the migrations are recorded as applied without running (a
+   *   baseline: the model already contains their result, so a seed `INSERT` in
+   *   a migration is skipped here too);
+   * - otherwise pending migrations run first (`ALTER`, renames, data moves),
+   *   then `ensureCreated` adds what is still missing and verifies the result.
+   */
+  async ensureCreatedWithMigrations(migrations: readonly Migration[]): Promise<EnsureCreatedWithMigrationsResult> {
+    const work = async (): Promise<EnsureCreatedWithMigrationsResult> => {
+      const runner = new MigrationRunner(this.provider, migrations);
+      const existing = await this.provider.introspect();
+      const fresh = this.models.entities.every((model) => !existing.tables.has(entityStorageKey(model)) && !existing.tables.has(model.tableName));
+      if (fresh) {
+        const created = await this.ensureCreated();
+        return { ...created, migrated: [], baselined: await runner.baseline() };
+      }
+      const { applied } = await runner.migrate();
+      return { ...(await this.ensureCreated()), migrated: applied, baselined: [] };
+    };
+    return this.provider.withMigrationLock ? this.provider.withMigrationLock(work) : work();
   }
 
   /**

@@ -121,7 +121,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
     attachOwnedStoreRegistration(module, buildConfig.context, buildConfig.entities ?? [], config.ownedStore);
     return module;
   }
-  if (config.ensureCreated && (config.migrateOnStart || config.runMigrationsOnStart || (config.migrations?.length ?? 0) > 0)) throw new OrmError("ensureCreated is mutually exclusive with ORM migration startup options.");
+  if (config.ensureCreated && config.migrateOnStart) throw new OrmError("ensureCreated and migrateOnStart are mutually exclusive: ensureCreated already adds the safe changes. Put other changes into migrations with runMigrationsOnStart: true.");
   if (config.ensureCreated && config.provider?.name === "postgres" && config.context) throw new OrmError("PostgreSQL ensureCreated requires the shared DATABASE_PROVIDER from @Infra.");
   // "Connection" mode: a provider only, no context.
   if (!config.context) {

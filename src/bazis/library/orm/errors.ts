@@ -33,7 +33,7 @@ export class SchemaMigrationRequiredError extends SchemaAdmissionError {
 
 function schemaVerificationMessage(summary: string, verification: SchemaVerificationResult): string {
   return [summary, formatSchemaDifferences(verification),
-    "Check the application version and target database. Align the ORM model and database schema; apply an explicit migration if a database change is intended.",
+    "Check the application version and target database. Align the ORM model and database schema; apply an explicit migration if a database change is intended (with ensureCreated: add it to the module's migrations with runMigrationsOnStart: true).",
   ].filter(Boolean).join("\n");
 }
 

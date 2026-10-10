@@ -61,6 +61,27 @@ export class MigrationRunner {
     return { applied, rolledBack: [] };
   }
 
+  /**
+   * Records pending migrations as applied without running them. Used when the
+   * schema was just created from the current model, which already contains
+   * their result.
+   */
+  async baseline(): Promise<readonly string[]> {
+    return this.withMigrationLock(async () => {
+      await this.ensureHistory();
+      const appliedSet = await this.loadApplied();
+      const recorded: string[] = [];
+      for (const migration of this.migrations.filter((item) => !appliedSet.has(item.id))) {
+        await this.provider.execute(
+          `INSERT INTO ${this.quote(HISTORY_TABLE)} (${this.quote("MigrationId")}, ${this.quote("AppliedAt")}) VALUES (${this.param(0)}, ${this.param(1)})`,
+          [migration.id, new Date().toISOString()],
+        );
+        recorded.push(migration.id);
+      }
+      return recorded;
+    });
+  }
+
   /** Rolls back the last `steps` migrations (requires `down`). */
   async rollback(steps = 1): Promise<VersionedMigrationResult> {
     if (!Number.isSafeInteger(steps) || steps < 0) {

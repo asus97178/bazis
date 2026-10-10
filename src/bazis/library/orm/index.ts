@@ -132,6 +132,7 @@ export type {
 } from "./Schema/introspection";
 export type { SchemaDifferenceCode, SafeSchemaDescriptor, SchemaDifference, SchemaVerificationResult } from "./Schema/ExactSchemaVerifier";
 export type { EnsureCreatedResult } from "./Schema/SchemaAdmission";
+export type { EnsureCreatedWithMigrationsResult } from "./DatabaseFacade";
 export { SchemaAdmissionError, SchemaMigrationRequiredError, SchemaVerificationError } from "./errors";
 export type { SchemaAdmissionErrorCode } from "./errors";
 export { compileCheck, renderCheck } from "./Schema/CheckExpression";
