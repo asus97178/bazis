@@ -138,11 +138,15 @@ export class OrmDatabaseTimeError extends OrmError {
 
 /** Immediate DML is deliberately isolated from tracked state. */
 export class OrmTrackedMutationConflictError extends OrmError {
-  constructor() { super("Immediate ORM mutation conflicts with tracked entities."); }
+  constructor(entityName?: string) {
+    super(entityName === undefined
+      ? "Immediate ORM mutation conflicts with tracked entities."
+      : `Immediate ORM mutation conflicts with tracked entities: this context tracks "${entityName}" entities (loaded with tracking or saved through saveChanges()), which the mutation would make stale. Load them with .asNoTracking(), or run the mutation in a separate DbContext.`);
+  }
 }
 /** Immediate DML accepts only the small, closed descriptor-safe input domain. */
 export class OrmUnsafeImmediateMutationError extends OrmError {
-  constructor() { super("Immediate ORM mutation input is unsafe or unsupported."); }
+  constructor(reason?: string) { super(reason === undefined ? "Immediate ORM mutation input is unsafe or unsupported." : `Immediate ORM mutation input is unsafe or unsupported: ${reason}.`); }
 }
 /** INSERT ON CONFLICT may name only an exactly declared unique target. */
 export class OrmUndeclaredConflictTargetError extends OrmError {

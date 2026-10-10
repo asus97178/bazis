@@ -220,18 +220,19 @@ test("insert count matrix and physical aliases are exact", async () => {
   for (const changes of [0, 1]) { const log: { sql: string; params: readonly unknown[] }[] = []; const base = provider(log); const db = new Context({ ...base, execute: async (sql, params) => { log.push({ sql, params }); return { changes, lastInsertId: 0 }; } }); const result = await db.rows.insertIfAbsent(Object.assign(new RowEntity(), { id: 1, name: "alias", note: null }), { conflictBy: x => [x.id] }); expect(result.inserted).toBe(changes === 1); expect(Object.isFrozen(result)).toBe(true); expect(log[0]).toEqual({ sql: 'INSERT INTO "immediate_rows" ("id", "name", "note") VALUES ($1, $2, $3) ON CONFLICT ("id") DO NOTHING', params: [1, "alias", null] }); }
   for (const changes of [2, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) { const base = provider([]); const db = new Context({ ...base, execute: async () => ({ changes, lastInsertId: 0 }) }); await expect(db.rows.insertIfAbsent(Object.assign(new RowEntity(), { id: 1, name: "bad", note: null }), { conflictBy: x => [x.id] })).rejects.toBeInstanceOf(OrmError); }
 });
-test("update admission rejects empty symbols undefined null generated and unknown before SQL", async () => {
+test("update admission rejects empty symbols undefined generated and unknown before SQL", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); const query = db.rows.asNoTracking().where(x => x.id.eq(1));
-  const symbol = Symbol("field"); const cases: unknown[] = [{}, { name: undefined }, { name: null }, { id: 2 }, { unknown: "x" }, Object.assign(Object.create(null), { [symbol]: "x" }), new Proxy({ name: "x" }, {})];
+  const symbol = Symbol("field"); const cases: unknown[] = [{}, { name: undefined }, { id: 2 }, { unknown: "x" }, Object.assign(Object.create(null), { [symbol]: "x" }), new Proxy({ name: "x" }, {})];
   for (const values of cases) await expect(query.executeUpdate(values as never)).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError);
   expect(log).toEqual([]);
 });
 test("insert admission rejects missing undefined required-null accessors symbols proxies and unsafe options", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); const valid = () => Object.assign(new RowEntity(), { id: 1, name: "n", note: null });
   const missing = Object.assign(new RowEntity(), { id: 1, name: "n" }); delete (missing as { note?: unknown }).note;
-  const undefinedNote = Object.assign(new RowEntity(), { id: 1, name: "n", note: undefined }); const requiredNull = Object.assign(new RowEntity(), { id: null, name: "n", note: null });
+  const undefinedNote = Object.assign(new RowEntity(), { id: 1, name: "n", note: undefined });
   const accessor = valid(); Object.defineProperty(accessor, "name", { enumerable: true, get() { return "hook"; } }); const symbol = Object.assign(valid(), { [Symbol("x")]: 1 });
-  for (const entity of [missing, undefinedNote, requiredNull, accessor, symbol, new Proxy(valid(), {})]) await expect(db.rows.insertIfAbsent(entity as never, { conflictBy: x => [x.id] })).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError);
+  for (const entity of [missing, undefinedNote, accessor, symbol, new Proxy(valid(), {})]) await expect(db.rows.insertIfAbsent(entity as never, { conflictBy: x => [x.id] })).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError);
+  await expect(db.keyRows.insertIfAbsent(Object.assign(new KeyRow(), { tenantKey: null, sequence: 1 }) as never, { conflictBy: x => [x.tenantKey, x.sequence] })).rejects.toThrow('"tenantKey" is required (NOT NULL); got null');
   const options = Object.create(null); Object.defineProperty(options, "conflictBy", { enumerable: true, get() { return () => []; } }); await expect(db.rows.insertIfAbsent(valid(), options)).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError);
   expect(log).toEqual([]);
 });
@@ -442,11 +443,12 @@ test("ValueConverters.json accepts a dense top-level array clone without touchin
   await db.jsonText.asNoTracking().where(x => x.id.eq(3)).executeUpdate({ payload: input as never }); input.push("later");
   expect(log[0]!.params).toEqual(['["one",{"nested":["two"]}]', 3]);
 });
-test("nullable insert null bypasses converter while update null is unsafe and predicate null counts occurrences", async () => {
+test("nullable insert and update null bypass the converter while predicate null counts occurrences", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); nullableConverterCalls = 0;
-  await expect(db.nullable.asNoTracking().where(x => x.id.eq(1)).executeUpdate({ value: null })).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError); expect(nullableConverterCalls).toBe(0);
   await db.nullable.insertIfAbsent(Object.assign(new NullableConvertedRow(), { id: 2, value: null }), { conflictBy: x => [x.id] }); expect(nullableConverterCalls).toBe(0); expect(log[0]!.params).toEqual([2, null]);
   const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; converterCalls = 0; query.plan = { conditions: [{ kind: "tuples", properties: ["value"], values: [[null], [null]] }], orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] }; await query.executeDelete(); expect(converterCalls).toBe(2); expect(log[1]!.params).toEqual([null, null]);
+  // Like insert, an update to NULL binds SQL NULL without the converter.
+  await db.nullable.asNoTracking().where(x => x.id.eq(1)).executeUpdate({ value: null }); expect(nullableConverterCalls).toBe(0); expect(log[2]!.params).toEqual([null, 1]);
 });
 test("admitted predicate null AST uses zero calls while compare and IN bind each null occurrence", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; const base = { orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] };
@@ -461,7 +463,7 @@ test("requires public asNoTracking for update and delete before any dispatch", a
 });
 test("nullable undefined root null and Operand bags reject before converter or SQL", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); nullableConverterCalls = 0; const query = db.nullable.asNoTracking().where(x => x.id.eq(1));
-  for (const values of [null, { value: undefined }, { value: null }, { value: new Operand("value") }]) await expect(query.executeUpdate(values as never)).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError);
+  for (const values of [null, { value: undefined }, { value: new Operand("value") }]) await expect(query.executeUpdate(values as never)).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError);
   expect(nullableConverterCalls).toBe(0); expect(log).toEqual([]);
 });
 test("complete insert requires convention columns while physical soft-delete remains DELETE", async () => {
@@ -538,4 +540,80 @@ test("throwing native cancel quarantines held dispatch and blocks late inherited
     await expect(scope).rejects.toBeInstanceOf(OrmTransactionScopeError); await expect(operation).rejects.toBeInstanceOf(OrmTransactionScopeError); releaseLate(); await done;
     expect(lateError).toBeInstanceOf(OrmTransactionScopeError); expect({ calls: value.calls(), cancelAttempts, quarantines: value.quarantines(), rootCloses: value.rootCloses(), commits: value.commits(), rollbacks: value.rollbacks(), lateSuccess, state: db.stateOf(unrelated), id: unrelated.id, text: unrelated.value }).toEqual({ calls: 1, cancelAttempts: 1, quarantines: 1, rootCloses: 0, commits: 0, rollbacks: 1, lateSuccess: 0, state: EntityState.Added, id: 77, text: "unrelated" });
   }
+});
+
+@Entity({ table: "immediate_dx_rows" })
+class DxRow {
+  @Key() id = 0;
+  @Column({ type: "text", nullable: false }) title = "";
+  @Index({ unique: true }) @Column({ type: "text" }) slug = "";
+  @Column({ type: "integer" }) views = 0;
+  @Column({ type: "datetime", nullable: true }) publishedAt: Date | null = null;
+  @CreatedAt() createdAt = new Date(0);
+}
+@Entity({ table: "immediate_dx_v7_rows" })
+class DxV7Row { @UUID({ version: "v7" }) id = ""; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+@Entity({ table: "immediate_dx_v4_rows" })
+class DxV4Row { @UUID() id = ""; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+class DxContext extends DbContext {
+  readonly rows = this.set(DxRow); readonly v7 = this.set(DxV7Row); readonly v4 = this.set(DxV4Row);
+  constructor(value: DatabaseProvider) { super(new DbContextOptions({ provider: value, entities: [DxRow, DxV7Row, DxV4Row] })); }
+}
+
+test("immediate mutation errors name the rejected query shape", async () => {
+  const log: { sql: string; params: readonly unknown[] }[] = []; const db = new DxContext(provider(log));
+  const where = () => db.rows.asNoTracking().where(x => x.id.eq(1));
+  await expect(db.rows.where(x => x.id.eq(1)).executeUpdate({ views: 1 })).rejects.toThrow("call .asNoTracking() before executeUpdate()");
+  await expect(db.rows.where(x => x.id.eq(1)).executeDelete()).rejects.toThrow("call .asNoTracking() before executeDelete()");
+  await expect(db.rows.asNoTracking().executeUpdate({ views: 1 })).rejects.toThrow("add .where(...) before executeUpdate(); changing every row of a table is not allowed");
+  await expect(db.rows.asNoTracking().executeDelete()).rejects.toThrow("add .where(...) before executeDelete()");
+  await expect(where().take(1).executeUpdate({ views: 1 })).rejects.toThrow("executeUpdate() does not accept take() or skip()");
+  await expect(where().orderBy(x => x.id).executeDelete()).rejects.toThrow("executeDelete() does not accept orderBy()");
+  await expect(where().forUpdate().executeDelete()).rejects.toThrow("executeDelete() does not accept forUpdate()");
+  expect(log).toEqual([]);
+});
+
+test("immediate update errors name the rejected value", async () => {
+  const log: { sql: string; params: readonly unknown[] }[] = []; const db = new DxContext(provider(log));
+  const update = (values: unknown) => db.rows.asNoTracking().where(x => x.id.eq(1)).executeUpdate(values as never);
+  await expect(update({})).rejects.toThrow("pass at least one property to set");
+  await expect(update({ nope: 1 })).rejects.toThrow('"nope" is not a mapped property of DxRow');
+  await expect(update({ id: 2 })).rejects.toThrow('"id" is the primary key of DxRow and cannot be changed');
+  await expect(update({ createdAt: new Date() })).rejects.toThrow('"createdAt" is filled automatically and cannot be set');
+  await expect(update({ title: undefined })).rejects.toThrow('"title" is undefined; omit it or pass a value');
+  await expect(update({ title: null })).rejects.toThrow('"title" is required (NOT NULL) and cannot be set to null');
+  await expect(update({ views: "7" })).rejects.toThrow('"views" expects integer, got string');
+  await expect(update({ views: (row: DxRow) => row.views + 1 })).rejects.toThrow('"views" must be a value, got a function; expressions such as views + 1 are not supported');
+  await expect(update({ publishedAt: "2026-10-10" })).rejects.toThrow('"publishedAt" expects datetime, got string');
+  expect(log).toEqual([]);
+  await expect(db.rows.asNoTracking().where(x => x.views.eq("7" as never)).executeDelete()).rejects.toThrow('"views" expects integer, got string');
+  await expect(update(new Proxy({ views: "7" }, {}))).rejects.toThrow("pass the new values as a plain object");
+});
+
+test("immediate update sets a nullable column to NULL", async () => {
+  const log: { sql: string; params: readonly unknown[] }[] = []; const db = new DxContext(provider(log));
+  await expect(db.rows.asNoTracking().where(x => x.id.eq(1)).executeUpdate({ publishedAt: null, views: 0 })).resolves.toEqual({ affectedRows: 2 });
+  expect(log).toEqual([{ sql: 'UPDATE "immediate_dx_rows" SET "publishedAt" = $1, "views" = $2 WHERE "id" = $3', params: [null, 0, 1] }]);
+});
+
+test("the tracked conflict names the entity and the way out", async () => {
+  const db = new DxContext(provider([]));
+  db.rows.attach(Object.assign(new DxRow(), { id: 5, title: "t", slug: "s" }));
+  await expect(db.rows.asNoTracking().where(x => x.id.eq(1)).executeUpdate({ views: 1 })).rejects.toThrow('this context tracks "DxRow" entities (loaded with tracking or saved through saveChanges()), which the mutation would make stale. Load them with .asNoTracking(), or run the mutation in a separate DbContext.');
+});
+
+test("insertIfAbsent leaves an unset generated key to the database or a new UUID v7", async () => {
+  const log: { sql: string; params: readonly unknown[] }[] = []; const db = new DxContext(provider(log));
+  const row = Object.assign(new DxRow(), { title: "A", slug: "a" });
+  await expect(db.rows.insertIfAbsent(row, { conflictBy: x => [x.slug] })).resolves.toEqual({ inserted: true });
+  expect(log[0]!.sql).toBe('INSERT INTO "immediate_dx_rows" ("title", "slug", "views", "publishedAt", "createdAt") VALUES ($1, $2, $3, $4, $5) ON CONFLICT ("slug") DO NOTHING');
+  expect(row.id).toBe(0); expect(db.stateOf(row)).toBe(EntityState.Detached);
+  const v7 = Object.assign(new DxV7Row(), { code: "a" });
+  await db.v7.insertIfAbsent(v7, { conflictBy: x => [x.code] });
+  expect(log[1]!.sql).toBe('INSERT INTO "immediate_dx_v7_rows" ("id", "code") VALUES ($1, $2) ON CONFLICT ("code") DO NOTHING');
+  expect(String(log[1]!.params[0])).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(v7.id).toBe("");
+  await db.v4.insertIfAbsent(Object.assign(new DxV4Row(), { code: "a" }), { conflictBy: x => [x.code] });
+  expect(log[2]!.sql).toBe('INSERT INTO "immediate_dx_v4_rows" ("code") VALUES ($1) ON CONFLICT ("code") DO NOTHING');
+  await expect(db.rows.insertIfAbsent({ title: "B", slug: "b" } as DxRow, { conflictBy: x => [x.slug] })).rejects.toThrow('"views" is missing; pass an entity with every mapped property of DxRow');
 });

@@ -4,6 +4,34 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.19 — 2026-10-10
+
+### Added
+
+- `executeUpdate({ publishedAt: null })` sets a nullable column to `NULL`.
+  A required (`NOT NULL`) column still rejects `null`, now with a message.
+
+### Fixed
+
+- `insertIfAbsent` with an unset generated key (`@Key() id = 0`) inserted
+  `id = 0` explicitly: the first row got key `0`, and the next insert failed
+  with `duplicate key value violates unique constraint "pk_articles"`. A
+  `@UUID({ version: "v7" })` key left as `""` failed with `invalid input syntax
+  for type uuid`. An unset identity or v4 key is now assigned by the database,
+  and a v7 key gets a new UUID v7, as with `saveChanges()`. An explicitly set
+  key is inserted as given; the passed entity stays unchanged.
+- `executeUpdate`, `executeDelete` and `insertIfAbsent` explain why the input is
+  rejected instead of `Immediate ORM mutation input is unsafe or unsupported.`:
+  `call .asNoTracking() before executeUpdate()`, `add .where(...) before
+  executeDelete()`, `does not accept take() or skip()` / `orderBy()` /
+  `forUpdate()`, `"nope" is not a mapped property of Article`, `"id" is the
+  primary key…`, `"views" expects integer, got string`, `"views" must be a
+  value, got a function; expressions such as views + 1 are not supported`,
+  `"views" is missing; pass an entity with every mapped property`. Hostile
+  inputs (proxies, accessors, cycles) keep the generic message.
+- `OrmTrackedMutationConflictError` names the tracked entity and the way out:
+  load it with `.asNoTracking()` or run the mutation in a separate `DbContext`.
+
 ## 0.98.18 — 2026-10-10
 
 ### Changed

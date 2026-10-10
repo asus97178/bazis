@@ -396,8 +396,11 @@ the `uuid` physical type as for v4 keys.
 "the database assigns the key"; `CommandBuilder`, `SaveExecutor` and
 `ChangeTracker` use it, so a v7 key is treated as an application key. The
 duplicate-key preflight skips only unassigned v7 keys and rechecks after the
-ORM assigns them. `insertIfAbsent` keeps its contract: it inserts the given
-values and does not apply conventions.
+ORM assigns them. `insertIfAbsent` inserts the given values and does not apply
+`@CreatedAt`/`@UpdatedAt` conventions. Since 0.98.19 an unset single key
+(`0`, `""`, `null`, `undefined`) is left to the database for identity and v4
+keys and gets `Bun.randomUUIDv7()` for v7 keys; the caller's entity stays
+unchanged and detached. An explicitly set key is still inserted as given.
 
 Owned-store admission accepts a `uuid` column either as a single v4 key with
 `uuidDefault` generation and the `gen_random_uuid()` default, or as a plain
