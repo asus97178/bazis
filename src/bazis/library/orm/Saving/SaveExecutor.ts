@@ -7,7 +7,8 @@ import type { DatabaseProvider, DbExecutor } from "../Providers/types";
 import { isUnknownTransactionOutcome, registerTransactionUncertainty, TransactionOutcomeUnknownError } from "../Providers/transactionOutcome";
 import { registerPostCommitFinalizer } from "../Providers/transactionCallbacks";
 import { EntityState } from "../Tracking/EntityState";
-import { assertUniqueTrackedKeys, holdDeletedIdentity, type ChangeTracker, type TrackedEntry } from "../Tracking/ChangeTracker";
+import { assertUniqueTrackedKeys, holdDeletedIdentity, trackedEntriesOf, type ChangeTracker, type TrackedEntry } from "../Tracking/ChangeTracker";
+import { NavigationFixup } from "./navigationFixup";
 import { CommandBuilder } from "./CommandBuilder";
 import { applyConventions } from "./applyConventions";
 import { ExecutionStrategy, type ExecutionStrategyOptions } from "./ExecutionStrategy";
@@ -78,6 +79,10 @@ export class SaveExecutor {
 
   private async saveCore(): Promise<number> {
     if (uncertainTrackers.has(this.tracker)) throw new TransactionOutcomeUnknownError();
+    // Foreign keys from navigations first, so a changed navigation on an
+    // Unchanged entity is detected as a Modified foreign key.
+    const fixup = new NavigationFixup(trackedEntriesOf(this.tracker));
+    fixup.applyAll();
     this.tracker.detectChanges();
     const pending = this.tracker.entriesToProcess();
     if (pending.length === 0) {
@@ -127,8 +132,13 @@ export class SaveExecutor {
               group.push(ordered[i]!);
               i += 1;
             }
+            // Parents are inserted first: their generated keys are known now.
+            for (const added of group) fixup.apply(added);
             await this.insertBatch(tx, entry.model, group);
             continue;
+          }
+          if (entry.state === EntityState.Modified) {
+            for (const name of fixup.apply(entry)) entry.modifiedProperties.add(name);
           }
           await this.execute(tx, entry);
           i += 1;

@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.17 — 2026-10-10
+
+### Fixed
+
+- `saveChanges` sets foreign keys from navigations. `article.author = bob` (a
+  `@ManyToOne`) or `bob.articles.push(article)` (a `@OneToMany`) with a new
+  `bob` now saves `article.authorId` with `bob`'s generated key: the author is
+  inserted first, and the key is copied right before the article's insert.
+  Before, `authorId` stayed `0` and the insert failed with `violates foreign key
+  constraint "fk_articles_authorId"`. Changing the navigation of a loaded entity
+  updates its foreign key. Only entities tracked by the same context are
+  followed; the navigation wins over a different value in the foreign key
+  property.
+
 ## 0.98.16 — 2026-10-10
 
 ### Added
