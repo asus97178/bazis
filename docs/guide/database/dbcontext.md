@@ -181,4 +181,4 @@ await this.db.database.executeSqlRaw("UPDATE products SET price = price * {0}", 
 - [Сущности и ключи](entities.md)
 - [Жизненный цикл](../fundamentals/lifecycle.md)
 - [Запросы](queries.md)
-- Сохранение и отслеживание изменений *(в работе)*
+- [Сохранение и отслеживание изменений](saving.md)
