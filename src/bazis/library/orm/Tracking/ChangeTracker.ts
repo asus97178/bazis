@@ -342,6 +342,11 @@ export class ChangeTracker {
   }
 }
 
+/** Non-barrel access to every tracked entry, for the save-time navigation fix-up. */
+export function trackedEntriesOf(tracker: ChangeTracker): ReadonlyMap<object, TrackedEntry> {
+  return trackerEntries.get(tracker) ?? new Map();
+}
+
 /** Non-barrel helper used only by immediate DML admission. */
 export function hasTrackedEntriesForModel(tracker: ChangeTracker, model: EntityModel): boolean {
   return [...(trackerEntries.get(tracker)?.values() ?? [])].some((entry) => entry.model === model);

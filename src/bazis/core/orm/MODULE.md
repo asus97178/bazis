@@ -204,3 +204,14 @@ rejected by codegen (`BAZIS_ORM_PREDICATE_LOGIC`, now with a relative path and a
 escaped PostgreSQL `ILIKE` (immediate mutations accept it too). A computation inside
 `select()` (a template literal, arithmetic, a constant) fails with a hint to compute after
 `toList()`. Regression: `library/orm/test/orm.query-dx.test.ts`.
+
+## Foreign keys from navigations (2026-10-10, 0.98.17)
+
+`saveChanges` runs `NavigationFixup` (`library/orm/Saving/navigationFixup.ts`) twice: over every
+tracked entry before change detection, so a changed `@ManyToOne` navigation of an Unchanged
+entity becomes a Modified foreign key, and again right before each Added or Modified entry's SQL,
+when its parents' generated keys are known (parents are inserted first). A `@ManyToOne`
+navigation copies the target's key into the foreign key properties; an entity in a parent's
+`@OneToMany` array gets the parent's key. Only entities tracked by the same context are followed,
+and the navigation wins over a different foreign key value. Regression:
+`library/orm/test/orm.navigation-fixup.test.ts`.
