@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { DbContext } from "../DbContext";
-import { ConcurrentTransactionScopeError, OrmDatabaseTimeError, OrmProviderIdentityMismatchError, OrmTransactionScopeError } from "../errors";
+import { ConcurrentTransactionScopeError, differentProviderMessage, OrmDatabaseTimeError, OrmProviderIdentityMismatchError, OrmTransactionScopeError } from "../errors";
 import { baseProvider, withPostgresScopeOptions, createObservedProvider, postgresTransactionCapability, rootAuthority, withProviderDispatchObserver, withoutProviderDispatchObserver, type CancellableProviderDispatch } from "../Providers/ormTransactionRuntime";
 import type { DatabaseProvider } from "../Providers/types";
 import { OrmTransaction, type OrmDatabaseTimeV1, type OrmTransactionScopeOptions } from "./OrmTransaction";
@@ -47,6 +47,27 @@ const uncertainContexts = new WeakSet<object>();
 const contextTokens = new WeakMap<object, object>();
 const contextProviders = new WeakMap<object, DatabaseProvider>();
 
+const contextName = (context: object): string => (context.constructor as { readonly name?: string } | undefined)?.name || "This DbContext";
+const scopeClosed = () => new OrmTransactionScopeError("ORM transaction scope has already finished or is closing; await every ORM call inside the scope callback.");
+const nestedScopeRunning = () => new OrmTransactionScopeError("A nested transaction scope is still running; await it before using the outer scope.");
+const notEnrolled = (context: object) => new OrmTransactionScopeError(`${contextName(context)} is not part of the surrounding transaction scope. Run it through tx.use(context, work) to share the transaction, or use it after the scope.`);
+
+/** Explains why `context` cannot run ORM work in the current scope view. */
+function scopeRejection(context: object, view: View): OrmTransactionScopeError {
+  const provider = contextProviders.get(context);
+  if (provider && rootAuthority(provider) !== view.frame.authority) return new OrmTransactionScopeError(differentProviderMessage(contextName(context)));
+  if (!view.enrolled.has(contextToken(context))) return notEnrolled(context);
+  if (view.frame.state !== "active") return scopeClosed();
+  return view.frame.activeChild !== undefined ? nestedScopeRunning() : new OrmTransactionScopeError();
+}
+
+/** A failed operation dooms its scope; a callback that caught the error still learns why. */
+function operationFailed(error: unknown): OrmTransactionScopeError {
+  if (error instanceof OrmTransactionScopeError) return error;
+  const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return new OrmTransactionScopeError(`ORM transaction scope was rolled back because an operation inside it failed: ${reason}. A failed operation marks the whole scope for rollback even when its error is caught; to continue after an expected failure, run that operation in a nested transactionScope().`, { cause: error });
+}
+
 /** Private, non-barrel signal: SaveExecutor uses it to suppress retries only
  * in a coordinator-owned ORM scope, never in arbitrary provider transactions. */
 export function isNewOrmTransactionScopeActive(): boolean {
@@ -69,7 +90,7 @@ export function observedProvider(context: object, provider: DatabaseProvider): D
     if (!view) return guarded();
     const frame = view.frame;
     if (frame.authority !== authority || !view.enrolled.has(token) || frame.state !== "active" || frame.activeChild !== undefined) {
-      return Promise.reject(new OrmTransactionScopeError());
+      return Promise.reject(scopeRejection(context, view));
     }
     return trackTask(frame, guarded);
   };
@@ -87,7 +108,7 @@ export function monitorWholeOperation<T>(context: object, operation: () => Promi
   if (uncertainContexts.has(contextToken(context))) return Promise.reject(new TransactionOutcomeUnknownError());
   const view = views.getStore();
   if (!view) return operation();
-  if (!view.enrolled.has(contextToken(context)) || view.frame.state !== "active" || view.frame.activeChild !== undefined) return Promise.reject(new OrmTransactionScopeError());
+  if (!view.enrolled.has(contextToken(context)) || view.frame.state !== "active" || view.frame.activeChild !== undefined) return Promise.reject(scopeRejection(context, view));
   // Save work must not inherit a forever `use` callback task: only its
   // post-validation unwind is framework-owned during physical quarantine.
   return trackTask(view.frame, operation, "save", true);
@@ -99,11 +120,11 @@ export function monitorImmediateOperation<T>(context: object, operation: () => T
   const view = views.getStore();
   const token = contextToken(context);
   const run = () => Promise.resolve().then(() => {
-    if (view && (!view.enrolled.has(token) || view.frame.state !== "active" || view.frame.activeChild !== undefined)) throw new OrmTransactionScopeError();
+    if (view && (!view.enrolled.has(token) || view.frame.state !== "active" || view.frame.activeChild !== undefined)) throw scopeRejection(context, view);
     return operation();
   });
   if (!view) return run();
-  if (!view.enrolled.has(token) || view.frame.state !== "active" || view.frame.activeChild !== undefined) return Promise.reject(new OrmTransactionScopeError());
+  if (!view.enrolled.has(token) || view.frame.state !== "active" || view.frame.activeChild !== undefined) return Promise.reject(scopeRejection(context, view));
   return trackTask(view.frame, run, "immediate", true);
 }
 
@@ -123,9 +144,9 @@ export function markCurrentSaveRequiresUnwind(): void {
 function trackTask<T>(frame: Frame, operation: () => Promise<T>, kind: PendingTask["kind"] = "user", distinct = false): Promise<T> {
   const parent = currentTasks.getStore();
   if (!distinct && parent?.frame === frame && frame.pending.has(parent)) {
-    const promise = Promise.resolve().then(() => { if (frame.state !== "active") throw new OrmTransactionScopeError(); return operation(); });
+    const promise = Promise.resolve().then(() => { if (frame.state !== "active") throw scopeClosed(); return operation(); });
     parent.attached.add(promise);
-    void promise.catch(() => { frame.rollbackOnly ??= new OrmTransactionScopeError(); });
+    void promise.catch((error) => { frame.rollbackOnly ??= operationFailed(error); });
     promise.finally(() => { parent.attached.delete(promise); releaseTask(parent); }).catch(() => {});
     return Promise.race([promise, frame.abortPromise]);
   }
@@ -134,12 +155,12 @@ function trackTask<T>(frame: Frame, operation: () => Promise<T>, kind: PendingTa
   const task: PendingTask = { frame, kind, dispatches: new Set(), attached: new Set(), promise: Promise.resolve(), underlying: Promise.resolve(), abort, settled: false };
   frame.pending.add(task);
   const underlying = Promise.resolve().then(() => {
-    if (frame.state !== "active") throw new OrmTransactionScopeError();
+    if (frame.state !== "active") throw scopeClosed();
     return currentTasks.run(task, operation);
   });
   task.promise = underlying;
   (task as { underlying: Promise<unknown> }).underlying = underlying;
-  void underlying.catch(() => { frame.rollbackOnly ??= new OrmTransactionScopeError(); });
+  void underlying.catch((error) => { frame.rollbackOnly ??= operationFailed(error); });
   underlying.finally(() => { task.settled = true; releaseTask(task); }).catch(() => {});
   // Permanent rejection sink makes detached hostile user tails safe.
   void abortProjection.catch(() => {});
@@ -154,14 +175,17 @@ export async function transactionScope<TResult>(context: DbContext, provider: Da
   let signal = options?.signal;
   if (options?.timeoutMs !== undefined) positiveTimeout(options.timeoutMs, 30_000, "timeoutMs");
   if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError("ORM transaction signal must be an AbortSignal.");
-  const assertNotAborted = () => { if (signal?.aborted) throw new OrmTransactionScopeError("ORM transaction scope was aborted."); };
+  const abortReason = () => signal?.reason instanceof OrmTransactionScopeError ? signal.reason : new OrmTransactionScopeError("ORM transaction scope was aborted.");
+  const assertNotAborted = () => { if (signal?.aborted) throw abortReason(); };
   assertNotAborted();
   const token = contextToken(context);
   if (uncertainContexts.has(token)) throw new TransactionOutcomeUnknownError();
   const authority = rootAuthority(provider);
   const current = views.getStore();
   if (current) {
-    if (current.frame.authority !== authority || !current.enrolled.has(token) || current.frame.state !== "active") throw new OrmProviderIdentityMismatchError();
+    if (current.frame.authority !== authority) throw new OrmProviderIdentityMismatchError(contextName(context));
+    if (!current.enrolled.has(token)) throw notEnrolled(context);
+    if (current.frame.state !== "active") throw scopeClosed();
     if (current.frame.activeChild !== undefined) throw new ConcurrentTransactionScopeError();
   }
   const base = baseProvider(provider);
@@ -171,7 +195,7 @@ export async function transactionScope<TResult>(context: DbContext, provider: Da
   const uncertain = (error: unknown) => postgres.isOutcomeUncertain ? postgres.isOutcomeUncertain(error) : isUnknownTransactionOutcome(error);
   const inheritedSignal = postgres.operationSignal?.();
   const timeoutMs = positiveTimeout(options?.timeoutMs, postgres.operationTimeoutMs ?? 30_000, "timeoutMs");
-  const deadline = new OperationDeadline(timeoutMs, signal && inheritedSignal ? AbortSignal.any([signal, inheritedSignal]) : signal ?? inheritedSignal);
+  const deadline = new OperationDeadline(timeoutMs, signal && inheritedSignal ? AbortSignal.any([signal, inheritedSignal]) : signal ?? inheritedSignal, "ORM transaction scope");
   signal = deadline.signal;
   const parent = current?.frame;
   const ownership = Symbol("orm transaction child");
@@ -210,7 +234,7 @@ export async function transactionScope<TResult>(context: DbContext, provider: Da
       return withProviderDispatchObserver((dispatch) => registerDispatch(frame, dispatch), () => views.run(view, async () => {
         const transaction = new ScopedOrmTransaction(frame);
         const onAbort = () => {
-          const error = new OrmTransactionScopeError("ORM transaction scope was aborted.");
+          const error = abortReason();
           // Fence synchronously: a callback catching its aborted operation
           // cannot enqueue another query before asynchronous close starts.
           for (let target: Frame | undefined = frame; target; target = target.activeChildFrame) {
@@ -286,13 +310,13 @@ function registerDispatch(frame: Frame, dispatch: CancellableProviderDispatch): 
   const settled = Promise.resolve(dispatch.settled);
   // Keep a rejection sink for detached driver promises while preserving the
   // original caller-facing rejection returned by query/execute.
-  void settled.catch(() => { frame.rollbackOnly ??= new OrmTransactionScopeError(); });
+  void settled.catch((error) => { frame.rollbackOnly ??= operationFailed(error); });
   settled.finally(() => { task.dispatches.delete(dispatch); releaseTask(task); }).catch(() => {});
 }
 
 async function settleFrame(frame: Frame): Promise<void> {
   if (frame.pending.size === 0) return;
-  frame.rollbackOnly ??= new OrmTransactionScopeError("ORM transaction scope has unresolved operations.");
+  frame.rollbackOnly ??= new OrmTransactionScopeError("ORM transaction scope callback returned while ORM operations were still running, so the scope was rolled back; await every ORM call inside the scope callback.");
   const capability = postgresTransactionCapability(frame.provider);
   const hasDispatch = [...frame.pending].some((task) => task.dispatches.size > 0);
   let quarantine = frame.cancellationRequested || (capability?.quarantineOnPendingDispatch && hasDispatch);
@@ -335,6 +359,7 @@ async function settleFrame(frame: Frame): Promise<void> {
   }
 }
 
+const foreignTransaction = () => new OrmTransactionScopeError("This transaction object belongs to another transaction scope; use the object passed to the innermost transactionScope() callback.");
 const transactionFrames = new WeakMap<ScopedOrmTransaction, Frame>();
 class ScopedOrmTransaction extends OrmTransaction {
   constructor(frame: Frame) { super(); transactionFrames.set(this, frame); }
@@ -343,9 +368,9 @@ class ScopedOrmTransaction extends OrmTransaction {
     const frame = this.#requireCurrentFrame();
     const token = contextToken(context);
     const provider = contextProviders.get(context);
-    if (!provider || rootAuthority(provider) !== frame.authority) throw new OrmProviderIdentityMismatchError();
+    if (!provider || rootAuthority(provider) !== frame.authority) throw new OrmProviderIdentityMismatchError(contextName(context));
     const parent = views.getStore();
-    if (!parent || parent.frame !== frame) throw new OrmTransactionScopeError();
+    if (!parent || parent.frame !== frame) throw foreignTransaction();
     if (uncertainContexts.has(token)) throw new TransactionOutcomeUnknownError();
     for (let target: Frame | undefined = frame; target; target = target.parent) target.allEnrolled.add(token);
     const enrolled = new Set(parent.enrolled); enrolled.add(token);
@@ -371,7 +396,9 @@ class ScopedOrmTransaction extends OrmTransaction {
   #requireCurrentFrame(): Frame {
     const frame = transactionFrames.get(this);
     const view = views.getStore();
-    if (!frame || frame.state !== "active" || frame.activeChild !== undefined || !view || view.frame !== frame) throw new OrmTransactionScopeError();
+    if (!frame || frame.state !== "active") throw new OrmTransactionScopeError("ORM transaction scope has already finished or is closing; use the transaction object only inside its transactionScope() callback.");
+    if (frame.activeChild !== undefined) throw nestedScopeRunning();
+    if (!view || view.frame !== frame) throw foreignTransaction();
     return frame;
   }
 }

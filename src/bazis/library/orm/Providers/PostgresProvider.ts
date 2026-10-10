@@ -828,6 +828,7 @@ export class PostgresProvider implements DatabaseProvider {
     let result!: T;
     let failure: unknown;
     try {
+      this.traceSql("BEGIN", []);
       await this.ownerCommand(owner, "BEGIN");
       await this.configureSession(owner);
       result = await this.transactionCallbacks.run(callbacks, () => this.ambient.run({ executor, session: owner.session, owner }, async () => {
@@ -837,6 +838,7 @@ export class PostgresProvider implements DatabaseProvider {
       }));
       operation.signal.throwIfAborted();
       committing = true;
+      this.traceSql("COMMIT", []);
       await this.ownerCommand(owner, "COMMIT");
       committed = true;
     } catch (error) {
@@ -850,6 +852,7 @@ export class PostgresProvider implements DatabaseProvider {
           if (operation.signal.aborted || owner.quarantinePromise) await this.quarantineOwner(owner);
           else {
             const cleanup = new OperationDeadline(this.cancellationTimeoutMs);
+            this.traceSql("ROLLBACK", []);
             try { await cleanup.wait(this.native(() => owner.session.unsafe("ROLLBACK"))); }
             catch { await this.quarantineOwner(owner); }
             finally { cleanup.dispose(); }
@@ -1265,6 +1268,7 @@ export class PostgresProvider implements DatabaseProvider {
     const rollback = async () => {
       // No further owner dispatch can pass the synchronous quarantine fence.
       await deadline.wait(Promise.allSettled([...(owner.pending ?? [])]));
+      this.traceSql("ROLLBACK", []);
       await deadline.wait(this.native(() => { deadline.signal.throwIfAborted(); return owner.session.unsafe("ROLLBACK"); }, true));
       const current = await this.readBackendIdentity(owner.session, deadline);
       if (Object.entries(identity).some(([key, value]) => current[key as keyof BackendIdentity] !== value)) throw new OrmTransactionScopeError("PostgreSQL rollback backend identity changed.");

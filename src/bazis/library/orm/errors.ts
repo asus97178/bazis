@@ -119,12 +119,16 @@ export class ConcurrentTransactionScopeError extends OrmError {
 
 /** Safe failure for a stale, closing, or unenrolled ORM transaction capability. */
 export class OrmTransactionScopeError extends OrmError {
-  constructor(message = "ORM transaction scope is not active for this operation.") { super(message); }
+  constructor(message = "ORM transaction scope is not active for this operation.", options?: ErrorOptions) { super(message, options); }
 }
 
 /** Contexts may share transaction work only when their configured provider is the same object. */
 export class OrmProviderIdentityMismatchError extends OrmError {
-  constructor() { super("ORM transaction context belongs to a different provider identity."); }
+  constructor(contextName = "This DbContext") { super(differentProviderMessage(contextName)); }
+}
+
+export function differentProviderMessage(contextName: string): string {
+  return `${contextName} uses a different database provider than the surrounding transaction scope. Contexts share one transaction only when they are created with the same provider object.`;
 }
 
 /** The provider did not return an exact safe millisecond database timestamp. */

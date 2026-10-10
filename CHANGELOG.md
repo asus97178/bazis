@@ -4,6 +4,37 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.18 — 2026-10-10
+
+### Changed
+
+- `forUpdate()` and `findForUpdate()` outside a transaction fail before the
+  query with a hint to use `db.transactionScope(...)`. Outside a transaction
+  PostgreSQL releases the row lock right after the `SELECT`, so such a read
+  never protected the following `saveChanges()`. `forUpdate({ skipLocked: true })`
+  already required a transaction.
+
+### Fixed
+
+- A transaction scope whose callback caught a failed operation and returned
+  normally was rolled back with `ORM transaction scope is not active for this
+  operation.` It now says `rolled back because an operation inside it failed:
+  PostgresError: division by zero`, keeps the original error in `cause`, and
+  suggests a nested `transactionScope()` for an expected failure.
+- Errors for a context that cannot run in the current scope name the context
+  and the reason: `AuditDb is not part of the surrounding transaction scope.
+  Run it through tx.use(context, work)…`, `AuditDb uses a different database
+  provider…`, a finished scope (`await every ORM call inside the scope
+  callback`), or a still running nested scope. A same-provider context that
+  starts its own scope inside another one got `belongs to a different provider
+  identity`; it now gets the `tx.use` hint (`OrmTransactionScopeError`).
+- A scope timeout said `ORM operation was aborted.`; it now says `ORM
+  transaction scope timed out after 200 ms.` A nested deadline keeps its
+  parent's reason, and a plain operation timeout says `ORM operation timed out
+  after N ms.`
+- `onSql` traces `BEGIN`, `COMMIT` and `ROLLBACK` of PostgreSQL transactions,
+  not only `SAVEPOINT` commands.
+
 ## 0.98.17 — 2026-10-10
 
 ### Fixed

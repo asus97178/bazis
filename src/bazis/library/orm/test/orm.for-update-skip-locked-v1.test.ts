@@ -55,3 +55,16 @@ test("skipLocked admission rejects projected terminal before dispatch and admits
   await expect(new EntityQuery<Claim>(composite, unsupportedRuntime as unknown as DbContextRuntime).where(x => x.id.eq(1)).orderBy(x => x.tenant).orderBy(x => x.id).take(1).forUpdate({ skipLocked: true }).toList()).rejects.toThrow("PostgreSQL");
   expect(dispatches).toBe(3);
 });
+
+test("forUpdate outside a transaction fails before dispatch with a transactionScope hint", async () => {
+  let dispatches = 0; let active = false;
+  const runtime = { provider: { dialect: new PostgresDialect(), isTransactionActive: () => active, query: async () => { dispatches += 1; return []; } }, tracker: { trackReloaded: (entity: unknown) => entity } } as unknown as DbContextRuntime;
+  const query = new EntityQuery<Claim>(model, runtime).where(x => x.id.eq(1));
+  await expect(query.forUpdate().toList()).rejects.toThrow("forUpdate() locks rows only until the surrounding transaction ends");
+  await expect(query.forUpdate().firstOrDefault()).rejects.toThrow("db.transactionScope(");
+  await expect(query.forUpdate().count()).rejects.toThrow("forUpdate()");
+  expect(dispatches).toBe(0);
+  active = true;
+  await query.forUpdate().toList();
+  expect(dispatches).toBe(1);
+});
