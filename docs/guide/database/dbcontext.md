@@ -137,7 +137,7 @@ but does not export. Add it to the exports of "CatalogModule".
 | `attach(entity)` | Начать отслеживать существующую строку без изменений |
 | `find(key)` | Найти по ключу; составной — объектом `{ orderId, lineNo }` |
 | `findForUpdate(key)` | Найти и заблокировать строку (`FOR UPDATE`) до конца транзакции |
-| `where`, `orderBy`, `take`, `toList`, `count`, … | Запросы — см. главу «Запросы» |
+| `where`, `orderBy`, `take`, `toList`, `count`, … | Запросы — см. [Запросы](queries.md) |
 
 `add`, `update`, `remove` ничего не отправляют в базу — изменения уходят
 одним `saveChanges()`:
@@ -180,5 +180,5 @@ await this.db.database.executeSqlRaw("UPDATE products SET price = price * {0}", 
 
 - [Сущности и ключи](entities.md)
 - [Жизненный цикл](../fundamentals/lifecycle.md)
-- Запросы *(в работе)*
+- [Запросы](queries.md)
 - Сохранение и отслеживание изменений *(в работе)*
