@@ -1,6 +1,6 @@
 import { types } from "node:util";
 import { OrmError, OrmTrackedMutationConflictError, OrmUndeclaredConflictTargetError, OrmUnsafeImmediateMutationError } from "../errors";
-import type { EntityModel, PropertyModel } from "../Metadata/types";
+import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import type { DbContextRuntime } from "../runtime";
 import { hasTrackedEntriesForModel } from "../Tracking/ChangeTracker";
 import { isPostgresJsonScalarParameter } from "../Providers/PostgresDialect";
@@ -16,7 +16,7 @@ export type OrmUniqueKeySelectorV1<T extends object> = (entity: FieldSelector<T>
 
 export function executeImmediateUpdate<T extends object>(model: EntityModel, runtime: DbContextRuntime, plan: QueryPlan, values: OrmUpdateValuesV1<T>): Promise<OrmMutationResultV1> {
   return runtime.runImmediateOperation(async () => {
-    guard(model, runtime); const admittedPlan = admitPlan(plan);
+    guard(model, runtime); const admittedPlan = admitPlan(plan, "executeUpdate");
     const conditions = effectiveConditions(model, admittedPlan); const assignments = encodeAssignments(runtime, admitUpdateValues(model, values));
     const compiled = new SqlTranslator(model, runtime.provider.dialect).immediateUpdate(assignments, conditions, (property, value) => encode(runtime, property, snapshot(value), true));
     Object.freeze(compiled.params);
@@ -28,7 +28,7 @@ export function executeImmediateUpdate<T extends object>(model: EntityModel, run
 
 export function executeImmediateDelete(model: EntityModel, runtime: DbContextRuntime, plan: QueryPlan): Promise<OrmMutationResultV1> {
   return runtime.runImmediateOperation(async () => {
-    guard(model, runtime); const admittedPlan = admitPlan(plan); const conditions = effectiveConditions(model, admittedPlan);
+    guard(model, runtime); const admittedPlan = admitPlan(plan, "executeDelete"); const conditions = effectiveConditions(model, admittedPlan);
     const compiled = new SqlTranslator(model, runtime.provider.dialect).immediateDelete(conditions, (property, value) => encode(runtime, property, snapshot(value), true));
     Object.freeze(compiled.params);
     guard(model, runtime);
@@ -52,13 +52,14 @@ export function insertIfAbsent<T extends object>(model: EntityModel, runtime: Db
 }
 
 function guard(model: EntityModel, runtime: DbContextRuntime): void {
-  if (hasTrackedEntriesForModel(runtime.tracker, model)) throw new OrmTrackedMutationConflictError();
+  if (hasTrackedEntriesForModel(runtime.tracker, model)) throw new OrmTrackedMutationConflictError(model.name);
 }
 interface AdmittedImmediatePlan { readonly explicitConditions: readonly Condition[]; readonly ignoreQueryFilters: boolean; }
-function admitPlan(plan: QueryPlan): AdmittedImmediatePlan {
+function admitPlan(plan: QueryPlan, terminal: "executeUpdate" | "executeDelete"): AdmittedImmediatePlan {
   try {
     if (types.isProxy(plan) || typeof plan !== "object" || plan === null || Object.getPrototypeOf(plan) !== Object.prototype) unsafe();
     const fields = Object.getOwnPropertyDescriptors(plan); const names = Object.getOwnPropertyNames(plan); if (Object.getOwnPropertySymbols(plan).length !== 0) unsafe();
+    explainPlan(fields, terminal);
     const required = ["conditions", "orders", "noTracking", "includes", "ignoreQueryFilters", "projections"];
     const optional = ["limit", "requestedLimit", "invalidRequestedLimit", "offset", "rowLock", "skipLocked"];
     if (names.length !== required.length || required.some((key) => !Object.prototype.hasOwnProperty.call(fields, key)) || optional.some((key) => Object.prototype.hasOwnProperty.call(fields, key))) unsafe();
@@ -70,32 +71,69 @@ function admitPlan(plan: QueryPlan): AdmittedImmediatePlan {
     return Object.freeze({ explicitConditions: Object.freeze(explicitConditions), ignoreQueryFilters: fields.ignoreQueryFilters!.value });
   } catch (error) { if (error instanceof OrmUnsafeImmediateMutationError) throw error; unsafe(); }
 }
+/** Names the query method that an immediate mutation does not accept; reads data descriptors only. */
+function explainPlan(fields: Record<string, PropertyDescriptor>, terminal: string): void {
+  const valueOf = (key: string) => { const descriptor = fields[key]; return descriptor && "value" in descriptor ? descriptor.value as unknown : undefined; };
+  const length = (key: string) => { const value = valueOf(key); return Array.isArray(value) && !types.isProxy(value) ? Object.getOwnPropertyDescriptor(value, "length")?.value as unknown : undefined; };
+  if (valueOf("noTracking") !== true) unsafe(`call .asNoTracking() before ${terminal}(); immediate mutations bypass the change tracker`);
+  if (["limit", "requestedLimit", "invalidRequestedLimit", "offset"].some((key) => key in fields)) unsafe(`${terminal}() does not accept take() or skip(); narrow the rows with where(...)`);
+  if ("rowLock" in fields || "skipLocked" in fields) unsafe(`${terminal}() does not accept forUpdate()`);
+  for (const [key, method] of [["orders", "orderBy()"], ["includes", "include()"], ["projections", "select()"]] as const) {
+    const size = length(key); if (typeof size === "number" && size > 0) unsafe(`${terminal}() does not accept ${method}`);
+  }
+  if (length("conditions") === 0) unsafe(`add .where(...) before ${terminal}(); changing every row of a table is not allowed, use raw SQL for that`);
+}
 function count(value: unknown): number { if (!Number.isSafeInteger(value) || (value as number) < 0) throw new OrmError("ORM provider returned an invalid immediate mutation count."); return value as number; }
-function unsafe(): never { throw new OrmUnsafeImmediateMutationError(); }
+function unsafe(reason?: string): never { throw new OrmUnsafeImmediateMutationError(reason); }
+function describeValue(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  if (value instanceof Date) return "Date";
+  if (value instanceof Uint8Array) return "Uint8Array";
+  return typeof value;
+}
+function functionValue(name: string): never { unsafe(`"${name}" must be a value, got a function; expressions such as views + 1 are not supported, use raw SQL for them`); }
 
 interface AdmittedAssignment { readonly property: PropertyModel; readonly value: unknown; }
 function admitUpdateValues<T extends object>(model: EntityModel, values: OrmUpdateValuesV1<T>): readonly AdmittedAssignment[] {
-  if (!plain(values)) unsafe();
-  const descriptors = ownData(values); const keys = [...descriptors.keys()]; if (keys.length === 0) unsafe();
+  if (!plain(values)) unsafe('pass the new values as a plain object, for example { status: "archived" }');
+  const descriptors = ownData(values); const keys = [...descriptors.keys()]; if (keys.length === 0) unsafe("pass at least one property to set");
   const out: AdmittedAssignment[] = [];
   for (const key of keys) {
     const descriptor = descriptors.get(key)!;
-    const property = model.propertyByName(key); if (!property || property.isKey || property.generation !== "none" || property.convention || descriptor.value === undefined || descriptor.value === null) unsafe();
+    const property = model.propertyByName(key);
+    if (!property) unsafe(`"${key}" is not a mapped property of ${model.name}`);
+    if (property.isKey) unsafe(`"${key}" is the primary key of ${model.name} and cannot be changed`);
+    if (property.generation !== "none" || property.convention) unsafe(`"${key}" is filled automatically and cannot be set`);
+    if (descriptor.value === undefined) unsafe(`"${key}" is undefined; omit it or pass a value`);
+    if (descriptor.value === null) {
+      if (property.required) unsafe(`"${key}" is required (NOT NULL) and cannot be set to null`);
+      out.push(Object.freeze({ property, value: null })); continue;
+    }
+    if (typeof descriptor.value === "function") functionValue(key);
     out.push(Object.freeze({ property, value: snapshot(descriptor.value) }));
   }
   return Object.freeze(out.map((value) => Object.freeze(value)));
 }
 function admitInsertValues<T extends object>(model: EntityModel, entity: T): readonly AdmittedAssignment[] {
-  if (!objectInput(entity)) unsafe();
+  if (!objectInput(entity)) unsafe("pass an entity object to insertIfAbsent()");
   const descriptors = ownData(entity);
   const out: AdmittedAssignment[] = [];
   for (const property of model.properties) {
-    const descriptor = descriptors.get(property.propertyName); if (!descriptor || descriptor.value === undefined) unsafe();
-    if (descriptor.value === null) { if (property.required) unsafe(); out.push(Object.freeze({ property, value: null })); continue; }
+    const descriptor = descriptors.get(property.propertyName);
+    // An unset generated key is assigned as by saveChanges(); the caller's entity stays unchanged.
+    if (property.isKey && model.key.length === 1 && unsetKey(descriptor?.value)) {
+      if (isDatabaseGenerated(property.generation)) continue;
+      if (property.generation === "uuidV7") { out.push(Object.freeze({ property, value: Bun.randomUUIDv7() })); continue; }
+    }
+    if (!descriptor || descriptor.value === undefined) unsafe(`"${property.propertyName}" is missing; pass an entity with every mapped property of ${model.name}`);
+    if (descriptor.value === null) { if (property.required) unsafe(`"${property.propertyName}" is required (NOT NULL); got null`); out.push(Object.freeze({ property, value: null })); continue; }
+    if (typeof descriptor.value === "function") functionValue(property.propertyName);
     out.push(Object.freeze({ property, value: snapshot(descriptor.value) }));
   }
   return Object.freeze(out.map((value) => Object.freeze(value)));
 }
+function unsetKey(value: unknown): boolean { return value === undefined || value === null || value === "" || value === 0; }
 function encodeAssignments(runtime: DbContextRuntime, assignments: readonly AdmittedAssignment[]): readonly { readonly property: PropertyModel; readonly value: SqlParam }[] {
   return Object.freeze(assignments.map(({ property, value }) => Object.freeze({ property, value: value === null ? null : encode(runtime, property, value) })));
 }
@@ -104,7 +142,11 @@ function encode(runtime: DbContextRuntime, property: PropertyModel, input: unkno
     const providerValue = property.converter ? property.converter.toProvider(input) : input;
     const safeProvider = storageValue(providerValue, property.type, allowNull);
     return snapshotEncodedSqlParam(runtime.provider.dialect.encode(safeProvider, property.type));
-  } catch { unsafe(); }
+  } catch {
+    // Hostile inputs keep the generic message; describing them could run their traps.
+    if (typeof input === "object" && input !== null && types.isProxy(input)) unsafe();
+    unsafe(property.converter ? `"${property.propertyName}" could not be converted for its ${property.type} column` : `"${property.propertyName}" expects ${property.type}, got ${describeValue(input)}`);
+  }
 }
 
 function conflictTarget<T extends object>(model: EntityModel, options: { readonly conflictBy: OrmUniqueKeySelectorV1<T> }): readonly string[] {
@@ -120,11 +162,18 @@ function conflictTarget<T extends object>(model: EntityModel, options: { readonl
   if (!Number.isSafeInteger(length) || length < 1 || targetDescriptors.size !== length + 1) unsafe();
   const properties: string[] = [];
   for (let index = 0; index < length; index += 1) { const operand = targetDescriptors.get(String(index))?.value; if (typeof operand !== "object" || operand === null || types.isProxy(operand)) unsafe(); const property = issued.get(operand as Operand); if (!property) unsafe(); properties.push(property); }
-  if (new Set(properties).size !== properties.length) throw new OrmUndeclaredConflictTargetError();
+  const repeated = properties.find((name, index) => properties.indexOf(name) !== index);
+  if (repeated !== undefined) throw new OrmUndeclaredConflictTargetError(`conflictBy lists "${repeated}" more than once`);
   const columns = properties.map((name) => model.propertyByName(name)?.columnName);
-  if (columns.some((column) => column === undefined)) throw new OrmUndeclaredConflictTargetError();
+  const unknown = properties.find((_name, index) => columns[index] === undefined);
+  if (unknown !== undefined) throw new OrmUndeclaredConflictTargetError(`conflictBy uses "${unknown}", which is not a mapped property of ${model.name}`);
   const candidates = [model.key.map((property) => property.columnName), ...model.indexes.filter((index) => index.unique).map((index) => index.columns)];
-  if (!candidates.some((candidate) => candidate.length === columns.length && candidate.every((column, index) => column === columns[index]))) throw new OrmUndeclaredConflictTargetError();
+  if (!candidates.some((candidate) => candidate.length === columns.length && candidate.every((column, index) => column === columns[index]))) {
+    // Candidates are physical columns; the message speaks in property names, in the declared order.
+    const propertyOf = (column: string) => model.properties.find((property) => property.columnName === column)?.propertyName ?? column;
+    const options = candidates.map((candidate) => `(${candidate.map(propertyOf).join(", ")})`).join(", ");
+    throw new OrmUndeclaredConflictTargetError(`conflictBy (${properties.join(", ")}) is not the primary key or a unique index of ${model.name}. Use one of: ${options}; or declare @Index({ unique: true }) on these properties`);
+  }
   return Object.freeze(columns as string[]);
 }
 
