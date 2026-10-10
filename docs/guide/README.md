@@ -62,7 +62,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Запросы](database/queries.md) — условия, поиск по тексту, порядок и страницы, `select`, `include`, отслеживание
 - ✅ [Сохранение и отслеживание изменений](database/saving.md) — состояния, связанные сущности, объекты не из контекста, ошибки сохранения
 - ✅ [Транзакции](database/transactions.md) — `transactionScope`, откат, блокировки строк и `skipLocked`, вложенные scope, `tx.use`, `afterCommit`, тайм-аут
-- ⏳ Немедленные изменения (update / delete без загрузки)
+- ✅ [Немедленные изменения](database/immediate.md) — `executeUpdate`, `executeDelete`, `insertIfAbsent`, мягкое удаление, ограничения и отслеживание
 - ⏳ Управление схемой — `ensureCreated`, миграции
 - ⏳ Репозитории
 - ⏳ Owned stores

@@ -151,4 +151,4 @@ DbUpdateError: Primary key for tracked entity "Article" cannot be changed.
 - [Запросы](queries.md)
 - [`DbContext` и `DbSet`](dbcontext.md)
 - [Транзакции](transactions.md)
-- Немедленные изменения *(в работе)*
+- [Немедленные изменения](immediate.md)
