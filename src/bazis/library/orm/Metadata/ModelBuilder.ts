@@ -54,7 +54,7 @@ export class ModelBuilder {
       }
       if (rawProp.index) {
         indexes.push({
-          name: rawProp.index.name ?? `ix_${defaultTableName(ctor.name).toLowerCase()}_${property.columnName}`,
+          name: rawProp.index.name ?? `ix_${(raw.table ?? defaultTableName(ctor.name)).toLowerCase()}_${property.columnName}`,
           columns: [property.columnName],
           unique: rawProp.index.unique,
         });

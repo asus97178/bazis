@@ -4,6 +4,46 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.20 — 2026-10-10
+
+### Fixed
+
+- A startup failure is printed as `Name [code]: message`, the stack frames, the
+  remaining error properties and the `cause` chain. Before, the whole error was
+  inspected as an object: the message appeared twice (also inside `stack`) as
+  `'…' + '…'` string pieces. Secrets in error properties are still masked.
+- A foreign key to an entity of another context with `ensureCreated` or
+  `migrateOnStart` failed with `Error: ORM_SCHEMA_CROSS_UNIT_FOREIGN_KEY`. It
+  is now a `SchemaAdmissionError` naming the entity, the property and the
+  target, with the way out: keep the id as a plain column without `@ManyToOne`,
+  or map both entities in one context. Two entities of one context mapping one
+  table are named too.
+- A table created by two contexts with `ensureCreated` names the table and both
+  contexts instead of `Schema admission table ownership conflicts.`
+- Mixing schema modes (`ensureCreated` in one module, `migrateOnStart` or
+  migrations in another) names each context and its mode instead of `Schema
+  admission and legacy ORM schema authority cannot be composed together.`
+- `ensureCreated` logs the additive changes it made: `[orm:schema] applied 2
+  operation(s): add column products.sku, create unique index … (sku)`.
+  `EnsureCreatedResult` has the same list in `applied`.
+- `ensureCreated` failing on existing data (for example duplicates for a new
+  unique index) names the operation and the PostgreSQL code instead of
+  `Existing PostgreSQL data violates the declared additive schema change.`;
+  row values are not included.
+- `migrateOnStart` warns about a column whose type or NULL-ability differs from
+  the model; before, it silently left such columns as they were.
+- A failed versioned migration names itself: `Migration "20261010_03_bad"
+  failed and was rolled back: PostgresError: relation "nope" does not exist`
+  (the original error is the `cause`). The same for `down()`.
+- A property-level `@Index()` is named after the table, like a class-level
+  `@Index([...])`: `@Entity({ table: "app_users" })` gets `ix_app_users_email`
+  instead of `ix_users_email` from the class name. For databases created
+  earlier the old name is tolerated: `ensureCreated` reports the
+  `ALTER INDEX … RENAME TO …` command as a warning instead of failing, and
+  `migrateOnStart` no longer creates a second copy of an index that differs only
+  by name. Only entities whose class name does not match their table are
+  affected.
+
 ## 0.98.19 — 2026-10-10
 
 ### Added

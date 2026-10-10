@@ -39,6 +39,7 @@ function createOrmLifecycle<TContext extends DbContext>(
     config.migrations ?? [],
     config.runMigrationsOnStart === true,
     ownsConnection,
+    config.context.name,
   );
 }
 

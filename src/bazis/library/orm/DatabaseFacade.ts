@@ -72,7 +72,7 @@ export class DatabaseFacade {
     const types = this.provider.dialect.name === "postgres" ? physicalColumnTypes(this.models.entities) : undefined;
     const foreignKeys = new Map(targets.map((model) => [model, this.foreignKeysFor(model, types)]));
     const schema = await this.provider.introspect();
-    const { operations, warnings } = new SchemaDiffer().diff(targets, schema);
+    const { operations, warnings } = new SchemaDiffer(types).diff(targets, schema);
     const migrator = new Migrator(this.provider, (model) => foreignKeys.get(model)!);
     const applied = await migrator.apply(operations);
     return { applied: applied.length, operations: applied, warnings };

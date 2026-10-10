@@ -22,10 +22,13 @@ export class OrmLifecycle implements HostedService {
   readonly __bazisLegacySchemaAuthority: boolean;
   /** Internal hosted-plan marker: tables and foreign keys of the phase -105 exact `ensureCreated` admission on PostgreSQL. */
   readonly __bazisSchemaAdmission?: {
+    readonly owner: string;
     readonly unit: readonly string[];
     readonly tables: readonly string[];
     readonly foreignKeys: readonly { readonly source: string; readonly target: string }[];
   };
+  /** Internal hosted-plan marker: the context and its startup schema mode, for readable plan errors. */
+  readonly __bazisSchemaOwner: { readonly context: string; readonly mode: string };
   private connectionClosed = false;
   private closePromise?: Promise<void>;
 
@@ -42,13 +45,17 @@ export class OrmLifecycle implements HostedService {
      * must not close it at shutdown, or the shared pool would be closed twice.
      */
     private readonly ownsConnection: boolean = true,
+    contextName = "DbContext",
   ) {
+    const modes = [ensureCreated && "ensureCreated", migrateOnStart && "migrateOnStart", runMigrationsOnStart && migrations.length > 0 && "migrations"].filter(Boolean);
+    this.__bazisSchemaOwner = Object.freeze({ context: contextName, mode: modes.join(" + ") || "none" });
     this.phase = ensureCreated && options.provider.name === "postgres" ? -105 : -100;
     this.__bazisLegacySchemaAuthority = this.phase === -100 && (ensureCreated || migrateOnStart || (runMigrationsOnStart && migrations.length > 0));
     if (this.phase === -105) {
       const expected = compileExpectedSchema(options.model);
       const tables = Object.freeze(expected.tables.map((table) => `${table.schema}.${table.table}`));
       this.__bazisSchemaAdmission = Object.freeze({
+        owner: contextName,
         unit: tables,
         tables,
         foreignKeys: Object.freeze(expected.tables.flatMap((table) =>
@@ -66,6 +73,9 @@ export class OrmLifecycle implements HostedService {
     try {
       if (this.ensureCreated) {
         const result = await database.ensureCreated();
+        if (result.applied && result.applied.length > 0) {
+          console.info(`[orm:schema] applied ${result.applied.length} operation(s): ${result.applied.join(", ")}`);
+        }
         for (const warning of result.warnings) {
           console.warn(`[orm:schema] ${warning}`);
         }

@@ -1,10 +1,10 @@
-import { inspect } from "node:util";
 import { DiError } from "../di";
 import { Kernel } from "./Kernel";
 import { KernelBuilder, type RootModuleInput } from "./KernelBuilder";
 import { KernelError, ShutdownTimeoutError } from "./errors";
 import type { KernelOptions } from "./types";
-import { redactSensitive, redactSensitiveText } from "../../library/redaction";
+import { redactSensitiveText } from "../../library/redaction";
+import { formatStartupFailure } from "./startupFailure";
 
 /**
  * Entry-point facade.
@@ -61,10 +61,7 @@ export class Bazis {
       if (error instanceof DiError || error instanceof KernelError) {
         console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
       } else {
-        console.error("[bazis] application failed:", inspect(redactSensitive(error), {
-          depth: null, colors: false, customInspect: false, getters: false,
-          maxArrayLength: null, maxStringLength: null,
-        }));
+        console.error(`[bazis] application failed: ${formatStartupFailure(error)}`);
       }
       process.exitCode = 1;
       return 1;

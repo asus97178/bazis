@@ -21,28 +21,38 @@ function validateOrmHostedPlan(services: readonly HostedService[]): void {
       if (!framework && (service.phase ?? 0) < 0) throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", "Application hosted services must use phase 0 or later with ORM owned-store admission.");
     }
   }
-  const strict = services.filter((service): service is HostedService & { readonly __bazisSchemaAdmission: { readonly unit: readonly string[]; readonly tables: readonly string[]; readonly foreignKeys: readonly { readonly source: string; readonly target: string }[] } } =>
+  const strict = services.filter((service): service is HostedService & { readonly __bazisSchemaAdmission: { readonly owner?: string; readonly unit: readonly string[]; readonly tables: readonly string[]; readonly foreignKeys: readonly { readonly source: string; readonly target: string }[] } } =>
     (service as { __bazisSchemaAdmission?: unknown }).__bazisSchemaAdmission !== undefined,
   );
   if (strict.length === 0) return;
-  const owners = new Set<string>();
+  const owners = new Map<string, string>();
   for (const service of strict) {
     if ((service.phase ?? 0) !== -105) throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", "Schema admission has an invalid hosted phase.");
-    for (const table of service.__bazisSchemaAdmission.tables) { if (owners.has(table)) throw new SchemaAdmissionError("ORM_SCHEMA_OWNERSHIP_CONFLICT", "Schema admission table ownership conflicts."); owners.add(table); }
+    const owner = service.__bazisSchemaAdmission.owner ?? "A DbContext";
+    for (const table of service.__bazisSchemaAdmission.tables) {
+      const other = owners.get(table);
+      if (other !== undefined) throw new SchemaAdmissionError("ORM_SCHEMA_OWNERSHIP_CONFLICT", `Schema admission table ownership conflicts: table ${table} is created by both ${other} and ${owner} with ensureCreated. One context must own the table: remove the entity from the other context and refer to it by a plain id column.`);
+      owners.set(table, owner);
+    }
     const unit = new Set(service.__bazisSchemaAdmission.unit);
     for (const foreignKey of service.__bazisSchemaAdmission.foreignKeys) {
       if (!unit.has(foreignKey.source) || !unit.has(foreignKey.target)) {
-        throw new SchemaAdmissionError("ORM_SCHEMA_OWNERSHIP_CONFLICT", "Schema admission foreign keys must target the same explicit unit.");
+        throw new SchemaAdmissionError("ORM_SCHEMA_OWNERSHIP_CONFLICT", `Schema admission foreign keys must target the same explicit unit: ${owner} has a foreign key from ${foreignKey.source} to ${foreignKey.target}, which it does not create.`);
       }
     }
   }
   if (!services.some((service) => isOrmProviderLifecycle(service) && (service.phase ?? 0) === -110)) {
     throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", "Schema admission requires a provider lifecycle at phase -110.");
   }
+  const legacy = services.filter((service) => (service as { __bazisLegacySchemaAuthority?: unknown }).__bazisLegacySchemaAuthority === true);
+  if (legacy.length > 0) {
+    const describe = (service: HostedService) => {
+      const owner = (service as { __bazisSchemaOwner?: { context: string; mode: string } }).__bazisSchemaOwner;
+      return owner ? `${owner.context} uses ${owner.mode}` : "a module uses migrateOnStart or migrations";
+    };
+    throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", `Schema admission and legacy ORM schema authority cannot be composed together: ${[...strict, ...legacy].map(describe).join(", ")}. Use one schema mode in the application: ensureCreated in every module, or migrateOnStart/migrations in every module.`);
+  }
   for (const service of services) {
-    if ((service as { __bazisLegacySchemaAuthority?: unknown }).__bazisLegacySchemaAuthority === true) {
-      throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", "Schema admission and legacy ORM schema authority cannot be composed together.");
-    }
     const framework = isOrmProviderLifecycle(service)
       || isStrictSchemaPrerequisiteLifecycle(service)
       || (service as { __bazisOrmLegacyLifecycle?: unknown }).__bazisOrmLegacyLifecycle === true

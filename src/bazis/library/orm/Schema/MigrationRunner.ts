@@ -1,4 +1,6 @@
 import type { DatabaseProvider, DbExecutor, Row, SqlParam } from "../Providers/types";
+import { OrmError } from "../errors";
+import { isUnknownTransactionOutcome } from "../Providers/transactionOutcome";
 
 /** Execution context of a versioned migration. */
 export interface MigrationContext {
@@ -53,7 +55,7 @@ export class MigrationRunner {
           `INSERT INTO ${this.quote(HISTORY_TABLE)} (${this.quote("MigrationId")}, ${this.quote("AppliedAt")}) VALUES (${this.param(0)}, ${this.param(1)})`,
           [migration.id, new Date().toISOString()],
         );
-      });
+      }).catch((error: unknown) => { throw migrationFailed(`Migration "${migration.id}"`, error); });
       applied.push(migration.id);
     }
     return { applied, rolledBack: [] };
@@ -86,7 +88,7 @@ export class MigrationRunner {
         await tx.execute(`DELETE FROM ${this.quote(HISTORY_TABLE)} WHERE ${this.quote("MigrationId")} = ${this.param(0)}`, [
           id,
         ]);
-      });
+      }).catch((error: unknown) => { throw migrationFailed(`Rollback of migration "${id}"`, error); });
       rolledBack.push(id);
     }
     return { applied: [], rolledBack };
@@ -143,4 +145,12 @@ export class MigrationRunner {
       return this.param(index);
     });
   }
+}
+
+/** Names the failed migration; its transaction was rolled back, earlier ones stay applied. */
+function migrationFailed(subject: string, error: unknown): unknown {
+  // An unknown COMMIT outcome must not be reported as a rollback.
+  if (isUnknownTransactionOutcome(error)) return error;
+  const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return new OrmError(`${subject} failed and was rolled back: ${reason}`, { cause: error });
 }
