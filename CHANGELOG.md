@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.16 — 2026-10-10
+
+### Added
+
+- Case-insensitive text matches: `p.title.contains("sql", { ignoreCase: true })`,
+  and the same option on `startsWith`, `endsWith` and `eq`. PostgreSQL gets an
+  escaped `ILIKE`; `%` and `_` in the value stay literal.
+
+### Fixed
+
+- A condition that is not an ORM condition fails with a hint:
+  `where() expects a condition such as (p) => p.views.gt(70), got boolean. Use
+  .gt()/.eq()/.and()/.or() instead of >, ===, &&, ||.` Before, the query failed
+  with `undefined is not an object (evaluating 'condition.kind')`. Applies to
+  `where`, `count`, `any`, `first`, `firstOrDefault` and `@QueryFilter`.
+- A computation inside `select()` fails with a hint:
+  `select() maps properties as they are, e.g. (p) => ({ name: p.title });
+  compute values after toList().` Before, `({ label: `${p.title}!` })` failed
+  with `Property "title!" is not mapped on entity "Post". Did you forget @Column()?`.
+- The `BAZIS_ORM_PREDICATE_LOGIC` codegen error (`&&`/`||` over conditions)
+  shows a relative path and an example of `.and()`.
+
 ## 0.98.15 — 2026-10-10
 
 ### Fixed

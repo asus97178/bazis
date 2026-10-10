@@ -1,3 +1,4 @@
+import path from "node:path";
 import ts from "typescript";
 
 /** Reject JS truthiness where the caller is constructing an ORM condition. */
@@ -11,8 +12,11 @@ export function analyzeOrmPredicates(checker: ts.TypeChecker, source: ts.SourceF
   };
   const reject = (node: ts.Node): void => {
     const location = source.getLineAndCharacterOfPosition(node.getStart(source));
-    diagnostics.push(`BAZIS_ORM_PREDICATE_LOGIC: ${source.fileName}:${location.line + 1}:${location.character + 1}: `
-      + "ORM conditions cannot use JavaScript truthiness. Use .and(), .or(), .not() or an explicit boolean condition.");
+    // Relative like the other codegen diagnostics: the project path is noise.
+    const fileName = (path.isAbsolute(source.fileName) ? path.relative(".", source.fileName) : source.fileName).replaceAll("\\", "/");
+    diagnostics.push(`BAZIS_ORM_PREDICATE_LOGIC: ${fileName}:${location.line + 1}:${location.character + 1}: `
+      + "ORM conditions cannot use JavaScript truthiness: JavaScript keeps only one side of && and ||. "
+      + "Use .and(), .or(), .not(): (p) => p.views.gt(70).and(p.authorId.eq(2)).");
   };
   const visit = (node: ts.Node): void => {
     if (ts.isBinaryExpression(node)

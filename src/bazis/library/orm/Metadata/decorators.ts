@@ -1,6 +1,6 @@
 import type { ColumnOptionsType, RelationKind, PropertyConvention } from "./types";
 import type { ValueConverter } from "./ValueConverter";
-import { fieldSelector, type PredicateFn } from "../Query/conditions";
+import { evaluatePredicate, type PredicateFn } from "../Query/conditions";
 import type { Condition } from "../Query/conditions";
 import { compileCheck, type CheckPredicate } from "../Schema/CheckExpression";
 
@@ -371,7 +371,7 @@ export function HasConversion(converter: ValueConverter) {
 export function QueryFilter<T extends object>(predicate: PredicateFn<T>) {
   return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
     const raw = ownRaw(context.metadata);
-    const node = predicate(fieldSelector<T>()).node;
+    const node = evaluatePredicate(predicate, "@QueryFilter").node;
     raw.queryFilters = [...(raw.queryFilters ?? []), node];
   };
 }
