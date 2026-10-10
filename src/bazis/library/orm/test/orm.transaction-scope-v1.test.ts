@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Column, ConcurrentTransactionScopeError, DbContext, DbContextOptions, Entity, EntityState, Key, OrmProviderIdentityMismatchError, OrmTransactionScopeError, PostCommitError, withRetry, type DatabaseProvider, type DbExecutor, type ExecuteResult, type Row, type SqlDialect } from "../index";
 import { observeProviderDispatch, registerPostgresTransactionCapability } from "../Providers/ormTransactionRuntime";
@@ -858,4 +858,88 @@ test("parent abort interrupts an already-closing child's JS drain and fences its
   resume(); await new Promise<void>((resolve) => setTimeout(resolve, 0));
   await expect(late).rejects.toBeInstanceOf(OrmTransactionScopeError);
   expect((value as DatabaseProvider & { __executorCalls: () => number }).__executorCalls()).toBe(0);
+});
+
+describe("transaction scope errors name the cause", () => {
+  class AuditContext extends Context {}
+  const providerWithHooks = () => provider() as DatabaseProvider & { __setQuery(work: () => Promise<Row[]>): void };
+
+  test("a failure caught inside the callback is reported with its cause", async () => {
+    const p = providerWithHooks(); const db = new Context(p);
+    const failure = new Error("division by zero");
+    p.__setQuery(async () => { throw failure; });
+    const error = await db.transactionScope(async () => {
+      await db.database.querySqlRaw("SELECT 1/0").catch(() => {});
+      return "returned normally";
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(OrmTransactionScopeError);
+    expect((error as Error).message).toContain("rolled back because an operation inside it failed: Error: division by zero");
+    expect((error as Error).message).toContain("nested transactionScope()");
+    expect((error as Error).cause).toBe(failure);
+  });
+
+  test("a same-provider context outside tx.use is named and pointed to tx.use", async () => {
+    const p = provider(); const db = new Context(p); const audit = new AuditContext(p);
+    const errors: unknown[] = [];
+    await db.transactionScope(async () => {
+      errors.push(await audit.database.querySqlRaw("SELECT 1").catch((caught: unknown) => caught));
+      errors.push(await audit.transactionScope(async () => 1).catch((caught: unknown) => caught));
+    }).catch(() => {});
+    expect(errors).toHaveLength(2);
+    for (const error of errors) {
+      expect(error).toBeInstanceOf(OrmTransactionScopeError);
+      expect((error as Error).message).toContain("AuditContext is not part of the surrounding transaction scope. Run it through tx.use(context, work)");
+    }
+  });
+
+  test("a context with another provider is named in both use and direct calls", async () => {
+    const db = new Context(provider()); const other = new AuditContext(provider());
+    const errors: unknown[] = [];
+    await db.transactionScope(async (tx) => {
+      errors.push(await tx.use(other, async () => 1).catch((caught: unknown) => caught));
+      errors.push(await other.database.querySqlRaw("SELECT 1").catch((caught: unknown) => caught));
+    }).catch(() => {});
+    expect(errors[0]).toBeInstanceOf(OrmProviderIdentityMismatchError);
+    expect(errors[1]).toBeInstanceOf(OrmTransactionScopeError);
+    for (const error of errors) expect((error as Error).message).toContain("AuditContext uses a different database provider than the surrounding transaction scope");
+  });
+
+  test("work left running after the callback returns explains the missing await", async () => {
+    const p = providerWithHooks(); const db = new Context(p);
+    let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
+    p.__setQuery(async () => { await gate; return []; });
+    let detached: Promise<unknown> | undefined;
+    const scope = db.transactionScope(async () => { detached = db.database.querySqlRaw("SELECT 1"); }).catch((caught: unknown) => caught);
+    setTimeout(release, 20);
+    const error = await scope;
+    expect((error as Error).message).toContain("await every ORM call inside the scope callback");
+    await detached?.catch(() => {});
+    await expect(db.transactionScope(async () => undefined)).resolves.toBeUndefined();
+  });
+
+  test("ORM work after the scope finished says so", async () => {
+    const db = new Context(provider());
+    let retained: import("../index").OrmTransaction | undefined;
+    await db.transactionScope(async (tx) => { retained = tx; });
+    expect(() => retained!.afterCommit(() => {})).toThrow("has already finished");
+  });
+
+  test("the outer scope is blocked with a hint while a nested scope runs", async () => {
+    const db = new Context(provider());
+    await db.transactionScope(async (outer) => {
+      let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; });
+      const child = db.transactionScope(async () => { await gate; });
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(() => outer.afterCommit(() => {})).toThrow("A nested transaction scope is still running");
+      release(); await child;
+    });
+  });
+
+  test("a scope timeout reports the budget instead of a plain abort", async () => {
+    const db = new Context(provider());
+    await expect(db.transactionScope(() => new Promise((resolve) => setTimeout(resolve, 500)), { timeoutMs: 50 })).rejects.toThrow("ORM transaction scope timed out after 50 ms");
+    const controller = new AbortController(); setTimeout(() => controller.abort(), 20);
+    await expect(db.transactionScope(() => new Promise((resolve) => setTimeout(resolve, 500)), { signal: controller.signal })).rejects.toThrow("ORM transaction scope was aborted.");
+  });
 });

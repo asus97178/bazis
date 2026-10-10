@@ -11,11 +11,12 @@ export class OperationDeadline {
   readonly controller = new AbortController();
   readonly signal = this.controller.signal;
   private readonly timer: ReturnType<typeof setTimeout>;
-  private readonly onAbort = () => this.controller.abort(new OrmTransactionScopeError("ORM operation was aborted."));
+  // A parent deadline's reason (for example a scope timeout) survives nesting.
+  private readonly onAbort = () => this.controller.abort(this.parent?.reason instanceof OrmTransactionScopeError ? this.parent.reason : new OrmTransactionScopeError(`${this.label} was aborted.`));
 
-  constructor(timeoutMs: number, private readonly parent?: AbortSignal) {
+  constructor(timeoutMs: number, private readonly parent?: AbortSignal, private readonly label = "ORM operation") {
     if (parent !== undefined && !(parent instanceof AbortSignal)) throw new TypeError("signal must be an AbortSignal.");
-    this.timer = setTimeout(() => this.controller.abort(new OrmTransactionScopeError("ORM operation deadline exceeded.")), timeoutMs);
+    this.timer = setTimeout(() => this.controller.abort(new OrmTransactionScopeError(`${label} timed out after ${timeoutMs} ms.`)), timeoutMs);
     if (parent?.aborted) this.onAbort();
     else parent?.addEventListener("abort", this.onAbort, { once: true });
   }

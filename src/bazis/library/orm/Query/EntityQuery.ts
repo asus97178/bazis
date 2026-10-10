@@ -207,6 +207,8 @@ export class EntityQuery<T extends object, TResult = T> {
 }
 
 function assertSkipLocked(model: EntityModel, runtime: DbContextRuntime, plan: QueryPlan, terminal: "toList" | "count"): void {
+  // Outside a transaction PostgreSQL releases the lock right after the SELECT.
+  if (plan.rowLock && !plan.skipLocked && runtime.provider.isTransactionActive?.() !== true) throw new Error("forUpdate() locks rows only until the surrounding transaction ends; outside a transaction the lock is released right after the SELECT. Run the read and the following saveChanges() inside db.transactionScope(async () => { ... }).");
   if (!plan.skipLocked) return;
   if (terminal !== "toList" || runtime.provider.isTransactionActive?.() !== true || plan.conditions.length === 0 || plan.invalidRequestedLimit !== undefined || !Number.isSafeInteger(plan.limit) || plan.limit! <= 0 || plan.requestedLimit !== undefined && plan.requestedLimit !== plan.limit || plan.offset !== undefined || plan.projections.length !== 0 || plan.includes.length !== 0) throw new Error("FOR UPDATE SKIP LOCKED requires an active transaction, where, positive take, and terminal materialization.");
   const ordered = new Set(plan.orders.map((order) => order.property));
