@@ -1,7 +1,7 @@
 import { EntityNotFoundError } from "../errors";
 import type { EntityModel } from "../Metadata/types";
 import type { DbContextRuntime } from "../runtime";
-import { fieldSelector, type KeySelectorFn, type PredicateFn } from "./conditions";
+import { evaluatePredicate, fieldSelector, type KeySelectorFn, type PredicateFn } from "./conditions";
 import { IncludeLoader } from "./IncludeLoader";
 import { materialize, materializeProjection } from "./materialize";
 import { EMPTY_PLAN, withCondition, withOrder, type QueryPlan } from "./QueryPlan";
@@ -30,6 +30,16 @@ function captureNavigation<T>(selector: (entity: T) => unknown): string {
   return captured;
 }
 
+const SELECT_HINT = "select() maps properties as they are, e.g. (p) => ({ name: p.title }); compute values after toList().";
+
+/** A property read inside `select`; turning it into a string or number is a computation select cannot translate. */
+class ProjectedField {
+  constructor(readonly property: string) {}
+  [Symbol.toPrimitive](): never {
+    throw new TypeError(SELECT_HINT);
+  }
+}
+
 /** Captures the `.select(u => ({ alias: u.prop }))` projection. */
 function captureProjection<T, R extends Record<string, unknown>>(
   selector: (entity: T) => R,
@@ -37,13 +47,16 @@ function captureProjection<T, R extends Record<string, unknown>>(
   const proxy = new Proxy(
     {},
     {
-      get(_target, property): string {
-        return String(property);
+      get(_target, property): ProjectedField {
+        return new ProjectedField(String(property));
       },
     },
   );
   const mapped = selector(proxy as T);
-  return Object.entries(mapped).map(([alias, propertyName]) => ({ alias, property: String(propertyName) }));
+  return Object.entries(mapped).map(([alias, field]) => {
+    if (!(field instanceof ProjectedField)) throw new TypeError(`${SELECT_HINT} "${alias}" is not a property.`);
+    return { alias, property: field.property };
+  });
 }
 
 /**
@@ -64,7 +77,7 @@ export class EntityQuery<T extends object, TResult = T> {
 
   /** Filter. Several calls are combined with AND. */
   where(predicate: PredicateFn<T>): EntityQuery<T, TResult> {
-    const result = predicate(fieldSelector<T>());
+    const result = evaluatePredicate(predicate, "where");
     return this.derive(withCondition(this.plan, result.node));
   }
 

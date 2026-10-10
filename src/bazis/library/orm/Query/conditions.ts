@@ -6,10 +6,17 @@
  * returns a column operand, comparison methods produce AST nodes, and
  * `.and()/.or()/.not()` combine them. No user strings in the SQL, only parameters.
  *
- * Note: `&&`/`||` are not intercepted; use `.and()/.or()`.
+ * Note: `&&`/`||` are not intercepted; use `.and()/.or()`. Codegen rejects
+ * them in where/count/any/first/firstOrDefault and @QueryFilter, and a result
+ * that is not a Predicate fails with a hint (see {@link evaluatePredicate}).
  */
 
-export type CompareOp = "=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE";
+export type CompareOp = "=" | "<>" | ">" | ">=" | "<" | "<=" | "LIKE" | "ILIKE";
+
+/** Text match options: `ignoreCase` compares case-insensitively (PostgreSQL `ILIKE`). */
+export interface TextMatchOptions {
+  readonly ignoreCase?: boolean;
+}
 
 export type Condition =
   | {
@@ -17,7 +24,7 @@ export type Condition =
       readonly property: string;
       readonly op: CompareOp;
       readonly value: unknown;
-      /** For LIKE from startsWith/endsWith/contains: add `ESCAPE '\'`. */
+      /** For LIKE/ILIKE from startsWith/endsWith/contains/eq: add `ESCAPE '\'`. */
       readonly escaped?: boolean;
     }
   | { readonly kind: "in"; readonly property: string; readonly values: readonly unknown[] }
@@ -49,12 +56,17 @@ export class Operand<T = unknown> {
     return new Predicate({ kind: "compare", property: this.property, op, value });
   }
 
-  /** LIKE with escaped wildcards (needs `ESCAPE '\'` in SQL). */
-  private likeEscaped(pattern: string): Predicate {
-    return new Predicate({ kind: "compare", property: this.property, op: "LIKE", value: pattern, escaped: true });
+  /** LIKE/ILIKE with escaped wildcards (needs `ESCAPE '\'` in SQL). */
+  private likeEscaped(pattern: string, options: TextMatchOptions | undefined): Predicate {
+    return new Predicate({ kind: "compare", property: this.property, op: options?.ignoreCase === true ? "ILIKE" : "LIKE", value: pattern, escaped: true });
   }
 
-  eq(value: T): Predicate {
+  /** Equality; `{ ignoreCase: true }` compares strings case-insensitively. */
+  eq(value: T, options?: TextMatchOptions): Predicate {
+    if (options?.ignoreCase === true) {
+      if (typeof value !== "string") throw new TypeError(`eq(..., { ignoreCase: true }) on "${this.property}" needs a string value.`);
+      return this.likeEscaped(escapeLike(value), options);
+    }
     return value === null ? this.isNull() : this.compare("=", value);
   }
   ne(value: T): Predicate {
@@ -75,14 +87,14 @@ export class Operand<T = unknown> {
   like(pattern: TextValue<T>): Predicate {
     return this.compare("LIKE", pattern);
   }
-  startsWith(value: TextValue<T>): Predicate {
-    return this.likeEscaped(`${escapeLike(value)}%`);
+  startsWith(value: TextValue<T>, options?: TextMatchOptions): Predicate {
+    return this.likeEscaped(`${escapeLike(value)}%`, options);
   }
-  endsWith(value: TextValue<T>): Predicate {
-    return this.likeEscaped(`%${escapeLike(value)}`);
+  endsWith(value: TextValue<T>, options?: TextMatchOptions): Predicate {
+    return this.likeEscaped(`%${escapeLike(value)}`, options);
   }
-  contains(value: TextValue<T>): Predicate {
-    return this.likeEscaped(`%${escapeLike(value)}%`);
+  contains(value: TextValue<T>, options?: TextMatchOptions): Predicate {
+    return this.likeEscaped(`%${escapeLike(value)}%`, options);
   }
   in(values: readonly T[]): Predicate {
     return new Predicate({ kind: "in", property: this.property, values: [...values] });
@@ -124,4 +136,18 @@ const FIELD_PROXY: ProxyHandler<object> = {
 /** Creates a Proxy selector of the entity fields. */
 export function fieldSelector<T>(): FieldSelector<T> {
   return new Proxy({}, FIELD_PROXY) as FieldSelector<T>;
+}
+
+/**
+ * Runs a predicate function and checks that it built a condition. `>`/`===`
+ * on an operand yield a boolean, and `cond && other` with a false left side
+ * yields `false`; without this check the query failed deep in SQL building.
+ */
+export function evaluatePredicate<T>(predicate: PredicateFn<T>, method: string): Predicate {
+  const result: unknown = predicate(fieldSelector<T>());
+  if (result instanceof Predicate) return result;
+  throw new TypeError(
+    `${method}() expects a condition such as (p) => p.views.gt(70), got ${result === null ? "null" : typeof result}. `
+      + "Use .gt()/.eq()/.and()/.or() instead of >, ===, &&, ||.",
+  );
 }

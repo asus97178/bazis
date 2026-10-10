@@ -192,3 +192,15 @@ a number, boolean, `Date`, object or array initial value on a column, or a non-n
 key, now fails the model build and names the type to set. Before 0.98.14 such columns were
 silently `text` (a number came back as a string) and a string key became a bigint identity
 that dropped the assigned value. Regression: `library/orm/test/orm.column-type-initializer.test.ts`.
+
+## Query DX (2026-10-10, 0.98.16)
+
+`where`, `count`, `any`, `first`, `firstOrDefault` and `@QueryFilter` run the predicate
+through `evaluatePredicate`: a result that is not a `Predicate` (`p.views > 70` after a cast,
+`flag && cond` with a false flag) fails with `where() expects a condition such as (p) =>
+p.views.gt(70), got boolean …`. `&&`/`||`/`!` over conditions in application code are already
+rejected by codegen (`BAZIS_ORM_PREDICATE_LOGIC`, now with a relative path and an example).
+`eq`, `contains`, `startsWith` and `endsWith` take `{ ignoreCase: true }`, rendered as
+escaped PostgreSQL `ILIKE` (immediate mutations accept it too). A computation inside
+`select()` (a template literal, arithmetic, a constant) fails with a hint to compute after
+`toList()`. Regression: `library/orm/test/orm.query-dx.test.ts`.
