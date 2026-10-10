@@ -617,3 +617,13 @@ test("insertIfAbsent leaves an unset generated key to the database or a new UUID
   expect(log[2]!.sql).toBe('INSERT INTO "immediate_dx_v4_rows" ("code") VALUES ($1) ON CONFLICT ("code") DO NOTHING');
   await expect(db.rows.insertIfAbsent({ title: "B", slug: "b" } as DxRow, { conflictBy: x => [x.slug] })).rejects.toThrow('"views" is missing; pass an entity with every mapped property of DxRow');
 });
+
+test("an undeclared conflict target lists the unique keys that would work", async () => {
+  const log: { sql: string; params: readonly unknown[] }[] = []; const db = new DxContext(provider(log));
+  const row = () => Object.assign(new DxRow(), { id: 1, title: "A", slug: "a" });
+  await expect(db.rows.insertIfAbsent(row(), { conflictBy: (x) => [x.title] })).rejects.toThrow('conflictBy (title) is not the primary key or a unique index of DxRow. Use one of: (id), (slug); or declare @Index({ unique: true }) on these properties.');
+  await expect(db.rows.insertIfAbsent(row(), { conflictBy: (x) => [x.slug, x.slug] })).rejects.toThrow('conflictBy lists "slug" more than once');
+  const keys = Object.assign(new KeyRow(), { tenantKey: "t", sequence: 1, externalKey: "e", payload: "p" });
+  await expect(new Context(provider(log)).keyRows.insertIfAbsent(keys, { conflictBy: (x) => [x.tenantKey] })).rejects.toThrow("Use one of: (tenantKey, sequence), (externalKey, tenantKey);");
+  expect(log).toEqual([]);
+});

@@ -162,11 +162,18 @@ function conflictTarget<T extends object>(model: EntityModel, options: { readonl
   if (!Number.isSafeInteger(length) || length < 1 || targetDescriptors.size !== length + 1) unsafe();
   const properties: string[] = [];
   for (let index = 0; index < length; index += 1) { const operand = targetDescriptors.get(String(index))?.value; if (typeof operand !== "object" || operand === null || types.isProxy(operand)) unsafe(); const property = issued.get(operand as Operand); if (!property) unsafe(); properties.push(property); }
-  if (new Set(properties).size !== properties.length) throw new OrmUndeclaredConflictTargetError();
+  const repeated = properties.find((name, index) => properties.indexOf(name) !== index);
+  if (repeated !== undefined) throw new OrmUndeclaredConflictTargetError(`conflictBy lists "${repeated}" more than once`);
   const columns = properties.map((name) => model.propertyByName(name)?.columnName);
-  if (columns.some((column) => column === undefined)) throw new OrmUndeclaredConflictTargetError();
+  const unknown = properties.find((_name, index) => columns[index] === undefined);
+  if (unknown !== undefined) throw new OrmUndeclaredConflictTargetError(`conflictBy uses "${unknown}", which is not a mapped property of ${model.name}`);
   const candidates = [model.key.map((property) => property.columnName), ...model.indexes.filter((index) => index.unique).map((index) => index.columns)];
-  if (!candidates.some((candidate) => candidate.length === columns.length && candidate.every((column, index) => column === columns[index]))) throw new OrmUndeclaredConflictTargetError();
+  if (!candidates.some((candidate) => candidate.length === columns.length && candidate.every((column, index) => column === columns[index]))) {
+    // Candidates are physical columns; the message speaks in property names, in the declared order.
+    const propertyOf = (column: string) => model.properties.find((property) => property.columnName === column)?.propertyName ?? column;
+    const options = candidates.map((candidate) => `(${candidate.map(propertyOf).join(", ")})`).join(", ");
+    throw new OrmUndeclaredConflictTargetError(`conflictBy (${properties.join(", ")}) is not the primary key or a unique index of ${model.name}. Use one of: ${options}; or declare @Index({ unique: true }) on these properties`);
+  }
   return Object.freeze(columns as string[]);
 }
 

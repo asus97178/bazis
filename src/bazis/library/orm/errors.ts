@@ -150,7 +150,7 @@ export class OrmUnsafeImmediateMutationError extends OrmError {
 }
 /** INSERT ON CONFLICT may name only an exactly declared unique target. */
 export class OrmUndeclaredConflictTargetError extends OrmError {
-  constructor() { super("Immediate ORM mutation conflict target is not a declared unique key."); }
+  constructor(detail?: string) { super(detail === undefined ? "Immediate ORM mutation conflict target is not a declared unique key." : `Immediate ORM mutation conflict target is not a declared unique key: ${detail}.`); }
 }
 
 /**

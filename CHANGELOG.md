@@ -31,6 +31,10 @@ contain breaking changes, a patch version does not.
   inputs (proxies, accessors, cycles) keep the generic message.
 - `OrmTrackedMutationConflictError` names the tracked entity and the way out:
   load it with `.asNoTracking()` or run the mutation in a separate `DbContext`.
+- `OrmUndeclaredConflictTargetError` lists the keys that would work:
+  `conflictBy (title) is not the primary key or a unique index of Article. Use
+  one of: (id), (slug); or declare @Index({ unique: true }) on these
+  properties.` A repeated or unmapped property in `conflictBy` is named too.
 
 ## 0.98.18 — 2026-10-10
 
