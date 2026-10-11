@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, Global, Module, singletonValue } from "@/core/di";
 import {
-  AGENT_MODEL_PROVIDER,
+  AGENT_MODEL_PROVIDER, AgentRuntime,
   agentMessage,
   agentModelRequest,
   agentModelResponse,
@@ -129,7 +129,7 @@ describe("LLM model router", () => {
     class AppInfra {}
 
     const meta = AppInfra as unknown as { exports?: readonly unknown[]; config?: readonly unknown[] };
-    expect(meta.exports).toEqual([AGENT_MODEL_PROVIDER]);
+    expect(meta.exports).toEqual([AGENT_MODEL_PROVIDER, AgentRuntime]);
     expect(meta.config).toEqual([fastConfig, sharedConfig]);
   });
 

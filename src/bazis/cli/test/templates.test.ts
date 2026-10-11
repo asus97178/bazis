@@ -49,7 +49,7 @@ test("generated CRUD passports link to existing components and document their fi
     expect(markdown).toContain("AGENTS.md");
   }
   const passport = await Bun.file(path.join(catalogDir, "MODULE.md")).text();
-  for (const field of ["body.name", "body.email", "basePath", "topic", "audience", "context"]) expect(passport).toContain(field);
+  for (const field of ["body.name", "body.email", "basePath", "topic", "context", "toolNames"]) expect(passport).toContain(field);
 });
 
 test("full service evicts list and item caches after successful mutations, preserving other tags", async () => {

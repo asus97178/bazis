@@ -99,7 +99,9 @@ export class AgentRegistry {
       ...(input.description === undefined ? {} : { description: input.description }),
       ...(input.modelProfile === undefined ? {} : { modelProfile: input.modelProfile }),
     };
-    return new AgentRegistry(tools, agent);
+    // The whole catalog stays known so that a call of an unnamed tool is denied as
+    // not visible to this agent; the model is offered only `agent.tools`.
+    return new AgentRegistry(allowedTools, agent);
   }
 
   /** The application's Tools from the `@Module.tools` registrations, without constructing them. */

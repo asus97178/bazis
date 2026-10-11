@@ -50,10 +50,8 @@ function base(phase: "ready-model" | "pending-tools" | "terminal"): Record<strin
   return {
     version,
     invocation: {
-      kind: "task",
       invocationId: "inv-1",
       agentName: "catalog-agent",
-      taskName: "answer",
       input: null,
       metadata: { source: "session" },
       options: resolvedOptions(),

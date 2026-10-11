@@ -50,7 +50,7 @@ test("an agent sees only the registered tools it names and calls them through th
     expect(requests[0]?.tools.map((tool) => tool.name)).toEqual(["host.read"]);
     expect(result.status).toBe("completed");
     expect(result.toolResults[0]?.output).toBe("Read through ToolExecutor");
-    expect(result.toolResults[1]?.error?.code).toBe("TOOL_NOT_REGISTERED");
+    expect(result.toolResults[1]).toMatchObject({ status: "denied", error: { code: "TOOL_NOT_VISIBLE_TO_AGENT" } });
     expect(requests).toHaveLength(2);
   } finally { await container.dispose(); }
 });
