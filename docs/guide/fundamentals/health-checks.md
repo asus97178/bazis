@@ -121,6 +121,7 @@ http: { health: { path: "/ready", exposeDetails: false, timeoutMs: 5000, cacheMs
 | `cache: memory()` | `cache:memory` |
 | Подключения из `infra` (PostgreSQL, Redis) | Своя проверка на каждое подключение |
 | ORM | Доступность базы данных |
+| Фоновая служба в `background` модуля | `background:<Класс>` — не прошла, если служба остановилась насовсем ([Фоновые службы](../realtime/background-services.md#здоровье)) |
 
 ## Что проверять
 
