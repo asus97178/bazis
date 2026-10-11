@@ -23,8 +23,19 @@ export class AuthController {
 ## Проверка: `AuthorizeCheck`
 
 ```ts
-type AuthorizeCheck = (ctx: HttpContext) => boolean | Promise<boolean>;
+type AuthorizeCheck = (ctx: AuthorizeContext) => boolean | Promise<boolean>;
+
+interface AuthorizeContext {
+  header(name: string): string | undefined;   // заголовок запроса
+  readonly services: ServiceScope;             // scope этого запроса
+  readonly state: Map<string, unknown>;        // общее с обработчиком
+}
 ```
+
+`HttpContext` подходит под `AuthorizeContext`, поэтому проверка получает
+обычный контекст запроса. Те же проверки защищают и
+[gRPC-методы](../realtime/grpc.md#авторизация): там `header()` читает
+метаданные вызова.
 
 | Что сделала проверка | Ответ клиенту |
 | --- | --- |
@@ -111,7 +122,7 @@ export class AuthTokens {
 // checks.ts
 import {
   PRINCIPAL_STATE_KEY, UnauthorizedError,
-  type AuthorizeCheck, type HttpContext, type RequestPrincipal,
+  type AuthorizeCheck, type AuthorizeContext, type RequestPrincipal,
 } from "bazis/core/http";
 import { AuthTokens } from "./AuthTokens.service";
 
@@ -137,10 +148,18 @@ export const signedIn: AuthorizeCheck = async (ctx) => {
 /** Нужная роль; ставится после signedIn. Нет роли → false → 403. */
 export const hasRole = (role: string): AuthorizeCheck => (ctx) => currentUser(ctx).role === role;
 
-export function currentUser(ctx: HttpContext): UserPrincipal {
+export function currentUser(ctx: AuthorizeContext): UserPrincipal {
   return ctx.state.get(PRINCIPAL_STATE_KEY) as UserPrincipal;
 }
 ```
+
+`currentUser` принимает `AuthorizeContext`: его вызывает проверка
+`hasRole`, а контроллер передаёт ему свой `HttpContext`.
+
+> [!NOTE]
+> `AuthorizeContext` — с версии 0.98.32. Раньше проверка получала
+> `HttpContext`; помощник, которому проверка передаёт свой контекст,
+> теперь принимает `AuthorizeContext`.
 
 > [!TIP]
 > С версии 0.98.26 проверку можно сократить: `bearerToken(ctx)` достаёт

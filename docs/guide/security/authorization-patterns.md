@@ -51,6 +51,9 @@ export class NotesService {
 }
 ```
 
+Для [gRPC](../realtime/grpc.md#авторизация) это тоже работает: там
+`ctx.services` — scope вызова, и те же проверки защищают gRPC-методы.
+
 Вне HTTP-запроса (фоновая задача, скрипт) пользователя нет, и
 `current.get()` бросит ошибку — это лучше, чем молча работать «от
 никого».
@@ -62,6 +65,9 @@ export class NotesService {
 ```ts
 export const hasRole = (...roles: User["role"][]): AuthorizeCheck =>
   (ctx) => roles.includes(currentUser(ctx).role);
+
+/** Пользователь, которого сохранила проверка signedIn. */
+export const currentUser = (ctx: AuthorizeContext) => ctx.state.get(PRINCIPAL_STATE_KEY) as User;
 ```
 
 Когда ролей больше двух, удобнее права: роль — это набор прав, а маршрут
