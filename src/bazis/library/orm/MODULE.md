@@ -452,6 +452,26 @@ failed migration;
 [orm.schema-plan-messages.test.ts](../../core/orm/test/orm.schema-plan-messages.test.ts)
 covers the module options and the hosted plan.
 
+## 13a. A database user without DDL rights (2026-10-11)
+
+An application user with data rights only (SELECT/INSERT/UPDATE/DELETE) while
+the schema owner applies changes is a production practice. Since 0.98.30:
+
+- `MigrationRunner` looks the history table up (`to_regclass`) and runs
+  `CREATE TABLE IF NOT EXISTS "__BazisMigrations"` only when it is missing:
+  PostgreSQL checks the CREATE privilege on the schema even for an existing
+  table, so such a user could not start with migrations at all. When the table
+  is missing and may not be created (42501), the error names the table and the
+  way out;
+- a 42501 during additive schema admission (`must be owner of table …`) keeps
+  `ORM_SCHEMA_ADDITIVE_DDL_FAILED` / `ORM_SCHEMA_CREATE_FAILED` and adds a hint:
+  apply the change with the owner's credentials (`BAZIS_SCHEMA_ONLY=1`, see the
+  kernel passport) or grant the rights.
+
+Checks: [orm.restricted-user.postgres.live.test.ts](test/orm.restricted-user.postgres.live.test.ts)
+(a real role with data rights only) and the history-table cases in
+[orm.schema-dx.test.ts](test/orm.schema-dx.test.ts).
+
 ## 14. Readable owned-store errors (2026-10-11)
 
 Owned-store checks keep failing closed with bare codes: `safe()`, the

@@ -55,16 +55,21 @@ export class LifecycleCoordinator {
     return this.rollbackStartedAt === undefined ? 0 : performance.now() - this.rollbackStartedAt;
   }
 
-  public async start(signal?: AbortSignal, rollbackTimeoutMs = 0): Promise<void> {
+  /**
+   * `infrastructureOnly` starts only hosted services with a negative phase
+   * (connections and the database schema) and no lifecycle hooks.
+   */
+  public async start(signal?: AbortSignal, rollbackTimeoutMs = 0, infrastructureOnly = false): Promise<void> {
     signal?.throwIfAborted();
     validateOptionsOnStart(this.resolver);
-    const hosted = resolveHostedServices(this.resolver);
+    const resolved = resolveHostedServices(this.resolver);
+    const hosted = infrastructureOnly ? resolved.filter((service) => (service.phase ?? 0) < 0) : resolved;
     // Background failures go to the application logger, like HTTP errors.
     const logger = this.resolver.tryResolve?.(LOGGER);
     if (logger) for (const service of hosted) service.useDiagnostics?.(logger);
     const validation = validateHostedServicePlan(hosted, signal);
     if (validation) await awaitAbortable(validation, signal);
-    this.hooks = this.resolver.resolveAll(LIFECYCLE_HOOK);
+    this.hooks = infrastructureOnly ? [] : this.resolver.resolveAll(LIFECYCLE_HOOK);
 
     try {
       for (let index = 0; index < this.hooks.length; index += 1) {

@@ -130,10 +130,24 @@ export class MigrationRunner {
   }
 
   private async ensureHistory(): Promise<void> {
+    // CREATE TABLE IF NOT EXISTS needs the CREATE privilege on the schema even
+    // when the table exists, so an application user with data rights only
+    // could never start. Create the table only when it is missing.
+    const [found] = await this.provider.query(`SELECT to_regclass(${this.param(0)}) IS NOT NULL AS present`, [this.quote(HISTORY_TABLE)]);
+    if (found?.present === true) {
+      return;
+    }
     await this.provider.execute(
       `CREATE TABLE IF NOT EXISTS ${this.quote(HISTORY_TABLE)} (${this.quote("MigrationId")} TEXT PRIMARY KEY, ${this.quote("AppliedAt")} TEXT NOT NULL)`,
       [],
-    );
+    ).catch((error: unknown) => {
+      if (sqlState(error) !== "42501") throw error;
+      throw new OrmError(
+        `The migration history table "${HISTORY_TABLE}" does not exist and this database user may not create it (PostgreSQL 42501). ` +
+          "Run the first start with the schema owner's credentials (BAZIS_SCHEMA_ONLY=1 applies the schema and exits), or grant CREATE on the schema.",
+        { cause: error },
+      );
+    });
   }
 
   private async loadApplied(): Promise<Set<string>> {
@@ -166,6 +180,11 @@ export class MigrationRunner {
       return this.param(index);
     });
   }
+}
+
+function sqlState(error: unknown): string | undefined {
+  const code = (error as { errno?: unknown; code?: unknown } | null)?.errno ?? (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : undefined;
 }
 
 /** Names the failed migration; its transaction was rolled back, earlier ones stay applied. */

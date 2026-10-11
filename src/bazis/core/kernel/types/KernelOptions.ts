@@ -20,4 +20,12 @@ export interface KernelOptions {
   readonly validateOnBuild?: boolean;
   /** Startup report in the console. Default: only outside production. */
   readonly startupReport?: boolean;
+  /**
+   * Start only the infrastructure and the database schema (hosted services with
+   * a negative phase: connections, migrations, `ensureCreated`), then stop with
+   * exit code 0. HTTP, background services and lifecycle hooks do not run.
+   * For a deployment step with the schema owner's credentials.
+   * Default: the BAZIS_SCHEMA_ONLY variable (`1`/`true`), otherwise false.
+   */
+  readonly schemaOnly?: boolean;
 }

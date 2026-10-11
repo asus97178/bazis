@@ -4,6 +4,31 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.30 — 2026-10-11
+
+### Added
+
+- Schema-only start: `BAZIS_SCHEMA_ONLY=1` (or `kernel: { schemaOnly: true }`)
+  starts only the infrastructure and the database schema (hosted services
+  with a negative phase: connections, migrations, `ensureCreated`), then
+  stops with exit code 0. HTTP, background services, lifecycle hooks and the
+  started/stopping events do not run. Run it as a deployment step with the
+  schema owner's credentials, and the application itself with a user that has
+  data rights only. Another value of the variable stops the build.
+
+### Fixed
+
+- An application with versioned migrations starts under a database user
+  without DDL rights: the migration history table is created only when it is
+  missing. Before, every start ran `CREATE TABLE IF NOT EXISTS
+  "__BazisMigrations"`, which PostgreSQL refuses without the CREATE privilege
+  on the schema even when the table exists (`permission denied for schema
+  public`). When the table is missing and the user may not create it, the
+  error names the table and the way out.
+- A schema change refused for lack of rights (PostgreSQL 42501, `must be owner
+  of table …`) explains what to do: apply it with the schema owner's
+  credentials (`BAZIS_SCHEMA_ONLY=1`) or grant the rights.
+
 ## 0.98.29 — 2026-10-11
 
 ### Added

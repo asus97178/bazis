@@ -73,7 +73,12 @@ export class SchemaAdmissionEngine {
     // The PostgreSQL message names objects, not row values (those stay in its detail field).
     const reason = `${describeOperation(operation)} failed${sqlState ? ` with PostgreSQL ${sqlState}` : ""}${error instanceof Error && error.message ? `: ${error.message}` : ""}`;
     if (["23502", "23503", "23505", "23514"].includes(sqlState)) return new SchemaAdmissionError("ORM_SCHEMA_ADDITIVE_DATA_VIOLATION", `Existing PostgreSQL data violates the declared additive schema change: ${reason}. Fix the data, then start again.`);
-    return new SchemaAdmissionError(operation.kind === "createSchema" || operation.kind === "createTable" ? "ORM_SCHEMA_CREATE_FAILED" : "ORM_SCHEMA_ADDITIVE_DDL_FAILED", `PostgreSQL additive schema admission failed: ${reason}.`);
+    // 42501: an application user with data rights only. The schema change is
+    // right; it has to be applied by a user that owns the tables.
+    const hint = sqlState === "42501"
+      ? " This database user may not change the schema: apply the change with the schema owner's credentials (BAZIS_SCHEMA_ONLY=1 applies the schema and exits), or grant the rights."
+      : "";
+    return new SchemaAdmissionError(operation.kind === "createSchema" || operation.kind === "createTable" ? "ORM_SCHEMA_CREATE_FAILED" : "ORM_SCHEMA_ADDITIVE_DDL_FAILED", `PostgreSQL additive schema admission failed: ${reason}.${hint}`);
   }
 }
 

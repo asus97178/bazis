@@ -6,6 +6,7 @@ import { ConfigRegistry } from "./config/ConfigRegistry";
 import { argsSource, envSource } from "./config/sources";
 import { Environment } from "./Environment";
 import { EventBus } from "./events/EventBus";
+import { KernelError } from "./errors";
 import { HealthService } from "./health/HealthService";
 import { Kernel, type KernelTimings } from "./Kernel";
 import { ConsoleLogger } from "./logging/ConsoleLogger";
@@ -46,6 +47,7 @@ export class KernelBuilder {
   private validateOnBuild = true;
   private overrides: readonly ProviderDefinition[] = [];
   private startupReport?: boolean;
+  private schemaOnly?: boolean;
   private logger?: Logger;
 
   public constructor(private readonly rootModule: RootModuleInput) {}
@@ -65,6 +67,7 @@ export class KernelBuilder {
     if (options.unhandledErrorPolicy !== undefined) this.unhandledErrorPolicy = options.unhandledErrorPolicy;
     if (options.validateOnBuild !== undefined) this.validateOnBuild = options.validateOnBuild;
     if (options.startupReport !== undefined) this.startupReport = options.startupReport;
+    if (options.schemaOnly !== undefined) this.schemaOnly = options.schemaOnly;
     return this;
   }
 
@@ -177,6 +180,17 @@ export class KernelBuilder {
       signals: this.signals,
       unhandledErrorPolicy: this.unhandledErrorPolicy,
       startupReport: this.startupReport ?? !environment.isProduction,
+      schemaOnly: this.schemaOnly ?? schemaOnlyFromProcess(),
     });
   }
+}
+
+/** BAZIS_SCHEMA_ONLY: `1`/`true` or `0`/`false`/unset; anything else is a mistake worth stopping for. */
+function schemaOnlyFromProcess(): boolean {
+  const raw = process.env.BAZIS_SCHEMA_ONLY;
+  if (raw === undefined || raw === "") return false;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true") return true;
+  if (normalized === "0" || normalized === "false") return false;
+  throw new KernelError(`BAZIS_SCHEMA_ONLY must be 1, true, 0 or false, got ${JSON.stringify(raw.slice(0, 40))}.`);
 }
