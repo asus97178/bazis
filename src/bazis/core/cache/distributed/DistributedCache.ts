@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { CacheValueError } from "../errors/CacheError";
+import { CacheUnavailableError, CacheValueError } from "../errors/CacheError";
 import { assertCacheKey, measureStringBytes } from "../internal/CacheKeyGuard";
 import type { CacheCodec } from "./CacheCodec";
 import type {
@@ -36,7 +36,11 @@ export interface DistributedCacheConfig {
   readonly maxValueBytes?: number;
   /** Poll interval (ms) while waiting for a peer worker to fill the cache. */
   readonly pollIntervalMs?: number;
+  /** Bound of one store operation (ms); a hung store must not hang the caller. Default 1000. */
+  readonly operationTimeoutMs?: number;
 }
+
+const DEFAULT_OPERATION_TIMEOUT_MS = 1000;
 
 /**
  * Backend-agnostic distributed cache. Owns all caching policy and delegates raw
@@ -52,6 +56,9 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
   private readonly fullPrefix: string;
   private readonly maxKeyLength: number;
   private readonly pollIntervalMs: number;
+  private readonly operationTimeoutMs: number;
+  /** The driver with every operation bounded by {@link io}. */
+  private readonly ioCall: DistributedCacheDriver;
 
   public readonly connectionName: string;
   public readonly keyPrefix: string;
@@ -71,6 +78,9 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     if (snapshot.maxValueBytes !== undefined && (!Number.isInteger(snapshot.maxValueBytes) || snapshot.maxValueBytes <= 0)) {
       throw new CacheValueError("maxValueBytes must be a positive integer");
     }
+    if (snapshot.operationTimeoutMs !== undefined && (!Number.isSafeInteger(snapshot.operationTimeoutMs) || snapshot.operationTimeoutMs <= 0 || snapshot.operationTimeoutMs > 2_147_483_647)) {
+      throw new CacheValueError("operationTimeoutMs must be a positive integer of milliseconds");
+    }
     if (snapshot.pollIntervalMs !== undefined && (!Number.isFinite(snapshot.pollIntervalMs) || snapshot.pollIntervalMs <= 0)) {
       throw new CacheValueError("pollIntervalMs must be a positive number");
     }
@@ -80,12 +90,40 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     this.fullPrefix = `${snapshot.keyPrefix}${snapshot.namespace ?? ""}`;
     this.maxKeyLength = snapshot.maxKeyLength ?? DEFAULT_DISTRIBUTED_MAX_KEY_LENGTH;
     this.pollIntervalMs = snapshot.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    this.operationTimeoutMs = snapshot.operationTimeoutMs ?? DEFAULT_OPERATION_TIMEOUT_MS;
+    this.ioCall = new Proxy(driver, {
+      get: (target, property) => {
+        const member = (target as unknown as Record<PropertyKey, unknown>)[property];
+        return typeof member === "function"
+          ? (...args: unknown[]) => this.io(() => (member as (...values: unknown[]) => Promise<unknown>).apply(target, args))
+          : member;
+      },
+    });
+  }
+
+  /**
+   * One store operation, bounded by `operationTimeoutMs`. A timeout or a driver
+   * failure becomes {@link CacheUnavailableError}; the native operation is not
+   * cancelled (the driver has no cancellation), only no longer awaited.
+   */
+  private io<T>(work: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new CacheUnavailableError(
+        `Distributed cache "${this.connectionName}" did not answer within ${this.operationTimeoutMs} ms.`,
+      )), this.operationTimeoutMs);
+      let started: Promise<T>;
+      try { started = work(); } catch (error) { clearTimeout(timer); reject(unavailable(this.connectionName, error)); return; }
+      started.then(
+        (value) => { clearTimeout(timer); resolve(value); },
+        (error: unknown) => { clearTimeout(timer); reject(unavailable(this.connectionName, error)); },
+      );
+    });
   }
 
   public async get<T = TValue>(key: string): Promise<T | undefined> {
     assertCacheKey(key, this.maxKeyLength);
     const storageKey = this.storageKey(key);
-    const raw = await this.driver.read(storageKey);
+    const raw = await this.ioCall.read(storageKey);
     if (raw === null) {
       return undefined;
     }
@@ -93,7 +131,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
       return this.codec.deserialize(decodeEnvelope(raw).payload) as unknown as T;
     } catch {
       try {
-        await this.driver.deleteIfValue(storageKey, raw);
+        await this.ioCall.deleteIfValue(storageKey, raw);
       } catch {
         // A corrupt cache entry is still a miss when backend cleanup fails.
         // Do not turn best-effort cache maintenance into a request failure.
@@ -108,7 +146,14 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     options: DistributedCacheSetOptions,
   ): Promise<T | undefined> {
     const normalizedOptions = this.normalizeSetOptions(options);
-    const hit = await this.get<T>(key);
+    let hit: T | undefined;
+    try {
+      hit = await this.get<T>(key);
+    } catch (error) {
+      // The cache is optional: an unavailable store means "compute it now".
+      if (error instanceof CacheUnavailableError) return factory();
+      throw error;
+    }
     if (hit !== undefined) {
       return hit;
     }
@@ -132,7 +177,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
   public async remove(key: string): Promise<boolean> {
     assertCacheKey(key, this.maxKeyLength);
     this.inFlight.delete(key);
-    return this.driver.invalidate(this.entryVersionKey(key), this.storageKey(key), this.lockKeyFor(key));
+    return this.ioCall.invalidate(this.entryVersionKey(key), this.storageKey(key), this.lockKeyFor(key));
   }
 
   public async evictByTag(tag: string): Promise<number> {
@@ -142,8 +187,8 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     }
     const versionKey = this.tagVersionKey(tag);
     const pendingKey = this.tagPendingKey(tag);
-    await this.driver.advanceTagGeneration(versionKey, pendingKey);
-    const generations = [...await this.driver.tagMembers(pendingKey)]
+    await this.ioCall.advanceTagGeneration(versionKey, pendingKey);
+    const generations = [...await this.ioCall.tagMembers(pendingKey)]
       .filter((value) => /^\d+$/.test(value))
       .sort((left, right) => Number(left) - Number(right));
     let removed = 0;
@@ -155,7 +200,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
 
   private async evictTagGeneration(tag: string, generation: string, pendingKey: string): Promise<number> {
     const tagKey = this.tagKey(tag, generation);
-    const members = await this.driver.tagMembers(tagKey);
+    const members = await this.ioCall.tagMembers(tagKey);
     let removed = 0;
     for (const member of members) {
       const parsed = decodeTagMember(member);
@@ -165,19 +210,19 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
       if (!parsed.storageKey.startsWith(`${this.fullPrefix}entry:`)) {
         continue;
       }
-      const raw = await this.driver.read(parsed.storageKey);
+      const raw = await this.ioCall.read(parsed.storageKey);
       if (raw === null) {
         continue;
       }
       if (decodeEnvelope(raw).token !== parsed.token) {
         continue;
       }
-      if (await this.driver.deleteIfValue(parsed.storageKey, raw)) {
+      if (await this.ioCall.deleteIfValue(parsed.storageKey, raw)) {
         removed += 1;
       }
     }
-    await this.driver.delete([tagKey]);
-    await this.driver.removeTagMembers(pendingKey, [generation]);
+    await this.ioCall.delete([tagKey]);
+    await this.ioCall.removeTagMembers(pendingKey, [generation]);
     return removed;
   }
 
@@ -215,9 +260,21 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     const lockTtl = Math.max(1, Math.floor(options.lockSeconds ?? this.config.defaultLockSeconds));
     const token = randomUUID();
 
-    const acquired = await this.driver.acquireLock(lockKey, token, lockTtl);
+    let acquired: boolean;
+    try {
+      acquired = await this.ioCall.acquireLock(lockKey, token, lockTtl);
+    } catch (error) {
+      if (error instanceof CacheUnavailableError) return factory();
+      throw error;
+    }
     if (!acquired) {
-      const peerValue = await this.waitForPeerResult<T>(key, lockKey, lockTtl);
+      let peerValue: T | undefined;
+      try {
+        peerValue = await this.waitForPeerResult<T>(key, lockKey, lockTtl);
+      } catch (error) {
+        if (error instanceof CacheUnavailableError) return factory();
+        throw error;
+      }
       if (peerValue !== undefined) return peerValue;
       if (contentionAttempt < 2) {
         return this.runLockedFactory(key, factory, options, contentionAttempt + 1);
@@ -228,11 +285,18 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     }
 
     try {
-      const again = await this.get<T>(key);
-      if (again !== undefined) {
-        return again;
+      let versionChecks: readonly DistributedCacheVersionCheck[];
+      try {
+        const again = await this.get<T>(key);
+        if (again !== undefined) {
+          return again;
+        }
+        versionChecks = await this.captureVersions(key, options.tags);
+      } catch (error) {
+        // The store went away under the lock: compute, but do not write.
+        if (error instanceof CacheUnavailableError) return await factory();
+        throw error;
       }
-      const versionChecks = await this.captureVersions(key, options.tags);
       const value = await factory();
       if (value !== undefined) {
         await this.trySet(key, value, options, lockKey, token, versionChecks);
@@ -243,7 +307,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
         // Unlock is best effort: a transport error must not replace a fresh
         // service result or the factory's original exception. The lock still
         // has a bounded TTL, so another worker eventually makes progress.
-        await this.driver.releaseLock(lockKey, token, this.entryVersionKey(key));
+        await this.ioCall.releaseLock(lockKey, token, this.entryVersionKey(key));
       } catch {
         // Intentionally preserve the primary outcome.
       }
@@ -257,7 +321,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
       if (hit !== undefined) {
         return hit;
       }
-      if (await this.driver.read(lockKey) === null) {
+      if (await this.ioCall.read(lockKey) === null) {
         break;
       }
       await Bun.sleep(this.pollIntervalMs);
@@ -273,8 +337,11 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     lockToken: string,
     versionChecks: readonly DistributedCacheVersionCheck[],
   ): Promise<void> {
+    // A value the codec refuses is a bug of the cached method, not a store
+    // outage: it surfaces instead of silently never being cached.
+    const serialized = this.codec.serialize(value as unknown as TValue);
     try {
-      await this.write(key, value as unknown as TValue, options, lockKey, lockToken, versionChecks);
+      await this.write(key, serialized, options, lockKey, lockToken, versionChecks);
     } catch {
       // Graceful degradation — the caller still receives the fresh value.
     }
@@ -282,14 +349,13 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
 
   private async write(
     key: string,
-    value: TValue,
+    serialized: string,
     options: DistributedCacheSetOptions,
     lockKey: string,
     lockToken: string,
     versionChecks: readonly DistributedCacheVersionCheck[],
   ): Promise<void> {
     assertCacheKey(key, this.maxKeyLength);
-    const serialized = this.codec.serialize(value);
 
     if (this.config.maxValueBytes !== undefined) {
       const bytes = measureStringBytes(serialized);
@@ -318,7 +384,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
       tags[index] = { key: tag.key, member: encodeTagMember(storageKey, writeToken) };
     }
     const envelope = encodeEnvelope(writeToken, serialized);
-    await this.driver.writeIfLockOwner({
+    await this.ioCall.writeIfLockOwner({
       lockKey,
       lockToken,
       key: storageKey,
@@ -336,7 +402,7 @@ export class DistributedCache<TValue = unknown> implements IDistributedCache<TVa
     const keys = [this.entryVersionKey(key), ...(tags ?? []).map((tag) => this.tagVersionKey(tag))];
     return Promise.all(keys.map(async (versionKey) => ({
       key: versionKey,
-      expected: await this.driver.read(versionKey),
+      expected: await this.ioCall.read(versionKey),
     })));
   }
 
@@ -400,4 +466,9 @@ function decodeTagMember(member: string): { readonly storageKey: string; readonl
     // a backend key.
   }
   return undefined;
+}
+
+function unavailable(connection: string, error: unknown): CacheUnavailableError {
+  if (error instanceof CacheUnavailableError) return error;
+  return new CacheUnavailableError(`Distributed cache "${connection}" failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
 }

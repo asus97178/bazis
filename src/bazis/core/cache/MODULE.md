@@ -92,7 +92,7 @@ contracts: [cache.proxy-contracts.test.ts](test/cache.proxy-contracts.test.ts).
 | --- | --- | --- |
 | MemoryCache | [MemoryCache.ts](MemoryCache.ts) | Values, TTL/LRU, tags, coalescing and the factory limit |
 | CacheOptions | [types/CacheOptions.ts](types/CacheOptions.ts) | Inputs and the configuration check |
-| cachedSingleton / cachedScoped | [providers/cachedProviders.ts](providers/cachedProviders.ts) | A class provider with a wrapper after DI activation |
+| Cache hook | [di/classProviderHook.ts](di/classProviderHook.ts), [providers/cachedProviders.ts](providers/cachedProviders.ts) | Wraps regular `singleton`/`scoped` registrations of classes with cache decorators; refuses a scoped method without `key` and any transient (0.98.34) |
 | wrapCachedService | [services/cacheProxy.ts](services/cacheProxy.ts) | Keys and calls into the memory/distributed API |
 | AutomaticCacheKey | [internal/AutomaticCacheKey.ts](internal/AutomaticCacheKey.ts) | The argument graph, identity of collection keys and the cache bypass decision |
 | memory | [cacheModule.ts](cacheModule.ts) | Global connection of the existing module |
@@ -134,6 +134,31 @@ get no `Age`). `missingCacheModuleCheck()` is a route composer the application c
 installs with HTTP: without a registered `ICache` it warns once per `@OutputCache` route
 at startup and adds no middleware.
 Regression: [output-cache-dx.integration.test.ts](../scripts/test/output-cache-dx.integration.test.ts).
+
+## 3a. Changes of 0.98.34
+
+- The distributed JSON codec (`jsonCacheCodec`) refuses a value JSON would change —
+  Date, Set, Map, a class instance, bigint, NaN/Infinity, `undefined` in an array, a
+  function, a cycle — with `CacheValueError` naming the path (`value.at is a Date`).
+  `DistributedCache` serializes before the guarded store write, so the error reaches the
+  caller instead of being swallowed as a store outage; `@CacheableRedis` prefixes the
+  method (`Report.build: …`). Store failures still degrade to the fresh value.
+- The cache hook refuses at container build (`CacheDeclarationError`, a DI error printed as a configuration
+  error) a scoped service whose cached method has no `key` (nor a named `policy`), and any
+  transient service with cache decorators.
+- `IDistributedCache` is also a DI token: `redisConnect(config, { cache: "distributed" })`
+  registers the connector's one connection under it, so services take it by type.
+- `DistributedCache` bounds every driver operation by `operationTimeoutMs` (default 1000;
+  `RedisDistributedCacheTuning.operationTimeoutMs`). A timeout or a driver failure is
+  `CacheUnavailableError`. The cache-aside path (`getOrCreateAsync`, `@CacheableRedis`) then
+  calls the factory without the store (no lock, no write); `@OutputRedisCache` serves the
+  route uncached; explicit `get`/`remove`/`evictByTag` throw. The native operation is not
+  cancelled, only no longer awaited. Checks: [cache.unavailable-store.test.ts](test/cache.unavailable-store.test.ts).
+- `cachedScoped` / `cachedSingleton` are no longer exported: the regular registration does
+  the same. The CLI `g module --full` template uses `scoped`.
+Checks: [cache.distributed-values.test.ts](test/cache.distributed-values.test.ts),
+[autoCachedProviders.test.ts](test/autoCachedProviders.test.ts),
+[cache-composition.test.ts](../infra/test/cache-composition.test.ts).
 
 ## 4. Checks
 

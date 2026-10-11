@@ -1,12 +1,12 @@
 # Cache Compatibility
 
-The aliases below were removed in 0.96.1, before the first `bazis` npm release,
-so no published version ever contained them. Use the replacement.
+The names below were removed; use the replacement. The `cached*` helpers were
+public until 0.98.34, the others were removed in 0.96.1 before the first npm release.
 
 | Removed name | Kind | Replacement |
 | --- | --- | --- |
-| `autoCachedScoped` | public alias | `cachedScoped` |
-| `autoCachedSingleton` | public alias | `cachedSingleton` |
+| `autoCachedScoped`, `cachedScoped` | public helpers, removed in 0.98.34 | `scoped(...)`: the cache hook wraps it |
+| `autoCachedSingleton`, `cachedSingleton` | public helpers, removed in 0.98.34 | `singleton(...)` |
 | `warnInsecureOutputCacheRoute` | public alias | `guardInsecureOutputCacheRoute` |
 | `warnOnAuthorizedRoutesWithoutVaryByUser` | config switch | `insecureAuthorizedRouteBehavior` (`false` was `"ignore"`) |
 | `DEFAULT_CACHEABLE_METHODS` | internal alias | `DEFAULT_OUTPUT_CACHE_METHODS` |

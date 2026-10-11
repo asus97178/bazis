@@ -51,7 +51,7 @@ export {
   type DistributedCacheVersionCheck,
   type DistributedCachePing,
   type DistributedCacheSetOptions,
-  type IDistributedCache,
+  IDistributedCache,
 } from "./distributed";
 export {
   DISTRIBUTED_CACHE_BACKEND,
@@ -66,7 +66,7 @@ export {
   type CacheModuleConfig,
   type CacheOutputCacheOptions,
 } from "./internal/buildCacheProviders";
-export { CacheError, CacheKeyError, CacheValueError, CacheCapacityError } from "./errors/CacheError";
+export { CacheError, CacheKeyError, CacheValueError, CacheCapacityError, CacheDeclarationError, CacheUnavailableError } from "./errors/CacheError";
 
 export { OutputCache, type OutputCacheOptions as OutputCacheDecoratorOptions } from "./decorators/OutputCache";
 export {
@@ -91,7 +91,3 @@ export {
 } from "./internal/resolveCachePolicy";
 export { buildOutputCacheKey, OUTPUT_CACHE_PRINCIPAL_STATE_KEY } from "./http/buildOutputCacheKey";
 export { wrapCachedService, type CacheProxyOptions } from "./services/cacheProxy";
-export {
-  cachedSingleton,
-  cachedScoped,
-} from "./providers/cachedProviders";

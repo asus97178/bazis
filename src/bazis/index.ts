@@ -204,8 +204,6 @@ export {
 export {
   Cacheable,
   OutputCache,
-  cachedScoped,
-  cachedSingleton,
   memory,
 } from "./core/cache";
 export {

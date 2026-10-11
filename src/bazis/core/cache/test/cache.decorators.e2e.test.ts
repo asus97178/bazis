@@ -1,6 +1,6 @@
 import { registerGeneratedBindings } from "../../http/Binding/autoBindings";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { Module, createToken, createContainer, HOSTED_SERVICE, type DiContainer } from "@/core/di";
+import { Module, createToken, createContainer, HOSTED_SERVICE, singleton, type DiContainer } from "@/core/di";
 import {
   OUTPUT_CACHE_PRINCIPAL_STATE_KEY,
   Cacheable,
@@ -8,7 +8,6 @@ import {
   MemoryCache,
   OutputCache,
   memory,
-  cachedSingleton,
   wrapCachedService,
 } from "@/core/cache";
 import {
@@ -291,7 +290,7 @@ describe("@Cacheable service cache", () => {
 
     @Module({
       imports: [cacheModuleRef],
-      providers: [cachedSingleton(IGreetingService, GreetingService)],
+      providers: [singleton(IGreetingService, GreetingService)],
     })
     class CacheableUnitModule {}
 
@@ -299,7 +298,7 @@ describe("@Cacheable service cache", () => {
     cache = container.resolve(ICache);
   });
 
-  test("works through interface token when registered with cachedSingleton", () => {
+  test("works through an interface token registered as a plain singleton", () => {
     cache.clear();
     greetCalls = 0;
 
@@ -319,7 +318,7 @@ describe("@Cacheable service cache", () => {
     expect(greetCalls).toBe(1);
   });
 
-  test("plain singleton without cachedSingleton ignores @Cacheable", () => {
+  test("an instance created without DI is not cached", () => {
     cache.clear();
     greetCalls = 0;
 

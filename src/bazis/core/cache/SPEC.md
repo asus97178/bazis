@@ -19,7 +19,7 @@ Quick navigation:
 - [7. `@OutputRedisCache` — HTTP output cache (distributed)](#7-outputrediscache--http-output-cache-distributed)
 - [8. `@Cacheable`: service method cache (memory)](#8-cacheable-service-method-cache-memory)
 - [9. `@CacheableRedis`: service method cache (distributed)](#9-cacheableredis-service-method-cache-distributed)
-- [10. DI providers: `cachedSingleton` / `cachedScoped` (+ auto-hook)](#10-di-providers-cachedsingleton--cachedscoped--auto-hook)
+- [10. DI registration: `singleton` / `scoped` with the cache hook](#10-di-registration-singleton--scoped-with-the-cache-hook)
 - [11. `ICache`: programmatic API](#11-icache-programmatic-api)
 - [12. Output cache key building](#12-output-cache-key-building)
 - [13. Anti-stampede and concurrent miss](#13-anti-stampede-and-concurrent-miss)
@@ -68,7 +68,6 @@ import {
   OutputRedisCache,
   Cacheable,
   CacheableRedis,
-  cachedScoped,
   ICache,
 } from "@/core/cache";
 import { composeRouteMiddlewareComposers } from "@/core/http";
@@ -116,8 +115,8 @@ import { redisConnect } from "@/core/infra";
 | --- | --- | --- | --- |
 | `@OutputCache` | controller action | `ICache` in-memory | the cache module's `ROUTE_MIDDLEWARE_COMPOSER` registration (automatic) |
 | `@OutputRedisCache` | controller action | `IDistributedCache` | the same + `redisConnect(config, { cache: "distributed" })` in Infra |
-| `@Cacheable` | service method | `ICache` in-memory | `cachedSingleton` / `cachedScoped` (or the auto-hook) |
-| `@CacheableRedis` | service method | `IDistributedCache` | `cachedSingleton` / `cachedScoped` + `redisConnect(config, { cache: "distributed" })` in Infra |
+| `@Cacheable` | service method | `ICache` in-memory | `singleton` / `scoped` (the cache hook wraps it) |
+| `@CacheableRedis` | service method | `IDistributedCache` | `singleton` / `scoped` + `redisConnect(config, { cache: "distributed" })` in Infra |
 
 **Important:** put decorators on the **implementation class**, not on a TypeScript interface. DI registers the interface token → the proxy wraps the implementation.
 
@@ -161,7 +160,7 @@ flowchart TB
 ### 3.1. Minimum: in-memory output + method cache
 
 ```ts
-import { Cacheable, OutputCache, cachedScoped, memory } from "@/core/cache";
+import { Cacheable, OutputCache, memory } from "@/core/cache";
 import { runApp } from "@/core/app";
 
 await runApp(AppModule, {
@@ -195,7 +194,7 @@ class UserService implements IUserStore {
 
 // UsersModule:
 providers: [
-  cachedScoped(IUserStore, UserService, [repositoryFor(User)]),
+  scoped(IUserStore, UserService, [repositoryFor(User)]),
 ],
 ```
 
@@ -232,7 +231,7 @@ class ProductService {
 
 // The same provider as for memory: the distributed level turns on
 // automatically when Infra publishes the registry of distributed stores in DI.
-cachedScoped(IProductService, ProductService, deps);
+scoped(IProductService, ProductService, deps);
 ```
 
 ---
@@ -620,31 +619,26 @@ class UserService implements IUserStore {
 
 ---
 
-## 10. DI providers: `cachedSingleton` / `cachedScoped` (+ auto-hook)
+## 10. DI registration: `singleton` / `scoped` with the cache hook
 
-One provider covers both levels. `@Cacheable` → the in-memory `ICache`; `@CacheableRedis` →
-the distributed `DISTRIBUTED_SERVICE_CACHE`, **automatically** if the registry is
-registered through Infra/DI. There are no separate `redisCached*` / `hybridCached*` anymore.
+`memory()` registers a hook on the core `singleton()` / `scoped()` providers: if a class
+carries `@Cacheable` / `@CacheableRedis`, the regular registration is wrapped with a
+caching proxy. One proxy routes `@Cacheable` to the in-memory `ICache` and
+`@CacheableRedis` to the distributed `DISTRIBUTED_SERVICE_CACHE`. The former
+`cachedSingleton` / `cachedScoped` helpers were removed in 0.98.34: they did the same.
 
-| Provider | Decorators | DI dependencies | Scope |
-| --- | --- | --- | --- |
-| `cachedSingleton` | `@Cacheable` and/or `@CacheableRedis` | `ICache`, `CACHE_POLICIES`, (optional) `DISTRIBUTED_SERVICE_CACHE` | singleton |
-| `cachedScoped` | `@Cacheable` and/or `@CacheableRedis` | the same | scoped |
+The hook checks the lifetime at container build (0.98.34):
 
-Removed aliases: `src/bazis/core/cache/COMPATIBILITY.md`.
+| Lifetime | Rule |
+| --- | --- |
+| `singleton` | Any declaration; the automatic key works across calls |
+| `scoped` | Every cached method needs an explicit `key` (or a named `policy`): the automatic key belongs to the instance, so it would cache within one request only. Otherwise `CacheDeclarationError` at startup |
+| `transient` | Refused with `CacheDeclarationError`: a new instance per injection never reuses its cache |
 
 ```ts
 // Interface token ← proxy ← implementation class with decorators.
-// Works for both @Cacheable and @CacheableRedis (if the backend is configured).
-cachedScoped(IUserStore, UserService, [repositoryFor(User)]);
+scoped(IUserStore, UserService);
 ```
-
-### 10.0. Out of the box (auto-hook)
-
-`memory()` registers a hook on the core `singleton()` / `scoped()` providers: if a class
-carries `@Cacheable` / `@CacheableRedis`, the regular registration is **automatically**
-wrapped with a caching proxy. An explicit `cachedScoped` is needed only when you want to
-be completely explicit.
 
 ### 10.1. Interface vs implementation: a common question
 
@@ -659,7 +653,7 @@ class UserService implements IUserStore {
 }
 
 // ✅ correct
-cachedScoped(IUserStore, UserService, deps);
+scoped(IUserStore, UserService, deps);
 
 // ❌ a decorator on an interface does not work
 // With memory() connected, a plain singleton(IUserStore, UserService)
@@ -674,7 +668,7 @@ or a root import of `memory()`. A feature module registers only its own service:
 ```ts
 @Module({
   imports: [UsersDataModule],
-  providers: [cachedScoped(IUserStore, UserService, deps)],
+  providers: [scoped(IUserStore, UserService, deps)],
 })
 class UsersModule {}
 ```
@@ -1066,7 +1060,7 @@ class UserService implements IUserStore {
 
 // UsersModule:
 imports: [UsersDataModule],
-providers: [cachedScoped(IUserStore, UserService, deps)],
+providers: [scoped(IUserStore, UserService, deps)],
 ```
 
 `@CacheableRedis.findByName` uses the distributed level automatically when the backend is
@@ -1174,7 +1168,7 @@ Checklist:
 
 1. The decorator is on the **class `UserService`**, not on `interface IUserStore`.
 2. The root app installs `cache: memory()` or imports `memory()` (auto-hook + `ICache`, `CACHE_POLICIES`).
-3. The registration goes through `singleton`/`scoped` (the auto-hook wraps it) or explicitly `cachedScoped`/`cachedSingleton`.
+3. The registration goes through `singleton`/`scoped` (the cache hook wraps it); a scoped one needs an explicit `key`.
 4. The options have **`seconds`** (inline or in the `policy`).
 5. For `@CacheableRedis`, infra connects `redisConnect(redisConfig, { cache: "distributed" })`, otherwise the call throws.
 
@@ -1190,7 +1184,7 @@ Checklist:
 async byId(id: number) { ... }
 
 // UsersModule.ts: registration on the interface token
-cachedScoped(IUserStore, UserService, deps);
+scoped(IUserStore, UserService, deps);
 ```
 
 The controller gets the proxy registered as `IUserStore`. The metadata is read from the `UserService` class (`Symbol.metadata`), not from the interface.
@@ -1242,28 +1236,16 @@ Technically yes, but **do not**: a startup warning, and Redis wins. Pick one sto
 
 ### Can `@Cacheable` and `@CacheableRedis` be on one method?
 
-**No**: a runtime error. On **different** methods of one class use a regular `cachedScoped` (one proxy routes memory and distributed).
+**No**: a runtime error. On **different** methods of one class use a regular `scoped` registration (one proxy routes memory and distributed).
 
 ---
 
-### `cachedSingleton` or `cachedScoped`?
+### `singleton` or `scoped`?
 
-| | singleton | scoped |
-| --- | --- | --- |
-| Proxy instance | one per DI registration in the container | one per DI registration in the scope |
-| `@Cacheable` cache | the shared ICache store, automatic keys are isolated per instance | the same ICache store, automatic keys are isolated per instance |
-| ORM `DbContext` | ⚠️ careful | ✅ the typical case |
-
-A `UserService` with an ORM → **`cachedScoped`**. A stateless read-only service without scoped deps → `cachedSingleton` is fine.
-An explicit `key` in `cachedScoped` and `cachedSingleton` is a sharing contract: include the
-tenant/user in it if the result is personalized. Without an explicit `key` the framework
-isolates the automatic key per instance, so hidden constructor state does not leak into the
-response of another registration or request. This also applies to `@CacheableRedis`:
-sharing between processes and reuse after a restart need an explicit application `key`.
-DI creates the object with a regular class provider and then applies the proxy;
-constructor deps and lifecycle are not bypassed.
-
----
+A `UserService` with an ORM is **`scoped`**: give every cached method an explicit `key`
+that includes the user or tenant when the result depends on them. A stateless read-only
+service without scoped dependencies can be a `singleton`; its automatic keys work across
+calls.
 
 ### Is Redis needed for the application to work?
 

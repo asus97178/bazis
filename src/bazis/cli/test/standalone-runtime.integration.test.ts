@@ -51,7 +51,7 @@ test("compiled CLI creates an independent app with exact late DI and cached acti
 import { DependencyService } from "./Dependency.service";
 export class CachedService {
   constructor(readonly dependency: DependencyService) {}
-  @Cacheable({ seconds: 30 }) get() { return this.dependency.get(); }
+  @Cacheable({ seconds: 30, key: () => "audit-probe" }) get() { return this.dependency.get(); }
 }`,
       "src/app/modules/audit-probe/AuditProbe.module.ts": `import { Module, scoped } from "bazis/core/di";
 import { memory } from "bazis/core/cache";
