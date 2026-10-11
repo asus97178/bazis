@@ -2,7 +2,7 @@
 
 Passport version: 1. Date: 2026-10-04. Status: partial passport of the existing
 implementation. Type: atomic technical module. Path: `src/bazis/core/background`.
-Connection point: [backgroundModule(config)](backgroundModule.ts); public
+Connection point: the `background` field of `@Module`; public
 entry: [index.ts](index.ts). Scope: isolation of diagnostic callbacks on errors
 and restarts; a full audit of the other options/lifecycle is out of scope.
 The original creation command is unknown; no new scaffold was created.
@@ -42,10 +42,21 @@ protected `reportFailure(message, error, fields?)`.
 
 ## Connection and DI
 
-`backgroundModule({ services })` registers the classes as singletons and publishes
-each through the existing enumerable HOSTED_SERVICE. The historical factory has no
-imports and no explicit exports; its former visibility is kept. Regular codegen
-wires the service constructors. Example and types: [backgroundModule.ts](backgroundModule.ts).
+`@Module({ background: [Worker] })` registers each class as a singleton of that
+module (it sees the module's providers) and publishes it through the enumerable
+HOSTED_SERVICE, plus a `HOSTED_SERVICE_HEALTH` entry `background:<Class>`. Regular
+codegen wires the service constructors. The former `backgroundModule({ services })`
+factory, which registered the classes in a module of its own, is removed in 0.98.33.
+
+## Health (since 0.98.33)
+
+`BackgroundService.checkHealth()` (the optional `HostedService.checkHealth`) is
+unhealthy once the service stopped for good: it crashed without a restart policy or
+used up `maxRestarts`; the details are the stop message and the error text (redacted
+by `HealthService`, shown only with `health.exposeDetails`). A pause before a restart,
+a failed tick of a periodic service and a normal end of `execute` stay healthy.
+`HealthService` reports `HOSTED_SERVICE_HEALTH` entries after the `HEALTH_CHECK` ones,
+so `/health` answers 503 when a background worker is dead.
 Environment configuration, ORM, schema and migrations are not used here.
 
 ## Changed diagnostics contract

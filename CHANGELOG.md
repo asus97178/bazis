@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.33 — 2026-10-11
+
+### Changed (breaking)
+
+- `backgroundModule({ services })` is removed: background services are declared
+  by `background` of their module, `@Module({ background: [Worker] })`, where
+  they also see the module's providers.
+
+### Fixed
+
+- `/health` reports a background service that stopped for good. Every
+  `background` service of a module is a check `background:<Class>`; it turns
+  unhealthy when the service crashed without a restart policy or used up
+  `maxRestarts`, so `/health` answers 503 and an orchestrator can restart the
+  application. Before, `/health` stayed `200 healthy` while the worker was
+  dead. A pause before a restart, a failed tick of a periodic service and a
+  normal end of `execute` stay healthy. The reason (stop message and error,
+  redacted) is shown only with `health.exposeDetails`. A custom
+  `HostedService` can report its own state through the optional
+  `checkHealth()`.
+
 ## 0.98.32 — 2026-10-11
 
 ### Changed (breaking)

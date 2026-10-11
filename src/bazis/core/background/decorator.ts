@@ -26,7 +26,8 @@ interface BackgroundMetadataCarrier {
  * ```
  *
  * Options passed explicitly to `super(...)` take precedence over the decorator.
- * Registration stays explicit — list the class in `backgroundModule({ services })`.
+ * Registration stays explicit — list the class in `background` of its module:
+ * `@Module({ background: [Heartbeat] })`.
  */
 export function Background(options: BackgroundDecoratorOptions = {}) {
   return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
