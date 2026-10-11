@@ -22,21 +22,20 @@ export class ChatGateway {
 }
 ```
 
-Register it next to HTTP:
+Declare it in its module, like a controller; `runApp` serves it on the HTTP listener:
 
 ```ts
-import { Module } from "@/core/di";
-import { httpModule } from "@/core/http";
-import { websocketModule } from "@/core/websocket";
+import { Module, singleton } from "@/core/di";
 
-@Module({
-  imports: [
-    httpModule({ port: 3000 }),
-    websocketModule({ gateways: [ChatGateway] }),
-  ],
-})
-export class AppModule {}
+@Module({ gateways: [ChatGateway], providers: [singleton(ChatHistory)] })
+export class ChatModule {}
+
+await runApp(AppModule, { http: { port: 3000 }, websocket: { requireAuth: true, authenticator } });
 ```
+
+Without `runApp`, `websocketModule({ imports: [ChatModule], ... })` next to
+`httpModule` does the same. Services send with `WebSocketService`:
+`this.ws.to("user:ann").emit("order-paid", { id })`.
 
 The gateway above upgrades on `/ws/chat`.
 
@@ -102,7 +101,7 @@ default, `replayDelivery: "transport"`.
 ### Client-confirmed replay
 
 Opt in with `?replay=client-ack` on each connection, or require it for all clients
-with `websocketModule({ gateways, replayDelivery: "client-ack" })`. The adapter
+with `runApp({ websocket: { replayDelivery: "client-ack" } })`. The adapter
 must support CAS. A saved client-ack session cannot reconnect in transport mode;
 such an upgrade returns 409. Invalid/duplicate replay query values return 400.
 
@@ -151,7 +150,7 @@ Pass an existing native Bun RedisClient from the host infrastructure:
 const adapter = new RedisWebSocketAdapter(hostRedisClient, {
   keyPrefix: "my-app:ws", // same on participating nodes; distinct per application
 });
-const module = websocketModule({ gateways, adapter, replayDelivery: "client-ack" });
+await runApp(AppModule, { http: {}, websocket: { adapter, replayDelivery: "client-ack" } });
 ```
 
 The adapter owns only a duplicate connection for pub/sub. Closing the adapter

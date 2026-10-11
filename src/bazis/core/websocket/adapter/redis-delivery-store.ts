@@ -56,13 +56,13 @@ export class RedisRoomDeliveryStore implements ReliableRoomDelivery {
     if (!deliveryUuid.test(request.messageId) || !Number.isSafeInteger(request.expiresAt)
       || typeof request.namespace !== "string" || request.namespace.length > 256 || request.namespace.includes("\0")
       || typeof request.room !== "string" || !request.room.length || request.room.length > 256 || request.room.includes("\0")
-      || typeof request.excludeSid !== "string" || request.excludeSid.length > 128
+      || (request.excludeSid !== undefined && (typeof request.excludeSid !== "string" || request.excludeSid.length > 128))
       || request.packet.type !== "event" || typeof request.packet.event !== "string" || !request.packet.event.length
       || request.packet.event.length > 256) throw new WebSocketDeliveryError("INVALID_PUBLICATION");
     const packet = JSON.stringify({ ...request.packet, v: 1, namespace: request.namespace, deliveryId: request.messageId });
     if (Buffer.byteLength(packet) > this.limits.maxQueueBytes) throw new WebSocketDeliveryError("QUEUE_CAPACITY");
     const metadata = JSON.stringify({ messageId: request.messageId, expiresAt: request.expiresAt,
-      namespace: request.namespace, room: request.room, excludeSid: request.excludeSid });
+      namespace: request.namespace, room: request.room, excludeSid: request.excludeSid ?? "" });
     const fingerprint = canonicalJsonHashV1("bazis.websocket.publication/v1", { metadata: JSON.parse(metadata), packet: JSON.parse(packet) });
     const result = await this.operations.send("EVAL", [PUBLISH, "0", this.prefix, metadata, JSON.stringify(this.limits), fingerprint, packet]) as string[];
     if (result[0] !== "OK") throw new WebSocketDeliveryError(result[0] ?? "STORE_PROTOCOL");

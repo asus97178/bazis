@@ -1,6 +1,7 @@
 import {
   collectModuleUiProfiles,
   collectModuleControllers,
+  collectModuleGateways,
   DI,
   Global,
   Module,
@@ -12,7 +13,8 @@ import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
 import { httpModule, useModelValidator, type HttpModuleOptions, type ModelValidator } from "../http";
 import { grpcModule, type GrpcModuleOptions } from "../grpc";
 import { buildHttpOpenApiDocument } from "../http/OpenApi/openApiDocument";
-import { KernelBuilder, Bazis, type KernelOptions, type ValidatableConfig } from "../kernel";
+import { KernelBuilder, Bazis, KernelError, type KernelOptions, type ValidatableConfig } from "../kernel";
+import { websocketModule, type WebSocketOptions } from "../websocket";
 import {
   isUiProfileAuthoringClass,
   type UiProfileV1,
@@ -39,6 +41,12 @@ export interface RunAppOptions {
   readonly http?: HttpModuleOptions;
   /** gRPC server; discovers feature-module grpcControllers, independently of HTTP. */
   readonly grpc?: GrpcModuleOptions;
+  /**
+   * WebSocket settings (authentication, adapter, limits). Gateways are
+   * collected from the `gateways` of the modules and served on the HTTP
+   * listener whenever a module declares one; this option only tunes them.
+   */
+  readonly websocket?: WebSocketOptions;
   /** Kernel options (environment, shutdown timeout, signals, ...). */
   readonly kernel?: KernelOptions;
   /**
@@ -86,6 +94,17 @@ export interface RunAppOptions {
    * policy projection and a safe session mapper.
    */
   readonly ui?: RunAppUiOptions;
+}
+
+/** Adds the WebSocket module when a module declares gateways; settings alone without gateways are a mistake. */
+function withWebSocket(root: BazisModuleRef, options: WebSocketOptions | undefined): BazisModuleRef {
+  if (collectModuleGateways([root]).length === 0) {
+    if (options !== undefined) {
+      throw new KernelError("runApp: websocket options are set, but no module declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.");
+    }
+    return root;
+  }
+  return { imports: [root, websocketModule({ ...options, imports: [root] })] };
 }
 
 function withUiRuntime(
@@ -279,8 +298,9 @@ export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): B
     // behavior after startup.
     useModelValidator(validator);
 
+    const gatewayRoot = withWebSocket(appRoot, options.websocket);
     const httpAppRoot = withUiRuntime(
-      { imports: [appRoot, ...(options.http.imports ?? [])] },
+      { imports: [gatewayRoot, ...(options.http.imports ?? [])] },
       options.ui,
       options.http,
     );

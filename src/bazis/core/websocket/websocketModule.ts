@@ -1,14 +1,16 @@
 import {
   DI,
+  collectModuleGateways,
   markGlobal,
   Module,
-  singleton,
-  type Class,
   type BazisModule,
+  type BazisModuleRef,
   type ProviderDefinition,
   type ServiceResolver,
 } from "../di";
 import { WEBSOCKET_UPGRADE } from "../http";
+import { LOGGER } from "../kernel";
+import { WebSocketService } from "./WebSocketService";
 import { WebSocketExplorer } from "./explorer";
 import { WebSocketServer, type WebSocketMemoryLimits } from "./ws-server";
 import type { WsAccessTokenAuthenticator, WsMiddleware } from "./middleware";
@@ -19,11 +21,10 @@ import type { WebSocketDiagnostic } from "./reliable-delivery";
 
 export interface WebSocketModuleConfig {
   /**
-   * Gateway classes decorated with `@WebSocketGateway`. Each is registered as a
-   * singleton (with auto-resolved constructor dependencies) and explored for
-   * `@SubscribeMessage` handlers.
+   * Modules whose `gateways` (classes with `@WebSocketGateway`) are served.
+   * The whole tree is searched, like `httpModule` searches for controllers.
    */
-  readonly gateways: readonly Class<object>[];
+  readonly imports?: readonly BazisModuleRef[];
   /** Kernel-owned upgrade policy using DI; runs before gateway middleware. */
   readonly middlewareFactory?: (services: ServiceResolver) => WsMiddleware;
   /** Upgrade-time authentication; `null`/omitted means anonymous connections. */
@@ -47,29 +48,39 @@ export interface WebSocketModuleConfig {
   readonly exposeHandlerErrors?: boolean;
 }
 
+/** Server-wide WebSocket settings of `runApp({ websocket })`; gateways come from the modules. */
+export type WebSocketOptions = Omit<WebSocketModuleConfig, "imports">;
+
 /**
- * Registers WebSocket gateways and shares the HTTP listener for upgrades.
+ * Serves the gateways declared by the modules of `imports` on the shared HTTP
+ * listener. `runApp` installs it next to the HTTP module whenever a module
+ * declares `gateways`; `runApp({ websocket })` passes the settings.
  *
  * ```ts
- * @Module({ imports: [httpModule({ ... }), websocketModule({ gateways: [ChatGateway] })] })
- * class AppModule {}
+ * @Module({ gateways: [ChatGateway], providers: [singleton(ChatHistory)] })
+ * class ChatModule {}
  * ```
  *
  * The built `WebSocketServer` is exposed under {@link WEBSOCKET_UPGRADE}; the
  * HTTP server resolves it and wires `Bun.serve({ websocket })` automatically.
+ * `WebSocketService` is exported globally for sending from services.
  */
 export function websocketModule(config: WebSocketModuleConfig): BazisModule {
+  const gateways = collectModuleGateways(config.imports ?? []);
+  if (gateways.length === 0) {
+    throw new Error("websocketModule: no module of imports declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.");
+  }
   const providers: ProviderDefinition[] = [
-    ...config.gateways.map((Gateway) => singleton(Gateway)),
     DI.singleton(
       DI.factoryProviderWithResolver(WEBSOCKET_UPGRADE, [], (resolver) => {
-        const instances = config.gateways.map((Gateway) => resolver.resolve(Gateway));
+        const instances = gateways.map((Gateway) => resolver.resolve(Gateway));
         const namespaces = new WebSocketExplorer().explore(instances);
         if (config.middlewareFactory) {
           const middleware = config.middlewareFactory(resolver);
           if (typeof middleware !== "function") throw new Error("WebSocket middlewareFactory must return middleware.");
           for (const namespace of namespaces) namespace.middleware.unshift(middleware);
         }
+        const logger = resolver.tryResolve(LOGGER);
         return new WebSocketServer({
           namespaces,
           authenticator: config.authenticator ?? null,
@@ -82,14 +93,23 @@ export function websocketModule(config: WebSocketModuleConfig): BazisModule {
           ...(config.onDiagnostic ? { onDiagnostic: config.onDiagnostic } : {}),
           ...(config.limits ? { limits: config.limits } : {}),
           ...(config.exposeHandlerErrors !== undefined ? { exposeHandlerErrors: config.exposeHandlerErrors } : {}),
+          ...(logger ? { logger } : {}),
         });
+      }),
+    ),
+    DI.singleton(
+      DI.factoryProviderWithResolver(WebSocketService, [], (resolver) => {
+        const upgrade = resolver.resolve(WEBSOCKET_UPGRADE);
+        if (!(upgrade instanceof WebSocketServer)) throw new Error("WebSocketService needs the WebSocketServer registered by websocketModule.");
+        return new WebSocketService(upgrade);
       }),
     ),
   ];
 
   // Global + exported so the HTTP module can resolve the upgrade port without
-  // importing the websocket module (one-way: websocket builds on http).
-  @Module({ providers, exports: [WEBSOCKET_UPGRADE] })
+  // importing the websocket module (one-way: websocket builds on http), and
+  // any service can take WebSocketService.
+  @Module({ imports: config.imports, providers, exports: [WEBSOCKET_UPGRADE, WebSocketService] })
   class WebSocketModule {}
 
   return markGlobal(WebSocketModule);

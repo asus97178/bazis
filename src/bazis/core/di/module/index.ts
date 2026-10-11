@@ -26,7 +26,7 @@ export {
   type ModuleOwnedProviderContributor,
 } from "./moduleOwnedProviderContributors";
 export { createContainer, type CreateContainerOptions } from "./createContainer";
-export { collectModuleControllers } from "./collectModuleControllers";
+export { collectModuleControllers, collectModuleGateways } from "./collectModuleControllers";
 export { collectModuleConfigs } from "./collectModuleConfigs";
 export { collectModuleUiProfiles } from "./collectModuleUiProfiles";
 export {

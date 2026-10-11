@@ -139,11 +139,13 @@ let gateway: ChatGateway;
 let base: string;
 
 beforeEach(async () => {
+  @Module({ gateways: [ChatGateway, TinyGateway, CustomAuthGateway] })
+  class Gateways {}
   @Module({
     imports: [
       httpModule({ port: 0, imports: [] }),
       websocketModule({
-        gateways: [ChatGateway, TinyGateway, CustomAuthGateway],
+        imports: [Gateways],
         limits: {
           maxIngressPacketsPerWindow: 2,
           maxControlFramesPerWindow: 1,
@@ -314,7 +316,9 @@ describe("WebSocket: e2e over the shared HTTP port", () => {
       async hold(): Promise<void> { started = true; await held; order.push("handler"); }
       onGatewayShutdown(): void { order.push("gateway"); }
     }
-    @Module({ imports: [httpModule({ port: 0 }), websocketModule({ gateways: [ShutdownGateway],
+    @Module({ gateways: [ShutdownGateway] })
+    class ShutdownModule {}
+    @Module({ imports: [httpModule({ port: 0 }), websocketModule({ imports: [ShutdownModule],
       limits: { shutdownDrainTimeoutMs: 20, messageHandlingTimeoutMs: 0 } })] })
     class ShutdownApp {}
     const isolated = createContainer(ShutdownApp, { validateOnBuild: true });

@@ -212,7 +212,7 @@ let explicitRequestModelRoots = new Set<ts.ClassDeclaration>();
 let agentCodegenSources: AgentCodegenSource[] = [];
 
 const ROUTE_DECORATORS = new Set(["Get", "Post", "Put", "Patch", "Delete", "Options", "Head", "All"]);
-const CODEGEN_CHANNEL_DECORATORS = new Set(["Controller", "GrpcController", "Agent", "Tool", "Prompt", "RequestModel", "UiProfile"]);
+const CODEGEN_CHANNEL_DECORATORS = new Set(["Controller", "GrpcController", "WebSocketGateway", "Agent", "Tool", "Prompt", "RequestModel", "UiProfile"]);
 const PRIMITIVE_QUERY_TYPES: Record<string, HttpBindingSpec["type"]> = {
   string: "string",
   number: "number",
@@ -867,7 +867,7 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
     if (!object || visitedModules.has(object)) return;
     visitedModules.add(object);
     const properties = propertiesOf(object);
-    for (const name of ["controllers", "grpcControllers", "background", "tools"]) {
+    for (const name of ["controllers", "grpcControllers", "gateways", "background", "tools"]) {
       const classes = properties.get(name);
       if (classes && ts.isArrayLiteralExpression(classes)) for (const entry of classes.elements) record(entry);
     }

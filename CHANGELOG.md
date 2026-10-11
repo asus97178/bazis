@@ -4,6 +4,40 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.31 — 2026-10-11
+
+### Changed (breaking)
+
+- A WebSocket gateway is declared by its module, like a controller:
+  `@Module({ gateways: [ChatGateway], providers: [singleton(ChatHistory)] })`.
+  The gateway is a singleton of that module and sees its providers; before, it
+  lived inside `WebSocketModule` and a dependency on the module's own service
+  failed with an encapsulation error that could not be fixed. `runApp` serves
+  the gateways on the HTTP listener whenever a module declares one;
+  `runApp({ websocket })` carries the server-wide settings (authentication,
+  adapter, limits), and settings without any gateway stop the start. The
+  `gateways` option of `websocketModule` is removed; it takes `imports`
+  instead, like `httpModule`.
+
+### Added
+
+- `WebSocketService` (exported globally by the WebSocket module) sends from
+  outside a handler — a service, a controller, a background job:
+  `this.ws.to("user:ann").emit("order-paid", { id })`, or
+  `namespace("chat").to(room)` with several namespaces. Delivery is the same
+  as `socket.to(room)`: live members of this node, other nodes through the
+  adapter, offline members queued for replay; `emitReliable` with the adapter
+  capability. Before, a message could be sent only in reply to a client.
+
+### Fixed
+
+- A gateway handler that throws, and an upgrade that fails unexpectedly, are
+  logged through the application logger (redacted). Before, the client got
+  "Handler failed" and nothing reached the log.
+- A token that the authenticator rejects with a `JwtError` or
+  `UnauthorizedError` (expired, bad signature) answers the upgrade with `401`
+  instead of `500 WebSocket upgrade failed`.
+
 ## 0.98.30 — 2026-10-11
 
 ### Added

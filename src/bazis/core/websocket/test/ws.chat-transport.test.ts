@@ -17,7 +17,8 @@ test("outbound bound is optional, independent, and positive", () => {
 });
 test("DI upgrade policy and different ingress/egress bounds work on the actual listener", async () => {
   let called = 0;
-  @Module({ imports: [websocketModule({ gateways: [BoundedGateway], middlewareFactory: services => {
+  @Module({ gateways: [BoundedGateway] }) class Bounded {}
+  @Module({ imports: [websocketModule({ imports: [Bounded], middlewareFactory: services => {
     expect(services.resolve(BoundedGateway)).toBeInstanceOf(BoundedGateway);
     return async (ctx, next) => { called++; if (ctx.request.headers.get("origin") !== "http://allowed.test") throw new WsUpgradeError("Forbidden"); await next(); };
   } })] }) class Root {}

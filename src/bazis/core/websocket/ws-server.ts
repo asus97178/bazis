@@ -40,7 +40,11 @@ import { InMemoryWebSocketAdapter } from "./adapter/in-memory.adapter";
 import type { PacketCodec } from "./codec/packet-codec.interface";
 import { payloadToBytes, payloadToText } from "./codec/packet-codec.interface";
 import { jsonPacketCodec } from "./codec/json.codec";
-import { WebSocketDeliveryError, type WebSocketDiagnostic, type ReliableSessionOwner } from "./reliable-delivery";
+import { WebSocketDeliveryError, type WebSocketDiagnostic, type ReliableBroadcastOptions, type ReliableBroadcastReceipt, type ReliableSessionOwner } from "./reliable-delivery";
+import type { Logger } from "../kernel";
+import { redactSensitive } from "../../library/redaction";
+import { normalizeNamespace } from "./decorators";
+import type { OutgoingPacket } from "./socket-wrapper";
 
 export interface WebSocketMemoryLimits {
   readonly maxRateLimitBuckets?: number;
@@ -93,6 +97,8 @@ export interface WebSocketServerOptions {
   limits?: WebSocketMemoryLimits;
   /** Expose validator/handler exception messages. Disabled by default. */
   exposeHandlerErrors?: boolean;
+  /** Receives unexpected handler and upgrade failures (redacted). */
+  logger?: Logger;
 }
 
 export interface WebSocketServerStats {
@@ -352,8 +358,74 @@ export class WebSocketServer {
       if (handshakeController.signal.aborted && this.closed) {
         return new Response("WebSocket service unavailable", { status: 503 });
       }
+      this.options.logger?.error("WebSocket upgrade failed", { path: registered.path, error: redactSensitive(error) });
       return new Response("WebSocket upgrade failed", { status: 500 });
     }
+  }
+
+  /** Namespaces served by this server, normalized (`/chat`). */
+  public get namespaceNames(): readonly string[] {
+    return [...this.namespacesByName.keys()];
+  }
+
+  /**
+   * Sends an event to every member of a room from outside a handler (a service,
+   * a controller, a background job). Delivery is the same as `socket.to(room)`:
+   * live members of this node and, through the adapter, of other nodes;
+   * offline members get it queued for reconnect replay.
+   */
+  public broadcast(namespace: string, room: string, event: string, data?: unknown): void {
+    const registered = this.requireNamespace(namespace);
+    this.publishToRoom(registered, room, { type: "event", namespace: registered.namespace, event, data }, outboundLimit(registered));
+  }
+
+  /** `socket.to(room).emitReliable` from outside a handler; needs the adapter capability. */
+  public async broadcastReliable(namespace: string, room: string, event: string, data: unknown, options: ReliableBroadcastOptions): Promise<ReliableBroadcastReceipt> {
+    const registered = this.requireNamespace(namespace);
+    const store = this.adapter.reliableRooms;
+    if (!store) throw new WebSocketDeliveryError("RELIABLE_DELIVERY_UNAVAILABLE");
+    const packet: OutgoingPacket = { type: "event", namespace: registered.namespace, event, data };
+    if (payloadBytes(this.codec.encodeServer({ ...packet, deliveryId: options.messageId })) > outboundLimit(registered)) {
+      throw new WebSocketDeliveryError("PAYLOAD_CAPACITY");
+    }
+    try {
+      const receipt = await store.publish({ ...options, namespace: registered.namespace, room, packet: { ...packet, v: 1 } });
+      this.diagnose("reliable-published", receipt.duplicate ? 0 : receipt.recipients);
+      return receipt;
+    } catch (error) {
+      this.diagnose("reliable-rejected");
+      throw error;
+    }
+  }
+
+  private requireNamespace(namespace: string): RegisteredNamespace {
+    if (this.closed || !this.initialized) throw new Error("WebSocket server is not running.");
+    const registered = this.namespacesByName.get(normalizeNamespace(namespace));
+    if (!registered) throw new Error(`Unknown WebSocket namespace "${namespace}"; registered: ${this.namespaceNames.join(", ")}.`);
+    return registered;
+  }
+
+  /**
+   * Fan-out to a room: the offline queue first (strict, so a rejection is not
+   * hidden behind a partial live delivery), then live members of this node,
+   * then other nodes through the adapter. `origin` is excluded, like `to()`.
+   */
+  private publishToRoom(registered: RegisteredNamespace, room: string, packet: OutgoingPacket, maxPayloadBytes: number, origin?: ServerWebSocket<WsConnectionData>): void {
+    const namespace = registered.namespace;
+    const topic = this.topics.get(namespace, room);
+    const payload = this.codec.encodeServer(packet);
+    const bytes = payloadToBytes(payload);
+    if (bytes.byteLength > maxPayloadBytes) {
+      throw new Error("WebSocket broadcast payload exceeds the namespace limit.");
+    }
+    const admission = this.sessionManager.enqueueToOfflineRoomMembers(namespace, room, { v: 1, ...packet }, origin?.data.sid, bytes.byteLength, true);
+    if (admission.truncated) {
+      this.diagnose("queue-rejected");
+      throw new WebSocketDeliveryError("OFFLINE_QUEUE_CAPACITY");
+    }
+    if (origin) origin.publish(topic, payload);
+    else this.bunServer?.publish(topic, this.codec.isBinary(payload) ? payload : payloadToText(payload));
+    this.trackAdapterOperation(this.adapter.publish(topic, bytes));
   }
 
   private async performUpgrade(
@@ -590,30 +662,10 @@ export class WebSocketServer {
         }
       },
       broadcast: (room, packet) => {
-        if (signal?.aborted) {
+        if (signal?.aborted || !registered) {
           return;
         }
-        const namespace = ws.data.namespace;
-        const topic = this.topics.get(namespace, room);
-        const payload = this.codec.encodeServer(packet);
-        const bytes = payloadToBytes(payload);
-        if (bytes.byteLength > maxPayloadBytes) {
-          throw new Error("WebSocket broadcast payload exceeds the namespace limit.");
-        }
-        const admission = this.sessionManager.enqueueToOfflineRoomMembers(
-          namespace,
-          room,
-          { v: 1, ...packet },
-          ws.data.sid,
-          bytes.byteLength,
-          true,
-        );
-        if (admission.truncated) {
-          this.diagnose("queue-rejected");
-          throw new WebSocketDeliveryError("OFFLINE_QUEUE_CAPACITY");
-        }
-        ws.publish(topic, payload);
-        this.trackAdapterOperation(this.adapter.publish(topic, bytes));
+        this.publishToRoom(registered, room, packet, maxPayloadBytes, ws);
       },
       broadcastReliable: async (room, packet, options) => {
         signal?.throwIfAborted();
@@ -1241,6 +1293,11 @@ export class WebSocketServer {
       const cause = error instanceof WsDispatchError ? error.cause : error;
       if (cause instanceof WebSocketDeliveryError) this.sendError(ws, cause.message, packet.id, cause.code);
       else this.sendError(ws, this.options.exposeHandlerErrors === true && rawMessage ? rawMessage : safeMessage, packet.id);
+      // A validation failure is the client's mistake; anything else is ours and
+      // belongs in the log, like an unhandled HTTP error.
+      if (!(error instanceof WsDispatchError && error.kind === "validation") && !(cause instanceof WebSocketDeliveryError)) {
+        this.options.logger?.error("WebSocket handler failed", { namespace: ws.data.namespace, event: packet.event, error: redactSensitive(cause) });
+      }
     }
     throwIfAborted(signal);
   }
