@@ -11,6 +11,8 @@ import type { MethodDefinition } from "./serviceDefinition";
 import { modelValidatorAdapter } from "../../library/validation";
 import { getGrpcRequestBinding } from "./GrpcBinding.contract";
 import { GrpcRequestBinding } from "./GrpcRequest.binding";
+import { resolveAuthorizeMeta, type AuthorizeCheck } from "../http/Authorization/metadata";
+import { LOGGER, type Logger } from "../kernel/logging/Logger";
 
 type Contribution = ModuleOwnedProviderContribution<GrpcControllerDefinition, object>;
 
@@ -24,7 +26,8 @@ export class GrpcServer implements HostedService {
   private readonly sendLimit: number;
   private readonly maxConcurrentCalls: number;
   private readonly shutdownTimeoutMs: number;
-  private readonly routes = new Map<string, { entry: Contribution; method: MethodDefinition; name: string | symbol; binding?: GrpcRequestBinding }>();
+  private readonly routes = new Map<string, { entry: Contribution; method: MethodDefinition; name: string | symbol; binding?: GrpcRequestBinding; checks: readonly AuthorizeCheck[] }>();
+  private readonly logger?: Logger;
   private readonly sessions = new Set<ServerHttp2Session>();
   private readonly active = new Map<GrpcCall, Promise<void>>();
   private state: "idle" | "starting" | "running" | "stopping" | "stopped" = "idle";
@@ -34,6 +37,7 @@ export class GrpcServer implements HostedService {
   private boundPort?: number;
 
   constructor(options: GrpcModuleOptions, private readonly provider: ServiceProvider, controllers: readonly Contribution[]) {
+    this.logger = provider.tryResolve(LOGGER);
     const address = options.address ?? "127.0.0.1:50051";
     const match = typeof address === "string" && /^(?:\[([^\]]+)\]|([^:[\]\s]+)):(\d{1,5})$/.exec(address);
     if (!match || Number(match[3]) > 65535 || options.address === null) throw new TypeError("gRPC address must be host:port or [IPv6]:port.");
@@ -68,7 +72,9 @@ export class GrpcServer implements HostedService {
           throw new TypeError(`gRPC request stream/DTO mismatch: ${method.path}.`);
         }
         const model = explicit ?? generated?.model;
-        this.routes.set(method.path, { entry, method, name, binding: model ? new GrpcRequestBinding(model, validator) : undefined });
+        const access = resolveAuthorizeMeta(entry.payload.controller, name);
+        const checks = access.allowAnonymous ? [] : access.authorize?.checks ?? [];
+        this.routes.set(method.path, { entry, method, name, binding: model ? new GrpcRequestBinding(model, validator) : undefined, checks });
       }
     }
     const tls = credentials.http2Options();
@@ -113,7 +119,7 @@ export class GrpcServer implements HostedService {
       reject(error instanceof GrpcError ? error.code : GrpcStatus.INVALID_ARGUMENT, error instanceof GrpcError ? error.message : "Invalid gRPC headers.");
       return;
     }
-    const execution = new GrpcCall(transport, route.method, route.name, route.entry.activation, this.provider, route.binding);
+    const execution = new GrpcCall(transport, route.method, route.name, route.entry.activation, this.provider, route.binding, route.checks, this.logger);
     const pending = execution.run().catch((error: unknown) => transport.fail(error))
       .finally(() => this.active.delete(execution));
     this.active.set(execution, pending);

@@ -1,10 +1,10 @@
 import { DI, HOSTED_SERVICE, Module, SERVICE_PROVIDER, collectModuleControllers, type BazisModule, type ProviderDefinition } from "../di";
 import { HttpServer } from "./HttpServer";
-import type { HttpModuleOptions } from "./options";
+import type { HttpModuleOptions, HttpServerOptions } from "./options";
 
 /**
- * Builds the HTTP module: discovers controllers from `imports` (and optional
- * `controllers` on feature modules) and registers the HttpServer hosted service.
+ * Builds the HTTP module: discovers the `controllers` of the modules in
+ * `imports` and registers the HttpServer hosted service.
  *
  * ```ts
  * @Module({
@@ -22,11 +22,9 @@ import type { HttpModuleOptions } from "./options";
  * ```
  */
 export function httpModule(options: HttpModuleOptions): BazisModule {
-  const allControllers = collectModuleControllers(options.imports ?? [], options.controllers);
-
-  const serverOptions: HttpModuleOptions = {
+  const serverOptions: HttpServerOptions = {
     ...options,
-    controllers: allControllers,
+    controllers: collectModuleControllers(options.imports ?? []),
   };
 
   const providers: ProviderDefinition[] = [
@@ -40,7 +38,6 @@ export function httpModule(options: HttpModuleOptions): BazisModule {
   @Module({
     imports: options.imports,
     providers,
-    controllers: options.controllers,
   })
   class HttpModule {}
 

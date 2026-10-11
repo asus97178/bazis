@@ -37,7 +37,7 @@ async function start(produce: (ctx: HttpContext, resource: Resource) => unknown,
   }
   @Module({
     imports: [httpModule({
-      controllers: [FixtureController], port: 0, docs: false, inspectableRedirects,
+      imports: [{ controllers: [FixtureController] }], port: 0, docs: false, inspectableRedirects,
       middleware: shortCircuit ? [async ctx => {
         resource = ctx.services.resolve(Resource);
         ctx.response = produce(ctx, resource) as Response;

@@ -1,4 +1,5 @@
 import { constants, type Http2Session, type ClientHttp2Stream, type IncomingHttpHeaders } from "node:http2";
+import { markUpstreamFailure } from "../http/Errors/upstreamFailure";
 import type { GrpcResponseStream } from "./clientContracts";
 import { GrpcError } from "./GrpcError";
 import { GrpcStatus } from "./GrpcStatus";
@@ -83,6 +84,9 @@ export class GrpcClientCall<T> implements GrpcResponseStream<T> {
     if (!this.terminalHeaders) this.fail(new GrpcError(GrpcStatus.UNAVAILABLE, "gRPC connection closed before completion."));
   }
   fail(error: GrpcError): void {
+    // In an HTTP request this is a failure of another service: 504 or 502.
+    // Marked even after finish: the same error is rethrown to the caller.
+    markUpstreamFailure(error, error.code === GrpcStatus.DEADLINE_EXCEEDED ? "timeout" : "failure");
     if (this.finished) return;
     this.failure = error;
     this.abort.abort(error);

@@ -151,8 +151,7 @@ describe("@OutputCache HTTP e2e", () => {
       imports: [
         cacheModuleRef,
         httpModule({
-          imports: [cacheModuleRef],
-          controllers: [CatalogController, CacheBoundaryController, CollisionControllerA, CollisionControllerB],
+          imports: [cacheModuleRef, { controllers: [CatalogController, CacheBoundaryController, CollisionControllerA, CollisionControllerB] }],
           port: 0,
           prefix: "api",
           middleware: [async (ctx, next) => {

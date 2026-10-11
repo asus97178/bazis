@@ -3,6 +3,7 @@ import { redactSensitive, redactSensitiveText } from "../../../library/redaction
 import { HttpClientError, HttpErrorCode } from "../../../library/http-client/errors";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import { HttpError } from "../Errors/HttpError";
+import { upstreamFailure } from "../Errors/upstreamFailure";
 import type { HttpMiddleware } from "./types";
 
 export interface ErrorHandlerOptions {
@@ -162,6 +163,8 @@ function unexpectedStatus(error: unknown, mapper?: (error: unknown) => number | 
   if (error instanceof HttpClientError && error.code !== undefined) {
     return error.code === HttpErrorCode.Timeout ? [504, "Gateway Timeout"] : [502, "Bad Gateway"];
   }
+  const upstream = upstreamFailure(error);
+  if (upstream !== undefined) return upstream === "timeout" ? [504, "Gateway Timeout"] : [502, "Bad Gateway"];
   let mapped: number | undefined;
   try { mapped = mapper?.(error); } catch { mapped = undefined; }
   if (mapped !== undefined && Number.isInteger(mapped) && mapped >= 400 && mapped <= 599) return [mapped, REASONS[mapped] ?? (mapped >= 500 ? "Server Error" : "Client Error")];

@@ -24,8 +24,8 @@ registerModuleOwnedProviderContributor((metadata, context) => {
 });
 
 /** @internal Discover only the feature tree published by this transport. */
-export function collectGrpcControllers(roots: readonly BazisModuleRef[], extra: readonly Class<object>[] = []): Set<Class<object>> {
-  const result = new Set(extra);
+export function collectGrpcControllers(roots: readonly BazisModuleRef[]): Set<Class<object>> {
+  const result = new Set<Class<object>>();
   const visited = new Set<BazisModuleRef>();
   const visit = (module: BazisModuleRef): void => {
     if (visited.has(module)) return;

@@ -16,7 +16,7 @@ beforeAll(async () => {
   useModelValidator(modelValidatorAdapter);
 
   @Module({
-    imports: [httpModule({ controllers: [ConventionController], port: 0, docs: true })],
+    imports: [httpModule({ imports: [{ controllers: [ConventionController] }], port: 0, docs: true })],
   })
   class ConventionsAppModule {}
 

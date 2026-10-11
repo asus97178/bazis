@@ -43,7 +43,7 @@ class EchoController {
 }
 
 async function fixture(options: Partial<GrpcClientOptions> = {}, controller: Class<object> = EchoController) {
-  const container = createContainer(grpcModule({ controllers: [controller], address: "127.0.0.1:0" }));
+  const container = createContainer(grpcModule({ imports: [{ grpcControllers: [controller] }], address: "127.0.0.1:0" }));
   const server = container.resolveAll(HOSTED_SERVICE).find((s): s is GrpcServer => s instanceof GrpcServer)!;
   await server.start();
   const client = new GrpcClient(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000, ...options });

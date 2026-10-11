@@ -1,10 +1,23 @@
-import type { HttpContext } from "../HttpContext/HttpContext";
+import type { ServiceScope } from "../../di";
 
 // Same one-line polyfill as the rest of the HTTP module: Bun executes TC39
 // decorators natively, but Symbol.metadata may be missing in the runtime.
 (Symbol as { metadata?: symbol }).metadata ??= Symbol.for("Symbol.metadata");
 
 const AUTHORIZE_META = Symbol.for("bazis:http:authorize");
+
+/**
+ * What an access check sees. An HTTP request (`HttpContext`) and a gRPC call
+ * (`GrpcContext`) both provide it, so one check protects both transports.
+ */
+export interface AuthorizeContext {
+  /** A request header (HTTP) or a text metadata value (gRPC), by case-insensitive name. */
+  header(name: string): string | undefined;
+  /** The DI scope of this request or call. */
+  readonly services: ServiceScope;
+  /** Values shared by the checks and the handler of this request or call. */
+  readonly state: Map<string, unknown>;
+}
 
 /**
  * Access check for `@Authorize`. Receives the request context and decides
@@ -18,8 +31,10 @@ const AUTHORIZE_META = Symbol.for("bazis:http:authorize");
  *   (for example `UnauthorizedError` → `401` when there are no credentials at all).
  *
  * Dependencies (services, DB) come from `ctx.services` (the request scope).
+ * On a gRPC call `false`/`ForbiddenError` is PERMISSION_DENIED and
+ * `UnauthorizedError`/`JwtError` is UNAUTHENTICATED.
  */
-export type AuthorizeCheck = (ctx: HttpContext) => boolean | Promise<boolean>;
+export type AuthorizeCheck = (ctx: AuthorizeContext) => boolean | Promise<boolean>;
 
 /** Authorization requirement: one or more checks (all must pass). */
 export interface AuthorizeOptions {

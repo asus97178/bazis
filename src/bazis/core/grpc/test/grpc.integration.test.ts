@@ -197,11 +197,11 @@ describe("gRPC module: real HTTP/2 and protobuf", () => {
 
   test("rejects duplicate routes, missing methods and duplicate provider ownership", async () => {
     class Duplicate extends EchoController {}
-    expect(() => createContainer(grpcModule({ controllers: [EchoController, Duplicate] })).resolveAll(HOSTED_SERVICE))
+    expect(() => createContainer(grpcModule({ imports: [{ grpcControllers: [EchoController, Duplicate] }] })).resolveAll(HOSTED_SERVICE))
       .toThrow("Duplicate gRPC method");
     @GrpcController(echoService)
     class Missing {}
-    expect(() => createContainer(grpcModule({ controllers: [Missing] }))).toThrow("missing @GrpcMethod");
+    expect(() => createContainer(grpcModule({ imports: [{ grpcControllers: [Missing] }] }))).toThrow("missing @GrpcMethod");
     expect(() => createContainer({ grpcControllers: [EchoController], providers: [scoped(EchoController)] }))
       .toThrow("both a module-owned contribution");
     expect(() => new GrpcError(status.OK, "invalid")).toThrow("non-OK");
@@ -261,7 +261,7 @@ describe("gRPC module: real HTTP/2 and protobuf", () => {
       try { expect(() => container.resolveAll(HOSTED_SERVICE)).toThrow(); }
       finally { await container.dispose(); }
     }
-    const container = createContainer(grpcModule({controllers: [EchoController], address: "127.0.0.1:0"}));
+    const container = createContainer(grpcModule({ imports: [{ grpcControllers: [EchoController] }], address: "127.0.0.1:0" }));
     const server = container.resolveAll(HOSTED_SERVICE)[0] as GrpcServer;
     const abort = new AbortController();
     abort.abort(new Error("startup cancelled"));

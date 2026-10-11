@@ -56,11 +56,6 @@ export interface HttpModuleOptions {
    * Authorized/CORS-allowed clients can then inspect each redirect Location.
    */
   readonly inspectableRedirects?: boolean;
-  /**
-   * Controller classes (decorated with @Controller). Optional when controllers
-   * are declared on imported modules via `controllers` on `BazisModule`.
-   */
-  readonly controllers?: readonly Class<object>[];
   /** Request-model validator captured by this HTTP server instance. */
   readonly validator?: ModelValidator;
   /**
@@ -135,4 +130,9 @@ export interface HttpModuleOptions {
   readonly accessLog?: AccessLogOptions | boolean;
   /** Hosted-service startup phase (default 10 — after infrastructure). */
   readonly phase?: number;
+}
+
+/** @internal What `httpModule` hands to the server: the options plus the controllers it collected. */
+export interface HttpServerOptions extends HttpModuleOptions {
+  readonly controllers: readonly Class<object>[];
 }

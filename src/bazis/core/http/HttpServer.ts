@@ -19,7 +19,7 @@ import type { Router } from "./Routing/Router";
 import { parseRequestPath } from "./Routing/template";
 import { assertVersioningOptions, createVersionReader, type VersionReader } from "./Versioning/VersionReader";
 import { HTTP_ERROR_HOOK, ROUTE_MIDDLEWARE_COMPOSER, SERVER_MIDDLEWARE, sortByOrder } from "./middlewareTokens";
-import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions } from "./options";
+import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions, HttpServerOptions } from "./options";
 import { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
 import { HttpSetupError } from "./Errors/HttpError";
 import { getModelValidator, type ModelValidator } from "./Binding/modelValidator";
@@ -96,7 +96,7 @@ export class HttpServer implements HostedService {
   private docs?: PreparedOpenApiDocs;
 
   constructor(
-    private readonly options: HttpModuleOptions,
+    private readonly options: HttpServerOptions,
     /** Root container: the per-request scope factory. */
     private readonly provider: ServiceProvider,
     /** Root resolver for optional kernel services (Environment). */
@@ -181,11 +181,11 @@ export class HttpServer implements HostedService {
       this.options.versioning,
       this.collectRouteComposer(),
     );
-    this.router = builder.build(this.options.controllers as readonly Class<object>[]);
+    this.router = builder.build(this.options.controllers);
     this.readVersion = createVersionReader(this.options.versioning);
     this.docs = prepareOpenApiDocs({
       option: this.options.docs,
-      controllers: this.options.controllers as readonly Class<object>[],
+      controllers: this.options.controllers,
       globalPrefix: this.options.prefix,
       versioning: this.options.versioning,
       environment: this.resolver.tryResolve(Environment),
