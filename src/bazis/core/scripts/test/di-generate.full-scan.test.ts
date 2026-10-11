@@ -58,7 +58,7 @@ test("test fixture stays out of production output", async () => {
   expect(generated.exit).toBe(0);
   // Framework packages must not ship the host application's name-based DI map.
   expect(generated.output).not.toContain("BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/app/test/fixtures/application-postgres.fixture.ts");
-  const channels = ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "agentCatalog.ts", "runtime.ts"];
+  const channels = ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "runtime.ts"];
   const paths = [
     ...channels.map((channel) => `src/generated/bazis/${channel}`),
     ...channels.map((channel) => `src/generated/bazis/targets/test/${channel}`),
@@ -90,9 +90,11 @@ test("all targets share one root Program and the target pipeline emits every cha
   expect(exitCode).toBe(0);
   expect(output).toContain("programFactories=1");
   expect(output).toContain("targets=production,test");
-  for (const channel of ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "agentCatalog.ts", "runtime.ts"]) {
+  for (const channel of ["deps.ts", "bindings.ts", "httpRequestModels.ts", "httpListModels.ts", "openapi.ts", "runtime.ts"]) {
     expect(await Bun.file(`src/generated/bazis/targets/test/${channel}`).exists()).toBe(true);
   }
+  // Agents are data since 0.99.0: the catalog channel is gone and a stale file is removed.
+  expect(await Bun.file("src/generated/bazis/targets/test/agentCatalog.ts").exists()).toBe(false);
   expect(await Bun.file("src/generated/bazis/targets/demo/runtime.ts").exists()).toBe(false);
 }, 60_000);
 
@@ -136,12 +138,12 @@ test("a generic third target receives only its static reachable application slic
   expect(reached).toEqual(new Set([projectPath(third), projectPath(feature)]));
 });
 
-test("fails closed from the shared candidate index for real DI, HTTP, Agent and Module markers", async () => {
+test("fails closed from the shared candidate index for real DI, HTTP, Tool and Module markers", async () => {
   const root = await temporaryProject({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", experimentalDecorators: true }, include: ["src/**/*.ts"] }),
     "bazis.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
     "src/index.ts": "export const root = true;\n",
-    "src/z-agent.ts": "@Agent() export class AgentSource {}\n@Tool() export class ToolSource {}\n@Prompt() export class PromptSource {}\n",
+    "src/z-tool.ts": "@Tool() export class ToolSource {}\n",
     "src/c-controller.ts": "@Controller(\"items\") export class ControllerSource {}\n",
     "src/d-di.ts": "export class DiSource { constructor(private readonly widget: IWidget) {} }\n",
     "src/m-module.ts": "@Module({ providers: [] }) export class FeatureModule {}\n",
@@ -159,7 +161,7 @@ test("fails closed from the shared candidate index for real DI, HTTP, Agent and 
       "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/c-controller.ts",
       "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/d-di.ts",
       "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/m-module.ts",
-      "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/z-agent.ts",
+      "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/z-tool.ts",
     ]);
     expect(await Bun.file(path.join(root, "src/generated/bazis/sentinel.ts")).text()).toBe("untouched\n");
     expect(await Bun.file(path.join(root, "src/generated/bazis/deps.ts")).exists()).toBe(false);

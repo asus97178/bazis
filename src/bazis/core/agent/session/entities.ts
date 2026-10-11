@@ -13,7 +13,6 @@ export class AgentSessionRowV1 {
   @Column({ type: "text" }) ownerSubject = "";
   @Column({ type: "text", nullable: true }) tenant?: string;
   @Column({ type: "text" }) agentName = "";
-  @Column({ type: "text", nullable: true }) taskName?: string;
   @Column({ type: "text" }) implementationVersion = "";
   @Column({ type: "text" }) bindingHash = "";
   @Column({ type: "text" }) state = "created";

@@ -39,10 +39,8 @@ const issuedCheckpoints = new WeakSet<object>();
 export type AgentExecutionPhase = "ready-model" | "pending-tools" | "terminal";
 
 export interface AgentExecutionInvocationState {
-  readonly kind: "agent" | "task";
   readonly invocationId: string;
   readonly agentName: string;
-  readonly taskName?: string;
   readonly input: JsonValue;
   readonly metadata: JsonObject;
   /** Resolved Session data only; never classes, callbacks, DI or policies. */
@@ -239,14 +237,10 @@ function checkpointFromBoundary(value: BoundaryJsonValue): AgentExecutionCheckpo
 }
 
 function parseInvocation(value: BoundaryJsonValue): AgentExecutionInvocationState {
-  const record = closed(value, ["kind", "invocationId", "agentName", "taskName", "input", "metadata", "options"]);
-  if (record.kind !== "agent" && record.kind !== "task") throw invalid();
-  if ((record.kind === "agent" && record.taskName !== null) || (record.kind === "task" && typeof record.taskName !== "string")) throw invalid();
+  const record = closed(value, ["invocationId", "agentName", "input", "metadata", "options"]);
   return Object.freeze({
-    kind: record.kind,
     invocationId: requiredString(record.invocationId),
     agentName: requiredString(record.agentName),
-    taskName: record.taskName === null ? undefined : requiredString(record.taskName),
     input: asJsonValue(record.input),
     metadata: asJsonObject(record.metadata),
     options: parseResolvedOptions(record.options),
@@ -610,10 +604,8 @@ function checkpointRecord(checkpoint: AgentExecutionCheckpointV1): Record<string
   return {
     version: checkpoint.version,
     invocation: {
-      kind: checkpoint.invocation.kind,
       invocationId: checkpoint.invocation.invocationId,
       agentName: checkpoint.invocation.agentName,
-      taskName: checkpoint.invocation.taskName ?? null,
       input: checkpoint.invocation.input,
       metadata: checkpoint.invocation.metadata,
       options: checkpoint.invocation.options,

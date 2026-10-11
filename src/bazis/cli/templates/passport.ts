@@ -66,9 +66,7 @@ adapters that access it.
 | ${e}Response / ${m}Summary / to${e}Response | [responses](http/contracts/${m}.responses.ts) | ORM entity | Public data projection |
 | ${m}ListQuery | [list](http/contracts/${m}List.query.ts) | Query string | ListQuery, filters/sorting/pages |
 ${profile === "full" ? `| ${m}Reporter | [background](background/${m}.reporter.ts) | ServiceProvider, Logger, AbortSignal | Runs count and logs it |
-| ${m}SummaryTool | [tool](ai/tools/${m}Summary.tool.ts) | I${m}Service, input, context | Summary for the agent |
-| ${m}AnalystAgent | [agent](ai/agents/${m}Analyst.agent.ts) | Prepare${m}BriefRequest | ${m}BriefDocument via AgentRuntime |
-| AI DTO | [contracts](ai/contracts/${m}.brief.ts) | topic, audience | title, bullets |
+| ${m}SummaryTool | [tool](ai/tools/${m}Summary.tool.ts) | I${m}Service, input, context | Summary for an agent |
 ` : ""}
 
 ## Wiring, DI and data
@@ -80,8 +78,8 @@ I${m}Service → ${m}Service, scoped lifetime. The context and DbSet belong to t
 ${profile === "full" ? `${m}SummaryTool is listed in tools: [${m}SummaryTool]; the framework registers it as scoped, the tool is not exported.
 The service is scoped; its keyed @Cacheable works when the host installs the cache (runApp cache: memory()).
 The background service gets its own scope per tick and disposes it in finally.
-The host also provides auth from src/app/modules/auth (TokenKind.Admin/Client),
-AgentRuntime and the reasoning modelProfile. The CLI does not create them.
+The host also provides auth from src/app/modules/auth (TokenKind.Admin/Client)
+and an LLM connector, which registers AgentRuntime. The CLI does not create them.
 ` : ""}Constructor dependencies, including ${m}DbContext, are wired by codegen.
 No manual deps arrays. UI, events and own configuration are not used.
 
@@ -167,21 +165,19 @@ AbortSignal from the runtime, creates a scope, runs count and logs it unless
 the signal is aborted; dispose always runs. The SQL itself is not cancelled by
 this signal.
 
-Tool ${n.route}.summary: execute(input, context), sideEffect read.
-Agent ${n.route}-analyst: prepareBrief(input), task prepare-${n.route}-brief;
-modelProfile reasoning, maxSteps 3. The agentOutput method is a declaration
-for the runtime. Calling prepareBrief directly does not run the LLM.
+Tool ${n.route}.summary: execute(input, context), sideEffect read. Agents are
+data, not classes: an agent definition names the tool in toolNames and runs
+with AgentRuntime.run(definition, { input }).
 
-| AI input field | Type / source | Required | null | Default | Check | Example |
+| Tool input field | Type / source | Required | null | Default | Check | Example |
 | --- | --- | --- | --- | --- | --- | --- |
-| topic | string / tool input or Prepare${n.module}BriefRequest | Yes | no | none | Validator required, minLength 3 | Daily summary |
-| audience | string / Prepare${n.module}BriefRequest | Yes by Validator | no | operators when the DTO is created | Validator required, minLength 3 | operators |
-| context | AgentToolExecutionContext / runtime | For the tool | no | runtime | agentName comes from the server context | agentName: ${n.route}-analyst |
+| topic | string / tool input | Yes | no | none | Validator required, minLength 3 | Daily summary |
+| context | AgentToolExecutionContext / runtime | Yes | no | runtime | agentName comes from the running agent definition | agentName: ${n.route}-analyst |
 
 Tool output: topic string, count number, names string[], agentName string
-(empty when the context has no name). Agent output: title string, bullets
-string[]. AgentRuntime validates AI inputs and reports their errors; the
-scaffold adds no own permission checks for direct DI/tool calls. The host
-decides which tools are allowed. The scaffold does not retry the tool.
+(empty when the context has no name). AgentRuntime validates the tool input
+and reports its errors to the model; the scaffold adds no own permission
+checks. Which agents may call the tool is decided by their definitions'
+toolNames. The scaffold does not retry the tool.
 `;
 }

@@ -63,13 +63,10 @@ improved first. Creating or copying a scaffold by hand instead of the CLI is for
 The domain CRUD fields are the learning `name`/`email`; the author replaces them and
 updates the passport. `full` stays an atomic module. `pack` holds independent empty atomic parts.
 
-**Agent/Module transition:** per [AGENT-ARCH-001](../../../docs/architecture/AGENT_ARCHITECTURE.md)
-agents are created separately from modules. The current `--full` still generates an
-AnalystAgent inside the module and the `@Module.agents` field; this is a known mismatch
-with the target architecture. Separating the generation is part of the first stage of work.
-There is no separate agent generation command yet. The tables below describe the
-current CLI; the `--full` template was not changed by this step. AgentsModule was
-created with the regular `--empty`.
+**Agents and modules:** per [AGENT-ARCH-001](../../../docs/architecture/AGENT_ARCHITECTURE.md)
+agents are data, not module members (bazis 0.99.0). `--full` generates a Tool in
+`ai/tools` and lists it in `@Module.tools`; it generates no agent. An agent
+definition names the Tool and runs through `AgentRuntime.run`.
 
 Project OpenAPI codegen now takes inherited DTO properties into account, including an
 empty RequestModel subclass of an imported input contract. Validators come from the
@@ -78,15 +75,14 @@ analyzing members is kept. The fix is in the [OpenAPI analyzer](../library/opena
 and is called by the regular [di-generate](../core/scripts/di-generate.ts); only the
 generator updates the result.
 
-Agent schemas (R4, 2026-10-04) use the same OpenAPI analyzer naming function for the
-real declarations of input/output DTOs. Schema selection keeps the inputs/outputs of
-Agent, Task, Tool and their references; the constructor → schema links of root and
-nested class DTOs extend the existing `GENERATED_OPENAPI_SCHEMA_MODELS`.
-An unrelated interface with the same name no longer loses the class schema.
-A linked class DTO that cannot be imported is rejected with
-`BAZIS_AGENT_SCHEMA_MODEL_UNIMPORTABLE` before generated files are written.
-The Agent collector's existing limits on ambiguous class names and named exports are
-kept. The public commands and input DTOs of this CLI do not change.
+Tool schemas use the same OpenAPI analyzer naming function for the real
+declarations of `@Tool({ input, output })` DTOs. Schema selection keeps them and
+their references; the constructor → schema links of root and nested class DTOs
+extend the existing `GENERATED_OPENAPI_SCHEMA_MODELS`. An unrelated interface with
+the same name does not lose the class schema. A linked class DTO that cannot be
+imported is rejected with `BAZIS_TOOL_SCHEMA_MODEL_UNIMPORTABLE` before generated
+files are written. A class name declared in two files is a fatal codegen error.
+Since 0.99.0 there is no agent catalog; codegen removes a stale `agentCatalog.ts`. The public commands and input DTOs of this CLI do not change.
 The [Agent standalone integration](../core/agent/test/agent.standalone.integration.test.ts)
 check runs real codegen, typing, source and binary for a copy of the package outside the checkout.
 
@@ -228,10 +224,9 @@ name with the role moved into a suffix: `StatsController` → `http/Stats.contro
 `model/Stats.model.ts`, `model/Stats.dbContext.ts`, `services/IStats.service.ts`,
 `services/Stats.service.ts`, `http/Stats.controller.ts`,
 `http/contracts/Stats.requests.ts`, `Stats.responses.ts`, `StatsList.query.ts`;
-`--full` adds `background/Stats.reporter.ts`, `ai/agents/StatsAnalyst.agent.ts`,
-`ai/tools/StatsSummary.tool.ts`, `ai/contracts/Stats.brief.ts`. Role classes:
-`StatsModule`, `StatsController`, `IStatsService`/`StatsService`, `StatsDbContext`,
-`StatsListQuery`, `StatsReporter`, `StatsSummaryTool`, `StatsAnalystAgent`.
+`--full` adds `background/Stats.reporter.ts` and `ai/tools/StatsSummary.tool.ts`.
+Role classes: `StatsModule`, `StatsController`, `IStatsService`/`StatsService`,
+`StatsDbContext`, `StatsListQuery`, `StatsReporter`, `StatsSummaryTool`.
 The record and its DTOs stay singular: `class Stat`, `CreateStatRequest`,
 `StatResponse`; the route is `/stats`. Before 0.96.1 names were built from the entity
 (`StatController.ts`, `StatService`). Pack parts that coincide in the singular

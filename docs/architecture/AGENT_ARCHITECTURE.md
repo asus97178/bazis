@@ -1,7 +1,7 @@
 # bazis agents, modules and tools
 
-Identifier: **AGENT-ARCH-001**. Version: **1.2**. Date: **2026-09-21**.
-Status: **the catalog, Admin UI, shared runs from chat/CLI and the first allowed tool are implemented; long-running execution is the next stage**.
+Identifier: **AGENT-ARCH-001**. Version: **1.3**. Date: **2026-10-12**.
+Status: **agents are only data since bazis 0.99.0; long-running execution is the next stage**.
 Basis: the user set the order: first put the existing Agent Runtime and Tools in
 order and separate agents from modules, then build on that base.
 
@@ -9,7 +9,8 @@ This document extends [MOD-ARCH-001](MODULE_ARCHITECTURE.md). By the user's next
 request, an atomic [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md)
 was created in the osnova application to manage definitions from the admin panel.
 Then a path to run a definition as data and a separate user-facing Vue chat were
-added. The earlier declarations are not fully migrated.
+added. In bazis 0.99.0 the declarations through classes (`@Agent`, `@Task`,
+`@Prompt`, `@Module.agents`) were removed: a definition is the only way to declare an agent.
 
 ## 1. The accepted separation
 
@@ -22,8 +23,7 @@ added. The earlier declarations are not fully migrated.
 | Tool | A verifiable action contract and its binding to an implementation | Assigned to an agent; one tool may be used by several agents |
 | Agent Runtime | Executes the definition: context, limits, work state and error boundary | Runs all agents through one shared Tool call mechanism |
 
-In the target model an agent is not part of `@Module.agents`, a submodule or a new
-DI container. Creating a concrete agent does not require creating an bazis module or
+An agent is not part of a module, a submodule or a new DI container. Creating a concrete agent does not require creating an bazis module or
 adding it to `imports`.
 
 A Tool implementation may use a module's services through the existing DI and stay
@@ -43,10 +43,9 @@ the sources; there is no need to create the directory empty. Definitions from th
 database need no separate source files per agent.
 Do not copy a shared Tool implementation into the directory of every agent that uses it.
 
-Target direction: an agent definition is serializable metadata. A developer
-declaration and a definition from storage go through the same check and reference
-resolution, then run in one runtime. The existing decorators may stay as an authoring
-method; a class must not be mandatory for a definition from the database.
+An agent definition is serializable data (`AgentDataDefinition`). A definition in
+the sources and a definition from storage go through the same check and reference
+resolution in `AgentRuntime.run`, then run in one runtime. There is no class form.
 
 A basic definition records identity, version, name, instructions and state; the list
 of Tools and the model profile may stay empty. A separate input/output schema is
@@ -97,17 +96,16 @@ a DI scope is not process, file or network isolation.
 | Area | What exists | What has to change |
 | --- | --- | --- |
 | [AgentsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/MODULE.md) | Definitions in PostgreSQL, protected Admin CRUD, versions, Main, RunService and agents.getAll | Main creating other agents through a Tool with a separate permission check |
-| [Module AI metadata](../../src/bazis/core/agent/index.ts) | `agents/tools/prompts/agentToolHooks` extend the module metadata | Remove the dependency of agent execution on the module declaration; keep the current path during the migration |
-| [AgentRegistry](../../src/bazis/core/agent/AgentRegistry.ts) | fromDefinition resolves toolNames from the host's explicit list; an immutable snapshot without an agent class | Storing a versioned snapshot together with a long-running session |
-| [Agent metadata](../../src/bazis/core/agent/metadata.ts) | Dynamic definitions are data; classes/decorators stay for Tools/DTOs and compatibility | Align the old examples and generation without changing the old API without a migration |
-| [CLI full template](../../src/bazis/cli/templates/module.ts) | Creates an AnalystAgent inside the module and writes `agents` into `@Module` | Separate module and agent generation, align codegen and checks |
+| [Module AI metadata](../../src/bazis/core/agent/index.ts) | `tools/agentToolHooks` extend the module metadata; agents are not declared in modules | — |
+| [AgentRuntime](../../src/bazis/core/agent/AgentRuntime.ts) | `run(definition)` resolves toolNames from the `@Module.tools` catalog; an immutable snapshot per run; injected by type, registered by the LLM connectors | Storing a versioned snapshot together with a long-running session |
+| [Tool metadata](../../src/bazis/core/agent/metadata.ts) | `@Tool` only; codegen collects Tool DTO schemas | — |
+| [CLI full template](../../src/bazis/cli/templates/module.ts) | Creates a Tool inside the module; no agent | — |
 | [Agent Runtime](../../src/bazis/core/agent/MODULE.md) | The working Agent → model → Tool loop and the checked limits of local fixes | Put the current contracts and registration in order before adding new capabilities |
 | [Chat](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agent-chat/MODULE.md) / [CLI](../../src/bazis/cli/MODULE.md) | The shared RunService, saved answers, cancellation, text and tool progress in Vue; the CLI gets the final answer | CLI streaming/resume and a transport-independent session |
 | [Session contracts](../../src/bazis/core/agent/session/contracts.ts) | Session contracts; entities, a codec and checkpoint protection exist next to them | Finish the executing service separately; having contracts does not prove recovery works |
 
-The current code with `@Module.agents` is compatibility during the transition, not a
-model for new agents. `extras` already allows passing separate declarations, but it
-does not by itself complete an independent lifecycle and a dynamic catalog.
+The class form and `@Module.agents` were removed in 0.99.0 without a compatibility
+layer: the framework is young and the path was not used outside the osnova application.
 The existing tests of the module path stay the evidence of compatibility until the migration.
 
 ## 5. Order of work

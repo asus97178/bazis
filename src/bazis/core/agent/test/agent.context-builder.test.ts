@@ -1,68 +1,32 @@
 import { describe, expect, test } from "bun:test";
-import { Module } from "@/core/di";
 import {
-  Agent,
-  AgentRegistry,
   DefaultAgentContextBuilder,
-  Prompt,
   agentMessage,
   agentToolCall,
   agentToolCallPart,
   agentToolResult,
   agentToolResultPart,
 } from "../index";
+import { AgentRegistry } from "../AgentRegistry";
+import { agentDefinition } from "./agentDefinition.fixture";
 
-@Prompt({
-  name: "product.designer.prompt",
-  role: "Product analyst",
-  goal: "Turn product ideas into a clear delivery plan.",
-  instructions: ["Ask for missing business context.", "Prefer explicit acceptance criteria."],
-  constraints: ["Do not invent regulatory claims."],
-  sections: [
-    {
-      kind: "developer",
-      title: "Domain rules",
-      content: ["Keep enterprise processes auditable.", "Prefer reversible operations."],
-    },
-    {
-      kind: "tool-policy",
-      content: "Use read tools before proposing write actions.",
-    },
-  ],
-})
-class ProductDesignerPrompt {}
-
-@Agent({
+const ProductDesignerAgent = agentDefinition({
   name: "product-designer",
-  role: "Senior product analyst",
   description: "Designs enterprise product processes.",
-  prompt: ProductDesignerPrompt,
-})
-class ProductDesignerAgent {}
+  instructions: [
+    "You are a senior product analyst. Turn product ideas into a clear delivery plan.",
+    "- Ask for missing business context.",
+    "- Do not invent regulatory claims.",
+  ].join("\n"),
+});
 
-@Agent({ name: "plain-agent" })
-class PlainAgent {}
+const PlainAgent = agentDefinition({ name: "plain-agent" });
 
-@Agent({
-  name: "inline-prompt-agent",
-  role: "Catalog operator",
-  goal: "Help the user manage the product catalog.",
-  instructions: ["Answer briefly.", "Do not invent products or stock."],
-  constraints: ["Use only data from tools."],
-  sections: [
-    {
-      kind: "tool-policy",
-      content: "Call a read tool before answering about products.",
-    },
-  ],
-})
-class InlinePromptAgent {}
+const agents = new Map([ProductDesignerAgent, PlainAgent].map((definition) => [definition.name, AgentRegistry.fromDefinition(definition).requireAgent(definition.name)]));
 
-@Module({
-  agents: [ProductDesignerAgent, PlainAgent, InlinePromptAgent],
-  prompts: [ProductDesignerPrompt],
-})
-class AppModule {}
+function agentNamed(name: string) {
+  return agents.get(name)!;
+}
 
 function textOf(message: ReturnType<typeof agentMessage> | undefined): string {
   const part = message?.content[0];
@@ -70,12 +34,9 @@ function textOf(message: ReturnType<typeof agentMessage> | undefined): string {
 }
 
 describe("agent context builder", () => {
-  test("renders agent and prompt metadata into a stable system message", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("product-designer");
-    const builder = new DefaultAgentContextBuilder();
-
-    const context = builder.build({
+  test("sends the definition's instructions as the system message, as written", () => {
+    const agent = agentNamed("product-designer");
+    const context = new DefaultAgentContextBuilder().build({
       invocationId: "inv-1",
       agent,
       messages: [agentMessage("user", "Design the checkout")],
@@ -83,15 +44,8 @@ describe("agent context builder", () => {
     });
 
     expect(context.messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(textOf(context.messages[0])).toContain("Role: Senior product analyst");
-    expect(textOf(context.messages[0])).toContain("Prompt role: Product analyst");
-    expect(textOf(context.messages[0])).toContain("Goal: Turn product ideas into a clear delivery plan.");
-    expect(textOf(context.messages[0])).toContain("- Prefer explicit acceptance criteria.");
-    expect(textOf(context.messages[0])).toContain("- Do not invent regulatory claims.");
-    expect(textOf(context.messages[0])).toContain("Domain rules:");
-    expect(textOf(context.messages[0])).toContain("- Keep enterprise processes auditable.");
-    expect(textOf(context.messages[0])).toContain("Tool policy:");
-    expect(textOf(context.messages[0])).toContain("Use read tools before proposing write actions.");
+    expect(textOf(context.messages[0])).toBe(agent.instructions);
+    expect(context.messages[0]?.metadata).toEqual({ agentName: "product-designer" });
     expect(context.trace[0]).toMatchObject({ section: "prompt", role: "system", included: true });
     expect(context.trace[0]?.tokens).toBeGreaterThan(0);
     expect(context.trace[1]).toMatchObject({ section: "conversation[0]", role: "user", included: true });
@@ -99,32 +53,18 @@ describe("agent context builder", () => {
     expect(context.metadata.tokenCount).toBeGreaterThan(0);
   });
 
-  test("renders inline agent prompt metadata without a prompt class", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("inline-prompt-agent");
-    const builder = new DefaultAgentContextBuilder();
-
-    const context = builder.build({
+  test("sends no system message for empty instructions", () => {
+    const context = new DefaultAgentContextBuilder().build({
       invocationId: "inv-1",
-      agent,
+      agent: agentNamed("plain-agent"),
       messages: [agentMessage("user", "Show the products")],
       metadata: {},
     });
-
-    const system = textOf(context.messages[0]);
-    expect(context.messages.map((message) => message.role)).toEqual(["system", "user"]);
-    expect(system).toContain("Role: Catalog operator");
-    expect(system).toContain("Goal: Help the user manage the product catalog.");
-    expect(system).toContain("- Answer briefly.");
-    expect(system).toContain("- Use only data from tools.");
-    expect(system).toContain("Tool policy:");
-    expect(system).toContain("Call a read tool before answering about products.");
-    expect(agent.prompt).toBeUndefined();
+    expect(context.messages.map((message) => message.role)).toEqual(["user"]);
   });
 
   test("keeps the system prompt and newest conversation messages when maxMessages trims history", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("product-designer");
+    const agent = agentNamed("product-designer");
     const builder = new DefaultAgentContextBuilder();
 
     const context = builder.build({
@@ -152,8 +92,7 @@ describe("agent context builder", () => {
   });
 
   test("drops oldest non-protected messages when maxChars trims history", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder();
 
     const context = builder.build({
@@ -176,8 +115,7 @@ describe("agent context builder", () => {
   });
 
   test("drops oldest non-protected messages when maxTokens trims history", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder();
 
     const context = builder.build({
@@ -201,8 +139,7 @@ describe("agent context builder", () => {
   });
 
   test("trims an assistant tool call and its result as one protocol unit", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder();
     const call = agentToolCall({ id: "call-1", name: "catalog.search", input: { query: "old" } });
     const context = builder.build({
@@ -228,8 +165,7 @@ describe("agent context builder", () => {
   });
 
   test("protects the assistant call when the newest message is a tool result", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder();
     const call = agentToolCall({ id: "call-1", name: "catalog.search" });
 
@@ -250,8 +186,7 @@ describe("agent context builder", () => {
   });
 
   test("fails when limits would remove protected context", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("product-designer");
+    const agent = agentNamed("product-designer");
     const builder = new DefaultAgentContextBuilder();
 
     expect(() =>
@@ -266,8 +201,7 @@ describe("agent context builder", () => {
   });
 
   test("fails when maxTokens is too small for protected context", () => {
-    const registry = AgentRegistry.fromModules([AppModule]);
-    const agent = registry.requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder();
 
     expect(() =>
@@ -282,13 +216,13 @@ describe("agent context builder", () => {
   });
 
   test("rejects invalid custom token estimates before budget trimming", () => {
-    const agent = AgentRegistry.fromModules([AppModule]).requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder({ tokenEstimator: { estimateMessage: () => Number.NaN } });
     expect(() => builder.build({ invocationId: "inv", agent, messages: [agentMessage("user", "x")], metadata: {}, limits: { maxTokens: 1 } })).toThrow(/invalid estimate/);
   });
 
   test("applies all budgets in order on a long history and preserves protocol blocks", () => {
-    const agent = AgentRegistry.fromModules([AppModule]).requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     const builder = new DefaultAgentContextBuilder({ tokenEstimator: { estimateMessage: () => 10 } });
     const call = agentToolCall({ id: "latest", name: "catalog.search" });
     const input = {
@@ -312,7 +246,7 @@ describe("agent context builder", () => {
   });
 
   test("preserves custom fractional and overflowing token estimates while trimming", () => {
-    const agent = AgentRegistry.fromModules([AppModule]).requireAgent("plain-agent");
+    const agent = agentNamed("plain-agent");
     for (const estimates of [[0.1, 0.2, 1], [1e308, 1e308, 1]]) {
       let index = 0;
       const builder = new DefaultAgentContextBuilder({ tokenEstimator: { estimateMessage: () => estimates[index++]! } });

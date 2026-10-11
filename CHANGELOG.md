@@ -4,6 +4,49 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.0 — 2026-10-12
+
+### Changed (breaking)
+
+- Agents are data only. An agent is an `AgentDataDefinition` — `name`,
+  `instructions`, `toolNames`, optional `description` and `modelProfile` —
+  that can live in a database and change without a deploy; Tools stay code.
+  Removed: the `@Agent`, `@Task` and `@Prompt` decorators, `agentOutput()`,
+  the `agents` and `prompts` fields of `@Module`, agent input/output classes,
+  `collectAgentCatalog`, `AgentRegistry.fromModules` /
+  `fromGeneratedModules`, invoking a registered agent by name
+  (`invoke`, `invokeTask`) and the generated `agentCatalog.ts` (codegen
+  deletes a stale one). `AgentRegistry` and `AgentToolExecutor` are internal;
+  tools run through `AgentRuntime`.
+- `AgentRuntime` is created by DI: `llmConnect` and `llmRouter` register it
+  next to the model provider, and a service takes it by type,
+  `constructor(private readonly agents: AgentRuntime)`. The constructor is
+  `new AgentRuntime(services, modelProvider, options?)`, for tests and
+  standalone use. Runtime settings (limits, approval policy, audit sink,
+  context builder) come from the optional `AGENT_RUNTIME_OPTIONS` token,
+  registered in any module. Tool DTOs are validated by
+  `modelValidatorAdapter` unless `toolExecutorOptions.schemaValidator` says
+  otherwise. The `model` and `taskSchemaValidator` options are removed.
+- The definition's `instructions` are the system message as written; the
+  role/goal/constraints/sections prompt rendering is gone with `@Agent`.
+- The CLI `g module --full` template generates a Tool and no agent
+  (`ai/agents` and `ai/contracts` are gone).
+- The codegen error for an unimportable Tool DTO is
+  `BAZIS_TOOL_SCHEMA_MODEL_UNIMPORTABLE` (was `BAZIS_AGENT_SCHEMA_MODEL_UNIMPORTABLE`).
+
+### Added
+
+- `AgentRuntime.run(definition, options)` runs an agent definition. It
+  checks the definition before the model is called: a malformed field or a
+  tool name not registered in `@Module.tools` rejects with `AgentSetupError`
+  that lists the registered tools, `Agent "support": tool "orders.delete" is
+  not registered in the application (registered: orders.find)`. The model
+  sees only the named Tools. Structured output is requested per run,
+  `run(definition, { input, output: agentOutputContract({ mode: "json", schema }) })`,
+  and comes back validated in `result.output`.
+- `AgentRuntime.listTools()` returns the Tool catalog of the application, for
+  example for an agent editor.
+
 ## 0.98.34 — 2026-10-11
 
 ### Changed (breaking)

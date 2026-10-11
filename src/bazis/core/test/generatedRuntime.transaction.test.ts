@@ -6,8 +6,7 @@ import { resolveGeneratedBindings } from "@/core/http/Binding/autoBindings";
 import { findListModelByName } from "@/core/http/Binding/listModelRegistry";
 import { findRequestModelByName } from "@/core/http/Binding/requestModelRegistry";
 import { getGeneratedOpenApiMetadata, registerGeneratedOpenApiSchemaModel } from "@/core/http/OpenApi/generatedOpenApiRegistry";
-import { loadBazisGeneratedAgentMetadata, registerBazisGeneratedTargetDescriptor, type BazisGeneratedTargetDescriptor } from "@/core/generatedRuntime";
-import type { AgentMetadataIndex } from "@/core/agent";
+import { registerBazisGeneratedTargetDescriptor, type BazisGeneratedTargetDescriptor } from "@/core/generatedRuntime";
 import {
   createGeneratedProviderAttachmentChannel,
   getGeneratedProviderAttachment,
@@ -21,7 +20,6 @@ function descriptor(
   list: new () => object,
   schemaModel: abstract new (...args: never[]) => object,
   schemaName: string,
-  agentMetadata?: AgentMetadataIndex,
 ): BazisGeneratedTargetDescriptor {
   return {
     id,
@@ -38,7 +36,6 @@ function descriptor(
       operations: { [controller.name]: { save: { response: { $ref: `#/components/schemas/${schemaName}` } } } },
     },
     openApiSchemaModels: [[schemaModel, schemaName]],
-    agentMetadata,
   };
 }
 
@@ -190,33 +187,6 @@ describe("generated target runtime transaction", () => {
     expect(getGeneratedOpenApiMetadata([ProductionOpenApiController]).schemas).not.toHaveProperty("DemoOpenApiOnly");
     expect(getGeneratedOpenApiMetadata([DemoOpenApiController]).schemas).toHaveProperty("DemoOpenApiOnly");
     expect(getGeneratedOpenApiMetadata([DemoOpenApiController]).schemas).not.toHaveProperty("ProductionOpenApiOnly");
-  });
-
-  test("selects target-local generated Agent metadata by actual constructor", async () => {
-    class DemoAgent {}
-    class ProductionAgent {}
-    class DemoController {}
-    class ProductionController {}
-    class Dependency {}
-    class Request {}
-    class List {}
-    class DemoSchema {}
-    class ProductionSchema {}
-    const demoMetadata: AgentMetadataIndex = Object.freeze({
-      agents: new Map([[DemoAgent, { name: "demo-agent", instructions: [], constraints: [], sections: [], tools: [], tasks: [] }]]),
-      tools: new Map(),
-      prompts: new Map(),
-    });
-    const productionMetadata: AgentMetadataIndex = Object.freeze({
-      agents: new Map([[ProductionAgent, { name: "production-agent", instructions: [], constraints: [], sections: [], tools: [], tasks: [] }]]),
-      tools: new Map(),
-      prompts: new Map(),
-    });
-    await registerBazisGeneratedTargetDescriptor(descriptor("agent-demo", Dependency, DemoController, Request, List, DemoSchema, "AgentDemoSchema", demoMetadata));
-    await registerBazisGeneratedTargetDescriptor(descriptor("agent-production", Dependency, ProductionController, Request, List, ProductionSchema, "AgentProductionSchema", productionMetadata));
-
-    expect((await loadBazisGeneratedAgentMetadata([DemoAgent]))?.agents.get(DemoAgent)?.name).toBe("demo-agent");
-    expect((await loadBazisGeneratedAgentMetadata([ProductionAgent]))?.agents.get(ProductionAgent)?.name).toBe("production-agent");
   });
 
   test("rolls back generated exact-class attachments and rejects divergent target payloads", async () => {

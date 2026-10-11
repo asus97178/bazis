@@ -122,7 +122,7 @@ export class AppModule {}
       profile: "full",
     });
 
-    expect(result.files).toHaveLength(14);
+    expect(result.files).toHaveLength(12);
 
     const moduleDir = path.join(modulesRoot, "catalog");
     const expectedFiles = buildModuleTemplates(parseModuleName("Catalog"), "full").map((file) =>
@@ -137,14 +137,14 @@ export class AppModule {}
     expect(controller).toContain("@Authorize");
     expect(controller).toContain("@OutputCache");
 
-    const agent = await readFile(path.join(moduleDir, "ai/agents/CatalogAnalyst.agent.ts"), "utf8");
-    expect(agent).toContain("@Agent");
-    expect(agent).toContain("@Task");
-    expect(agent).toContain('role: "catalogs analyst"');
-    expect(await Bun.file(path.join(moduleDir, "ai/prompts/CatalogAnalystPrompt.ts")).exists()).toBe(false);
+    // Agents are data run by AgentRuntime; the module ships only its Tool.
+    const tool = await readFile(path.join(moduleDir, "ai/tools/CatalogSummary.tool.ts"), "utf8");
+    expect(tool).toContain('@Tool({\n  name: "catalogs.summary"');
+    expect(await Bun.file(path.join(moduleDir, "ai/agents")).exists()).toBe(false);
+    expect(await Bun.file(path.join(moduleDir, "ai/contracts")).exists()).toBe(false);
 
     const module = await readFile(path.join(moduleDir, "Catalog.module.ts"), "utf8");
-    expect(module).toContain("agents: [CatalogAnalystAgent]");
+    expect(module).not.toContain("agents:");
     expect(module).toContain("tools: [CatalogSummaryTool]");
     expect(module).not.toContain("scoped(CatalogSummaryTool)");
     expect(module).not.toContain("as const");
@@ -161,7 +161,7 @@ export class AppModule {}
       const root = path.join(host, "src/app/modules");
       await mkdir(root, { recursive: true });
       const result = await generateModule({ name: "Ledger", modulesRoot: root, register: false, profile: "full" });
-      expect(result.files).toHaveLength(14);
+      expect(result.files).toHaveLength(12);
       expect(result.warnings.some((warning) => warning.includes("no @Authorize"))).toBe(true);
       const controller = await readFile(path.join(root, "ledger/http/Ledger.controller.ts"), "utf8");
       expect(controller).not.toMatch(/^\s*@Authorize\(/m);

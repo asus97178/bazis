@@ -1,8 +1,7 @@
 import { registerGeneratedBindings } from "../../http/Binding/autoBindings";
 import { describe, expect, test } from "bun:test";
 import {
-  Agent,
-  AgentRegistry,
+  AgentRuntime,
   type AgentToolAuditHookProjectionV1,
   type AgentToolAuditPhase,
   type AgentToolBeforeEffectEventV1,
@@ -27,9 +26,9 @@ import {
   Get,
   Module,
   Ok,
-  Task,
   Tool,
-  agentOutput,
+  agentMessage,
+  agentModelResponse,
   createContainer,
   createToken,
   http,
@@ -99,14 +98,6 @@ registerGeneratedBindings(DxController, {
 })
 class DxLookupTool {}
 
-class DxTaskInput {
-  query = "";
-}
-
-class DxTaskOutput {
-  answer = "";
-}
-
 class DxEnforcementHook implements AgentToolEnforcementHookV1 {
   enforce(
     _event: AgentToolBeforeEffectEventV1,
@@ -129,27 +120,10 @@ class DxObserverHook implements AgentToolObserverHookV1 {
   observe(_event: AgentToolObserverEventV1, _context: AgentToolHookContextV1): void {}
 }
 
-@Agent({
-  name: "dx-agent",
-  role: "DX smoke agent",
-  tools: [DxLookupTool],
-})
-class DxAgent {
-  @Task({
-    name: "answer",
-    input: DxTaskInput,
-    output: DxTaskOutput,
-  })
-  answer(_input: DxTaskInput): DxTaskOutput {
-    return agentOutput();
-  }
-}
-
 @Module({
   imports: [memory()],
   providers: [scoped(DxCounter, DxCounterService), scoped(DxLookupTool)],
   controllers: [DxController],
-  agents: [DxAgent],
   tools: [DxLookupTool],
   agentToolHooks: [
     {
@@ -278,9 +252,12 @@ describe("public bazis DX smoke", () => {
       expect(await second.json()).toEqual({ value: "value:7" });
       expect(counterCalls).toBe(1);
 
-      const registry = AgentRegistry.fromModules([DxFeatureModule]);
-      expect(registry.requireAgent("dx-agent").tasks[0]?.metadata.name).toBe("answer");
-      expect(registry.getTool("dx.lookup")?.metadata.sideEffect).toBe("read");
+      const agents = new AgentRuntime(container, {
+        complete: (request) => agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", "ok") }),
+      }, { toolExecutorOptions: { auditSink: () => undefined, requiredPlatformHooks: dxRequiredPlatformHooks } });
+      expect(agents.listTools().map((tool) => [tool.metadata.name, tool.metadata.sideEffect])).toEqual([["dx.lookup", "read"]]);
+      const result = await agents.run({ name: "dx-agent", instructions: "DX smoke agent", toolNames: ["dx.lookup"] }, { input: "hi" });
+      expect(result.status).toBe("completed");
     } finally {
       await server!.stop();
     }

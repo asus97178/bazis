@@ -43,9 +43,11 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
     const bindings = await Bun.file(path.join(generated, "bindings.ts")).text();
     expect(bindings).toContain("CliGuestController");
     expect(bindings).toContain("CliCatalogController");
-    const agents = await Bun.file(path.join(generated, "agentCatalog.ts")).text();
-    expect(agents).toContain("CliCatalogSummaryTool");
-    expect(agents).toContain("CliCatalogAnalystAgent");
+    // Tool DTOs get JSON schemas for the model; there is no agent catalog.
+    const openApi = await Bun.file(path.join(generated, "openapi.ts")).text();
+    expect(openApi).toContain("CliCatalogSummaryToolInput");
+    expect(openApi).toContain("CliCatalogSummaryToolOutput");
+    expect(await Bun.file(path.join(generated, "agentCatalog.ts")).exists()).toBe(false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

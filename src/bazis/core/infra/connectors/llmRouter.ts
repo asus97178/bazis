@@ -1,6 +1,7 @@
 import type { AppConfig } from "../../kernel";
 import {
   AGENT_MODEL_PROVIDER,
+  AgentRuntime,
   agentModelRequest,
   type AgentModelProvider,
   type AgentModelProviderContext,
@@ -11,6 +12,7 @@ import { InfraError, type InfraConnector } from "../InfraConnector";
 import { redactSensitiveText } from "../../../library/redaction";
 import { awaitAbortable } from "../../kernel/internal/awaitAbortable";
 import {
+  agentRuntimeProviders,
   resolveLlmConnectionOptions,
   type LlmConfigShape,
   type LlmConnectionOptions,
@@ -408,6 +410,8 @@ export function llmRouter(
   return {
     token: AGENT_MODEL_PROVIDER,
     config: configs,
+    providers: agentRuntimeProviders,
+    exports: [AgentRuntime],
     create(configs) {
       // The router must have an owner before adapters allocate resources.
       // Initialization happens inside an awaited operation, so rollback can

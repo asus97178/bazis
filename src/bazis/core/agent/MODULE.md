@@ -1,24 +1,25 @@
 # Agent Runtime: partial passport
 
-Version: 9. Check date: 2026-10-04. Status: implemented in the described scope;
+Version: 10. Check date: 2026-10-12. Status: implemented in the described scope;
 checks and limits are in the [fixes report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
 Type: an existing atomic core feature. Path: `src/bazis/core/agent`.
 This subsystem has no `*.module.ts` of its own: it is connected by importing the
 public Agent API and through application module contributions. No new DI module was created.
 The scaffold existed before mandatory CLI generation; the creation command is unknown.
 
-Passport scope: `AgentRuntime.invoke/invokeTask`, the Tool outcome on timeout/abort,
+Passport scope: `AgentRuntime.run`, the Tool outcome on timeout/abort,
 DTO binding, JSON output, context trimming and observing the model's text.
 Session persistence and durable stream replay, the whole registry contract and all
 hooks are not qualified by this partial passport.
-The addition in this version: `@Module.tools` registration and the per-container catalog.
+The change in this version (0.99.0): agents are only data. `@Agent`, `@Task`,
+`@Prompt`, `agentOutput()`, `@Module.agents/prompts`, the generated agent catalog
+and invocation of registered agents by name were removed. `AgentRuntime` is
+injected by type and runs an `AgentDataDefinition`.
 
-**Accepted direction:** [AGENT-ARCH-001](../../../../docs/architecture/AGENT_ARCHITECTURE.md)
-separates agents from modules: an agent is assigned Tools whose implementations use
-the existing services and DI. This passport version records the decision;
-AgentRegistry.fromDefinition already accepts a definition as data. The old path
-through classes stays compatible; the full CLI/codegen migration and long-running
-framework sessions remain separate work.
+**Implemented direction:** [AGENT-ARCH-001](../../../../docs/architecture/AGENT_ARCHITECTURE.md)
+separates agents from modules: an agent is data that names Tools; Tool
+implementations use the existing services and DI. Long-running framework sessions
+remain separate work.
 
 ## 1. Responsibility and structure
 
@@ -37,10 +38,10 @@ No ORM, new container, third-party JSON Schema engine or new dependencies were a
 
 ### Definition as data
 
-`AgentRegistry.fromDefinition(input: AgentDataDefinition, allowedTools?: readonly ToolDefinition[]): AgentRegistry`
-creates an independent immutable snapshot for the regular AgentRuntime. The agent
-author needs no Class/@Module. The internal DataAgentTarget keeps the existing public
-type AgentDefinition.target; DI does not create it, and it is never executed.
+`AgentRuntime.run(definition: AgentDataDefinition, options?): Promise<AgentRuntimeResult>`
+checks the definition, takes the named Tools from the application catalog
+(`@Module.tools`) and runs it. Internally `AgentRegistry.fromDefinition(definition,
+catalog.listTools())` creates an independent immutable snapshot for one run.
 
 | Field | Type / default | Limits |
 | --- | --- | --- |
@@ -52,8 +53,9 @@ type AgentDefinition.target; DI does not create it, and it is never executed.
 | allowedTools | the second argument, default [] | real ToolDefinitions with unique names |
 
 null is not accepted. An unknown/duplicate tool gives AgentSetupError before the model
-is called. The host allows capabilities explicitly: a name does not grant access to
-the global catalog. The regular owner-bound registrations and hooks stay mandatory for
+is called; the message lists the registered names. `run` rejects with it. The model
+sees only the named Tools; a call of any other name is `TOOL_NOT_REGISTERED`.
+`instructions` become the system message as written; `description` is not sent. The regular owner-bound registrations and hooks stay mandatory for
 Tools. The snapshot is fixed for one turn; a change of the agent affects the next one.
 Checks: [agent.data-definition.test.ts](test/agent.data-definition.test.ts).
 
@@ -61,7 +63,8 @@ Checks: [agent.data-definition.test.ts](test/agent.data-definition.test.ts).
 
 | Component | File | Purpose |
 |---|---|---|
-| Public facade | [AgentRuntime.ts](AgentRuntime.ts) | Agent / Task calls |
+| Public facade | [AgentRuntime.ts](AgentRuntime.ts) | `run(definition)`, `listTools()`, `AGENT_RUNTIME_OPTIONS` |
+| Registry | [AgentRegistry.ts](AgentRegistry.ts) | The Tool catalog of a container and the snapshot of one run; internal |
 | Executor | [internal/AgentExecutionDriver.ts](internal/AgentExecutionDriver.ts) | Phases, contracts and the terminal result |
 | Tool executor | [AgentToolExecutor.ts](AgentToolExecutor.ts) | Policies, the call, timeout/abort, settlement and scope release |
 | DTO binding | [internal/AgentModelBinding.ts](internal/AgentModelBinding.ts) | Strict binding through the existing `bindModel`, DTO projection into JSON |
@@ -72,19 +75,17 @@ Checks: [agent.data-definition.test.ts](test/agent.data-definition.test.ts).
 
 ## 3. Connection and DI
 
-The TypeScript entry is [index.ts](index.ts); new internal functions are not exported
-through it. In the current API the application `@Module` declares `agents`, `tools`,
-`prompts`, `agentToolHooks` and regular providers. Tool implementations are resolved
+The TypeScript entry is [index.ts](index.ts); `AgentRegistry` and `AgentToolExecutor`
+are internal. The application `@Module` declares `tools`, `agentToolHooks` and regular
+providers. `llmConnect` and `llmRouter` register `AgentRuntime` (singleton, exported
+by type) next to `AGENT_MODEL_PROVIDER`; the factory reads optional
+`AGENT_RUNTIME_OPTIONS` from the root container, so any module may register it. The
+default `toolExecutorOptions.schemaValidator` is `modelValidatorAdapter`. Invalid
+options and hook setup fail on the first resolve of `AgentRuntime`. Tool implementations are resolved
 in a scope through the existing DI; class dependencies stay in constructors. The
 `imports` and `exports` lists belong to the connecting module. The facade introduces
 no separate DI exports. The model port is `AgentModelProvider`; model choice and
 transport belong to Infra.
-
-`AgentRegistry` also accepts a ready `AgentCatalog`, and
-`fromModules/fromGeneratedModules` accept extra `extras` declarations.
-This is the existing groundwork for standalone registration. The current definitions
-still hold class references. The target transition must not create a second executor
-or change the checks of DTOs, action outcomes and hooks depending on the agent source.
 
 ## 4. Data, configuration and lifecycle
 
@@ -104,7 +105,7 @@ It returns an immutable catalog of native Tools from the actual owner-bound
 contributions, without agents and prompts. A repeated call for one container returns
 the same registry; a WeakMap does not retain a finished container. Different
 containers are isolated. There is no file scanning, no AppModule import and no
-implicit inclusion of regular providers.
+implicit inclusion of regular providers. `AgentRuntime.listTools()` returns it.
 
 `fromDefinition` picks the assigned names from `catalog.listTools()` and creates a
 separate run snapshot. The registry does not cancel the permission, approval and input
@@ -142,14 +143,13 @@ and takes part in the retry policy; there is no automatic persistent dedup stora
 
 ## 5. Entry points and fields of the changed scope
 
-Existing calls are compatible; an optional onTextDelta was added to options.
 The full options are in the facade and executor sources; the table describes the
-fields affected by the fixes.
+main fields.
 
 | Input | Type / required | Default and limits |
 |---|---|---|
-| `invoke(agentName, options)` / `invokeTask(agentName, taskName, input, options)` | Existing methods | The Agent/Task must be registered |
-| `input` | JSON or an instance of the declared DTO | For classes: a no-argument constructor, a whitelist and validation |
+| `run(definition, options)` | `AgentDataDefinition`, options | The definition is checked before the model call |
+| `input` | A string (a user message) or JSON (a data part) | `input` or `messages` is required |
 | `output.mode` | `text`, `json`, `artifact`; required inside a passed output | The local structural check applies to `json` |
 | `output.schema` | An optional JSON Schema or a class name | Without a schema, JSON is checked; a class is resolved by generated metadata |
 | `schema.strict` | boolean; true by default | Passed to the adapter; false does not cancel the local schema check |
@@ -159,9 +159,8 @@ fields affected by the fixes.
 | `onTextDelta` | optional synchronous `(event: {step:number, text:string}) => void` | Partial text of one model step; without it the complete-only path is kept |
 | `contextLimits.maxMessages/maxChars/maxTokens` | Optional positive integers | Applied in this order; the protected minimum cannot be removed |
 
-Declared Agent/Task output classes take priority over the caller's output; the Agent
-output is checked before the Task output. Without these declarations an explicit JSON
-contract is checked in both `invoke` and `invokeTask`. Success holds the parsed
+Structured output is requested per run with `output: agentOutputContract({ mode: "json", schema })`.
+The contract is sent to the provider and checked locally. Success holds the parsed
 `result.output`; an invalid answer gives `failed / AGENT_OUTPUT_INVALID`. An
 unresolved explicit class gives `AGENT_OUTPUT_SCHEMA_UNAVAILABLE`; the LLM adapter
 also rejects an unresolved class before fetch.
@@ -171,8 +170,8 @@ Initialized nested fields are supported without shapes. Extra and forbidden fiel
 are rejected. Classes are projected recursively into plain JSON without calling
 `toJSON`; unset optional class fields are skipped, undefined in plain JSON and arrays
 is rejected. Cycles, depth over 64 and more than 100000 projection nodes are
-rejected. Custom decorators not expressed in the generated schema need a connected
-`taskSchemaValidator` / `schemaValidator`.
+rejected. Tool DTO rules not expressed in the generated schema are checked by the
+`schemaValidator` (by default `modelValidatorAdapter`).
 
 The public `describeTool(ToolDefinition): AgentToolContract` returns the same contract
 projection the runtime uses: name, description, effect properties and the generated
@@ -183,11 +182,12 @@ does not replace checking arguments, permissions or schemaValidator in AgentTool
 
 ### DTO schema identity and the standalone package (R4/K1, 2026-10-04)
 
-Tool, Agent and Task inputs and outputs resolve the generated schema by the exact
+Tool inputs and outputs and class output contracts resolve the generated schema by the exact
 constructor through the existing OpenAPI registry. The same link applies to the list
 of allowed fields of nested DTOs. An unrelated interface with the same name does not
-change the class contract. The shared OpenAPI analyzer decides schema names; the Agent
-collector passes the real class declarations to the generator. Codegen keeps root and
+change the class contract. The shared OpenAPI analyzer decides schema names; the Tool
+collector ([tool-codegen.ts](../scripts/tool-codegen.ts)) passes the real class
+declarations of `@Tool({ input, output })` to the generator. Codegen keeps root and
 nested schemas and publishes the constructor → schema links in the existing
 `GENERATED_OPENAPI_SCHEMA_MODELS`. No new registry is created.
 
@@ -196,16 +196,16 @@ kept. If an exact link exists but its schema is missing, another schema with the
 short name is not used. As before, a missing schema ends up in a class contract, and
 the host must reject it before external publication.
 Linked class DTOs must be named exported top-level classes; otherwise codegen returns
-`BAZIS_AGENT_SCHEMA_MODEL_UNIMPORTABLE` before writing results.
-The Agent collector's existing rejection of two class declarations with the same name
+`BAZIS_TOOL_SCHEMA_MODEL_UNIMPORTABLE` before writing results.
+The Tool collector's existing rejection of two class declarations with the same name
 is kept; this change does not promise support for a previously forbidden composition.
 
 AgentRuntime uses a relative import of Boundary Schema inside the package.
 The checks [agent.schema-identity.test.ts](test/agent.schema-identity.test.ts) and
 [agent.standalone.integration.test.ts](test/agent.standalone.integration.test.ts)
-cover the exact choice, no fallback to another schema, Agent/Task input/output, Tool
+cover the exact choice, no fallback to another schema, the output contract, Tool
 and nested DTOs. The integration check creates an independent copy of the package,
-checks the Agent API without `tsconfig.paths`, then runs real codegen with local paths
+checks `AgentRuntime` without `tsconfig.paths`, then runs real codegen with local paths
 only into the copied package; it runs the sources and two binaries outside the
 checkout. This is not a qualification of npm publishing, an LLM, session persistence
 or a full application run with external infrastructure.
@@ -248,5 +248,6 @@ on 500 histories; the measurements are in the report.
 The application/CLI build into a Bun binary; the control Agent probes run outside the
 checkout. A full application run with PostgreSQL and a check against a real LLM are
 outside the scope of these fixes. Codegen artifacts were not edited.
-These results refer to the audit fixes. Separating agents from modules is so far
-accepted as an architectural decision and not confirmed by separate implementation checks.
+Separating agents from modules is implemented in 0.99.0 and checked by
+[agent.data-definition.test.ts](test/agent.data-definition.test.ts) and
+[agent.runtime.test.ts](test/agent.runtime.test.ts).

@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, Module, scoped } from "@/core/di";
 import {
-  Agent,
-  AgentRegistry,
-  Task,
   Tool,
-  agentData,
   agentMessage,
   agentModelResponse,
   agentToolCall,
@@ -15,6 +11,7 @@ import {
   type AgentToolExecutionContext,
   type JsonValue,
 } from "../index";
+import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 import { AgentExecutionBoundaryError, AgentExecutionDriver } from "../internal/AgentExecutionDriver";
 import type { AgentSessionPreparationV1 } from "../internal/AgentExecutionDriver";
 import { canonicalAgentExecutionCheckpointV1, evolveAgentExecutionCheckpointV1, parseAgentExecutionCheckpointV1, type AgentExecutionBoundary, type AgentExecutionCheckpointV1 } from "../internal/AgentExecutionState";
@@ -28,8 +25,7 @@ class SessionEchoTool {
   }
 }
 
-@Agent({ name: "session-phase-agent", tools: [SessionEchoTool] })
-class SessionPhaseAgent {}
+const SessionPhaseAgent = agentDefinition({ name: "session-phase-agent", tools: [SessionEchoTool] });
 
 class ScriptedProvider implements AgentModelProvider {
   calls = 0;
@@ -58,7 +54,7 @@ function boundary(onControl: (phase: string) => "continue" | "suspend" = () => "
 
 async function prepared(driver: AgentExecutionDriver) {
   const outcome = await driver.prepareSessionCheckpoint({
-    invocationId: "session-phase-invocation", agentName: "session-phase-agent", taskName: null, input: { request: "go" },
+    invocationId: "session-phase-invocation", agentName: "session-phase-agent", input: { request: "go" },
     requested: { maxSteps: null, maxToolCallsPerStep: null, runTimeoutMs: null, modelProfile: null },
     module: { maxSessionSteps: 8, maxToolCallsPerStep: 8, runTimeoutMs: 300_000, providerCallTimeoutMs: 60_000, toolDefaultTimeoutMs: 30_000, scopeDisposeTimeoutMs: 5_000 },
   });
@@ -67,22 +63,22 @@ async function prepared(driver: AgentExecutionDriver) {
 }
 
 const desiredLimits = Object.freeze({ maxSessionSteps: 8, maxToolCallsPerStep: 8, runTimeoutMs: 200, providerCallTimeoutMs: 25, toolDefaultTimeoutMs: 5, scopeDisposeTimeoutMs: 20 });
-function desiredRequest(agentName: string, taskName: string | null = null, input: JsonValue = { value: "x" }): AgentSessionPreparationV1 {
-  return { invocationId: `desired-${agentName}-${taskName ?? "agent"}`, agentName, taskName, input,
+function desiredRequest(agentName: string, input: JsonValue = { value: "x" }): AgentSessionPreparationV1 {
+  return { invocationId: `desired-${agentName}`, agentName, input,
     requested: { maxSteps: null, maxToolCallsPerStep: null, runTimeoutMs: null, modelProfile: null }, module: desiredLimits };
 }
 function desiredBoundary(): AgentExecutionBoundary {
   return { async checkControl() { return { kind: "continue" }; }, async beforeModelDispatch() {}, async afterModelSettlement() {}, async beforeToolDispatch() {}, async afterToolSettlement() {} };
 }
 
-@Agent({ name: "desired-legacy" }) class DesiredLegacyAgent {}
+const DesiredLegacyAgent = agentDefinition({ name: "desired-legacy" });
 let desiredKeyEffects = 0;
 @Tool({ name: "desired.key", description: "Key failure probe.", sideEffect: "read" }) class DesiredKeyTool { execute(): JsonValue { desiredKeyEffects += 1; return { ok: true }; } }
-@Agent({ name: "desired-key-agent", tools: [DesiredKeyTool] }) class DesiredKeyAgent {}
+const DesiredKeyAgent = agentDefinition({ name: "desired-key-agent", tools: [DesiredKeyTool] });
 
 const desiredPhaseEffects: number[] = [];
 @Tool({ name: "desired.phase", description: "Phase probe.", sideEffect: "read" }) class DesiredPhaseTool { execute(input: JsonValue): JsonValue { desiredPhaseEffects.push((input as { index: number }).index); return input; } }
-@Agent({ name: "desired-phase-agent", tools: [DesiredPhaseTool] }) class DesiredPhaseAgent {}
+const DesiredPhaseAgent = agentDefinition({ name: "desired-phase-agent", tools: [DesiredPhaseTool] });
 class DesiredPhaseProvider implements AgentModelProvider {
   calls = 0;
   complete(r: AgentModelRequest): AgentModelResponse {
@@ -96,12 +92,12 @@ class DesiredPhaseProvider implements AgentModelProvider {
 
 describe("agent execution driver Session phase continuation", () => {
   test("commits three Tools, suspends after the second and resumes only the third", async () => {
-    @Module({ agents: [SessionPhaseAgent], tools: [SessionEchoTool], providers: [scoped(SessionEchoTool)] }) class AppModule {}
+    @Module({ tools: [SessionEchoTool], providers: [scoped(SessionEchoTool)] }) class AppModule {}
     const provider = new ScriptedProvider();
     const container = createContainer(AppModule);
     try {
       SessionEchoTool.calls = [];
-      const registry = AgentRegistry.fromModules([AppModule]);
+      const registry = agentRegistry(container, SessionPhaseAgent);
       const first = new AgentExecutionDriver(container, registry, provider);
       let committed: AgentExecutionCheckpointV1 | undefined;
       const gate = boundary();
@@ -133,12 +129,12 @@ describe("agent execution driver Session phase continuation", () => {
   });
 
   test("after model settlement rejection retains the initial checkpoint and executes no Tool", async () => {
-    @Module({ agents: [SessionPhaseAgent], tools: [SessionEchoTool], providers: [scoped(SessionEchoTool)] }) class AppModule {}
+    @Module({ tools: [SessionEchoTool], providers: [scoped(SessionEchoTool)] }) class AppModule {}
     const provider = new ScriptedProvider();
     const container = createContainer(AppModule);
     try {
       SessionEchoTool.calls = [];
-      const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), provider);
+      const driver = new AgentExecutionDriver(container, agentRegistry(container, SessionPhaseAgent), provider);
       const initial = await prepared(driver);
       const rejecting = boundary();
       rejecting.afterModelSettlement = async () => { throw new Error("store rejected"); };
@@ -150,12 +146,12 @@ describe("agent execution driver Session phase continuation", () => {
   });
 
   test("after Tool settlement rejection retains the previous pending checkpoint", async () => {
-    @Module({ agents: [SessionPhaseAgent], tools: [SessionEchoTool], providers: [scoped(SessionEchoTool)] }) class AppModule {}
+    @Module({ tools: [SessionEchoTool], providers: [scoped(SessionEchoTool)] }) class AppModule {}
     const provider = new ScriptedProvider();
     const container = createContainer(AppModule);
     try {
       SessionEchoTool.calls = [];
-      const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), provider);
+      const driver = new AgentExecutionDriver(container, agentRegistry(container, SessionPhaseAgent), provider);
       let firstCommitted: unknown;
       const rejecting = boundary();
       rejecting.afterToolSettlement = async (previous) => { firstCommitted = previous; throw new Error("store rejected"); };
@@ -171,11 +167,11 @@ describe("agent execution driver Session phase continuation", () => {
 });
 
 test("desired legacy pre-abort resolves AGENT_ABORTED at attempted step one without provider dispatch", async () => {
-  @Module({ agents: [DesiredLegacyAgent] }) class AppModule {}
+  @Module({}) class AppModule {}
   const container = createContainer(AppModule);
   try {
     const controller = new AbortController(); controller.abort(); let calls = 0;
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(): AgentModelResponse { calls += 1; throw new Error("must not run"); } });
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredLegacyAgent), { complete(): AgentModelResponse { calls += 1; throw new Error("must not run"); } });
     const result = await driver.invoke("desired-legacy", { input: "x", signal: controller.signal });
     expect(result).toMatchObject({ status: "failed", steps: 1, error: { code: "AGENT_ABORTED" } });
     expect(calls).toBe(0);
@@ -183,11 +179,11 @@ test("desired legacy pre-abort resolves AGENT_ABORTED at attempted step one with
 });
 
 test("desired legacy custom idempotency failure is a failed result and no Tool executes", async () => {
-  @Module({ agents: [DesiredKeyAgent], tools: [DesiredKeyTool], providers: [scoped(DesiredKeyTool)] }) class AppModule {}
+  @Module({ tools: [DesiredKeyTool], providers: [scoped(DesiredKeyTool)] }) class AppModule {}
   const container = createContainer(AppModule);
   try {
     desiredKeyEffects = 0;
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(r) { return agentModelResponse({ invocationId: r.invocationId, finishReason: "tool-calls", toolCalls: [agentToolCall({ id: "key-1", name: "desired.key", input: {} })] }); } });
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredKeyAgent), { complete(r) { return agentModelResponse({ invocationId: r.invocationId, finishReason: "tool-calls", toolCalls: [agentToolCall({ id: "key-1", name: "desired.key", input: {} })] }); } });
     const result = await driver.invoke("desired-key-agent", { input: "x", toolExecution: { idempotencyKeyForCall() { throw new Error("key fault"); } } });
     expect(result).toMatchObject({ status: "failed", error: { code: "AGENT_TOOL_OPTIONS_INVALID" } });
     expect(desiredKeyEffects).toBe(0);
@@ -195,10 +191,10 @@ test("desired legacy custom idempotency failure is a failed result and no Tool e
 });
 
 test("desired suspension after committed model returns exact committed candidate identity", async () => {
-  @Module({ agents: [DesiredPhaseAgent], tools: [DesiredPhaseTool], providers: [scoped(DesiredPhaseTool)] }) class AppModule {}
+  @Module({ tools: [DesiredPhaseTool], providers: [scoped(DesiredPhaseTool)] }) class AppModule {}
   const container = createContainer(AppModule);
   try {
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), new DesiredPhaseProvider());
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredPhaseAgent), new DesiredPhaseProvider());
     const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-phase-agent")); if (prepared.kind !== "prepared") throw new Error("not prepared");
     let committed: AgentExecutionCheckpointV1 | undefined; const gate = desiredBoundary();
     gate.afterModelSettlement = async (_previous, candidate) => { committed = candidate; };
@@ -210,11 +206,11 @@ test("desired suspension after committed model returns exact committed candidate
 });
 
 test("desired suspension after committed second Tool returns exact settled candidate identity", async () => {
-  @Module({ agents: [DesiredPhaseAgent], tools: [DesiredPhaseTool], providers: [scoped(DesiredPhaseTool)] }) class AppModule {}
+  @Module({ tools: [DesiredPhaseTool], providers: [scoped(DesiredPhaseTool)] }) class AppModule {}
   const container = createContainer(AppModule);
   try {
     desiredPhaseEffects.length = 0;
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), new DesiredPhaseProvider());
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredPhaseAgent), new DesiredPhaseProvider());
     const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-phase-agent")); if (prepared.kind !== "prepared") throw new Error("not prepared");
     let committed: AgentExecutionCheckpointV1 | undefined; const gate = desiredBoundary();
     gate.afterToolSettlement = async (_previous, candidate, _step, index) => { if (index === 1) committed = candidate; };
@@ -228,14 +224,14 @@ test("desired suspension after committed second Tool returns exact settled candi
 let desiredUnknownEffects = 0; let desiredSuffixEffects = 0;
 @Tool({ name: "desired.unknown", description: "Write unknown probe.", sideEffect: "write", timeoutMs: 5 }) class DesiredUnknownTool { execute(): Promise<JsonValue> { desiredUnknownEffects += 1; return new Promise(() => undefined); } }
 @Tool({ name: "desired.suffix", description: "Must not run.", sideEffect: "read" }) class DesiredSuffixTool { execute(): JsonValue { desiredSuffixEffects += 1; return { bad: true }; } }
-@Agent({ name: "desired-unknown-agent", tools: [DesiredUnknownTool, DesiredSuffixTool] }) class DesiredUnknownAgent {}
+const DesiredUnknownAgent = agentDefinition({ name: "desired-unknown-agent", tools: [DesiredUnknownTool, DesiredSuffixTool] });
 
 test("desired unknown middle write records canonical audit and afterTool terminal prefix before stopping suffix", async () => {
-  @Module({ agents: [DesiredUnknownAgent], tools: [DesiredUnknownTool, DesiredSuffixTool], providers: [scoped(DesiredUnknownTool), scoped(DesiredSuffixTool)] }) class AppModule {}
+  @Module({ tools: [DesiredUnknownTool, DesiredSuffixTool], providers: [scoped(DesiredUnknownTool), scoped(DesiredSuffixTool)] }) class AppModule {}
   const container = createContainer(AppModule);
   try {
     desiredUnknownEffects = 0; desiredSuffixEffects = 0; const audits: string[] = [];
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(r) { return agentModelResponse({ invocationId: r.invocationId, finishReason: "tool-calls", toolCalls: [agentToolCall({ id: "unknown", name: "desired.unknown", input: {} }), agentToolCall({ id: "suffix", name: "desired.suffix", input: {} })] }); } }, { toolExecutorOptions: { approvalPolicy: () => true, auditSink(entry) { audits.push(entry.phase); } } });
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredUnknownAgent), { complete(r) { return agentModelResponse({ invocationId: r.invocationId, finishReason: "tool-calls", toolCalls: [agentToolCall({ id: "unknown", name: "desired.unknown", input: {} }), agentToolCall({ id: "suffix", name: "desired.suffix", input: {} })] }); } }, { toolExecutorOptions: { approvalPolicy: () => true, auditSink(entry) { audits.push(entry.phase); } } });
     const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-unknown-agent")); if (prepared.kind !== "prepared") throw new Error("not prepared");
     let settled: AgentExecutionCheckpointV1 | undefined; const gate = desiredBoundary(); gate.afterToolSettlement = async (_previous, candidate) => { settled = candidate; };
     const result = await driver.driveCheckpoint({ checkpoint: prepared.checkpoint, boundary: gate, signal: new AbortController().signal });
@@ -245,43 +241,25 @@ test("desired unknown middle write records canonical audit and afterTool termina
   } finally { await container.dispose(); }
 });
 
-class DesiredInput { value = ""; }
-@Agent({ name: "desired-input-agent", input: DesiredInput }) class DesiredInputAgent {}
-test("desired Session preparation saves null context and uses module timeout for input validator", async () => {
-  @Module({ agents: [DesiredInputAgent] }) class AppModule {}
+const DesiredInputAgent = agentDefinition({ name: "desired-input-agent" });
+test("desired Session preparation saves null context limits", async () => {
+  @Module({}) class AppModule {}
   const container = createContainer(AppModule);
   try {
-    const slow = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(): AgentModelResponse { throw new Error("must not dispatch"); } }, { contextLimits: { maxMessages: 2, maxChars: 20, maxTokens: 4 }, timeoutMs: 100, taskSchemaValidator: { validate: async () => { await Bun.sleep(15); return { isValid: true, errors: [] }; } } });
-    const result = await slow.prepareSessionCheckpoint({ ...desiredRequest("desired-input-agent", null, { value: "x" }), module: { ...desiredLimits, providerCallTimeoutMs: 2 } });
-    expect(result).toMatchObject({ kind: "rejected", result: { error: { code: "AGENT_TASK_SCHEMA_VALIDATION_TIMEOUT" } } });
-    const quick = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(): AgentModelResponse { throw new Error("must not dispatch"); } }, { contextLimits: { maxMessages: 2, maxChars: 20, maxTokens: 4 }, taskSchemaValidator: { validate: () => ({ isValid: true, errors: [] }) } });
-    const saved = await quick.prepareSessionCheckpoint(desiredRequest("desired-input-agent", null, { value: "x" }));
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredInputAgent), { complete(): AgentModelResponse { throw new Error("must not dispatch"); } }, { contextLimits: { maxMessages: 2, maxChars: 20, maxTokens: 4 } });
+    const saved = await driver.prepareSessionCheckpoint(desiredRequest("desired-input-agent", { value: "x" }));
     expect(saved.kind).toBe("prepared"); if (saved.kind !== "prepared") throw new Error("not prepared");
     expect(saved.checkpoint.invocation.options.context).toEqual({ maxMessages: null, maxChars: null, maxTokens: null });
+    expect(saved.checkpoint.invocation).not.toHaveProperty("taskName");
   } finally { await container.dispose(); }
 });
 
-class DesiredTaskOutput { answer = ""; }
-@Agent({ name: "desired-task-output" }) class DesiredTaskOutputAgent { @Task({ name: "run", output: DesiredTaskOutput }) run(): never { throw new Error("marker"); } }
-test("desired task-only output rehydrates provider contract and fresh abort bounds output validation", async () => {
-  @Module({ agents: [DesiredTaskOutputAgent] }) class AppModule {}
-  const container = createContainer(AppModule);
-  try {
-    let modelRequest: AgentModelRequest | undefined;
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(r) { modelRequest = r; return agentModelResponse({ invocationId: r.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData({ answer: "x" })) }); } }, { taskSchemaValidator: { validate: () => new Promise(() => undefined) } });
-    const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-task-output", "run", {})); if (prepared.kind !== "prepared") throw new Error("not prepared");
-    const controller = new AbortController(); setTimeout(() => controller.abort(), 2);
-    const outcome = await driver.driveCheckpoint({ checkpoint: prepared.checkpoint, boundary: desiredBoundary(), signal: controller.signal });
-    expect(modelRequest?.output).toMatchObject({ mode: "json" }); expect(outcome).toMatchObject({ kind: "terminal", result: { status: "failed", error: { code: "AGENT_ABORTED" } } });
-  } finally { await container.dispose(); }
-});
-
-@Agent({ name: "desired-mismatch" }) class DesiredMismatchAgent {}
+const DesiredMismatchAgent = agentDefinition({ name: "desired-mismatch" });
 test("desired invocation mismatch publishes failed terminal without retaining foreign response and invokes after callback", async () => {
-  @Module({ agents: [DesiredMismatchAgent] }) class AppModule {}
+  @Module({}) class AppModule {}
   const container = createContainer(AppModule);
   try {
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete() { return agentModelResponse({ invocationId: "foreign", finishReason: "stop", message: agentMessage("assistant", "foreign") }); } });
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredMismatchAgent), { complete() { return agentModelResponse({ invocationId: "foreign", finishReason: "stop", message: agentMessage("assistant", "foreign") }); } });
     const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-mismatch")); if (prepared.kind !== "prepared") throw new Error("not prepared");
     let settled = false; const gate = desiredBoundary(); gate.afterModelSettlement = async () => { settled = true; };
     const outcome = await driver.driveCheckpoint({ checkpoint: prepared.checkpoint, boundary: gate, signal: new AbortController().signal });
@@ -289,12 +267,12 @@ test("desired invocation mismatch publishes failed terminal without retaining fo
   } finally { await container.dispose(); }
 });
 
-@Agent({ name: "desired-control" }) class DesiredControlAgent {}
+const DesiredControlAgent = agentDefinition({ name: "desired-control" });
 test("desired no-effect terminal controls publish candidate only on continue and never dispatch", async () => {
-  @Module({ agents: [DesiredControlAgent] }) class AppModule {}
+  @Module({}) class AppModule {}
   const container = createContainer(AppModule);
   try {
-    let dispatches = 0; const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(): AgentModelResponse { dispatches += 1; throw new Error("must not dispatch"); } });
+    let dispatches = 0; const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredControlAgent), { complete(): AgentModelResponse { dispatches += 1; throw new Error("must not dispatch"); } });
     const prepared = await driver.prepareSessionCheckpoint({ ...desiredRequest("desired-control"), requested: { maxSteps: 1, maxToolCallsPerStep: null, runTimeoutMs: null, modelProfile: null } }); if (prepared.kind !== "prepared") throw new Error("not prepared");
     const exhausted = evolveAgentExecutionCheckpointV1(prepared.checkpoint, { phase: "ready-model", steps: 1, messages: prepared.checkpoint.messages, responses: [], toolResults: [], seenToolCallIds: [], pendingToolBatch: undefined, terminal: undefined });
     expect(await driver.driveCheckpoint({ checkpoint: exhausted, boundary: desiredBoundary(), signal: new AbortController().signal })).toMatchObject({ kind: "terminal", result: { error: { code: "AGENT_MAX_STEPS_EXCEEDED" } } });
@@ -306,10 +284,10 @@ test("desired no-effect terminal controls publish candidate only on continue and
 });
 
 test("desired State issued canonical round trip is stable and unissued terminal cannot resume", async () => {
-  @Module({ agents: [DesiredControlAgent] }) class AppModule {}
+  @Module({}) class AppModule {}
   const container = createContainer(AppModule);
   try {
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(r) { return agentModelResponse({ invocationId: r.invocationId, finishReason: "stop", message: agentMessage("assistant", "done") }); } });
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredControlAgent), { complete(r) { return agentModelResponse({ invocationId: r.invocationId, finishReason: "stop", message: agentMessage("assistant", "done") }); } });
     const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-control")); if (prepared.kind !== "prepared") throw new Error("not prepared");
     const wire = canonicalAgentExecutionCheckpointV1(prepared.checkpoint); const parsed = parseAgentExecutionCheckpointV1(wire); expect(canonicalAgentExecutionCheckpointV1(parsed)).toBe(wire);
     await expect(driver.driveCheckpoint({ checkpoint: { ...parsed }, boundary: desiredBoundary(), signal: new AbortController().signal })).rejects.toMatchObject({ code: "AGENT_EXECUTION_STATE_INVALID" });
@@ -318,27 +296,12 @@ test("desired State issued canonical round trip is stable and unissued terminal 
   } finally { await container.dispose(); }
 });
 
-class DesiredAgentInput { value = ""; } class DesiredTaskInput { value = ""; } class DesiredAgentOutput { answer = ""; } class DesiredTaskFinal { answer = ""; }
-@Agent({ name: "desired-order", input: DesiredAgentInput, output: DesiredAgentOutput }) class DesiredOrderAgent { @Task({ name: "run", input: DesiredTaskInput, output: DesiredTaskFinal }) run(): never { throw new Error("marker"); } }
-test("desired Session validators run once in Task-Agent-AgentOutput-TaskOutput order and saved values beat new defaults", async () => {
-  @Module({ agents: [DesiredOrderAgent] }) class AppModule {}
-  const container = createContainer(AppModule);
-  try {
-    const order: string[] = []; let providerCalls = 0;
-    const first = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(): AgentModelResponse { throw new Error("first must not run"); } }, { timeoutMs: 100, taskSchemaValidator: { validate(v) { order.push(v.constructor.name); return { isValid: true, errors: [] }; } } });
-    const prepared = await first.prepareSessionCheckpoint(desiredRequest("desired-order", "run", { value: "x" })); if (prepared.kind !== "prepared") throw new Error("not prepared");
-    const resumed = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(r) { providerCalls += 1; return agentModelResponse({ invocationId: r.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData({ answer: "ok" })) }); } }, { timeoutMs: 1, contextLimits: { maxChars: 1 }, taskSchemaValidator: { validate(v) { order.push(v.constructor.name); return { isValid: true, errors: [] }; } } });
-    const result = await resumed.driveCheckpoint({ checkpoint: prepared.checkpoint, boundary: desiredBoundary(), signal: new AbortController().signal });
-    expect(result).toMatchObject({ kind: "terminal", result: { status: "completed", output: { answer: "ok" } } }); expect(order).toEqual(["DesiredTaskInput", "DesiredAgentInput", "DesiredAgentOutput", "DesiredTaskFinal"]); expect(providerCalls).toBe(1);
-  } finally { await container.dispose(); }
-});
-
 test("desired context failure proposes no-effect terminal only after control continue", async () => {
-  @Module({ agents: [DesiredControlAgent] }) class AppModule {}
+  @Module({}) class AppModule {}
   const container = createContainer(AppModule);
   try {
     let dispatches = 0;
-    const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), { complete(): AgentModelResponse { dispatches += 1; throw new Error("must not dispatch"); } }, { contextBuilder: { build() { throw new Error("context failed"); } } });
+    const driver = new AgentExecutionDriver(container, agentRegistry(container, DesiredControlAgent), { complete(): AgentModelResponse { dispatches += 1; throw new Error("must not dispatch"); } }, { contextBuilder: { build() { throw new Error("context failed"); } } });
     const prepared = await driver.prepareSessionCheckpoint(desiredRequest("desired-control")); if (prepared.kind !== "prepared") throw new Error("not prepared");
     const continued = await driver.driveCheckpoint({ checkpoint: prepared.checkpoint, boundary: desiredBoundary(), signal: new AbortController().signal });
     expect(continued).toMatchObject({ kind: "terminal", result: { status: "failed", error: { code: "AGENT_CONTEXT_INVALID" } } });
