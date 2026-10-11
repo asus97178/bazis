@@ -39,6 +39,7 @@ export { anyOf } from "./Authorization/anyOf";
 export {
   resolveAuthorizeMeta,
   type AuthorizeCheck,
+  type AuthorizeContext,
   type AuthorizeOptions,
   type ResolvedAuthorizeMeta,
 } from "./Authorization/metadata";
@@ -140,3 +141,4 @@ export {
   UnauthorizedError,
   UnsupportedMediaTypeError,
 } from "./Errors/HttpError";
+export { markUpstreamFailure, upstreamFailure, type UpstreamFailure } from "./Errors/upstreamFailure";

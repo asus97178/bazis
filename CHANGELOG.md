@@ -4,6 +4,37 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.32 — 2026-10-11
+
+### Changed (breaking)
+
+- `@Authorize` checks take an `AuthorizeContext` — `header(name)`, `services`,
+  `state` — instead of `HttpContext`. `HttpContext` provides it, so checks
+  written as `const signedIn: AuthorizeCheck = (ctx) => …` keep working; a
+  helper that a check calls with its context (`currentUser(ctx)`) types its
+  parameter as `AuthorizeContext` (or `Pick<AuthorizeContext, "state">`).
+- The `controllers` option of `httpModule` and `grpcModule` is removed:
+  controllers are declared by `controllers` / `grpcControllers` of their
+  modules, which the transport finds through `imports`.
+
+### Added
+
+- `@Authorize` and `@AllowAnonymous` protect gRPC controllers and methods with
+  the same checks as HTTP (`bearerToken`, `anyOf` included). `GrpcContext`
+  provides `header(name)` (text metadata), `services` (the RPC scope) and
+  `state`. The checks run before the request is read; a denial is
+  `PERMISSION_DENIED` (7), a missing or bad token (`UnauthorizedError`,
+  `JwtError`) `UNAUTHENTICATED` (16).
+
+### Fixed
+
+- A gRPC handler that throws is logged through the application logger
+  (redacted). Before, the client got `INTERNAL` and nothing reached the log.
+- A failing `GrpcClient` call inside an HTTP request answers `502 Bad Gateway`,
+  or `504 Gateway Timeout` for `DEADLINE_EXCEEDED`, like `HttpClientError`;
+  before it was `500 Internal Server Error`. `markUpstreamFailure` in
+  `bazis/core/http` sets the same mark for other clients.
+
 ## 0.98.31 — 2026-10-11
 
 ### Changed (breaking)

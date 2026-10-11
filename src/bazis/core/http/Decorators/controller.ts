@@ -12,7 +12,7 @@ import { ownMeta } from "./metadata";
  * ```
  *
  * The controller is a regular DI service: register it in a module
- * (`controllers: [...]` on `BazisModule`, or `httpModule({ controllers: [...] })`)
+ * (`controllers: [...]` on `BazisModule`)
  * with scoped lifetime and declare constructor dependencies as usual — auto deps work.
  */
 export function Controller(prefix = "") {

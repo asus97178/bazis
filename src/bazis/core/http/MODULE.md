@@ -3,6 +3,13 @@
 Passport version: 2. Date: 2026-09-14. Status: implemented, checks below.
 Type: atomic infrastructure module. Path: `src/bazis/core/http`.
 Connection point: `httpModule(options)`; public entry: `index.ts`.
+Controllers are declared only by `controllers` of the modules in `imports` (and of
+the modules `runApp` composes); the `controllers` option of `httpModule` is removed in
+0.98.32. `AuthorizeCheck` takes an `AuthorizeContext` (`header`, `services`, `state`)
+that `HttpContext` and the gRPC `GrpcContext` both provide, so `@Authorize` checks,
+`bearerToken` and `anyOf` serve both transports. An error marked by
+`markUpstreamFailure` (a `GrpcClient` failure) answers 502, or 504 for a timeout,
+like `HttpClientError`.
 Passport scope: negotiated redirects, the affected response lifecycle and the rate limiter fill policy; the other options are described in `options.ts`.
 
 ## Responsibility and components

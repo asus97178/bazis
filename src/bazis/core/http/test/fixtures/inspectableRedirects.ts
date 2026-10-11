@@ -57,7 +57,7 @@ export async function startRedirectPeer(options: {
     }
   }
   @Module({ imports: [httpModule({
-    controllers: [RedirectController], port: 0, hostname: "127.0.0.1", docs: false,
+    imports: [{ controllers: [RedirectController] }], port: 0, hostname: "127.0.0.1", docs: false,
     inspectableRedirects: options.enabled ?? true,
     cors: options.cors,
   })] })

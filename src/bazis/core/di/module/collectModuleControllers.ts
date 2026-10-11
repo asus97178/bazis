@@ -8,11 +8,7 @@ type ClassListKey = "controllers" | "gateways";
  * the module tree (the module itself plus `imports`, recursively). Duplicates by
  * class reference are dropped.
  */
-function collectModuleClasses(
-  roots: readonly BazisModuleRef[],
-  key: ClassListKey,
-  extra?: readonly Class<object>[],
-): Class<object>[] {
+function collectModuleClasses(roots: readonly BazisModuleRef[], key: ClassListKey): Class<object>[] {
   const seen = new Set<Class<object>>();
   const result: Class<object>[] = [];
   const add = (list: readonly Class<object>[] | undefined): void => {
@@ -44,16 +40,12 @@ function collectModuleClasses(
   for (let index = 0; index < roots.length; index += 1) {
     visit(roots[index] as BazisModuleRef, new Set());
   }
-  add(extra);
   return result;
 }
 
-/** Controller classes of the module tree; `extraControllers` are appended once. */
-export function collectModuleControllers(
-  roots: readonly BazisModuleRef[],
-  extraControllers?: readonly Class<object>[],
-): Class<object>[] {
-  return collectModuleClasses(roots, "controllers", extraControllers);
+/** Controller classes (`controllers` of `@Module`) of the module tree. */
+export function collectModuleControllers(roots: readonly BazisModuleRef[]): Class<object>[] {
+  return collectModuleClasses(roots, "controllers");
 }
 
 /** WebSocket gateway classes (`gateways` of `@Module`) of the module tree. */

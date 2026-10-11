@@ -1,5 +1,5 @@
 import type { IncomingHttpHeaders, ServerHttp2Stream } from "node:http2";
-import type { GrpcContext } from "./contracts";
+import type { GrpcCallInfo } from "./contracts";
 import { Metadata } from "./Metadata";
 import { GrpcError } from "./GrpcError";
 import { GrpcStatus } from "./GrpcStatus";
@@ -7,7 +7,7 @@ import type { MethodDefinition } from "./serviceDefinition";
 
 /** Owns the standard five-byte gRPC envelope and one built-in HTTP/2 stream. */
 export class GrpcTransport {
-  readonly context: GrpcContext;
+  readonly context: GrpcCallInfo;
   private readonly abort = new AbortController();
   private sentHeaders = false;
   private ended = false;

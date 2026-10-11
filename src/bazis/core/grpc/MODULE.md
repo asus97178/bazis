@@ -2,7 +2,7 @@
 
 Passport version: 1.3. Date: 2026-09-26. Type: atomic technical module.
 Path: `src/bazis/core/grpc`. Public entry: `bazis/core/grpc`.
-Connection: `grpcModule(options)` or `runApp(AppModule, { grpc: options })`.
+Connection: `runApp(AppModule, { grpc: options })`, or `grpcModule({ imports, ... })`; controllers are declared by `grpcControllers` of their modules only (the `controllers` option is removed in 0.98.32).
 Status: implemented without external libraries; the functional checks and the binary smoke test passed.
 Scope: server controllers, client RPCs, the protobuf contract, DI and the transport lifecycle.
 
@@ -299,7 +299,6 @@ rejected. Library types and an opaque passthrough of foreign settings were remov
 | grpcService(definition, serviceName) | PackageDefinition, the full name | Both required | A ServiceDefinition, or TypeError if the name does not point to a service |
 | loadGrpcPackage(filename, options?) | string or readonly string[], ProtoLoaderOptions | filename is required | Own proto3 loader, option fields below |
 | imports | readonly BazisModuleRef[] | [] | Publishes only the chosen tree; modules are deduplicated |
-| controllers | readonly Class[] | [] | An alternative to feature registration; the owner is the transport module |
 | validator | ModelValidator | modelValidatorAdapter | Synchronous check of the bound DTO; each server has its own instance |
 | address | config string | 127.0.0.1:50051 | host:port or [IPv6]:port; port 0 picks a free one; unix sockets/DNS resolver schemes are not supported |
 | credentials | ServerCredentials | createInsecure() | Plaintext by default; createSsl(...) for TLS/mTLS |
@@ -347,8 +346,18 @@ overriding a method does not change the base class.
 Wire message fields and defaults are defined by `.proto` and the codec. When a DTO class
 is bound, the shared binder creates an instance, removes unknown fields and checks
 @Validator. An interface/inline object without an explicit binding keeps the former raw
-protobuf path, without automatic DTO validation. HTTP routes/@Authorize do not apply.
-Access and extra domain invariants stay with the application.
+protobuf path, without automatic DTO validation. HTTP routes do not apply.
+
+`@Authorize` and `@AllowAnonymous` from `bazis/core/http` protect gRPC controllers
+and methods exactly like HTTP ones (since 0.98.32): the class checks run first, then
+the method checks; `@AllowAnonymous` on a method opens it. The checks see an
+`AuthorizeContext` — `header(name)` (text metadata), `services` (the RPC scope),
+`state` (shared with the handler) — so one check protects both transports. They run
+after the scope is created and before the request is read or the controller is
+activated. `false` and `ForbiddenError` → PERMISSION_DENIED (7) `Permission denied.`;
+`UnauthorizedError` and `JwtError` → UNAUTHENTICATED (16) `Unauthenticated.`; a
+`GrpcError` passes through; any other error is a bug → INTERNAL and the log.
+Domain invariants stay with the application.
 
 GrpcContext is passed as the second argument: metadata is the incoming Metadata;
 signal is the cancellation AbortSignal; deadline is a Date/number (currently epoch ms),
@@ -362,7 +371,15 @@ Application metadata does not override the controlling HTTP/2/gRPC headers.
 GrpcError(code, message, metadata?): code is an integer status 1..16, message a public
 string, metadata optional trailers. OK/invalid codes are forbidden.
 Regular exceptions, DI/disposal errors and a wrong streaming return → INTERNAL with the
-message `Internal server error.` without internal details.
+message `Internal server error.` without internal details. Since 0.98.32 such a failure
+is written to the application `LOGGER` (`gRPC handler failed`, the path and the redacted
+error); a `GrpcError` and a cancelled call are not logged.
+
+A `GrpcError` of `GrpcClient` (a status from the server, a deadline, a broken or refused
+connection) carries the `bazis/core/http` upstream mark: when it escapes an HTTP handler
+the error boundary answers `504 Gateway Timeout` for DEADLINE_EXCEEDED and
+`502 Bad Gateway` otherwise, like `HttpClientError`. A service that gives a remote status
+its own meaning (NOT_FOUND → 404) catches the `GrpcError`.
 
 ## Lifecycle and limits
 

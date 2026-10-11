@@ -193,7 +193,7 @@ test("validation trailers remain bounded; generated stream mismatch and invalid 
   registerGeneratedProviderAttachments([{ channel: GRPC_REQUEST_BINDINGS, target: GeneratedController,
     value: { echo: { model: MessageModel, requestStream: true } },
   }]);
-  const container = createContainer(grpcModule({ controllers: [GeneratedController] }));
+  const container = createContainer(grpcModule({ imports: [{ grpcControllers: [GeneratedController] }] }));
   expect(() => container.resolveAll(HOSTED_SERVICE)).toThrow("stream/DTO mismatch");
   const invalid = createContainer(grpcModule({ validator: null as never }));
   expect(() => invalid.resolveAll(HOSTED_SERVICE)).toThrow("ModelValidator");

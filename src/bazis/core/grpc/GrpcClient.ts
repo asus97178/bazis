@@ -2,6 +2,7 @@ import { connect, type ClientHttp2Session, type SecureClientSessionOptions } fro
 import type { GrpcCallOptions, GrpcClientOptions, GrpcResponse, GrpcResponseStream } from "./clientContracts";
 import { GrpcClientCall } from "./GrpcClientCall";
 import { GrpcError } from "./GrpcError";
+import { markUpstreamFailure } from "../http/Errors/upstreamFailure";
 import { GrpcStatus } from "./GrpcStatus";
 import { Metadata } from "./Metadata";
 import type { MethodDefinition, ServiceDefinition } from "./serviceDefinition";
@@ -114,10 +115,10 @@ export class GrpcClient {
       deadline = Math.min(deadline, explicit);
     }
     if (options.signal !== undefined && !(options.signal instanceof AbortSignal)) throw new TypeError("Invalid gRPC signal.");
-    if (options.signal?.aborted) throw new GrpcError(GrpcStatus.CANCELLED, "RPC cancelled.");
-    if (deadline <= Date.now()) throw new GrpcError(GrpcStatus.DEADLINE_EXCEEDED, "Deadline exceeded.");
-    if (this.closed) throw new GrpcError(GrpcStatus.CANCELLED, "gRPC client is closed.");
-    if (this.calls.size >= this.callLimit) throw new GrpcError(GrpcStatus.RESOURCE_EXHAUSTED, "Too many concurrent gRPC calls.");
+    if (options.signal?.aborted) throw upstream(new GrpcError(GrpcStatus.CANCELLED, "RPC cancelled."));
+    if (deadline <= Date.now()) throw upstream(new GrpcError(GrpcStatus.DEADLINE_EXCEEDED, "Deadline exceeded."));
+    if (this.closed) throw upstream(new GrpcError(GrpcStatus.CANCELLED, "gRPC client is closed."));
+    if (this.calls.size >= this.callLimit) throw upstream(new GrpcError(GrpcStatus.RESOURCE_EXHAUSTED, "Too many concurrent gRPC calls."));
     let session: ClientHttp2Session, stream: ReturnType<ClientHttp2Session["request"]>;
     try {
       session = this.session();
@@ -125,7 +126,7 @@ export class GrpcClient {
       const wireTimeout = remaining <= 99_999_999 ? `${remaining}m` : `${Math.ceil(remaining / 1000)}S`;
       stream = session.request({ ...metadata.toHttp2Headers(), ":method": "POST", ":path": method.path,
         "content-type": "application/grpc+proto", te: "trailers", "grpc-accept-encoding": "identity", "grpc-timeout": wireTimeout }, { endStream: false });
-    } catch { throw new GrpcError(GrpcStatus.UNAVAILABLE, "Unable to open gRPC connection."); }
+    } catch { throw upstream(new GrpcError(GrpcStatus.UNAVAILABLE, "Unable to open gRPC connection.")); }
     const call = new GrpcClientCall<T>(stream, method, { deadline, signal: options.signal, sendLimit: this.sendLimit, receiveLimit: this.receiveLimit }, () => {
       this.calls.delete(call);
       this.sessions.get(session)?.delete(call);
@@ -169,4 +170,9 @@ function metadataCopy(value: Metadata | undefined): Metadata {
   if (value === undefined) return new Metadata();
   if (!(value instanceof Metadata)) throw new TypeError("Expected Bazis Metadata.");
   return value.clone();
+}
+
+/** A failed call of this client is a failure of another service for an HTTP request: 504 or 502. */
+function upstream(error: GrpcError): GrpcError {
+  return markUpstreamFailure(error, error.code === GrpcStatus.DEADLINE_EXCEEDED ? "timeout" : "failure");
 }
