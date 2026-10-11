@@ -48,7 +48,8 @@ export {
   type WebSocketServerStats,
   type WsConnectionData,
 } from "./ws-server";
-export { websocketModule, type WebSocketModuleConfig } from "./websocketModule";
+export { websocketModule, type WebSocketModuleConfig, type WebSocketOptions } from "./websocketModule";
+export { WebSocketService, type WebSocketNamespace } from "./WebSocketService";
 export { TopicCache, topicCache, type TopicCacheOptions, type TopicCacheStats } from "./topic-cache";
 export {
   encodeServerPacket,

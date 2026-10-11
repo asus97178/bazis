@@ -16,7 +16,8 @@ export interface ReliableBroadcastReceipt {
 export interface ReliableRoomPublication extends ReliableBroadcastOptions {
   readonly namespace: string;
   readonly room: string;
-  readonly excludeSid: string;
+  /** The publishing session; omitted for a publication from a service. */
+  readonly excludeSid?: string;
   readonly packet: ServerPacket;
 }
 

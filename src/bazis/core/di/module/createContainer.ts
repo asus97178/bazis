@@ -144,6 +144,14 @@ export function createContainer(rootModule: BazisModuleRef, options?: CreateCont
       }
     }
 
+    const gateways = moduleRef.gateways;
+    if (gateways) {
+      for (let index = 0; index < gateways.length; index += 1) {
+        // One instance per gateway: it keeps connection state across requests.
+        collection.add(singleton(gateways[index] as Class<object>));
+      }
+    }
+
     const background = moduleRef.background;
     if (background) {
       for (let index = 0; index < background.length; index += 1) {

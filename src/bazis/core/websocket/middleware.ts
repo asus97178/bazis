@@ -1,4 +1,6 @@
 import type { SocketUser } from "./types";
+import { JwtError } from "../../library/jwt";
+import { UnauthorizedError } from "../http";
 
 const MAX_SOCKET_USER_ID_LENGTH = 256;
 
@@ -110,15 +112,24 @@ export function createWsAuthMiddleware(
   options?: { required?: boolean; allowQueryToken?: boolean },
 ): WsMiddleware {
   return async (ctx, next) => {
-    const user = await authenticator(
-      extractWebSocketToken(ctx.request, { allowQueryToken: options?.allowQueryToken }),
-      {
-        signal: ctx.signal,
-        namespace: ctx.namespace,
-        path: ctx.path,
-        request: ctx.request,
-      },
-    );
+    let user: SocketUser | null;
+    try {
+      user = await authenticator(
+        extractWebSocketToken(ctx.request, { allowQueryToken: options?.allowQueryToken }),
+        {
+          signal: ctx.signal,
+          namespace: ctx.namespace,
+          path: ctx.path,
+          request: ctx.request,
+        },
+      );
+    } catch (error) {
+      // A bad or expired token is a refusal, not a server failure.
+      if (error instanceof JwtError || error instanceof UnauthorizedError) {
+        throw new WsUpgradeError("Unauthorized", 401);
+      }
+      throw error;
+    }
     if (user !== null && !isValidSocketUser(user)) {
       throw new WsUpgradeError("Unauthorized", 401);
     }

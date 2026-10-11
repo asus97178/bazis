@@ -595,10 +595,12 @@ describe("WebSocket: lifecycle", () => {
         throw new Error("gateway startup failed");
       }
     }
+    @Module({ gateways: [BrokenStartGateway] })
+    class BrokenModule {}
     @Module({
       imports: [
         httpModule({ port: 0, imports: [] }),
-        websocketModule({ gateways: [BrokenStartGateway] }),
+        websocketModule({ imports: [BrokenModule] }),
       ],
     })
     class App {}

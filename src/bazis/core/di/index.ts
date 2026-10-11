@@ -24,6 +24,7 @@ export {
   createContainer,
   type CreateContainerOptions,
   collectModuleControllers,
+  collectModuleGateways,
   collectModuleConfigs,
   collectModuleUiProfiles,
   Global,

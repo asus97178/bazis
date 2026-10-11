@@ -73,11 +73,30 @@ The Redis adapter is an extra implementation of the existing port.
 
 ## 2. DI and public boundaries
 
-The factory registers gateways as singletons; the existing codegen wires the constructor
-dependencies. The singleton resolver factory `WEBSOCKET_UPGRADE` collects them through
-WebSocketExplorer. `WebSocketModule` is global and explicitly exports
-`[WEBSOCKET_UPGRADE]`. The dependency direction is WebSocket → HTTP; HTTP calls the
-upgrade port. TypeScript entry: [index.ts](index.ts), `bazis/core/websocket`.
+Since 0.98.31 a gateway is declared by its own module, like a controller:
+`@Module({ gateways: [ChatGateway], providers: [singleton(ChatHistory)] })`.
+`createContainer` registers each gateway as a singleton of that module, so it sees
+the module's providers; codegen records the `gateways` key and wires the constructor
+dependencies (`@WebSocketGateway` is a codegen channel decorator).
+`websocketModule({ imports, ... })` collects the gateways from the module tree
+(`collectModuleGateways`) and fails fast when none is found; the singleton resolver
+factory `WEBSOCKET_UPGRADE` resolves them and builds the server through
+WebSocketExplorer. `runApp` installs the module next to HTTP whenever a module
+declares gateways; `runApp({ websocket })` carries the server-wide settings
+(`WebSocketOptions`), and settings without any gateway are a `KernelError`.
+`WebSocketModule` is global and exports `[WEBSOCKET_UPGRADE, WebSocketService]`:
+[WebSocketService](WebSocketService.ts) is `to(room).emit(event, data)` (and
+`emitReliable`) from outside a handler — a service, a controller, a background job —
+with the same delivery as `socket.to(room)`: the offline queue first (strict), live
+members of this node through `Server.publish`, other nodes through the adapter, and
+no excluded session. `to(room)` needs exactly one namespace; `namespace(name).to(room)`
+picks one. Before `initialize` and after `close` the server refuses with
+"WebSocket server is not running.". Unexpected handler and upgrade failures go to the
+application `LOGGER` redacted (a validation failure and a delivery error do not); a
+`JwtError`/`UnauthorizedError` thrown by the authenticator is a 401 upgrade response.
+The dependency direction is WebSocket → HTTP; HTTP calls the upgrade port.
+TypeScript entry: [index.ts](index.ts), `bazis/core/websocket`.
+Checks: [ws.gateways-module.test.ts](test/ws.gateways-module.test.ts).
 New TypeScript exports: `ReplayDelivery`, `ReplayAcknowledgement`,
 `RedisWebSocketAdapter` and its options, `ReliableBroadcastOptions/Receipt`,
 `ReliableRoomDelivery/Publication`, `ReliableSessionOwner/DeliveryBatch`,

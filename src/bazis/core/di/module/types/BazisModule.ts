@@ -30,6 +30,13 @@ export interface BazisModuleMetadata {
    */
   readonly controllers?: readonly Class<object>[];
   /**
+   * WebSocket gateways of the module (classes with `@WebSocketGateway`).
+   * Registered as singletons in this module, so a gateway sees the module's
+   * providers like a controller does; `websocketModule` collects them from
+   * `imports` and serves them on the HTTP listener.
+   */
+  readonly gateways?: readonly Class<object>[];
+  /**
    * `@UiProfile()` declarations owned by this module. The DI layer keeps them
    * opaque; `runApp` resolves their controller/request/response references and
    * compiles the profiles per published surface.
