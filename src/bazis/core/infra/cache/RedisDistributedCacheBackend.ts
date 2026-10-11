@@ -25,6 +25,8 @@ export interface RedisDistributedCacheTuning {
   readonly maxValueBytes?: number;
   /** Polling interval (ms) while waiting for another worker's result. */
   readonly pollIntervalMs?: number;
+  /** Bound of one Redis operation (ms); on expiry the method runs without the cache. Default 1000. */
+  readonly operationTimeoutMs?: number;
 }
 
 const DEFAULT_KEY_PREFIX = "bazis:cache:";
@@ -59,6 +61,7 @@ export class RedisDistributedCacheBackend implements DistributedCacheStores {
       maxKeyLength: tuning.maxKeyLength,
       maxValueBytes: tuning.maxValueBytes,
       pollIntervalMs: tuning.pollIntervalMs,
+      operationTimeoutMs: tuning.operationTimeoutMs,
     };
 
     const output = new DistributedCache<CachedHttpPayload>(driver, httpPayloadCacheCodec, {

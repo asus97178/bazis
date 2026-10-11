@@ -4,6 +4,44 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.34 — 2026-10-11
+
+### Changed (breaking)
+
+- A cached method of a scoped service needs an explicit `key` (or a named
+  `policy`), and a transient service cannot use cache decorators: both stop
+  the start with a configuration error (`CacheDeclarationError`). The automatic key belongs to the service instance,
+  so on a scoped service it cached within one request only, and on a
+  transient one never — while looking like a working cache.
+- `cachedScoped` / `cachedSingleton` are removed: register the service with
+  the regular `scoped` / `singleton`, the cache hook wraps it. The CLI
+  `g module --full` template now generates `scoped`.
+
+### Added
+
+- `IDistributedCache` is a DI token too: with
+  `redisConnect(config, { cache: "distributed" })` a service takes the shared
+  cache by type, `constructor(private readonly shared: IDistributedCache)`,
+  for example to `evictByTag` after a write. Before, it needed the
+  `DISTRIBUTED_SERVICE_CACHE` registry and an explicit dependency list.
+
+### Fixed
+
+- The distributed cache (`@CacheableRedis`, `IDistributedCache`) refuses a
+  value JSON would change with `CacheValueError` naming the method and field:
+  `Report.build: Cache value is not plain JSON: value.at is a Date (JSON
+  returns a string)`. Before, the first call returned the real value and a
+  cache hit returned a string for a Date and `{}` for a Set or Map.
+- An unavailable Redis no longer takes the application down with it. Every
+  operation of the distributed cache is bounded by `operationTimeoutMs`
+  (default 1000, `redisConnect(config, { cache: { mode: "distributed",
+  operationTimeoutMs } })`). On a timeout or a store error `@CacheableRedis`
+  and `getOrCreateAsync` compute the value without the cache, and an
+  `@OutputRedisCache` route answers uncached; explicit `get`, `remove` and
+  `evictByTag` throw the new `CacheUnavailableError`. Before, a hung Redis
+  hung every such request until the connection was dropped, and a refused
+  connection failed the call.
+
 ## 0.98.33 — 2026-10-11
 
 ### Changed (breaking)

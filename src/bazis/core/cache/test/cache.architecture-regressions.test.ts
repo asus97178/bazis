@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   Cacheable, CacheableRedis, CacheCapacityError, CacheValueError, DEFAULT_MAX_IN_FLIGHT,
-  ICache, MemoryCache, cachedSingleton, memory, DistributedCache, NamedCacheRegistry,
+  ICache, MemoryCache, memory, DistributedCache, NamedCacheRegistry,
   DISTRIBUTED_SERVICE_CACHE, jsonCacheCodec,
 } from "../index";
 import { DI, ServiceCollection, ServiceValidationError, createContainer, createToken, singleton, singletonValue } from "../../di";
@@ -87,7 +87,7 @@ describe("architecture: cached class activation", () => {
       providers: [
         singletonValue(sourceA, "A"), singletonValue(sourceB, "B"),
         singletonValue(DISTRIBUTED_SERVICE_CACHE, new NamedCacheRegistry(new Map([["default", distributed]]))),
-        cachedSingleton(a, Catalog, [sourceA]), cachedSingleton(b, Catalog, [sourceB]),
+        singleton(a, Catalog, [sourceA]), singleton(b, Catalog, [sourceB]),
         DI.keyedSingleton("keyed", DI.classProvider(a, Catalog, [sourceB])),
       ],
     }, { validateOnBuild: true });

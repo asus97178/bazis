@@ -79,5 +79,5 @@ The `@/core/cache` core does not import Redis at all, only the
 
 ## Compatibility
 
-DI helpers are `cachedScoped` and `cachedSingleton`. Former aliases were
-removed before the first npm release; see [COMPATIBILITY.md](./COMPATIBILITY.md).
+Cached services are registered with the regular `scoped` / `singleton`; the cache
+hook wraps them. Removed names are listed in [COMPATIBILITY.md](./COMPATIBILITY.md).

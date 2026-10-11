@@ -3,6 +3,7 @@ import {
   DISTRIBUTED_CACHE_BACKEND,
   DISTRIBUTED_OUTPUT_CACHE,
   DISTRIBUTED_SERVICE_CACHE,
+  IDistributedCache,
   type DistributedCacheStores,
 } from "../../cache";
 import { createToken, DI, type InjectionToken, type ProviderDefinition } from "../../di";
@@ -60,6 +61,13 @@ function distributedCacheProviders(tuning: RedisDistributedCacheTuning, token: I
         backend.serviceCache,
       ),
     ),
+    // This connector's one connection by type, for services that evict tags or
+    // read values; its name may be "default" or the configured `connection`.
+    DI.singleton(
+      DI.factoryProvider(IDistributedCache, [DISTRIBUTED_CACHE_BACKEND], (backend: DistributedCacheStores) =>
+        backend.serviceCache.resolve(backend.serviceCache.connectionNames[0]),
+      ),
+    ),
   ];
 }
 
@@ -91,7 +99,7 @@ export function redisConnect<T extends RedisConfigShape>(
     token,
     config,
     providers: cacheProviders,
-    exports: cacheProviders ? [DISTRIBUTED_CACHE_BACKEND, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE] : undefined,
+    exports: cacheProviders ? [DISTRIBUTED_CACHE_BACKEND, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE, IDistributedCache] : undefined,
     create(configs) {
       return new RedisClient(redisUrl(reader(config, configs).get("url")));
     },

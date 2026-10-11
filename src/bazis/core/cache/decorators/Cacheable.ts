@@ -12,8 +12,9 @@ type ClassOrMethodDecorator = (
  * Caches the return value of a service/provider method in {@link ICache}.
  *
  * Mirrors Spring / FusionCache `@Cacheable`. Put the decorator on the
- * **implementation class**, then register via {@link cachedSingleton} or
- * {@link cachedScoped} so DI returns a caching proxy for the interface token.
+ * **implementation class** and register it as usual (`scoped`, `singleton`):
+ * with the cache module installed, DI returns a caching proxy. A scoped
+ * service needs an explicit `key`; a transient one cannot cache.
  *
  * ```ts
  * class UserService implements IUserStore {
@@ -21,7 +22,7 @@ type ClassOrMethodDecorator = (
  *   async byId(id: number) { ... }
  * }
  *
- * cachedScoped(IUserStore, UserService, [repositoryFor(User)])
+ * scoped(IUserStore, UserService)
  * ```
  */
 export function Cacheable(options: CacheableOptions): ClassOrMethodDecorator {

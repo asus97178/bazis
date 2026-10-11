@@ -56,9 +56,7 @@ export function buildModuleTemplates(
 }
 
 function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
-  const cacheImport = profile === "full" ? "import { cachedScoped } from \"bazis/core/cache\";\n" : "";
   const moduleImport = "import { Module, scoped } from \"bazis/core/di\";";
-  const providerFactory = profile === "full" ? "cachedScoped" : "scoped";
   const backgroundImport = profile === "full" ? `import { ${n.module}Reporter } from "./background/${n.module}.reporter";\n` : "";
   const aiImports = profile === "full"
     ? `import { ${n.module}AnalystAgent } from "./ai/agents/${n.module}Analyst.agent";
@@ -72,7 +70,7 @@ import { ${n.module}SummaryTool } from "./ai/tools/${n.module}Summary.tool";
 `
     : "";
 
-  return `${cacheImport}${moduleImport}
+  return `${moduleImport}
 ${aiImports}${backgroundImport}import { ${n.module}Controller } from "./http/${n.module}.controller";
 import { ${n.entity} } from "./model/${n.module}.model";
 import { ${n.module}DbContext } from "./model/${n.module}.dbContext";
@@ -86,7 +84,7 @@ import { ${n.module}Service } from "./services/${n.module}.service";
   },
   controllers: [${n.module}Controller],
   providers: [
-    ${providerFactory}(I${n.module}Service, ${n.module}Service),
+    scoped(I${n.module}Service, ${n.module}Service),
   ],
 ${backgroundLine}${aiLines}  exports: [I${n.module}Service],
 })

@@ -1,3 +1,4 @@
+import { createToken, type InjectionToken } from "../../di";
 import type { CacheSetOptions } from "../types/CacheOptions";
 
 /** Default named connection used when a decorator omits `connection`. */
@@ -38,3 +39,11 @@ export interface IDistributedCache<TValue = unknown> {
   /** Removes all entries carrying `tag`; returns the number removed. */
   evictByTag(tag: string): Promise<number>;
 }
+
+/**
+ * The distributed cache by type: `constructor(private readonly shared: IDistributedCache)`.
+ * Registered by `redisConnect(config, { cache: "distributed" })` for its one
+ * connection; a custom backend with several connections keeps
+ * `DISTRIBUTED_SERVICE_CACHE.resolve(name)`.
+ */
+export const IDistributedCache = createToken<IDistributedCache>("IDistributedCache") as InjectionToken<IDistributedCache<unknown>>;

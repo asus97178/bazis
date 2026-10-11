@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { RedisClient } from "bun";
 import { createContainer, createToken, DI, HOSTED_SERVICE, namedDependency, type BazisModuleRef } from "../../di";
-import { CacheError, DISTRIBUTED_CACHE_BACKEND, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE, type DistributedCacheStores } from "../../cache";
+import { CacheError, DISTRIBUTED_CACHE_BACKEND, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE, IDistributedCache, type DistributedCacheStores } from "../../cache";
 import { buildCacheModule } from "../../cache/internal/buildCacheProviders";
 import { defineConfig, HEALTH_CHECK, LifecycleCoordinator } from "../../kernel";
 import { infraModule, redisConnect, RedisDistributedCacheBackend } from "../index";
@@ -139,5 +139,13 @@ describe("distributed cache composition", () => {
     expect(await container.resolve(consumer).ping()).toEqual([{ connection: "default", healthy: true }]);
     expect(container.resolveAll(HOSTED_SERVICE)).toEqual([]);
     await container.dispose();
+  });
+
+  test("IDistributedCache resolves the connector's one connection, whatever its name (0.98.34)", () => {
+    const events: string[] = [];
+    const container = createContainer(infraModule({ cache: connector("orders", events) }));
+    const shared = container.resolve(IDistributedCache);
+    expect(shared.connectionName).toBe("orders");
+    expect(shared).toBe(container.resolve(DISTRIBUTED_SERVICE_CACHE).resolve("orders"));
   });
 });

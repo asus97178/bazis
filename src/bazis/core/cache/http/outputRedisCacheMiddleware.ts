@@ -1,5 +1,5 @@
 import type { HttpMiddleware } from "../../http";
-import { CacheError } from "../errors/CacheError";
+import { CacheError, CacheUnavailableError } from "../errors/CacheError";
 import { DISTRIBUTED_OUTPUT_CACHE } from "../tokens/DISTRIBUTED_CACHE";
 import {
   DEFAULT_OUTPUT_CACHE_METHODS,
@@ -14,6 +14,7 @@ import {
   resolveCachedHttpPayloadReadOptions,
   responseAllowsServerCache,
   responseToCachedPayload,
+  type CachedHttpPayload,
 } from "./CachedHttpPayload";
 
 export interface OutputRedisCacheMiddlewareOptions {
@@ -81,7 +82,15 @@ export function outputRedisCacheMiddleware(options: OutputRedisCacheMiddlewareOp
     }
 
     const key = buildRedisOutputCacheKey(ctx, routeName, config);
-    const cached = await cache.get(key);
+    let cached: CachedHttpPayload | undefined;
+    try {
+      cached = await cache.get(key);
+    } catch (error) {
+      // The cache is optional: an unavailable store serves the route uncached.
+      if (!(error instanceof CacheUnavailableError)) throw error;
+      await next();
+      return;
+    }
     if (cached !== undefined) {
       ctx.response = applyClientCacheHeaders(cachedPayloadToResponse(cached, { hit: true }), clientCache);
       return;

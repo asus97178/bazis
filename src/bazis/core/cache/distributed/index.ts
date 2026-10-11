@@ -3,7 +3,7 @@ export { jsonCacheCodec, httpPayloadCacheCodec } from "./codecs";
 export {
   DEFAULT_CACHE_CONNECTION,
   type DistributedCacheSetOptions,
-  type IDistributedCache,
+  IDistributedCache,
 } from "./IDistributedCache";
 export type {
   DistributedCacheDriver,

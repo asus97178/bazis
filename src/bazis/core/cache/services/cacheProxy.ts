@@ -11,7 +11,7 @@ import {
 } from "../decorators/cacheableRedisMetadata";
 import type { IDistributedCache } from "../distributed/IDistributedCache";
 import type { NamedCacheRegistry } from "../distributed/NamedCacheRegistry";
-import { CacheError } from "../errors/CacheError";
+import { CacheError, CacheValueError } from "../errors/CacheError";
 import type { ICache } from "../ICache";
 import { normalizeCacheKey } from "../internal/normalizeCacheKey";
 import { AutomaticCacheKey } from "../internal/AutomaticCacheKey";
@@ -141,7 +141,11 @@ function wrapDistributedMethod(
         return result instanceof Promise ? await result : result;
       },
       { ttlSeconds: options.seconds, tags: options.tags, lockSeconds: options.lockSeconds },
-    );
+    ).catch((error: unknown) => {
+      // Name the method: "value.at is a Date" alone does not say where.
+      if (error instanceof CacheValueError) throw new CacheValueError(`${className}.${String(methodName)}: ${error.message}`, { cause: error });
+      throw error;
+    });
   };
 }
 

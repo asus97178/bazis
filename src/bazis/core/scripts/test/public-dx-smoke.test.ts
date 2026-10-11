@@ -30,7 +30,6 @@ import {
   Task,
   Tool,
   agentOutput,
-  cachedScoped,
   createContainer,
   createToken,
   http,
@@ -148,7 +147,7 @@ class DxAgent {
 
 @Module({
   imports: [memory()],
-  providers: [cachedScoped(DxCounter, DxCounterService), scoped(DxLookupTool)],
+  providers: [scoped(DxCounter, DxCounterService), scoped(DxLookupTool)],
   controllers: [DxController],
   agents: [DxAgent],
   tools: [DxLookupTool],

@@ -12,9 +12,8 @@ type ClassOrMethodDecorator = (
  * Shared service method cache backed by the distributed tier (multi-instance safe).
  *
  * Requires a distributed backend: add `redisConnect(redisConfig, { cache: "distributed" })`
- * to your `@Infra` manifest. Register the class with the usual `cachedScoped` /
- * `cachedSingleton` (or just `scoped` / `singleton` — the auto-hook wraps it). The distributed
- * tier activates automatically when a backend is configured.
+ * to your `@Infra` manifest. Register the class as usual (`scoped` / `singleton`):
+ * the cache module wraps it. Values must be plain JSON.
  *
  * ```ts
  * class UserService implements IUserStore {
@@ -22,7 +21,7 @@ type ClassOrMethodDecorator = (
  *   async byId(id: number) { ... }
  * }
  *
- * cachedScoped(IUserStore, UserService, [repositoryFor(User)]);
+ * scoped(IUserStore, UserService);
  * ```
  */
 export function CacheableRedis(options: CacheableRedisOptions): ClassOrMethodDecorator {

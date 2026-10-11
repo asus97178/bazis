@@ -5,13 +5,12 @@ import {
   DistributedCache,
   NamedCacheRegistry,
   DISTRIBUTED_SERVICE_CACHE,
-  cachedScoped,
-  cachedSingleton,
   memory,
   jsonCacheCodec,
+  CacheDeclarationError,
   type IDistributedCache,
 } from "@/core/cache";
-import { createContainer, Module, createToken, singletonValue } from "@/core/di";
+import { createContainer, Module, createToken, DiError, scoped, singleton, singletonValue, transient } from "@/core/di";
 import { InMemoryCacheDriver } from "./support/InMemoryCacheDriver";
 
 function distributedRegistry(): NamedCacheRegistry<IDistributedCache> {
@@ -65,11 +64,11 @@ class HybridCounter implements IHybridCounter {
 }
 
 describe("cached providers", () => {
-  test("cachedScoped uses memory cache when no distributed backend is registered", () => {
+  test("a scoped service with a keyed @Cacheable uses the memory cache when no distributed backend is registered", () => {
     const cacheModuleRef = memory();
     @Module({
       imports: [cacheModuleRef],
-      providers: [cachedScoped(IMemoryCounter, MemoryCounter)],
+      providers: [scoped(IMemoryCounter, MemoryCounter)],
     })
     class TestModule {}
 
@@ -80,7 +79,7 @@ describe("cached providers", () => {
     expect(counter.next()).toBe(1);
   });
 
-  test("cachedScoped preserves explicitly keyed sharing across request scopes", () => {
+  test("a scoped service shares explicitly keyed values across request scopes", () => {
     let calls = 0;
     class ScopedCounter {
       @Cacheable({ seconds: 60, key: () => "same" })
@@ -93,7 +92,7 @@ describe("cached providers", () => {
     const cacheModuleRef = memory();
     @Module({
       imports: [cacheModuleRef],
-      providers: [cachedScoped(Counter, ScopedCounter)],
+      providers: [scoped(Counter, ScopedCounter)],
     })
     class TestModule {}
 
@@ -105,29 +104,48 @@ describe("cached providers", () => {
     expect(second.next()).toBe(1);
   });
 
-  test("cachedScoped isolates automatic argument keys across request scopes", () => {
-    let calls = 0;
+  test("a scoped service with @Cacheable without key is refused at startup (0.98.34)", () => {
     class ScopedCounter {
       @Cacheable({ seconds: 60 })
-      next(value: number): number {
-        calls += 1;
-        return value + calls;
-      }
+      next(value: number): number { return value; }
     }
     const Counter = createToken<ScopedCounter>("ImplicitScopedCounter");
-    const cacheModuleRef = memory();
-    @Module({ imports: [cacheModuleRef], providers: [cachedScoped(Counter, ScopedCounter)] })
+    @Module({ imports: [memory()], providers: [scoped(Counter, ScopedCounter)] })
     class TestModule {}
-
-    const container = createContainer(TestModule, { validateOnBuild: true });
-    const first = container.createScope().resolve(Counter);
-    const second = container.createScope().resolve(Counter);
-    expect(first.next(10)).toBe(11);
-    expect(first.next(10)).toBe(11);
-    expect(second.next(10)).toBe(12);
+    expect(() => createContainer(TestModule, { validateOnBuild: true })).toThrow(CacheDeclarationError);
+    // A DI error: the start prints it as a configuration error, not a crash.
+    expect(new CacheDeclarationError("x")).toBeInstanceOf(DiError);
+    expect(() => createContainer(TestModule, { validateOnBuild: true })).toThrow(
+      "ScopedCounter.next: @Cacheable without key on a scoped service caches only within one request (the automatic key belongs to the instance). Set key — include the user or tenant when the result depends on them — or register ScopedCounter as a singleton.",
+    );
   });
 
-  test("cachedScoped uses the distributed tier when a service cache is registered", async () => {
+  test("a transient service with @Cacheable is refused at startup (0.98.34)", () => {
+    class TransientCounter {
+      @Cacheable({ seconds: 60, key: () => "k" })
+      next(): number { return 1; }
+    }
+    @Module({ imports: [memory()], providers: [transient(TransientCounter)] })
+    class TestModule {}
+    expect(() => createContainer(TestModule, { validateOnBuild: true })).toThrow(
+      "TransientCounter uses @Cacheable but is registered transient: a new instance for every injection never reuses its cache. Register it as singleton or scoped.",
+    );
+  });
+
+  test("a singleton keeps automatic keys across calls", () => {
+    let calls = 0;
+    class SingletonCounter {
+      @Cacheable({ seconds: 60 })
+      next(value: number): number { calls += 1; return value + calls; }
+    }
+    @Module({ imports: [memory()], providers: [singleton(SingletonCounter)] })
+    class TestModule {}
+    const container = createContainer(TestModule, { validateOnBuild: true });
+    expect(container.resolve(SingletonCounter).next(10)).toBe(11);
+    expect(container.resolve(SingletonCounter).next(10)).toBe(11);
+  });
+
+  test("a scoped service uses the distributed tier for @CacheableRedis when a service cache is registered", async () => {
     hybridMemoryCalls = 0;
     hybridRedisCalls = 0;
 
@@ -137,7 +155,7 @@ describe("cached providers", () => {
       imports: [cacheModuleRef],
       providers: [
         singletonValue(DISTRIBUTED_SERVICE_CACHE, distributedRegistry()),
-        cachedScoped(IHybridCounter, HybridCounter),
+        scoped(IHybridCounter, HybridCounter),
       ],
     })
     class TestModule {}
@@ -154,11 +172,11 @@ describe("cached providers", () => {
     expect(hybridRedisCalls).toBe(1);
   });
 
-  test("cachedSingleton caches through interface token", () => {
+  test("a singleton caches through an interface token", () => {
     const cacheModuleRef = memory({ maxEntries: 100 });
     @Module({
       imports: [cacheModuleRef],
-      providers: [cachedSingleton(IMemoryCounter, MemoryCounter)],
+      providers: [singleton(IMemoryCounter, MemoryCounter)],
     })
     class TestModule {}
 
