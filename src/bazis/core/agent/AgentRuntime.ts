@@ -63,6 +63,15 @@ export class AgentRuntime {
   }
 
   /**
+   * Checks a definition the way `run` does, without calling the model: an
+   * invalid field or a tool name not registered in `@Module.tools` throws
+   * AgentSetupError. Use it before saving a definition an operator edited.
+   */
+  check(definition: AgentDataDefinition): void {
+    AgentRegistry.fromDefinition(definition, this.catalog.listTools());
+  }
+
+  /**
    * Runs one agent definition. An invalid definition, or a tool name that is
    * not registered in `@Module.tools`, rejects with AgentSetupError before the
    * model is called; failures of the run itself come back as `status: "failed"`.

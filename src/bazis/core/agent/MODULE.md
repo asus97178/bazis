@@ -149,6 +149,7 @@ main fields.
 | Input | Type / required | Default and limits |
 |---|---|---|
 | `run(definition, options)` | `AgentDataDefinition`, options | The definition is checked before the model call |
+| `check(definition)` | `AgentDataDefinition` | The same check without the model; throws AgentSetupError |
 | `input` | A string (a user message) or JSON (a data part) | `input` or `messages` is required |
 | `output.mode` | `text`, `json`, `artifact`; required inside a passed output | The local structural check applies to `json` |
 | `output.schema` | An optional JSON Schema or a class name | Without a schema, JSON is checked; a class is resolved by generated metadata |
