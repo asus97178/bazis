@@ -115,7 +115,8 @@ configuration reads only BAZIS_* variables (for example BAZIS_SMTP_HOST).
 `mail.host — conflicting environment aliases`.
 
 Bun сам читает файл `.env` в корне проекта, так что переменные удобно
-держать там. `bazis new` создаёт пример — `.env.example`.
+держать там. `bazis new` создаёт пример — `.env.example`. Собранный
+бинарник `.env` не читает — см. [Файлы `.env`](../security/secrets.md#файлы-env).
 
 ### Свой источник: JSON-файл
 
@@ -175,6 +176,10 @@ Invalid configuration (environment "development"): mail.port — must be a TCP p
 mail.apiKey — required non-empty secret is not set (BAZIS_MAIL__APIKEY).
 ```
 
+Где хранить секреты в production, что маскируется в логах и почему
+production не запустится на секрете из `default` — в главе
+[Секреты и конфигурация](../security/secrets.md).
+
 ## Что получилось: `inspect()`
 
 `ConfigView` умеет показать, откуда взялось каждое значение. Секреты при
@@ -224,3 +229,4 @@ mailConfig.get("port");
 - [Приложение](../overview/application.md)
 - [DI подробно](dependency-injection.md)
 - [Жизненный цикл](lifecycle.md)
+- [Секреты и конфигурация](../security/secrets.md)
