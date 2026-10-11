@@ -178,6 +178,7 @@ converted to numbers; unknown options fields are not used.
 | `KernelOptions.startupTimeoutMs` | number, builder options | no; 30000 | An integer 0…2147483647 ms; 0 disables the deadline of the whole startup |
 | `KernelOptions.shutdownTimeoutMs` | number, builder options | no; 10000 | The same range; 0 disables the shutdown deadline |
 | `KernelOptions.signals` | readonly NodeJS.Signals[], builder options | no; SIGINT, SIGTERM | A snapshot of unique values is kept at build; an empty array disables the handlers |
+| `KernelOptions.schemaOnly` | boolean, builder options; otherwise `BAZIS_SCHEMA_ONLY` | no; false | Since 0.98.30. Starts only hosted services with a negative phase (infrastructure, migrations, `ensureCreated`) and no lifecycle hooks; `run()` then stops with exit code 0. No `APPLICATION_STARTED`/`STOPPING` events and no lifetime callbacks. `BAZIS_SCHEMA_ONLY` accepts `1`, `true`, `0`, `false`; another value → KernelError at build |
 | `useStartupTimeout(timeoutMs)`, `useShutdownTimeout(timeoutMs)` | number, argument | required | The same check at build; invalid → KernelError before config/DI |
 | `Kernel.start()` | no input fields | — | Promise<void>; shared by repeated calls; the deadline includes notifications |
 | `Kernel.run()` | no input fields | — | A shared Promise<number> and one set of process handlers |

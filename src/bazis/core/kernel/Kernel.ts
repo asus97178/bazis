@@ -28,6 +28,8 @@ export interface KernelRuntimeOptions {
   readonly signals: readonly NodeJS.Signals[];
   readonly unhandledErrorPolicy: UnhandledErrorPolicy;
   readonly startupReport: boolean;
+  /** Start the infrastructure and the schema only, then stop (BAZIS_SCHEMA_ONLY). */
+  readonly schemaOnly?: boolean;
 }
 
 interface StopRequest {
@@ -101,9 +103,19 @@ export class Kernel {
       // Async singletons first: hosted services and controllers take them
       // through constructors, which resolve synchronously.
       await awaitAbortable(this.container.initializeAsyncSingletons(), abortController.signal);
-      await this.coordinator.start(abortController.signal, this.options.shutdownTimeoutMs);
+      await this.coordinator.start(abortController.signal, this.options.shutdownTimeoutMs, this.options.schemaOnly === true);
       coordinatorStarted = true;
       this.startupMs = performance.now() - this.timings.buildStartedAt;
+      if (this.options.schemaOnly === true) {
+        // The application itself never started: no lifetime callbacks, no
+        // STARTED event, no report. run() stops right away with exit code 0.
+        this.container.tryResolve(LOGGER)?.info("schema only: infrastructure and schema are ready, stopping (BAZIS_SCHEMA_ONLY)", {
+          hostedServices: this.coordinator.startedHostedCount,
+          startupMs: Number(this.startupMs.toFixed(1)),
+        });
+        this.state = "started";
+        return;
+      }
       await this.lifetime.notifyStarted(abortController.signal);
       await this.container.resolve(EventBus).publish(
         APPLICATION_STARTED,
@@ -222,16 +234,21 @@ export class Kernel {
 
   private async runShutdownSequence(request: StopRequest): Promise<void> {
     const errors: unknown[] = [];
+    // A schema-only start never announced the application, so it does not
+    // announce its stop either.
+    const announced = this.options.schemaOnly !== true;
     try {
-      await this.lifetime.notifyStopping();
+      if (announced) await this.lifetime.notifyStopping();
     } catch (error) {
       errors.push(error);
     }
     try {
-      await this.container.resolve(EventBus).publish(APPLICATION_STOPPING, {
-        ...(request.signal === undefined ? {} : { signal: request.signal }),
-        exitCode: request.exitCode,
-      });
+      if (announced) {
+        await this.container.resolve(EventBus).publish(APPLICATION_STOPPING, {
+          ...(request.signal === undefined ? {} : { signal: request.signal }),
+          exitCode: request.exitCode,
+        });
+      }
     } catch (error) {
       errors.push(error);
     }
@@ -249,7 +266,7 @@ export class Kernel {
     }
 
     try {
-      await this.lifetime.notifyStopped();
+      if (announced) await this.lifetime.notifyStopped();
     } catch (error) {
       errors.push(error);
     }
@@ -287,6 +304,10 @@ export class Kernel {
         return request.exitCode;
       }
 
+      if (this.options.schemaOnly === true) {
+        // The schema is in place: nothing to serve, stop as a finished job.
+        this.requestStop(this.stopRequested ?? { exitCode: 0 });
+      }
       const request = await new Promise<StopRequest>((resolve) => {
         // lifetime.stop() or a process signal may have fired during start().
         if (this.stopRequested) {

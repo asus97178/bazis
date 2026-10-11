@@ -75,3 +75,39 @@ describe("versioned migrations name the failed step", () => {
     expect(((error as Error).cause as Error).message).toBe('relation "nope" does not exist');
   });
 });
+
+describe("migration history and a database user without DDL rights (0.98.30)", () => {
+  const recording = (options: { present: boolean; denyCreate?: boolean }) => {
+    const statements: string[] = [];
+    const executor: DbExecutor = {
+      query: async (sql): Promise<Row[]> => { statements.push(sql); return sql.includes("to_regclass") ? [{ present: options.present }] : []; },
+      execute: async (sql) => {
+        statements.push(sql);
+        if (options.denyCreate && sql.startsWith("CREATE TABLE")) throw Object.assign(new Error("permission denied for schema public"), { name: "PostgresError", errno: "42501", code: "ERR_POSTGRES_SERVER_ERROR" });
+        return { changes: 0, lastInsertId: 0 };
+      },
+    };
+    const provider = { name: "test", dialect: { name: "test", quoteId: (name: string) => `"${name}"`, parameter: (index: number) => `$${index + 1}` }, query: executor.query, execute: executor.execute, transaction: async <T>(work: (tx: DbExecutor) => Promise<T>) => work(executor) } as unknown as DatabaseProvider;
+    return { provider, statements };
+  };
+
+  test("an existing history table is not created again: no CREATE privilege is needed", async () => {
+    const { provider, statements } = recording({ present: true });
+    expect(await new MigrationRunner(provider, []).migrate()).toEqual({ applied: [], rolledBack: [] });
+    expect(statements.some((sql) => sql.startsWith("CREATE"))).toBe(false);
+  });
+
+  test("a missing history table is created", async () => {
+    const { provider, statements } = recording({ present: false });
+    await new MigrationRunner(provider, []).migrate();
+    expect(statements.filter((sql) => sql.startsWith("CREATE TABLE"))).toHaveLength(1);
+  });
+
+  test("a user that may not create the history table gets the way out", async () => {
+    const { provider } = recording({ present: false, denyCreate: true });
+    const error = await new MigrationRunner(provider, []).migrate().catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(OrmError);
+    expect((error as Error).message).toBe('The migration history table "__BazisMigrations" does not exist and this database user may not create it (PostgreSQL 42501). Run the first start with the schema owner\'s credentials (BAZIS_SCHEMA_ONLY=1 applies the schema and exits), or grant CREATE on the schema.');
+    expect(((error as Error).cause as Error).message).toBe("permission denied for schema public");
+  });
+});
