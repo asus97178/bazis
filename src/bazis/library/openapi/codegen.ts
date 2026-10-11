@@ -461,12 +461,23 @@ export function createOpenApiCodegenAnalyzer(input: OpenApiCodegenAnalyzerInput)
   };
 
   const schemaFromArrayTsType = (type: ts.Type, seen: Set<string>): OpenApiCodegenSchema => {
-    if (checker.isTupleType(type)) {
-      const tupleArgs = typeArgumentsOf(type);
-      return { type: "array", items: mergeResponseSchemas(tupleArgs.map((item) => schemaFromTsType(item, seen))) ?? {} };
+    // A recursive alias can close its loop through an array without an object
+    // in between (`type Json = … | readonly Json[]`): the repeat is an untyped array.
+    const key = typeIdentity(type);
+    if (seen.has(key)) {
+      return { type: "array" };
     }
-    const args = typeArgumentsOf(type);
-    return { type: "array", items: args[0] ? schemaFromTsType(args[0], seen) : {} };
+    seen.add(key);
+    try {
+      if (checker.isTupleType(type)) {
+        const tupleArgs = typeArgumentsOf(type);
+        return { type: "array", items: mergeResponseSchemas(tupleArgs.map((item) => schemaFromTsType(item, seen))) ?? {} };
+      }
+      const args = typeArgumentsOf(type);
+      return { type: "array", items: args[0] ? schemaFromTsType(args[0], seen) : {} };
+    } finally {
+      seen.delete(key);
+    }
   };
 
   const schemaFromObjectTsType = (type: ts.Type, seen: Set<string>): OpenApiCodegenSchema => {

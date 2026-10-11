@@ -59,7 +59,8 @@ export class SupportService {
 tool name that is not registered in `@Module.tools` rejects with
 `AgentSetupError` that lists the registered names. The model sees only the
 Tools the definition names. `runtime.listTools()` returns the whole catalog,
-for example for an agent editor.
+for example for an agent editor, and `runtime.check(definition)` runs the same
+check without the model — call it before saving a definition an operator edited.
 
 The definition's `instructions` are the system message, sent as written.
 `description` is for people and catalogs and is not sent to the model.

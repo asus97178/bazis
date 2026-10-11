@@ -259,6 +259,23 @@ describe("agent runtime", () => {
     }
   });
 
+  test("check validates a definition like run, without calling the model", async () => {
+    const provider = new ScriptedModelProvider();
+    const { runtime, container } = createRuntime(provider);
+    try {
+      expect(() => runtime.check({ name: "support", instructions: "Help.", toolNames: ["catalog.search"] })).not.toThrow();
+      expect(() => runtime.check({ name: "support", instructions: "Help.", toolNames: ["orders.delete"] })).toThrow(
+        'Agent "support": tool "orders.delete" is not registered in the application (registered: catalog.search).',
+      );
+      expect(() => runtime.check({ name: "support", instructions: "Help.", toolNames: ["catalog.search", "catalog.search"] })).toThrow(AgentSetupError);
+      expect(() => runtime.check({ name: "bad name!", instructions: "" })).toThrow(AgentSetupError);
+      expect(() => runtime.check({ name: "support", instructions: null } as never)).toThrow(AgentSetupError);
+      expect(provider.requests).toHaveLength(0);
+    } finally {
+      await container.dispose();
+    }
+  });
+
   test("a later change of a definition object does not affect a run already started", async () => {
     const provider = new ScriptedModelProvider();
     const { runtime, container } = createRuntime(provider);

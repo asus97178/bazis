@@ -4,6 +4,23 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.1 — 2026-10-12
+
+### Added
+
+- `AgentRuntime.check(definition)` checks an agent definition the way `run`
+  does, without calling the model: an invalid field or a tool name not
+  registered in `@Module.tools` throws `AgentSetupError` with the list of
+  registered tools. Call it before saving a definition an operator edited;
+  before, a wrong tool name was found only by the first run.
+
+### Fixed
+
+- `bazis codegen` no longer overflows the stack on a controller response
+  holding a type that recurses through an array, such as `JsonValue` from
+  `bazis/core/agent` (`return Ok({ output: result.output })`). The repeated
+  array is described as an array without `items`.
+
 ## 0.99.0 — 2026-10-12
 
 ### Changed (breaking)

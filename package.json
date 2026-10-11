@@ -23,7 +23,7 @@
   "peerDependencies": {
     "typescript": "^6"
   },
-  "version": "0.99.0",
+  "version": "0.99.1",
   "workspaces": [
     "src/bazis"
   ]
