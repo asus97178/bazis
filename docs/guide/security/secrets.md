@@ -249,6 +249,7 @@ const keys = this.config.get("keys").reveal().split(",");
 
 ## Дальше
 
+- [Чек-лист перед продакшеном](production-checklist.md)
 - [Конфигурация](../fundamentals/configuration.md)
 - [Аутентификация через JWT](jwt.md)
 - [Обработка ошибок](../overview/errors.md)
