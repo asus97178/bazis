@@ -7,7 +7,7 @@ import {
   type OpenApiCodegenOperationSpec,
   type OpenApiCodegenSchema,
 } from "../../library/openapi/codegen";
-import { generateAgentMetadataCatalog, type AgentCodegenSource } from "./agent-codegen";
+import { collectToolSchemaModels, type ToolCodegenSource } from "./tool-codegen";
 import {
   analyzeRequestModelHydration,
   type RequestModelHydration,
@@ -30,8 +30,6 @@ const FRAMEWORK_SOURCE = ((): string | null => {
   try { return realpathSync("src/bazis") === FRAMEWORK_DIR ? "src/bazis" : null; } catch { return null; }
 })();
 const FRAMEWORK_ROOT = FRAMEWORK_SOURCE ?? "src/bazis";
-const CORE_AGENT_CATALOG_FILE = `${FRAMEWORK_ROOT}/core/agent/generated/catalog.ts`;
-const CORE_AGENT_GENERATED_DIR = `${FRAMEWORK_ROOT}/core/agent/generated`;
 const isFrameworkSourcePath = (file: string): boolean => FRAMEWORK_SOURCE !== null && file.startsWith(`${FRAMEWORK_SOURCE}/`);
 const APP_GENERATED_DIR = "src/generated/bazis";
 let activeGeneratedDir = APP_GENERATED_DIR;
@@ -209,10 +207,10 @@ let ambiguousClassNames = new Set<string>();
 // Exact roots that do not need convention name resolution: @RequestModel()
 // classes used by generated transport schemas.
 let explicitRequestModelRoots = new Set<ts.ClassDeclaration>();
-let agentCodegenSources: AgentCodegenSource[] = [];
+let toolCodegenSources: ToolCodegenSource[] = [];
 
 const ROUTE_DECORATORS = new Set(["Get", "Post", "Put", "Patch", "Delete", "Options", "Head", "All"]);
-const CODEGEN_CHANNEL_DECORATORS = new Set(["Controller", "GrpcController", "WebSocketGateway", "Agent", "Tool", "Prompt", "RequestModel", "UiProfile"]);
+const CODEGEN_CHANNEL_DECORATORS = new Set(["Controller", "GrpcController", "WebSocketGateway", "Tool", "RequestModel", "UiProfile"]);
 const PRIMITIVE_QUERY_TYPES: Record<string, HttpBindingSpec["type"]> = {
   string: "string",
   number: "number",
@@ -251,12 +249,7 @@ const BUILTIN_DEPENDENCY_NAMES = new Set([
 function isScannableFile(filePath: string): boolean {
   if (filePath.startsWith("../") || path.isAbsolute(filePath)) return false;
   if (!filePath.endsWith(".ts") || filePath.endsWith(".d.ts") || /\.(test|spec)\.ts$/.test(filePath)) return false;
-  if (
-    filePath === CORE_AGENT_CATALOG_FILE ||
-    filePath.startsWith(`${APP_GENERATED_DIR}/`)
-  ) {
-    return false;
-  }
+  if (filePath.startsWith(`${APP_GENERATED_DIR}/`)) return false;
   return !/(^|\/)(test|tests|__tests__|fixture|fixtures|__fixtures__|generated|node_modules|vendor|dist|build|bin|coverage|examples)(\/|$)/.test(filePath) && !filePath.startsWith("admin-ui/");
 }
 
@@ -414,7 +407,7 @@ function sourceHasCodegenCandidate(source: ts.SourceFile): boolean {
       const decorators = ts.getDecorators(node) ?? [];
       const constructorDeps = readConstructorTypeNames(node);
       // Shared all-channel boundary index: any class that feeds DI/HTTP,
-      // request/list, OpenAPI/UI, Agent/Tool/Prompt analysis must
+      // request/list, OpenAPI/UI, Tool analysis must
       // be owned by exactly one configured target before rendering begins.
       if (
         decorators.some((decorator) => {
@@ -456,7 +449,7 @@ function resetTargetAnalysis(files: Set<string>, generatedDir: string): void {
   httpBindings = {}; httpControllerFiles = {}; openApiSchemas = {}; openApiOperations = {};
   grpcBindings = new Map();
   uiProfileResponseModels = new Map(); openApiSchemaModels = new Map(); requestModelClassNames = new Set(); listRequestClassNames = new Set();
-  classFilesByName = new Map(); classDeclarationsByName = new Map(); ambiguousClassNames = new Set(); explicitRequestModelRoots = new Set(); agentCodegenSources = [];
+  classFilesByName = new Map(); classDeclarationsByName = new Map(); ambiguousClassNames = new Set(); explicitRequestModelRoots = new Set(); toolCodegenSources = [];
   sourceEntries = [...files].sort((a, b) => a.localeCompare(b)).map((filePath) => ({ filePath, source: programFiles.get(filePath) as ts.SourceFile }));
   sourceFilePathSet = new Set(sourceEntries.map((entry) => entry.filePath));
   openApiCodegen = createOpenApiCodegenAnalyzer({ checker, sourceFiles: sourceEntries.map((entry) => entry.source), schemaNameForDuplicate: duplicateOpenApiSchemaName });
@@ -478,7 +471,7 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
     if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
       collectClassDeps(source);
       collectGrpcBindings(source);
-      agentCodegenSources.push({ filePath, sourceFile: source });
+      toolCodegenSources.push({ filePath, sourceFile: source });
     }
     collectHttpBindings(source); collectOpenApiSchemas(source); collectUiProfileResponseModels(source);
   }
@@ -487,46 +480,39 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
   const requestModelImports = resolveRequestModelImports();
   const requestModelHydration = resolveRequestModelHydration(requestModelImports);
   const listModelImports = resolveListModelImports();
-  const agent = generateAgentMetadataCatalog(agentCodegenSources, {
-    generatedDir, frameworkImports: "public", schemaNameForDeclaration: openApiCodegen.schemaNameForDeclaration,
-  });
-  const schemaModels = resolveOpenApiSchemaModelImports(agent.schemaModels, agent.schemaNames);
-  classifyAgentWarnings(agent.warnings); failOnFatalErrors();
+  const tools = collectToolSchemaModels(toolCodegenSources, { schemaNameForDeclaration: openApiCodegen.schemaNameForDeclaration });
+  const schemaModels = resolveOpenApiSchemaModelImports(tools.schemaModels, tools.schemaNames);
+  classifyToolWarnings(tools.warnings); failOnFatalErrors();
   const analysisMs = performance.now() - startedAt;
   const renderStartedAt = performance.now();
   const requestModels = renderRequestModels(requestModelImports, requestModelHydration);
   const listModels = renderListModels(listModelImports);
-  const openApi = renderOpenApiMetadata(openApiSchemas, openApiOperations, "app", agent.schemaNames, schemaModels);
+  const openApi = renderOpenApiMetadata(openApiSchemas, openApiOperations, "app", tools.schemaNames, schemaModels);
   stageWrite(`${generatedDir}/deps.ts`, renderTargetDeps());
   stageWrite(`${generatedDir}/bindings.ts`, renderTargetBindings());
   stageWrite(`${generatedDir}/httpRequestModels.ts`, requestModels);
   stageWrite(`${generatedDir}/httpListModels.ts`, listModels);
   stageWrite(`${generatedDir}/openapi.ts`, openApi);
-  stageWrite(`${generatedDir}/agentCatalog.ts`, agent.output);
+  // Generated before 0.99.0, when agents were classes; nothing imports it now.
+  stageRemove(`${generatedDir}/agentCatalog.ts`);
   stageWrite(`${generatedDir}/runtime.ts`, renderGeneratedRuntime(name));
   if (production) stageWrite(`${generatedDir}/fingerprint.ts`, renderSourceFingerprint());
-  // The framework's own empty agent catalog (a fixture of agent.metadata.test)
-  // is refreshed only when the framework source is part of this project.
-  if (production) {
-    if (FRAMEWORK_SOURCE !== null) {
-      stageWrite(CORE_AGENT_CATALOG_FILE, generateAgentMetadataCatalog([], CORE_AGENT_GENERATED_DIR).output);
-    }
-  } else {
+  if (!production) {
     stageWrite(`${generatedDir}/bootstrap.ts`, 'import { registerBazisGeneratedRuntime } from "./runtime";\n\nawait registerBazisGeneratedRuntime();\n');
   }
   for (const warning of warnings) console.warn(`[di:generate] WARNING: ${warning}`);
-  console.log(`[di:generate] target=${name} sources=${sourceEntries.length} deps=${classDeps.size} controllers=${Object.keys(httpBindings).length} requestModels=${requestModelImports.length} listModels=${listModelImports.length} agents=${agent.agentCount} prepassMs=${prepassMs.toFixed(1)} analysisMs=${analysisMs.toFixed(1)} totalMs=${(performance.now() - startedAt).toFixed(1)}`);
+  console.log(`[di:generate] target=${name} sources=${sourceEntries.length} deps=${classDeps.size} controllers=${Object.keys(httpBindings).length} requestModels=${requestModelImports.length} listModels=${listModelImports.length} tools=${tools.toolCount} prepassMs=${prepassMs.toFixed(1)} analysisMs=${analysisMs.toFixed(1)} totalMs=${(performance.now() - startedAt).toFixed(1)}`);
   return {
     analysisMs,
     renderMs: performance.now() - renderStartedAt,
     eligible: sourceEntries.length,
-    candidates: classDeps.size + Object.keys(httpBindings).length + requestModelImports.length + listModelImports.length + agent.agentCount,
+    candidates: classDeps.size + Object.keys(httpBindings).length + requestModelImports.length + listModelImports.length + tools.toolCount,
   };
 }
 
-function classifyAgentWarnings(agentWarnings: readonly string[]): void {
-  for (let index = 0; index < agentWarnings.length; index += 1) {
-    const warning = agentWarnings[index] as string;
+function classifyToolWarnings(toolWarnings: readonly string[]): void {
+  for (let index = 0; index < toolWarnings.length; index += 1) {
+    const warning = toolWarnings[index] as string;
     if (warning.includes("ambiguous") || warning.includes("declared in more than one file")) {
       fatalErrors.push(warning);
     } else {
@@ -561,8 +547,8 @@ function renderGeneratedRuntime(targetId: string): string {
       "}",
       "",
       "async function loadTarget(): Promise<void> {",
-      "  const [deps, bindings, requests, lists, openApi, agentCatalog] = await Promise.all([import(\"./deps\"), import(\"./bindings\"), import(\"./httpRequestModels\"), import(\"./httpListModels\"), import(\"./openapi\"), import(\"./agentCatalog\")]);",
-      `  await registerBazisGeneratedTargetDescriptor({ id: ${JSON.stringify(targetId)}, classDeps: deps.GENERATED_TARGET_CLASS_DEPS, bindings: bindings.GENERATED_TARGET_BINDINGS, providerAttachments: bindings.GENERATED_PROVIDER_ATTACHMENTS, requestModels: requests.GENERATED_REQUEST_MODELS, requestShapes: requests.GENERATED_REQUEST_MODEL_SHAPES, listModels: lists.GENERATED_LIST_MODELS, openApi: openApi.GENERATED_OPENAPI_METADATA, openApiSchemaModels: openApi.GENERATED_OPENAPI_SCHEMA_MODELS, agentMetadata: agentCatalog.GENERATED_AGENT_METADATA });`,
+      "  const [deps, bindings, requests, lists, openApi] = await Promise.all([import(\"./deps\"), import(\"./bindings\"), import(\"./httpRequestModels\"), import(\"./httpListModels\"), import(\"./openapi\")]);",
+      `  await registerBazisGeneratedTargetDescriptor({ id: ${JSON.stringify(targetId)}, classDeps: deps.GENERATED_TARGET_CLASS_DEPS, bindings: bindings.GENERATED_TARGET_BINDINGS, providerAttachments: bindings.GENERATED_PROVIDER_ATTACHMENTS, requestModels: requests.GENERATED_REQUEST_MODELS, requestShapes: requests.GENERATED_REQUEST_MODEL_SHAPES, listModels: lists.GENERATED_LIST_MODELS, openApi: openApi.GENERATED_OPENAPI_METADATA, openApiSchemaModels: openApi.GENERATED_OPENAPI_SCHEMA_MODELS });`,
       "}",
       "",
     ].join("\n");
@@ -582,8 +568,8 @@ function renderGeneratedRuntime(targetId: string): string {
     "  // Test-only owner-private hook: it is inert unless an isolated test installs it before loading this generated module.",
     '  (globalThis as { __bazisGeneratedRuntimeTestHook?: (target: string) => void }).__bazisGeneratedRuntimeTestHook?.("production");',
     '  const { registerBazisGeneratedTargetDescriptor, warnIfGeneratedSourcesChanged } = await import("bazis/core/generatedRuntime");',
-    "  const [deps, bindings, requests, lists, openApi, agentCatalog] = await Promise.all([import(\"./deps\"), import(\"./bindings\"), import(\"./httpRequestModels\"), import(\"./httpListModels\"), import(\"./openapi\"), import(\"./agentCatalog\")]);",
-    `  await registerBazisGeneratedTargetDescriptor({ id: ${JSON.stringify(targetId)}, classDeps: deps.GENERATED_TARGET_CLASS_DEPS, bindings: bindings.GENERATED_TARGET_BINDINGS, providerAttachments: bindings.GENERATED_PROVIDER_ATTACHMENTS, requestModels: requests.GENERATED_REQUEST_MODELS, requestShapes: requests.GENERATED_REQUEST_MODEL_SHAPES, listModels: lists.GENERATED_LIST_MODELS, openApi: openApi.GENERATED_OPENAPI_METADATA, openApiSchemaModels: openApi.GENERATED_OPENAPI_SCHEMA_MODELS, agentMetadata: agentCatalog.GENERATED_AGENT_METADATA });`,
+    "  const [deps, bindings, requests, lists, openApi] = await Promise.all([import(\"./deps\"), import(\"./bindings\"), import(\"./httpRequestModels\"), import(\"./httpListModels\"), import(\"./openapi\")]);",
+    `  await registerBazisGeneratedTargetDescriptor({ id: ${JSON.stringify(targetId)}, classDeps: deps.GENERATED_TARGET_CLASS_DEPS, bindings: bindings.GENERATED_TARGET_BINDINGS, providerAttachments: bindings.GENERATED_PROVIDER_ATTACHMENTS, requestModels: requests.GENERATED_REQUEST_MODELS, requestShapes: requests.GENERATED_REQUEST_MODEL_SHAPES, listModels: lists.GENERATED_LIST_MODELS, openApi: openApi.GENERATED_OPENAPI_METADATA, openApiSchemaModels: openApi.GENERATED_OPENAPI_SCHEMA_MODELS });`,
     "  // Started from sources edited after codegen: say so instead of silently missing routes.",
     '  warnIfGeneratedSourcesChanged(import.meta.dir, (await import("./fingerprint")).GENERATED_SOURCE_FINGERPRINT);',
     "}",
@@ -1348,11 +1334,11 @@ function resolveUiProfileResponseModelImports(): OpenApiSchemaModelImport[] {
       || sourcePathForDeclaration(left.declaration).localeCompare(sourcePathForDeclaration(right.declaration)));
 }
 
-/** Agent DTOs and their referenced classes share the existing nominal OpenAPI registry. */
-function resolveOpenApiSchemaModelImports(agentModels: readonly ts.ClassDeclaration[], agentNames: readonly string[]): OpenApiSchemaModelImport[] {
+/** Tool contracts and their referenced classes share the existing nominal OpenAPI registry. */
+function resolveOpenApiSchemaModelImports(toolModels: readonly ts.ClassDeclaration[], toolNames: readonly string[]): OpenApiSchemaModelImport[] {
   const models = new Map(resolveUiProfileResponseModelImports().map((model) => [model.declaration, model.schemaName]));
   // Empty class contracts still have a real object schema and must survive filtering.
-  for (const declaration of agentModels) {
+  for (const declaration of toolModels) {
     const name = openApiCodegen.schemaNameForDeclaration(declaration.name!.text, declaration);
     openApiSchemas[name] ??= openApiCodegen.schemaFromDeclaration(declaration);
     models.set(declaration, name);
@@ -1363,11 +1349,11 @@ function resolveOpenApiSchemaModelImports(agentModels: readonly ts.ClassDeclarat
     reachable.add(name);
     collectSchemaRefs(openApiSchemas[name], add);
   };
-  for (const name of agentNames) add(name);
+  for (const name of toolNames) add(name);
   for (const [declaration, name] of openApiSchemaModels) {
     if (!reachable.has(name)) continue;
     if (!isNamedExportedTopLevelClass(declaration)) {
-      fatalErrors.push(`BAZIS_AGENT_SCHEMA_MODEL_UNIMPORTABLE: Agent schema ${name} must be a named exported top-level class (${sourcePathForDeclaration(declaration)}).`);
+      fatalErrors.push(`BAZIS_TOOL_SCHEMA_MODEL_UNIMPORTABLE: Tool schema ${name} must be a named exported top-level class (${sourcePathForDeclaration(declaration)}).`);
       continue;
     }
     openApiSchemas[name] ??= openApiCodegen.schemaFromDeclaration(declaration);

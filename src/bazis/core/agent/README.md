@@ -1,228 +1,136 @@
 # bazis Agent
 
-`core/agent` is the first executable foundation for bazis AI. It contains
-provider-neutral metadata, discovery and DI-backed tool execution:
+`core/agent` runs meta-agents. An agent is data — a name, instructions and
+the names of the Tools it may call — so it can live in a database, be edited
+by an operator and change without a deploy. Tools are code: classes with
+`@Tool`, registered in `@Module.tools` and executed through bazis DI with
+approval, audit, retries and deadlines.
 
-- `@Agent`
-- `@Task`
-- `@Tool`
-- `@Prompt`
-- `collectAgentCatalog`
-- `AgentRegistry`
-- generated metadata via `bun run di:generate`
+- `@Tool` and `@Module.tools` — what agents may do
+- `AgentRuntime` — runs an agent definition; injected by type
+- `AGENT_RUNTIME_OPTIONS` — optional runtime settings
+- `agentToolHooks` — enforcement, settlement and observer hooks around Tools
 - provider-neutral semantic model (`agentMessage`, `agentToolCall`,
-  `agentModelRequest`, `agentModelResponse`)
-- prompt/context rendering via `DefaultAgentContextBuilder`
-- DI-backed `AgentToolExecutor`
+  `agentModelRequest`, `agentModelResponse`, `agentOutputContract`)
+- context assembly via `DefaultAgentContextBuilder`
 
-Model providers live behind infra connectors. Long-term memory and streaming are
-still separate layers on top of this runtime boundary.
+Model providers live behind infra connectors (`llmConnect`, `llmRouter`); they
+also register `AgentRuntime`.
 
 ```ts
-import { Agent, Module, Task, Tool, agentOutput } from "bazis";
+import { Module, Tool, scoped, type AgentToolExecutionContext } from "bazis";
 
-class CreateRequirementsRequest {
-  feature!: string;
+class FindOrderInput {
+  @Validator({ required: true, min: 1 }) id!: number;
 }
 
-class ProductRequirementsDocument {
-  goal!: string;
-  acceptanceCriteria!: string[];
-}
+@Tool({ name: "orders.find", description: "Finds an order by id.", input: FindOrderInput, sideEffect: "read" })
+export class FindOrderTool {
+  constructor(private readonly orders: IOrdersService) {}
 
-@Tool({
-  name: "catalog.search",
-  description: "Searches products in the catalog.",
-  sideEffect: "read",
-})
-class SearchCatalogTool {}
-
-@Agent({
-  name: "system-analyst",
-  role: "System analyst",
-  sections: [
-    {
-      kind: "developer",
-      content: "Return concrete, testable requirements.",
-    },
-    {
-      kind: "tool-policy",
-      content: "Use read tools before proposing write actions.",
-    },
-  ],
-  tools: [SearchCatalogTool],
-  modelProfile: "reasoning",
-})
-class SystemAnalystAgent {
-  @Task({
-    name: "prepare-requirements",
-    description: "Prepare a requirements document for a product feature.",
-  })
-  prepareRequirements(input: CreateRequirementsRequest): ProductRequirementsDocument {
-    return agentOutput();
+  execute(input: FindOrderInput, context: AgentToolExecutionContext) {
+    return this.orders.find(input.id);
   }
 }
 
+@Module({ tools: [FindOrderTool], providers: [scoped(OrdersService)] })
+export class OrdersModule {}
+```
+
+```ts
+import { AgentRuntime, type AgentDataDefinition } from "bazis/core/agent";
+
+export class SupportService {
+  constructor(private readonly agents: AgentRuntime) {}
+
+  answer(question: string) {
+    const support: AgentDataDefinition = {
+      name: "support",
+      instructions: "Answer questions about orders. Use tools for data.",
+      toolNames: ["orders.find"],
+      modelProfile: "fast",
+    };
+    return this.agents.run(support, { input: question });
+  }
+}
+```
+
+`run` checks the definition before the model is called: a malformed field or a
+tool name that is not registered in `@Module.tools` rejects with
+`AgentSetupError` that lists the registered names. The model sees only the
+Tools the definition names. `runtime.listTools()` returns the whole catalog,
+for example for an agent editor.
+
+The definition's `instructions` are the system message, sent as written.
+`description` is for people and catalogs and is not sent to the model.
+
+Structured output is requested per run:
+
+```ts
+const result = await this.agents.run(analyst, {
+  input: { feature: "Checkout with a promo code" },
+  output: agentOutputContract({ mode: "json", schema: agentClassSchema("RequirementsDocument") }),
+});
+result.output; // validated JSON
+```
+
+A class schema comes from codegen (the class must be reachable for OpenAPI or
+be a Tool contract); `agentJsonSchema(name, schema)` takes a JSON Schema
+directly.
+
+Runtime settings — limits, approval policy, audit sink, context builder —
+are registered once:
+
+```ts
 @Module({
-  agents: [SystemAnalystAgent],
-  tools: [SearchCatalogTool],
+  providers: [DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, {
+    maxSteps: 6,
+    toolExecutorOptions: {
+      approvalPolicy: (request) => request.tool.sideEffect === "read",
+      auditSink: (entry) => auditStore.write(entry),
+    },
+  }))],
 })
-class ProductModule {}
+export class AgentSettingsModule {}
 ```
 
-The DI core does not know about agent metadata. Importing `@/core/agent` or
-the root `bazis` API extends `@Module` with `agents`, `tools` and `prompts`.
-Each entry in `tools` creates one ordinary scoped provider owned by that module.
-An existing exact scoped self-class provider is reused; incompatible lifetimes,
-duplicates, and conflicting owners are rejected before activation.
-`AgentRegistry.fromContainer(container)` returns the immutable host Tool catalog
-from these registrations without constructing Tools. Metadata-defined agents
-select their own subset through `AgentRegistry.fromDefinition(definition, catalog.listTools())`.
-Internal contribution readers use an Agent-owned view of these optional fields.
-This also allows an isolated HTTP host to type-check when `generatedRuntime`
-references `AgentRegistry` only as a type, without loading the public Agent barrel
-and its DI augmentation. Runtime validation and provider ownership are unchanged.
-For simple cases, put role/instructions/sections directly on `@Agent`. Use a
-separate `@Prompt` class when the prompt is reused, versioned, or owned outside
-one agent.
+Tool input and output are validated by the model validator
+(`modelValidatorAdapter`) unless `toolExecutorOptions.schemaValidator` says
+otherwise. Audit entries redact `input`, `result` and execution `metadata`
+by default using `bazis/library/redaction`.
 
-For startup-friendly discovery, `bun run di:generate` writes
-`src/generated/bazis/agentCatalog.ts`. Use
-`AgentRegistry.fromGeneratedModules([AppModule])` when the runtime should prefer
-the generated metadata index and still respect module ownership.
+Retries are opt-in. `write` and `external` tools need an idempotency key before
+the executor repeats them. Runtime-generated keys include both the invocation id
+and the unique model call id; `toolExecution.idempotencyKeyForCall` gives a
+domain-specific stable key. When execution settles after a timeout or abort,
+audit sinks receive a terminal `settlement` entry; an unknown write outcome stops
+the run.
 
-The semantic model is the provider-neutral language for future runtime/provider
-adapters:
+Every tool call has one 30-second deadline covering input validation, approval,
+audit, DI resolution, execution, output processing and result audit. Model
+provider calls default to 60 seconds. `timeoutMs: 0` disables either deadline.
+
+Context limits keep long conversations within the model's window:
 
 ```ts
-const request = agentModelRequest({
-  invocationId: "inv-1",
-  messages: [agentMessage("user", "Prepare acceptance criteria")],
-  tools: [agentToolContract({
-    name: "catalog.search",
-    description: "Searches products.",
-    sideEffect: "read",
-  })],
-});
-```
-
-Tool execution stays behind bazis DI, agent visibility and approval policy:
-
-```ts
-import { modelValidatorAdapter } from "@/library/validation";
-
-const container = createContainer(AppModule);
-const registry = AgentRegistry.fromModules([AppModule]);
-const executor = new AgentToolExecutor(container, registry, {
-  schemaValidator: modelValidatorAdapter,
-  auditSink: (entry) => auditStore.write(entry),
-});
-
-const result = await executor.execute(agentToolCall({
-  id: "call-1",
-  name: "catalog.search",
-  input: { query: "keyboard" },
-}), {
-  agentName: "product-designer",
-});
-```
-
-Audit entries redact `input`, `result` and execution `metadata` by default
-using `bazis/library/redaction` (`password`, `secret`, `token`, `apiKey`,
-`authorization`, `cookie`, etc.). Raw audit traces are an explicit local-debug
-escape hatch: pass `auditRedaction: false` on the executor or one execution.
-
-Retries are opt-in. `write` and `external` tools require an idempotency key
-before the executor will repeat them:
-
-```ts
-await executor.execute(agentToolCall({
-  id: "call-2",
-  name: "catalog.reindex",
-}), {
-  agentName: "product-designer",
-  idempotencyKey: "catalog-reindex-1",
-  retryPolicy: { maxAttempts: 3, delayMs: 100, backoff: "exponential" },
-});
-```
-
-Runtime-generated idempotency keys include both the invocation id and the
-unique model call id. Use `idempotencyKeyForCall` for a domain-specific stable
-key. Tool scopes have a bounded disposal wait (`scopeDisposeTimeoutMs`, five
-seconds by default). When execution settles after a timeout/abort, audit sinks
-receive a terminal `settlement` entry; an unknown write outcome stops runtime
-continuation.
-
-Every tool call also has one 30-second deadline covering input validation,
-approval, audit, DI resolution, execution, output processing and result audit.
-Model provider calls default to 60 seconds. Set the corresponding `timeoutMs`
-to `0` only when an explicit compatibility opt-out is required.
-
-The first runtime slice invokes a model provider from infra, then routes tool
-calls through the executor:
-
-```ts
-const runtime = new AgentRuntime(
-  container,
-  AgentRegistry.fromModules([AppModule]),
-  container.resolve(AGENT_MODEL_PROVIDER),
-);
-
-const result = await runtime.invoke("product-designer", {
-  input: "Prepare acceptance criteria",
-  maxSteps: 4,
-});
-```
-
-For controller-style DX, prefer task methods on an agent. The task method is a
-business operation contract; the method body is not called by user code:
-
-```ts
-const result = await runtime.invokeTask("system-analyst", "prepare-requirements", {
-  feature: "Checkout with a promo code",
-});
-```
-
-`@Task` can declare `input` and `output` explicitly. With `bun run di:generate`,
-simple method signatures are also read from code and written to generated
-metadata for faster startup-friendly discovery.
-
-Prompt metadata is rendered into provider request context, not stored in the
-conversation history returned by the runtime:
-
-```ts
-const runtime = new AgentRuntime(container, registry, provider, {
-  contextLimits: { maxMessages: 24, maxTokens: 8_000, maxChars: 32_000 },
-});
-
-const result = await runtime.invoke("product-designer", {
-  input: "Prepare acceptance criteria",
+await this.agents.run(support, {
+  messages: history,
   contextLimits: { maxMessages: 12, maxTokens: 4_000 },
 });
 ```
 
-`DefaultAgentContextBuilder` preserves the system prompt and newest conversation
-message when trimming old history. `maxTokens` uses a deterministic built-in
-estimator, and provider requests include `metadata.agentContext.trace` so context
-assembly is inspectable.
+`DefaultAgentContextBuilder` preserves the system prompt and the newest
+conversation message when trimming old history. Provider requests include
+`metadata.agentContext.trace` so context assembly is inspectable.
 
-LLM clients are registered by infra connectors, not inside agent modules. Agents
-name a model profile; infra owns provider URLs, model ids, limits and fallback:
+LLM clients are registered by infra connectors. Agents name a model profile;
+infra owns provider URLs, model ids, limits and fallback:
 
 ```ts
 @Infra({
   llm: llmRouter({
-    fast: llmProfile(llmConfig, openAiCompatibleAdapter(), {
-      model: "gpt-4.1-mini",
-      temperature: 0.1,
-      maxOutputTokens: 1000,
-    }),
-    reasoning: llmProfile(llmConfig, openAiCompatibleAdapter(), {
-      model: "gpt-4.1",
-      temperature: 0.2,
-      maxOutputTokens: 4000,
-      fallback: "fast",
-    }),
+    fast: llmProfile(llmConfig, openAiCompatibleAdapter(), { model: "gpt-4.1-mini" }),
+    reasoning: llmProfile(llmConfig, openAiCompatibleAdapter(), { model: "gpt-4.1", fallback: "fast" }),
   }, { defaultProfile: "fast" }),
 })
 class AppInfra {}

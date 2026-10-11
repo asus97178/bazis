@@ -1,5 +1,6 @@
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
-import { AGENT_MODEL_PROVIDER, type AgentModelProvider } from "../../agent";
+import { AGENT_MODEL_PROVIDER, AGENT_RUNTIME_OPTIONS, AgentRuntime, type AgentModelProvider } from "../../agent";
+import { DI, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
 import { reader, requireValue } from "../connectorConfig";
 import { InfraError, type InfraConnector } from "../InfraConnector";
 import { identifyConnector } from "../connectorIdentity";
@@ -54,6 +55,17 @@ export function resolveLlmConnectionOptions<T extends LlmConfigShape>(
   };
 }
 
+/**
+ * `AgentRuntime` on top of the connector's model provider, injectable by type.
+ * Options come from `AGENT_RUNTIME_OPTIONS` when the application registers it.
+ */
+export const agentRuntimeProviders: readonly ProviderDefinition[] = Object.freeze([
+  DI.singleton(DI.factoryProviderWithResolver(AgentRuntime, [AGENT_MODEL_PROVIDER], (resolver, model: AgentModelProvider) => {
+    const services = resolver.resolve(SERVICE_PROVIDER);
+    return new AgentRuntime(services, model, services.has(AGENT_RUNTIME_OPTIONS) ? services.resolve(AGENT_RUNTIME_OPTIONS) : {});
+  })),
+]);
+
 export function llmConnect<T extends LlmConfigShape>(
   config: AppConfig<T>,
   adapter: LlmProviderAdapter,
@@ -62,6 +74,8 @@ export function llmConnect<T extends LlmConfigShape>(
   return identifyConnector({
     token: AGENT_MODEL_PROVIDER,
     config,
+    providers: agentRuntimeProviders,
+    exports: [AgentRuntime],
     create(configs) {
       return adapter.create(resolveLlmConnectionOptions(config, options, configs));
     },

@@ -368,10 +368,6 @@ export function normalizeJsonValue(value: unknown, field = "value"): JsonValue {
   throw new AgentSemanticError(`${field} must be JSON-serializable.`);
 }
 
-export function agentOutput<T = never>(): T {
-  throw new AgentSemanticError("agentOutput() is an agent task marker and must not be called directly.");
-}
-
 export function agentText(text: string): AgentTextPart {
   const value = requiredContentText(text, "text");
   return Object.freeze({ kind: "text", text: value });

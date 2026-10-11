@@ -2,10 +2,7 @@ import { describe, expect, spyOn, test } from "bun:test";
 import { Module, createContainer, scoped } from "@/core/di";
 import { Validator, modelValidatorAdapter } from "@/library/validation";
 import {
-  Agent,
-  AgentRegistry,
   AgentToolPreCommitError,
-  AgentToolExecutor,
   Tool,
   agentToolCall,
   type AgentToolAuditEntry,
@@ -14,6 +11,8 @@ import {
   type JsonObject,
   type JsonValue,
 } from "../index";
+import { AgentToolExecutor } from "../AgentToolExecutor";
+import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 
 const CATALOG_AGENT = "catalog-agent";
 
@@ -332,9 +331,7 @@ class SecretEchoTool {
   }
 }
 
-@Agent({
-  name: CATALOG_AGENT,
-  tools: [
+const CatalogAgent = agentDefinition({ name: CATALOG_AGENT, tools: [
     SearchCatalogTool,
     ReindexCatalogTool,
     FlakyReadTool,
@@ -350,12 +347,9 @@ class SecretEchoTool {
     ThrowingDisposeWriteTool,
     InvalidWriteOutputTool,
     CommitThenThrowTool,
-  ],
-})
-class CatalogAgent {}
+  ] });
 
 @Module({
-  agents: [CatalogAgent],
   tools: [
     SearchCatalogTool,
     ReindexCatalogTool,
@@ -407,7 +401,7 @@ function createExecutor(
   readonly container: ReturnType<typeof createContainer>;
 } {
   const container = createContainer(ToolExecutorTestModule);
-  const registry = AgentRegistry.fromModules([ToolExecutorTestModule]);
+  const registry = agentRegistry(container, CatalogAgent);
   return {
     executor: new AgentToolExecutor(container, registry, {
       schemaValidator: modelValidatorAdapter,
@@ -886,7 +880,7 @@ describe("agent tool executor", () => {
   test("fails closed for side-effecting tools when no audit sink is configured", async () => {
     reindexCalls = 0;
     const container = createContainer(ToolExecutorTestModule);
-    const executor = new AgentToolExecutor(container, AgentRegistry.fromModules([ToolExecutorTestModule]), {
+    const executor = new AgentToolExecutor(container, agentRegistry(container, CatalogAgent), {
       approvalPolicy: () => true,
     });
     try {
@@ -1031,7 +1025,7 @@ describe("agent tool executor", () => {
 
   test("fails closed when a tool declares schema classes but no schema validator is configured", async () => {
     const { container } = createExecutor();
-    const registry = AgentRegistry.fromModules([ToolExecutorTestModule]);
+    const registry = agentRegistry(container, CatalogAgent);
     const strictExecutor = new AgentToolExecutor(container, registry);
     try {
       const result = await strictExecutor.execute(

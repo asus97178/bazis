@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, Module } from "@/core/di";
-import { Agent, AgentRegistry, type AgentModelProvider, type AgentModelRequest, type AgentModelResponse } from "../index";
+import { type AgentModelProvider, type AgentModelRequest, type AgentModelResponse } from "../index";
+import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 import { AgentExecutionDriver } from "../internal/AgentExecutionDriver";
 
-@Agent({ name: "checkpoint-agent" })
-class CheckpointAgent {}
+const CheckpointAgent = agentDefinition({ name: "checkpoint-agent" });
 
 class CountingProvider implements AgentModelProvider {
   calls = 0;
@@ -17,15 +17,14 @@ class CountingProvider implements AgentModelProvider {
 
 describe("agent execution driver durable preparation", () => {
   test("creates strict initial Session state through shared preparation without provider dispatch", async () => {
-    @Module({ agents: [CheckpointAgent] }) class AppModule {}
+    @Module({}) class AppModule {}
     const provider = new CountingProvider();
     const container = createContainer(AppModule);
     try {
-      const driver = new AgentExecutionDriver(container, AgentRegistry.fromModules([AppModule]), provider);
+      const driver = new AgentExecutionDriver(container, agentRegistry(container, CheckpointAgent), provider);
       const outcome = await driver.prepareSessionCheckpoint({
         invocationId: "session-invocation",
         agentName: "checkpoint-agent",
-        taskName: null,
         input: { request: "hello" },
         requested: { maxSteps: 3, maxToolCallsPerStep: 2, runTimeoutMs: null, modelProfile: null },
         module: {

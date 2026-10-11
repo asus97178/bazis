@@ -1,8 +1,5 @@
 import type { Class } from "../di";
 
-export { Agent } from "./decorators/Agent";
-export { Prompt } from "./decorators/Prompt";
-export { Task, type TaskDecoratorOptions } from "./decorators/Task";
 export { Tool } from "./decorators/Tool";
 export { describeTool } from "./Tool.contract";
 export type {
@@ -20,12 +17,12 @@ export {
   AgentToolPreCommitError,
 } from "./errors";
 export {
+  AGENT_RUNTIME_OPTIONS,
   AgentRuntime,
   type AgentRuntimeInvokeOptions,
   type AgentRuntimeOptions,
   type AgentRuntimeResult,
   type AgentRuntimeStatus,
-  type AgentRuntimeTaskInvokeOptions,
   type AgentRuntimeToolCallContext,
   type AgentRuntimeToolExecutionOptions,
 } from "./AgentRuntime";
@@ -43,7 +40,6 @@ export {
   type DefaultAgentContextBuilderOptions,
 } from "./AgentContextBuilder";
 export {
-  AgentToolExecutor,
   type AgentExecutableTool,
   type AgentToolAuditEntry,
   type AgentToolAuditFailureMode,
@@ -73,32 +69,10 @@ export {
   type AgentModelProvider,
   type AgentModelProviderContext,
 } from "./ModelProvider";
-export {
-  AgentRegistry,
-  collectAgentCatalog,
-  type AgentCatalog,
-  type AgentCatalogExtras,
-  type AgentDefinition,
-  type AgentMetadataIndex,
-  type AgentTaskDefinition,
-  type PromptDefinition,
-  type ToolDefinition,
-} from "./AgentRegistry";
+export type { ToolDefinition } from "./AgentRegistry";
 export type { AgentDataDefinition } from "./AgentDataDefinition";
 export {
-  agentMetadataOf,
-  agentTaskMetadataOf,
-  promptMetadataOf,
   toolMetadataOf,
-  type AgentMetadata,
-  type AgentOptions,
-  type AgentTaskMetadata,
-  type AgentTaskOptions,
-  type PromptMetadata,
-  type PromptOptions,
-  type PromptSectionKind,
-  type PromptSectionMetadata,
-  type PromptSectionOptions,
   type ToolApproval,
   type ToolMetadata,
   type ToolOptions,
@@ -115,7 +89,6 @@ export {
   agentModelCapabilities,
   agentModelRequest,
   agentModelResponse,
-  agentOutput,
   agentOutputContract,
   agentText,
   agentToolCall,
@@ -162,9 +135,8 @@ export {
 // depend on program file order and silently stop merging in some projects.
 declare module "../di/module/types/BazisModule" {
   interface BazisModuleMetadata {
-    readonly agents?: readonly Class<object>[];
+    /** Tools agents may call: classes with `@Tool`. An agent definition names them in `toolNames`. */
     readonly tools?: readonly Class<object>[];
-    readonly prompts?: readonly Class<object>[];
     readonly agentToolHooks?: readonly import("./AgentToolHooks").AgentToolHookRegistrationV1[];
   }
 }

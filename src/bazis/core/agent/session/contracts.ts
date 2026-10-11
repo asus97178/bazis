@@ -1,6 +1,6 @@
 import type { Secret } from "../../kernel";
 import type { BazisModuleRef } from "../../di";
-import type { AgentToolExecutorOptions, AgentToolSchemaValidator } from "../AgentToolExecutor";
+import type { AgentToolExecutorOptions } from "../AgentToolExecutor";
 import { normalizeJsonValue, type JsonObject, type JsonValue } from "../semantic";
 import { Validator } from "../../../library/validation";
 
@@ -16,8 +16,6 @@ export class CreateAgentSessionRequestV1 {
   requestId!: string;
   @Validator({ required: true, minLength: 1, maxLength: 128 })
   agentName!: string;
-  @Validator({ minLength: 1, maxLength: 128 })
-  taskName?: string;
   @Validator({
     required: true,
     // JsonValue deliberately includes null. Keep absence invalid while
@@ -55,7 +53,7 @@ export type AgentSessionStateV1 = "created" | "running" | "stop-requested" | "st
 export type AgentSessionCursorV1 = string;
 export interface AgentSessionOutcomeV1 { readonly status: "completed" | "failed" | "outcome-unknown"; readonly finalText?: string; readonly output?: JsonValue; readonly error?: { readonly code: string; readonly message: string }; }
 export interface AgentSessionViewV1 {
-  readonly version: 1; readonly sessionId: string; readonly invocationId: string; readonly agentName: string; readonly taskName?: string;
+  readonly version: 1; readonly sessionId: string; readonly invocationId: string; readonly agentName: string;
   readonly tenant?: string; readonly state: AgentSessionStateV1; readonly revision: number; readonly steps: number; readonly stopRequested: boolean;
   readonly resumeAllowed: boolean; readonly createdAt: string; readonly updatedAt: string; readonly outcome?: AgentSessionOutcomeV1;
 }
@@ -74,7 +72,7 @@ export abstract class AgentSessions {
   abstract readEvents(request: ReadAgentSessionEventsRequestV1, context: AgentSessionCallContextV1): Promise<AgentSessionEventPageV1>;
 }
 
-export interface AgentSessionAuthorizationTargetV1 { readonly sessionId: string; readonly ownerSubject: string; readonly tenant?: string; readonly agentName: string; readonly taskName?: string; }
+export interface AgentSessionAuthorizationTargetV1 { readonly sessionId: string; readonly ownerSubject: string; readonly tenant?: string; readonly agentName: string; }
 export type AgentSessionAuthorizationRequestV1 =
   | { readonly action: "create"; readonly principal: AgentSessionPrincipalV1; readonly candidate: AgentSessionAuthorizationTargetV1 }
   | { readonly action: "run" | "read" | "read-events" | "stop" | "resume"; readonly principal: AgentSessionPrincipalV1; readonly session: AgentSessionAuthorizationTargetV1 & { readonly state: AgentSessionStateV1 } };
@@ -87,9 +85,9 @@ export interface AgentSessionOpenRequestV1 { readonly expectedSessionId: string;
 export abstract class AgentSessionCheckpointProtectorV1 { abstract seal(request: AgentSessionSealRequestV1): Promise<AgentSessionSealedCheckpointV1>; abstract open(request: AgentSessionOpenRequestV1): Promise<string>; }
 
 export interface AgentSessionModuleOptionsV1 {
-  readonly imports?: readonly BazisModuleRef[]; readonly agentModules: readonly BazisModuleRef[]; readonly implementationVersion: string;
+  readonly imports?: readonly BazisModuleRef[]; readonly implementationVersion: string;
   readonly admission: { readonly bucket: string; readonly maxActiveRuns?: number };
-  readonly execution?: { readonly providerCallTimeoutMs?: number; readonly taskSchemaValidator?: AgentToolSchemaValidator; readonly toolExecutorOptions?: Pick<AgentToolExecutorOptions, "approvalPolicy" | "schemaValidator" | "auditSink" | "defaultTimeoutMs" | "scopeDisposeTimeoutMs" | "requiredPlatformHooks" | "hookRedaction">; };
+  readonly execution?: { readonly providerCallTimeoutMs?: number; readonly toolExecutorOptions?: Pick<AgentToolExecutorOptions, "approvalPolicy" | "schemaValidator" | "auditSink" | "defaultTimeoutMs" | "scopeDisposeTimeoutMs" | "requiredPlatformHooks" | "hookRedaction">; };
   readonly limits?: { readonly runTimeoutMs?: number; readonly maxSessionSteps?: number; readonly maxToolCallsPerStep?: number; readonly ownerLeaseMs?: number; readonly ownerHeartbeatMs?: number; readonly ownerStopGraceMs?: number; readonly authorizationTimeoutMs?: number; readonly checkpointProtectionTimeoutMs?: number; readonly databaseLockTimeoutMs?: number; readonly databaseStatementTimeoutMs?: number; readonly databaseWaitTimeoutMs?: number; readonly stopCheckIntervalMs?: number; readonly maxInputBytes?: number; readonly maxCheckpointBytes?: number; readonly maxJournalPayloadBytes?: number; readonly maxJournalEntries?: number; readonly reservedControlJournalEntries?: number; readonly defaultJournalPageSize?: number; readonly maxJournalPageSize?: number; };
 }
 export type AgentSessionErrorCodeV1 = `AGENT_SESSION_${"INVALID_REQUEST" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "OWNER_ACTIVE" | "ADMISSION_UNAVAILABLE" | "NOT_RESUMABLE" | "DEADLINE_EXCEEDED" | "LIMIT_EXCEEDED" | "AMBIENT_TRANSACTION_FORBIDDEN" | "BINDING_MISMATCH" | "CHECKPOINT_UNAVAILABLE" | "CHECKPOINT_CORRUPT" | "OUTCOME_UNKNOWN" | "STORE_CORRUPT" | "STORE_UNAVAILABLE" | "AUTHORIZATION_UNAVAILABLE" | "HOST_STOPPING" | "UNSUPPORTED_VERSION" | "IDEMPOTENCY_CONFLICT" | "COMMIT_OUTCOME_UNKNOWN" | "CONFIG_MISMATCH"}`;

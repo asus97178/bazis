@@ -463,105 +463,11 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     return estimate;
   }
 
+  /** The definition's instructions are the system prompt, sent as written. */
   private promptMessage(agent: AgentDefinition): AgentMessage | undefined {
-    const lines: string[] = [];
-    if (agent.metadata.role !== undefined) {
-      lines.push(`Role: ${agent.metadata.role}`);
-    }
-    if (agent.metadata.description !== undefined) {
-      lines.push(`Description: ${agent.metadata.description}`);
-    }
-    if (agent.metadata.goal !== undefined) {
-      lines.push(`Goal: ${agent.metadata.goal}`);
-    }
-    if (agent.metadata.instructions.length > 0) {
-      lines.push("Instructions:");
-      lines.push(...agent.metadata.instructions.map((item) => `- ${item}`));
-    }
-    if (agent.metadata.constraints.length > 0) {
-      lines.push("Constraints:");
-      lines.push(...agent.metadata.constraints.map((item) => `- ${item}`));
-    }
-    for (let index = 0; index < agent.metadata.sections.length; index += 1) {
-      appendPromptSection(lines, agent.metadata.sections[index] as (typeof agent.metadata.sections)[number]);
-    }
-
-    const prompt = agent.prompt?.metadata;
-    if (prompt !== undefined) {
-      if (prompt.description !== undefined) {
-        lines.push(`Prompt description: ${prompt.description}`);
-      }
-      if (prompt.version !== undefined) {
-        lines.push(`Prompt version: ${prompt.version}`);
-      }
-      if (prompt.role !== undefined) {
-        lines.push(`Prompt role: ${prompt.role}`);
-      }
-      if (prompt.goal !== undefined) {
-        lines.push(`Goal: ${prompt.goal}`);
-      }
-      if (prompt.instructions.length > 0) {
-        lines.push("Instructions:");
-        lines.push(...prompt.instructions.map((item) => `- ${item}`));
-      }
-      if (prompt.constraints.length > 0) {
-        lines.push("Constraints:");
-        lines.push(...prompt.constraints.map((item) => `- ${item}`));
-      }
-      for (let index = 0; index < prompt.sections.length; index += 1) {
-        appendPromptSection(lines, prompt.sections[index] as (typeof prompt.sections)[number]);
-      }
-    }
-
-    return lines.length === 0
+    const instructions = agent.instructions.trim();
+    return instructions.length === 0
       ? undefined
-      : agentMessage("system", lines.join("\n"), {
-          metadata: {
-            agentName: agent.metadata.name,
-            promptName: prompt?.name ?? null,
-            promptSectionKinds: prompt?.sections.map((section) => section.kind) ?? [],
-          },
-        });
-  }
-}
-
-function appendPromptSection(
-  lines: string[],
-  section: { readonly kind: string; readonly title?: string; readonly content: readonly string[] },
-): void {
-  lines.push(`${section.title ?? promptSectionTitle(section.kind)}:`);
-  if (section.content.length === 1) {
-    lines.push(section.content[0] as string);
-    return;
-  }
-  lines.push(...section.content.map((item) => `- ${item}`));
-}
-
-function promptSectionTitle(kind: string): string {
-  switch (kind) {
-    case "system":
-      return "System";
-    case "developer":
-      return "Developer";
-    case "role":
-      return "Role";
-    case "task":
-      return "Task";
-    case "instructions":
-      return "Instructions";
-    case "constraints":
-      return "Constraints";
-    case "examples":
-      return "Examples";
-    case "output":
-      return "Output format";
-    case "tool-policy":
-      return "Tool policy";
-    case "memory":
-      return "Memory";
-    case "knowledge":
-      return "Knowledge";
-    default:
-      return "Prompt section";
+      : agentMessage("system", instructions, { metadata: { agentName: agent.name } });
   }
 }

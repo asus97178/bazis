@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, Global, HOSTED_SERVICE, Module, singletonValue, type HostedService } from "@/core/di";
-import { AGENT_MODEL_PROVIDER, agentMessage, agentModelResponse, type AgentModelProvider } from "@/core/agent";
+import { AGENT_MODEL_PROVIDER, AgentRuntime, agentMessage, agentModelResponse, type AgentModelProvider } from "@/core/agent";
 import { Configuration, defineConfig, HEALTH_CHECK, secret, type HealthCheck } from "@/core/kernel";
 import {
   DEFAULT_LLM_REQUEST_TIMEOUT_MS,
@@ -79,7 +79,7 @@ describe("LLM infra connector", () => {
 
     const meta = AppInfra as unknown as { global?: boolean; exports?: readonly unknown[]; config?: readonly unknown[] };
     expect(meta.global).toBe(true);
-    expect(meta.exports).toEqual([AGENT_MODEL_PROVIDER]);
+    expect(meta.exports).toEqual([AGENT_MODEL_PROVIDER, AgentRuntime]);
     expect(meta.config).toEqual([llmConfig]);
   });
 

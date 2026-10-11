@@ -15,7 +15,7 @@ async function clearBuildFlags(root: string): Promise<void> {
   }
 }
 
-test("standalone Agent API and exact generated DTO schemas work in source and binaries outside checkout", async () => {
+test("standalone AgentRuntime and exact generated Tool DTO schemas work in source and binaries outside checkout", async () => {
   const repository = path.resolve(import.meta.dir, "../../../../..");
   const root = await mkdtemp(path.join(await realpath(tmpdir()), "bazis-agent-standalone-"));
   const project = path.join(root, "app");
@@ -40,13 +40,13 @@ test("standalone Agent API and exact generated DTO schemas work in source and bi
     // No paths at all: neither runtime nor type-only framework imports can borrow workspace aliases.
     await write("tsconfig.json", JSON.stringify({ compilerOptions, include: ["standalone.ts"] }));
     await write("standalone.ts", `import { createContainer } from "bazis/core/di";
-import { AgentRegistry, AgentRuntime, agentMessage, agentModelResponse } from "bazis/core/agent";
+import { AgentRuntime, agentMessage, agentModelResponse } from "bazis/core/agent";
 const services = createContainer({ exports: [] });
 try {
-  const runtime = new AgentRuntime(services, AgentRegistry.fromDefinition({ name: "standalone", instructions: "Answer." }), {
+  const runtime = new AgentRuntime(services, {
     complete(request) { return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", "standalone-ok") }); },
   });
-  const result = await runtime.invoke("standalone", { input: "ping" });
+  const result = await runtime.run({ name: "standalone", instructions: "Answer." }, { input: "ping" });
   if (result.status !== "completed") throw new Error(JSON.stringify(result));
   console.log("STANDALONE_AGENT_PASS");
 } finally { await services.dispose(); }
@@ -70,50 +70,48 @@ export interface NestedInput { count: number; }
 export interface EmptyInput { count: number; }
 export const unrelated = true;
 `);
-    await write("src/agent.ts", `import { Agent, Task, Tool, agentOutput } from "bazis/core/agent";
+    await write("src/agent.ts", `import { Tool } from "bazis/core/agent";
 import { SharedInput, SharedOutput } from "./alpha/contracts";
 @Tool({ name: "identity.tool", description: "Echo a declared field", input: SharedInput, output: SharedOutput })
 export class IdentityTool { execute(input: SharedInput): SharedOutput { return { answer: input.id }; } }
-@Agent({ name: "identity.agent", input: SharedInput, output: SharedOutput, tools: [IdentityTool] })
-export class IdentityAgent {
-  @Task({ name: "run", input: SharedInput, output: SharedOutput }) run(_input: SharedInput): SharedOutput { return agentOutput<SharedOutput>(); }
-}
 `);
     await write("src/index.ts", `import { createContainer } from "bazis/core/di";
-import { AgentRegistry, AgentRuntime, AgentToolExecutor, describeTool, agentMessage, agentModelResponse, agentToolCall } from "bazis/core/agent";
-import { modelValidatorAdapter } from "bazis/library/validation";
+import { AgentRuntime, describeTool, agentClassSchema, agentMessage, agentModelResponse, agentOutputContract, agentToolCall } from "bazis/core/agent";
 import { getGeneratedOpenApiSchemaName, getGeneratedOpenApiMetadata } from "bazis/core/http/OpenApi/generatedOpenApiRegistry";
 import { SharedInput, SharedOutput, NestedInput, EmptyInput } from "./alpha/contracts";
 import { unrelated } from "./beta/contracts";
-import { IdentityAgent, IdentityTool } from "./agent";
+import { IdentityTool } from "./agent";
 import { AppModule } from "./app/modules/App.module";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
 const names = [SharedInput, SharedOutput, NestedInput, EmptyInput].map(model => getGeneratedOpenApiSchemaName(model));
 if (!unrelated || names.some(name => !name) || names.some(name => ["SharedInput", "SharedOutput", "NestedInput", "EmptyInput"].includes(name!))) throw new Error("Missing exact generated names");
 const schemas = getGeneratedOpenApiMetadata().schemas;
-if (!names.every(name => schemas[name!])) throw new Error("Agent schema removed by codegen filtering");
-const modules = [{ imports: [AppModule], agents: [IdentityAgent], tools: [IdentityTool], exports: [] }];
-const services = createContainer(modules[0]!);
+if (!names.every(name => schemas[name!])) throw new Error("Tool schema removed by codegen filtering");
+const services = createContainer({ imports: [AppModule], tools: [IdentityTool], exports: [] });
 try {
-  const registry = AgentRegistry.fromModules(modules);
-  const contract = describeTool(registry.getTool("identity.tool")!);
-  if (contract.input?.kind !== "json-schema" || contract.input.name !== names[0] || contract.output?.name !== names[1]) throw new Error("Tool schema identity lost");
-  const executor = new AgentToolExecutor(services, registry, { schemaValidator: modelValidatorAdapter });
   const input = { id: "alice", child: { label: "nested" } };
-  const result = await executor.execute(agentToolCall({ id: "identity", name: "identity.tool", input }), { agentName: "identity.agent" });
-  if (result.status !== "success" || JSON.stringify(result.output) !== '{"answer":"alice"}') throw new Error(JSON.stringify(result));
-  const invalid = await executor.execute(agentToolCall({ id: "invalid", name: "identity.tool", input: { id: "alice", child: { count: 1 } } }), { agentName: "identity.agent" });
-  if (invalid.status !== "error") throw new Error("Nested DTO accepted wrong schema");
-  const runtime = new AgentRuntime(services, registry, {
+  let step = 0;
+  const runtime = new AgentRuntime(services, {
     complete(request) {
-      if (request.output?.schema?.kind !== "json-schema" || request.output.schema.name !== names[1]) throw new Error("Agent/Task output identity lost");
+      step += 1;
+      if (step === 1) return agentModelResponse({ invocationId: request.invocationId, finishReason: "tool-calls", toolCalls: [
+        agentToolCall({ id: "identity", name: "identity.tool", input }),
+        agentToolCall({ id: "invalid", name: "identity.tool", input: { id: "alice", child: { count: 1 } } }),
+      ] });
+      if (request.output?.schema?.kind !== "json-schema" || request.output.schema.name !== names[1]) throw new Error("Output schema identity lost");
       return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", '{"answer":"runtime-ok"}') });
     },
   });
-  for (const result of [await runtime.invoke("identity.agent", { input }), await runtime.invokeTask("identity.agent", "run", input)]) {
-    if (result.status !== "completed" || JSON.stringify(result.output) !== '{"answer":"runtime-ok"}') throw new Error(JSON.stringify(result));
-  }
+  const contract = describeTool(runtime.listTools()[0]!);
+  if (contract.input?.kind !== "json-schema" || contract.input.name !== names[0] || contract.output?.name !== names[1]) throw new Error("Tool schema identity lost");
+  const result = await runtime.run({ name: "identity.agent", instructions: "", toolNames: ["identity.tool"] }, {
+    input, output: agentOutputContract({ mode: "json", schema: agentClassSchema(names[1]!) }),
+    toolExecution: { approvalPolicy: () => true },
+  });
+  if (result.status !== "completed" || JSON.stringify(result.output) !== '{"answer":"runtime-ok"}') throw new Error(JSON.stringify(result));
+  if (result.toolResults[0]?.status !== "success" || JSON.stringify(result.toolResults[0].output) !== '{"answer":"alice"}') throw new Error(JSON.stringify(result.toolResults[0]));
+  if (result.toolResults[1]?.status !== "error") throw new Error("Nested DTO accepted wrong schema");
   console.log("AGENT_SCHEMA_IDENTITY_PASS");
 } finally { await services.dispose(); }
 `);
@@ -129,7 +127,7 @@ try {
     await write("src/alpha/contracts.ts", contracts.replace("export class NestedInput", "class NestedInput"));
     const rejected = await execute([process.execPath, "--no-env-file", generator]);
     expect(rejected.exit).not.toBe(0);
-    expect(rejected.stdout + rejected.stderr).toContain("BAZIS_AGENT_SCHEMA_MODEL_UNIMPORTABLE");
+    expect(rejected.stdout + rejected.stderr).toContain("BAZIS_TOOL_SCHEMA_MODEL_UNIMPORTABLE");
     expect(await Bun.file(path.join(project, "src/generated/bazis/openapi.ts")).text()).toBe(generatedBefore);
     console.log("Agent standalone types/source/binary and nominal schema generation/types/source/binary: PASS");
   } finally {

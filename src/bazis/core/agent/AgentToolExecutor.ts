@@ -1232,15 +1232,15 @@ export class AgentToolExecutor {
     for (let index = 0; index < agent.tools.length; index += 1) {
       const visible = agent.tools[index] as ToolDefinition;
       if (visible.target === tool.target || visible.metadata.name === tool.metadata.name) {
-        return { allowed: true, agentName: agent.metadata.name };
+        return { allowed: true, agentName: agent.name };
       }
     }
 
     return {
       allowed: false,
-      agentName: agent.metadata.name,
+      agentName: agent.name,
       code: "TOOL_NOT_VISIBLE_TO_AGENT",
-      message: `Tool "${tool.metadata.name}" is not visible to agent "${agent.metadata.name}".`,
+      message: `Tool "${tool.metadata.name}" is not visible to agent "${agent.name}".`,
       status: "denied",
     };
   }

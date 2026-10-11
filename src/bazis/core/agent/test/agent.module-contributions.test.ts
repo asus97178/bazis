@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { DI, Module, ModuleOwnedProviderConflictError, ServiceCollection, createContainer, scoped, singleton, transient } from "@/core/di";
-import { AgentRegistry, AgentSetupError, AgentToolExecutor, Tool } from "../index";
+import { AgentSetupError, Tool } from "../index";
+import { AgentToolExecutor } from "../AgentToolExecutor";
+import { AgentRegistry } from "../AgentRegistry";
 import { getAgentModuleContributionsV1 } from "../moduleContributions-v1";
 
 let toolConstructed = 0;
@@ -190,7 +192,7 @@ describe("Agent module contributions v1", () => {
     @Module({}) class LookalikeOwner {}
     @Module({ imports: [PlatformOwner, LookalikeOwner] }) class AppModule {}
     const container = createContainer(AppModule);
-    const registry = AgentRegistry.fromModules([AppModule]);
+    const registry = AgentRegistry.fromContainer(container);
     const base = { auditSink: () => undefined };
     expect(() => new AgentToolExecutor(container, registry, { ...base, requiredPlatformHooks: [{ owner: PlatformOwner, kind: "enforcement", id: "operator.control", version: 1 }] })).not.toThrow();
     for (const ref of [
@@ -209,7 +211,7 @@ describe("Agent module contributions v1", () => {
     for (const id of [" ", " ".repeat(128)]) {
       @Module({ agentToolHooks: [hookRegistration("enforcement", { id })] }) class PlatformOwner {}
       const container = createContainer(PlatformOwner);
-      const registry = AgentRegistry.fromModules([PlatformOwner]);
+      const registry = AgentRegistry.fromContainer(container);
       expect(() => new AgentToolExecutor(container, registry, {
         auditSink: () => undefined,
         requiredPlatformHooks: [{ owner: PlatformOwner, kind: "enforcement", id, version: 1 }],
@@ -218,7 +220,7 @@ describe("Agent module contributions v1", () => {
 
     @Module({ agentToolHooks: [hookRegistration()] }) class PlatformOwner {}
     const container = createContainer(PlatformOwner);
-    const registry = AgentRegistry.fromModules([PlatformOwner]);
+    const registry = AgentRegistry.fromContainer(container);
     for (const id of ["", "a".repeat(129), "кириллица", "line\nbreak", "\x7f"]) {
       expect(() => new AgentToolExecutor(container, registry, {
         auditSink: () => undefined,

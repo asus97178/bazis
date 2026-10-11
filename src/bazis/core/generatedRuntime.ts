@@ -1,5 +1,4 @@
 import path from "node:path";
-import type { AgentMetadataIndex } from "./agent/AgentRegistry";
 import { registerGeneratedClassDeps, restoreGeneratedClassDeps, snapshotGeneratedClassDeps, type GeneratedClassDependency } from "./di/module/autoDeps";
 import { registerGeneratedBindings, restoreGeneratedBindings, snapshotGeneratedBindings } from "./http/Binding/autoBindings";
 import { registerRequestModelShape, restoreRequestModelRegistry, snapshotRequestModelRegistry, type RequestModelClass, type RequestModelShape } from "./http/Binding/requestModelRegistry";
@@ -27,10 +26,6 @@ type GeneratedRuntimeModule = {
   readonly registerBazisGeneratedRuntime?: () => void | Promise<void>;
 };
 
-type GeneratedAgentCatalogModule = {
-  readonly GENERATED_AGENT_METADATA?: AgentMetadataIndex;
-};
-
 let runtimeLoad: Promise<void> | undefined;
 
 export interface BazisGeneratedTargetDescriptor {
@@ -42,15 +37,12 @@ export interface BazisGeneratedTargetDescriptor {
   readonly listModels: readonly ListModelClass[];
   readonly openApi: GeneratedOpenApiMetadata;
   readonly openApiSchemaModels: readonly (readonly [GeneratedOpenApiSchemaModel, string])[];
-  /** Target-local generated Agent/Tool/Prompt metadata. */
-  readonly agentMetadata?: AgentMetadataIndex;
   /** Package-internal exact-class metadata attached atomically with this target. */
   readonly providerAttachments?: readonly GeneratedProviderAttachmentV1[];
 }
 
 const committedTargetDescriptors = new Set<string>();
 const targetDescriptorLoads = new Map<string, Promise<void>>();
-const committedTargetDescriptorsById = new Map<string, BazisGeneratedTargetDescriptor>();
 const explicitlyActivatedTargetIds = new Set<string>();
 
 /**
@@ -87,7 +79,6 @@ export function registerBazisGeneratedTargetDescriptor(descriptor: BazisGenerate
       for (const [model, name] of descriptor.openApiSchemaModels) registerGeneratedOpenApiSchemaModel(model, name);
       commitGeneratedProviderAttachments(preparedAttachments);
       committedTargetDescriptors.add(descriptor.id);
-      committedTargetDescriptorsById.set(descriptor.id, descriptor);
       explicitlyActivatedTargetIds.add(descriptor.id);
     } catch (error) {
       restoreGeneratedClassDeps(snapshots.classDeps);
@@ -134,28 +125,6 @@ export function loadBazisGeneratedRuntime(): Promise<void> {
   if (explicitlyActivatedTargetIds.size > 0) return Promise.resolve();
   runtimeLoad ??= loadRuntimeOnce();
   return runtimeLoad;
-}
-
-export async function loadBazisGeneratedAgentMetadata(
-  targets: readonly Class<object>[] = [],
-): Promise<AgentMetadataIndex | undefined> {
-  const registered = selectRegisteredAgentMetadata(targets);
-  if (registered !== undefined || explicitlyActivatedTargetIds.size > 0) return registered;
-  const module = await importGeneratedModule<GeneratedAgentCatalogModule>("agentCatalog");
-  return module?.GENERATED_AGENT_METADATA;
-}
-
-function selectRegisteredAgentMetadata(targets: readonly Class<object>[]): AgentMetadataIndex | undefined {
-  const candidates = [...committedTargetDescriptorsById.values()]
-    .map((descriptor) => descriptor.agentMetadata)
-    .filter((metadata): metadata is AgentMetadataIndex => metadata !== undefined);
-  if (candidates.length === 0) return undefined;
-  for (const metadata of candidates) {
-    for (const target of targets) {
-      if (metadata.agents.has(target) || metadata.tools.has(target) || metadata.prompts.has(target)) return metadata;
-    }
-  }
-  return candidates.length === 1 ? candidates[0] : undefined;
 }
 
 async function loadRuntimeOnce(): Promise<void> {

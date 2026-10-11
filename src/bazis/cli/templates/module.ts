@@ -49,8 +49,6 @@ export function buildModuleTemplates(
   return [
     ...base,
     { relativePath: `background/${naming.module}.reporter.ts`, content: statsReporterFile(naming) },
-    { relativePath: `ai/agents/${naming.module}Analyst.agent.ts`, content: agentFile(naming) },
-    { relativePath: `ai/contracts/${naming.module}.brief.ts`, content: aiContractsFile(naming) },
     { relativePath: `ai/tools/${naming.module}Summary.tool.ts`, content: aiToolFile(naming) },
   ];
 }
@@ -59,14 +57,12 @@ function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const moduleImport = "import { Module, scoped } from \"bazis/core/di\";";
   const backgroundImport = profile === "full" ? `import { ${n.module}Reporter } from "./background/${n.module}.reporter";\n` : "";
   const aiImports = profile === "full"
-    ? `import { ${n.module}AnalystAgent } from "./ai/agents/${n.module}Analyst.agent";
-import { ${n.module}SummaryTool } from "./ai/tools/${n.module}Summary.tool";
+    ? `import { ${n.module}SummaryTool } from "./ai/tools/${n.module}Summary.tool";
 `
     : "";
   const backgroundLine = profile === "full" ? `  background: [${n.module}Reporter],\n` : "";
   const aiLines = profile === "full"
-    ? `  agents: [${n.module}AnalystAgent],
-  tools: [${n.module}SummaryTool],
+    ? `  tools: [${n.module}SummaryTool],
 `
     : "";
 
@@ -400,23 +396,6 @@ export class ${n.module}Reporter extends PeriodicBackgroundService {
 `;
 }
 
-function aiContractsFile(n: ModuleNaming): string {
-  return `import { Validator } from "bazis/library/validation";
-
-export class Prepare${n.module}BriefRequest {
-  @Validator({ required: true, minLength: 3 })
-  topic!: string;
-
-  @Validator({ required: true, minLength: 3 })
-  audience = "operators";
-}
-
-export class ${n.module}BriefDocument {
-  title = "";
-  bullets: string[] = [];
-}
-`;
-}
 
 function aiToolFile(n: ModuleNaming): string {
   return `import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
@@ -458,40 +437,3 @@ export class ${n.module}SummaryTool {
 `;
 }
 
-function agentFile(n: ModuleNaming): string {
-  return `import { Agent, Task, agentOutput } from "bazis/core/agent";
-import { Prepare${n.module}BriefRequest, ${n.module}BriefDocument } from "../contracts/${n.module}.brief";
-import { ${n.module}SummaryTool } from "../tools/${n.module}Summary.tool";
-
-@Agent({
-  name: "${n.route}-analyst",
-  role: "${n.route} analyst",
-  sections: [
-    {
-      kind: "developer",
-      content: "Write short, concrete operational summaries of the ${n.route} domain.",
-    },
-    {
-      kind: "tool-policy",
-      content: "Use read tools before the final summary. Do not make up data.",
-    },
-  ],
-  tools: [${n.module}SummaryTool],
-  modelProfile: "reasoning",
-  maxSteps: 3,
-})
-export class ${n.module}AnalystAgent {
-  @Task({
-    name: "prepare-${n.route}-brief",
-    description: "Prepare a short ${n.route} summary from the current module data.",
-    input: Prepare${n.module}BriefRequest,
-    output: ${n.module}BriefDocument,
-    modelProfile: "reasoning",
-    maxSteps: 3,
-  })
-  prepareBrief(_input: Prepare${n.module}BriefRequest): ${n.module}BriefDocument {
-    return agentOutput();
-  }
-}
-`;
-}

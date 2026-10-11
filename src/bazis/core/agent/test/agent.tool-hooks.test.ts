@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Module, createContainer, scoped } from "@/core/di";
 import {
-  Agent,
-  AgentRegistry,
   AgentSetupError,
-  AgentToolExecutor,
   Tool,
   agentToolCall,
   type AgentToolAuditEntry,
@@ -13,6 +10,9 @@ import {
   type AgentToolObserverEventV1,
   type AgentToolSettlementEventV1,
 } from "../index";
+import { AgentToolExecutor } from "../AgentToolExecutor";
+import { AgentRegistry } from "../AgentRegistry";
+import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 
 const AGENT = "hook-matrix-agent";
 const SECRET = "hook-matrix-raw-secret";
@@ -95,8 +95,7 @@ class HookMatrixSchemaTool {
   }
 }
 
-@Agent({ name: AGENT, tools: [HookMatrixTool, HookMatrixWriteTool, HookMatrixSchemaTool] })
-class HookMatrixAgent {}
+const HookMatrixAgent = agentDefinition({ name: AGENT, tools: [HookMatrixTool, HookMatrixWriteTool, HookMatrixSchemaTool] });
 
 class PlatformHook {
   public constructor() { state.policyConstructed += 1; state.policyConstruct("platform"); }
@@ -134,7 +133,6 @@ class ObserverHook {
 
 function createHarness(options: ConstructorParameters<typeof AgentToolExecutor>[2] = {}) {
   @Module({
-    agents: [HookMatrixAgent],
     tools: [HookMatrixTool, HookMatrixWriteTool, HookMatrixSchemaTool],
     providers: [scoped(HookMatrixTool), scoped(HookMatrixWriteTool), scoped(HookMatrixSchemaTool)],
     agentToolHooks: [
@@ -147,7 +145,7 @@ function createHarness(options: ConstructorParameters<typeof AgentToolExecutor>[
   class HookMatrixModule {}
 
   const container = createContainer(HookMatrixModule);
-  const executor = new AgentToolExecutor(container, AgentRegistry.fromModules([HookMatrixModule]), {
+  const executor = new AgentToolExecutor(container, agentRegistry(container, HookMatrixAgent), {
     auditSink: (entry) => state.constructorAudit(entry),
     requiredPlatformHooks: [{ owner: HookMatrixModule, kind: "enforcement", id: "operator.platform", version: 1 }],
     ...options,
@@ -298,7 +296,7 @@ describe("Agent Tool Hooks dispatcher", () => {
     class Root {}
     const container = createContainer(Root);
     try {
-      expect(() => new AgentToolExecutor(container, AgentRegistry.fromModules([Root]), {
+      expect(() => new AgentToolExecutor(container, AgentRegistry.fromContainer(container), {
         auditSink: () => undefined,
         requiredPlatformHooks: [{ owner: LookalikeOwner, kind: "enforcement", id: "operator.platform", version: 1 }],
       })).toThrow(AgentSetupError);

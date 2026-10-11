@@ -1,29 +1,27 @@
 import { expect, test } from "bun:test";
 import { Module, createContainer, scoped } from "@/core/di";
 import {
-  Agent,
-  AgentRegistry,
-  AgentToolExecutor,
   Tool,
   agentToolCall,
   type AgentToolExecutionContext,
   type AgentToolSettlementEventV1,
 } from "../index";
+import { AgentToolExecutor } from "../AgentToolExecutor";
+import { AgentRegistry } from "../AgentRegistry";
+import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 
 @Tool({ name: "audit.lifecycle.read", description: "Audit lifecycle fixture.", sideEffect: "read" })
 class AuditLifecycleReadTool {
   execute(_input: unknown, _context: AgentToolExecutionContext): unknown { return { ok: true }; }
 }
 
-@Agent({ name: "audit-lifecycle-agent", tools: [AuditLifecycleReadTool] })
-class AuditLifecycleAgent {}
+const AuditLifecycleAgent = agentDefinition({ name: "audit-lifecycle-agent", tools: [AuditLifecycleReadTool] });
 
 class AuditLifecycleSettlementHook {
   settle(_event: AgentToolSettlementEventV1): { readonly status: "recorded" } { return { status: "recorded" }; }
 }
 
 @Module({
-  agents: [AuditLifecycleAgent],
   tools: [AuditLifecycleReadTool],
   providers: [scoped(AuditLifecycleReadTool)],
   agentToolHooks: [{ kind: "settlement", id: "audit.lifecycle.settlement", version: 1, timeoutMs: 10, handler: AuditLifecycleSettlementHook }],
@@ -36,7 +34,7 @@ async function settles<T>(pending: Promise<T>, timeoutMs = 80): Promise<T | unde
 
 test("bounds approval and attempt audit before mandatory settlement", async () => {
   const approvalContainer = createContainer(AuditLifecycleModule);
-  const approvalExecutor = new AgentToolExecutor(approvalContainer, AgentRegistry.fromModules([AuditLifecycleModule]), {
+  const approvalExecutor = new AgentToolExecutor(approvalContainer, agentRegistry(approvalContainer, AuditLifecycleAgent), {
     defaultTimeoutMs: 5,
     auditSink: () => undefined,
     approvalPolicy: () => new Promise<boolean>(() => undefined),
@@ -46,7 +44,7 @@ test("bounds approval and attempt audit before mandatory settlement", async () =
   } finally { await approvalContainer.dispose(); }
 
   const attemptContainer = createContainer(AuditLifecycleModule);
-  const attemptExecutor = new AgentToolExecutor(attemptContainer, AgentRegistry.fromModules([AuditLifecycleModule]), {
+  const attemptExecutor = new AgentToolExecutor(attemptContainer, agentRegistry(attemptContainer, AuditLifecycleAgent), {
     defaultTimeoutMs: 5,
     auditSink: (entry) => entry.phase === "attempt" ? new Promise<void>(() => undefined) : undefined,
   });
@@ -57,7 +55,7 @@ test("bounds approval and attempt audit before mandatory settlement", async () =
 
 test("bounds mandatory settlement evidence for deadline and caller cancellation", async () => {
   const deadlineContainer = createContainer(AuditLifecycleModule);
-  const deadlineExecutor = new AgentToolExecutor(deadlineContainer, AgentRegistry.fromModules([AuditLifecycleModule]), {
+  const deadlineExecutor = new AgentToolExecutor(deadlineContainer, agentRegistry(deadlineContainer, AuditLifecycleAgent), {
     defaultTimeoutMs: 25,
     auditSink: (entry) => entry.phase === "settlement" ? new Promise<void>(() => undefined) : undefined,
   });
@@ -68,7 +66,7 @@ test("bounds mandatory settlement evidence for deadline and caller cancellation"
   let mark!: () => void;
   const enteredSettlement = new Promise<void>((resolve) => { mark = resolve; });
   const cancellationContainer = createContainer(AuditLifecycleModule);
-  const cancellationExecutor = new AgentToolExecutor(cancellationContainer, AgentRegistry.fromModules([AuditLifecycleModule]), {
+  const cancellationExecutor = new AgentToolExecutor(cancellationContainer, agentRegistry(cancellationContainer, AuditLifecycleAgent), {
     defaultTimeoutMs: 0,
     auditSink: (entry) => {
       if (entry.phase === "settlement") {
@@ -96,7 +94,7 @@ function frameworkTerminalFixture(entered: () => void): { readonly container: Re
   const container = createContainer(FrameworkTerminalModule);
   return Object.freeze({
     container,
-    executor: new AgentToolExecutor(container, AgentRegistry.fromModules([FrameworkTerminalModule]), {
+    executor: new AgentToolExecutor(container, AgentRegistry.fromContainer(container), {
       defaultTimeoutMs: 0,
       auditSink: () => { entered(); return new Promise<void>(() => undefined); },
     }),

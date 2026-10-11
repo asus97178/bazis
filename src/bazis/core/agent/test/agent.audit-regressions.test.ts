@@ -4,10 +4,23 @@ import { registerGeneratedOpenApiMetadata, restoreGeneratedOpenApiRegistry, snap
 import { registerRequestModelShape, restoreRequestModelRegistry, snapshotRequestModelRegistry } from "../../http/Binding/requestModelRegistry";
 import { Validator, modelValidatorAdapter } from "../../../library/validation";
 import {
-  Agent, Tool, Task, AgentRegistry, AgentRuntime, AgentToolExecutor,
-  agentClassSchema, agentData, agentMessage, agentModelResponse, agentOutput, agentOutputContract, agentJsonSchema, agentToolCall,
-  type AgentToolSettlementEventV1, type AgentToolObserverEventV1, type AgentOutputContract, type AgentToolExecutionContext,
+  Tool,
+  AgentRuntime,
+  agentClassSchema,
+  agentData,
+  agentMessage,
+  agentModelResponse,
+  agentOutputContract,
+  agentJsonSchema,
+  agentToolCall,
+  type AgentToolSettlementEventV1,
+  type AgentToolObserverEventV1,
+  type AgentOutputContract,
+  type AgentToolExecutionContext,
 } from "../index";
+import { AgentToolExecutor } from "../AgentToolExecutor";
+import { AgentRegistry } from "../AgentRegistry";
+import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 
 let schemas: ReturnType<typeof snapshotGeneratedOpenApiRegistry>;
 let models: ReturnType<typeof snapshotRequestModelRegistry>;
@@ -35,13 +48,13 @@ describe("Agent regressions: interrupted effects", () => {
           }
           class Settlement { settle(event: AgentToolSettlementEventV1) { events.push(event); return { status: "recorded" as const }; } }
           class Observer { observe(event: AgentToolObserverEventV1) { events.push(event.settlement); } }
-          @Agent({ name: "pending-agent", tools: [PendingTool] }) class PendingAgent {}
-          @Module({ agents: [PendingAgent], tools: [PendingTool], providers: [scoped(PendingTool)], exports: [], agentToolHooks: [
+          const PendingAgent = agentDefinition({ name: "pending-agent", tools: [PendingTool] });
+          @Module({ tools: [PendingTool], providers: [scoped(PendingTool)], exports: [], agentToolHooks: [
             ...(hooks === "settlement" || hooks === "both" ? [{ kind: "settlement" as const, id: "settle", version: 1, handler: Settlement }] : []),
             ...(hooks === "observer" || hooks === "both" ? [{ kind: "observer" as const, id: "observe", version: 1, handler: Observer }] : []),
           ] }) class Fixture {}
           const container = createContainer(Fixture);
-          const executor = new AgentToolExecutor(container, AgentRegistry.fromModules([Fixture]), { approvalPolicy: () => true, auditSink: (entry) => {
+          const executor = new AgentToolExecutor(container, agentRegistry(container, PendingAgent), { approvalPolicy: () => true, auditSink: (entry) => {
             if (entry.hook?.kind === "observer") observerOutcomes.push(entry.hook.outcome);
           } });
           const controller = new AbortController();
@@ -82,13 +95,13 @@ describe("Agent regressions: interrupted effects", () => {
     }
     class Settlement { settle() { return { status: "recorded" as const }; } }
     class Observer { observe() {} }
-    @Agent({ name: "write-agent", tools: [WriteTool] }) class WriteAgent {}
-    @Module({ agents: [WriteAgent], tools: [WriteTool], providers: [scoped(WriteTool)], agentToolHooks: [
+    const WriteAgent = agentDefinition({ name: "write-agent", tools: [WriteTool] });
+    @Module({ tools: [WriteTool], providers: [scoped(WriteTool)], agentToolHooks: [
       { kind: "settlement", id: "settle", version: 1, handler: Settlement },
       { kind: "observer", id: "observe", version: 1, handler: Observer },
     ], exports: [] }) class Fixture {}
     const container = createContainer(Fixture);
-    const runtime = new AgentRuntime(container, AgentRegistry.fromModules([Fixture]), {
+    const runtime = new AgentRuntime(container, {
       complete(request) {
         calls++;
         return calls === 1 ? agentModelResponse({ invocationId: request.invocationId, finishReason: "tool-calls", toolCalls: [agentToolCall({ id: "write", name: "audit.write" })] })
@@ -96,7 +109,7 @@ describe("Agent regressions: interrupted effects", () => {
       },
     }, { toolExecutorOptions: { defaultTimeoutMs: 30, approvalPolicy: () => true, auditSink: () => {} } });
     try {
-      const result = await runtime.invoke("write-agent", { input: "write" });
+      const result = await runtime.run(WriteAgent, { input: "write" });
       expect(result.error?.code).toBe("AGENT_TOOL_OUTCOME_UNKNOWN");
       expect(calls).toBe(1);
       expect(effects).toBe(0);
@@ -130,62 +143,54 @@ describe("Agent regressions: structured contracts", () => {
   ];
   for (const [name, response, output, valid] of cases) {
     test(name, async () => {
-      @Agent({ name: "output-agent" }) class OutputAgent { @Task({ name: "run" }) run() { return agentOutput(); } }
-      @Module({ agents: [OutputAgent], exports: [] }) class Fixture {}
+      @Module({ exports: [] }) class Fixture {}
       const container = createContainer(Fixture);
-      const runtime = new AgentRuntime(container, AgentRegistry.fromModules([Fixture]), {
+      const runtime = new AgentRuntime(container, {
         complete(request) { return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", response) }); },
       });
       try {
-        for (const result of [await runtime.invoke("output-agent", { input: "answer", output }), await runtime.invokeTask("output-agent", "run", {}, { output })]) {
-          expect(result.status).toBe(valid ? "completed" : "failed");
-          if (valid) expect(result.output).toEqual(JSON.parse(response));
-          else { expect(result.error?.code).toStartWith("AGENT_OUTPUT_"); expect(result.output).toBeUndefined(); }
-        }
+        const result = await runtime.run({ name: "output-agent", instructions: "" }, { input: "answer", output });
+        expect(result.status).toBe(valid ? "completed" : "failed");
+        if (valid) expect(result.output).toEqual(JSON.parse(response));
+        else { expect(result.error?.code).toStartWith("AGENT_OUTPUT_"); expect(result.output).toBeUndefined(); }
       } finally { await container.dispose(); }
     });
   }
 
   test("resolves and validates an explicit generated class output", async () => {
     registerGeneratedOpenApiMetadata({ schemas: { ExplicitOutput: numberSchema }, operations: {} });
-    @Agent({ name: "explicit-class" }) class ExplicitClassAgent {}
-    @Module({ agents: [ExplicitClassAgent], exports: [] }) class Fixture {}
+    @Module({ exports: [] }) class Fixture {}
     const container = createContainer(Fixture);
-    const runtime = new AgentRuntime(container, AgentRegistry.fromModules([Fixture]), {
+    const runtime = new AgentRuntime(container, {
       complete(request) {
         expect(request.output?.schema).toMatchObject({ kind: "json-schema", name: "ExplicitOutput", schema: numberSchema });
         return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData({ value: 3 })) });
       },
     });
     try {
-      const result = await runtime.invoke("explicit-class", { input: "answer", output: agentOutputContract({ mode: "json", schema: agentClassSchema("ExplicitOutput") }) });
+      const result = await runtime.run({ name: "explicit-class", instructions: "" }, { input: "answer", output: agentOutputContract({ mode: "json", schema: agentClassSchema("ExplicitOutput") }) });
       expect(result.output).toEqual({ value: 3 });
     } finally { await container.dispose(); }
   });
 
-  test("generated input and output enforce patterns and formats without an injected validator", async () => {
-    class AuditRules { email = ""; code = ""; }
+  test("a generated class output enforces patterns and formats without an injected validator", async () => {
     registerGeneratedOpenApiMetadata({ schemas: { AuditRules: { type: "object", properties: { email: { type: "string", format: "email" }, code: { type: "string", pattern: "^[A-Z]{3}$" } }, required: ["email", "code"] } }, operations: {} });
-    @Agent({ name: "rules-agent", input: AuditRules, output: AuditRules }) class RulesAgent {}
-    @Module({ agents: [RulesAgent], exports: [] }) class Fixture {}
+    @Module({ exports: [] }) class Fixture {}
     const container = createContainer(Fixture);
-    let calls = 0;
     let answer = { email: "bad", code: "lowercase" };
-    const runtime = new AgentRuntime(container, AgentRegistry.fromModules([Fixture]), {
-      complete(request) { calls++; return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData(answer)) }); },
+    const runtime = new AgentRuntime(container, {
+      complete(request) { return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData(answer)) }); },
     });
+    const output = agentOutputContract({ mode: "json", schema: agentClassSchema("AuditRules") });
     try {
-      expect((await runtime.invoke("rules-agent", { input: answer })).error?.code).toBe("AGENT_INPUT_INVALID");
-      expect(calls).toBe(0);
-      const valid = { email: "user@example.com", code: "ABC" };
-      expect((await runtime.invoke("rules-agent", { input: valid })).error?.code).toBe("AGENT_OUTPUT_INVALID");
-      answer = valid;
-      expect((await runtime.invoke("rules-agent", { input: valid })).output).toEqual(valid);
+      expect((await runtime.run({ name: "rules-agent", instructions: "" }, { input: "check", output })).error?.code).toBe("AGENT_OUTPUT_INVALID");
+      answer = { email: "user@example.com", code: "ABC" };
+      expect((await runtime.run({ name: "rules-agent", instructions: "" }, { input: "check", output })).output).toEqual(answer);
     } finally { await container.dispose(); }
   });
 
   for (const generated of [false, true]) {
-    test(`hydrates and serializes nested Tool/Agent/Task DTOs, generated=${generated}`, async () => {
+    test(`hydrates and serializes nested Tool DTOs, generated=${generated}`, async () => {
       class Child { @Validator({ required: true, min: 1 }) amount = 1; }
       class Parent { @Validator({ required: true, nested: true }) child = new Child(); }
       if (generated) registerGeneratedOpenApiMetadata({ schemas: { Parent: { type: "object", properties: { child: { type: "object", properties: { amount: { type: "number", minimum: 1 } }, required: ["amount"] } }, required: ["child"] } }, operations: {} });
@@ -201,14 +206,10 @@ describe("Agent regressions: structured contracts", () => {
           return output;
         }
       }
-      @Agent({ name: "nested-agent", input: Parent, output: Parent, tools: [NestedTool] })
-      class NestedAgent { @Task({ name: "run", input: Parent, output: Parent }) run() { return agentOutput(); } }
-      @Module({ agents: [NestedAgent], tools: [NestedTool], providers: [scoped(NestedTool)], exports: [] }) class Fixture {}
-      const container = createContainer(Fixture), registry = AgentRegistry.fromModules([Fixture]);
-      const executor = new AgentToolExecutor(container, registry, { schemaValidator: modelValidatorAdapter });
-      const runtime = new AgentRuntime(container, registry, {
-        complete(request) { return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData({ child: { amount: 2 } })) }); },
-      }, { taskSchemaValidator: modelValidatorAdapter });
+      const NestedAgent = agentDefinition({ name: "nested-agent", tools: [NestedTool] });
+      @Module({ tools: [NestedTool], providers: [scoped(NestedTool)], exports: [] }) class Fixture {}
+      const container = createContainer(Fixture);
+      const executor = new AgentToolExecutor(container, agentRegistry(container, NestedAgent), { schemaValidator: modelValidatorAdapter });
       const input = { child: { amount: 2 } };
       try {
         const tool = await executor.execute(agentToolCall({ id: "valid", name: "audit.nested", input }), { agentName: "nested-agent" });
@@ -216,35 +217,35 @@ describe("Agent regressions: structured contracts", () => {
         expect(tool.output).toEqual(input);
         for (const child of [{ amount: 0 }, { amount: 2, extra: true }]) {
           expect((await executor.execute(agentToolCall({ id: "invalid", name: "audit.nested", input: { child } }), { agentName: "nested-agent" })).status).toBe("error");
-          expect((await runtime.invoke("nested-agent", { input: { child } })).status).toBe("failed");
         }
         expect(executions).toBe(1);
-        expect((await runtime.invoke("nested-agent", { input })).output).toEqual(input);
-        expect((await runtime.invokeTask("nested-agent", "run", input)).output).toEqual(input);
-        const instance = new Parent();
-        instance.child.amount = 2;
-        expect((await runtime.invokeTask("nested-agent", "run", instance)).output).toEqual(input);
       } finally { await container.dispose(); }
     });
   }
 
-  test("generated arrays hydrate uninitialized DTO fields and keep nested validation", async () => {
+  test("generated arrays hydrate uninitialized Tool DTO fields and keep nested validation", async () => {
     class ArrayChild { @Validator({ required: true, min: 1 }) amount!: number; }
     class ArrayParent { @Validator({ required: true, nested: true }) children!: ArrayChild[]; }
     registerRequestModelShape(ArrayParent, { children: { model: ArrayChild, array: true } });
     registerGeneratedOpenApiMetadata({ schemas: { ArrayParent: { type: "object", properties: { children: { type: "array", items: { type: "object", properties: { amount: { type: "number" } }, required: ["amount"] } } }, required: ["children"] } }, operations: {} });
-    @Agent({ name: "array-agent", input: ArrayParent, output: ArrayParent }) class ArrayAgent {}
-    @Module({ agents: [ArrayAgent], exports: [] }) class Fixture {}
+    let executions = 0;
+    @Tool({ name: "audit.array", description: "Array round trip", input: ArrayParent, output: ArrayParent, sideEffect: "read" })
+    class ArrayTool {
+      execute(input: ArrayParent) {
+        expect(input.children[0]).toBeInstanceOf(ArrayChild);
+        executions++;
+        return input;
+      }
+    }
+    const ArrayAgent = agentDefinition({ name: "array-agent", tools: [ArrayTool] });
+    @Module({ tools: [ArrayTool], providers: [scoped(ArrayTool)], exports: [] }) class Fixture {}
     const container = createContainer(Fixture);
-    let calls = 0;
+    const executor = new AgentToolExecutor(container, agentRegistry(container, ArrayAgent), { schemaValidator: modelValidatorAdapter });
     const input = { children: [{ amount: 2 }] };
-    const runtime = new AgentRuntime(container, AgentRegistry.fromModules([Fixture]), {
-      complete(request) { calls++; return agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", agentData(input)) }); },
-    }, { taskSchemaValidator: modelValidatorAdapter });
     try {
-      expect((await runtime.invoke("array-agent", { input: { children: [{ amount: 0 }] } })).status).toBe("failed");
-      expect(calls).toBe(0);
-      expect((await runtime.invoke("array-agent", { input })).output).toEqual(input);
+      expect((await executor.execute(agentToolCall({ id: "invalid", name: "audit.array", input: { children: [{ amount: 0 }] } }), { agentName: "array-agent" })).status).toBe("error");
+      expect(executions).toBe(0);
+      expect((await executor.execute(agentToolCall({ id: "valid", name: "audit.array", input }), { agentName: "array-agent" })).output).toEqual(input);
     } finally { await container.dispose(); }
   });
 });

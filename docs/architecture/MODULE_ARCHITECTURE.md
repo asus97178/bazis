@@ -459,9 +459,9 @@ A hook is still registered as the owner's private contribution. Source:
 Linking a Tool implementation to a DI owner does not put the agent into the module.
 Assigning Tools to an agent and the actual permissions to act are defined separately.
 In the osnova application the shared [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
-lives in the agents area. `AgentRegistry.fromContainer` builds a catalog of the
-actual registrations without instantiating Tools; `AgentCatalogExtras`
-and the previous registry factories are kept for existing consumers.
+lives in the agents area. `AgentRuntime.listTools()` returns the catalog of the
+actual registrations without instantiating Tools; an agent definition names Tools
+from it (bazis 0.99.0: agents are data, not module members).
 
 Do not invent a missing API and do not treat an arbitrary `@Module` key as
 automatically executable. A new declarative capability needs a typed field, a

@@ -1,12 +1,11 @@
 import { inlineGeneratedSchema } from "./Schema.contract";
 import { describeTool } from "../Tool.contract";
-import type { Class, ServiceProvider } from "../../di";
-import { getGeneratedOpenApiMetadata, getGeneratedOpenApiSchemaName } from "../../http/OpenApi/generatedOpenApiRegistry";
+import type { ServiceProvider } from "../../di";
+import { getGeneratedOpenApiMetadata } from "../../http/OpenApi/generatedOpenApiRegistry";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 import { AgentRuntimeError } from "../errors";
-import { agentModelJson, bindAgentModel } from "./AgentModelBinding";
 import { validateAgentJsonSchema } from "./AgentJsonSchema";
-import type { AgentDefinition, AgentRegistry, AgentTaskDefinition, ToolDefinition } from "../AgentRegistry";
+import type { AgentDefinition, AgentRegistry } from "../AgentRegistry";
 import {
   DefaultAgentContextBuilder,
   mergeAgentContextLimits,
@@ -18,7 +17,6 @@ import {
   AgentToolExecutor,
   type AgentToolExecutionOptions,
   type AgentToolExecutorOptions,
-  type AgentToolSchemaValidator,
 } from "../AgentToolExecutor";
 import type { AgentModelProvider, AgentModelProviderContext } from "../ModelProvider";
 import {
@@ -29,7 +27,6 @@ import {
   type AgentExecutionCheckpointV1,
 } from "./AgentExecutionState";
 import {
-  agentClassSchema,
   agentData,
   agentJsonSchema,
   agentMessage,
@@ -78,23 +75,21 @@ export interface AgentRuntimeOptions {
   readonly maxSteps?: number;
   readonly maxToolCallsPerStep?: number;
   readonly modelProfile?: string;
-  readonly model?: string;
   /** Provider-call timeout. Defaults to 60 seconds; 0 explicitly disables it. */
   readonly timeoutMs?: number;
   readonly contextBuilder?: AgentContextBuilder;
   readonly contextLimits?: AgentContextLimits;
   readonly toolExecutorOptions?: AgentToolExecutorOptions;
-  readonly taskSchemaValidator?: AgentToolSchemaValidator;
 }
 
 export interface AgentRuntimeInvokeOptions {
   readonly id?: string;
   readonly input?: unknown;
   readonly messages?: readonly AgentMessage[];
+  /** Structured result: `{ mode: "json", schema }` makes `result.output` the validated value. */
   readonly output?: AgentOutputContract;
   readonly metadata?: unknown;
   readonly modelProfile?: string;
-  readonly model?: string;
   readonly maxSteps?: number;
   readonly maxToolCallsPerStep?: number;
   readonly maxOutputTokens?: number;
@@ -108,8 +103,6 @@ export interface AgentRuntimeInvokeOptions {
   readonly onTextDelta?: (event: { readonly step: number; readonly text: string }) => void;
 }
 
-export interface AgentRuntimeTaskInvokeOptions extends Omit<AgentRuntimeInvokeOptions, "input"> {}
-
 export interface AgentRuntimeResult {
   readonly invocationId: string;
   readonly agentName: string;
@@ -119,15 +112,11 @@ export interface AgentRuntimeResult {
   readonly responses: readonly AgentModelResponse[];
   readonly toolResults: readonly AgentToolResult[];
   readonly finalMessage?: AgentMessage;
-  /** Validated structured value for declared or explicitly requested JSON output. */
+  /** Validated structured value when `output` requested JSON. */
   readonly output?: JsonValue;
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
 }
-
-type PreparedTaskContract =
-  | { readonly ok: true; readonly instance: object; readonly value: JsonValue }
-  | { readonly ok: false; readonly error: AgentToolError };
 
 type PreparedAgentPlan = {
   readonly agent: AgentDefinition;
@@ -144,27 +133,10 @@ type PreparedAgentPlan = {
   readonly executorToolOptions: AgentToolExecutionOptions;
   readonly sessionToolTimeouts?: ReadonlyMap<string, number>;
   readonly options: AgentRuntimeInvokeOptions;
-  readonly taskFinalization?: TaskFinalizationPlan;
-};
-
-type TaskFinalizationPlan = {
-  readonly task: AgentTaskDefinition;
-  readonly timeoutMs: number | undefined;
-  readonly signal: AbortSignal | undefined;
 };
 
 type AgentPreparation =
   | { readonly ok: true; readonly plan: PreparedAgentPlan }
-  | { readonly ok: false; readonly result: AgentRuntimeResult };
-
-type PreparedTaskPlan = {
-  readonly task: AgentTaskDefinition;
-  readonly timeoutMs: number | undefined;
-  readonly plan: PreparedAgentPlan;
-};
-
-type TaskPreparation =
-  | { readonly ok: true; readonly prepared: PreparedTaskPlan }
   | { readonly ok: false; readonly result: AgentRuntimeResult };
 
 type EngineProgress = Pick<AgentExecutionCheckpointV1, "phase" | "steps" | "messages" | "responses" | "toolResults" | "seenToolCallIds" | "pendingToolBatch" | "terminal">;
@@ -200,7 +172,6 @@ export type AgentExecutionDriveOutcome =
 export interface AgentSessionPreparationV1 {
   readonly invocationId: string;
   readonly agentName: string;
-  readonly taskName: string | null;
   readonly input: JsonValue;
   readonly requested: {
     readonly maxSteps: number | null;
@@ -380,12 +351,6 @@ function generatedInvocationId(): string {
   return `inv-${crypto.randomUUID()}`;
 }
 
-function classDebugName(value: unknown): string {
-  const name = (value as { readonly name?: unknown }).name;
-  return typeof name === "string" && name.trim().length > 0 ? name : "<anonymous class>";
-}
-
-
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -535,11 +500,9 @@ export class AgentExecutionDriver {
   private readonly defaultMaxSteps: number;
   private readonly defaultMaxToolCallsPerStep: number;
   private readonly defaultModelProfile?: string;
-  private readonly hasConcreteModelOption: boolean;
   readonly defaultTimeoutMs?: number;
   private readonly defaultContextLimits?: AgentContextLimits;
   private readonly contextBuilder: AgentContextBuilder;
-  private readonly taskSchemaValidator?: AgentToolSchemaValidator;
 
   constructor(
     services: ServiceProvider,
@@ -553,13 +516,11 @@ export class AgentExecutionDriver {
     this.defaultMaxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
     this.defaultMaxToolCallsPerStep = options.maxToolCallsPerStep ?? DEFAULT_MAX_TOOL_CALLS_PER_STEP;
     this.defaultModelProfile = optionalText(options.modelProfile, "AgentRuntime.modelProfile");
-    this.hasConcreteModelOption = options.model !== undefined;
     this.defaultTimeoutMs = options.timeoutMs === 0
       ? undefined
       : options.timeoutMs ?? DEFAULT_MODEL_TIMEOUT_MS;
     this.defaultContextLimits = normalizeAgentContextLimits(options.contextLimits, "AgentRuntime.contextLimits");
     this.contextBuilder = options.contextBuilder ?? new DefaultAgentContextBuilder();
-    this.taskSchemaValidator = options.taskSchemaValidator ?? options.toolExecutorOptions?.schemaValidator;
     this.toolExecutor = new AgentToolExecutor(services, registry, options.toolExecutorOptions);
   }
 
@@ -581,16 +542,13 @@ export class AgentExecutionDriver {
         contextLimits: undefined,
         signal: request.signal,
       };
-      const prepared = request.taskName === null
-        ? await this.prepareAgent(request.agentName, options)
-        : await this.prepareTask(request.agentName, request.taskName, request.input, options);
+      const prepared = await this.prepareAgent(request.agentName, options);
       if (!prepared.ok) return { kind: "rejected", result: prepared.result };
-      const plan = "plan" in prepared ? prepared.plan : prepared.prepared.plan;
-      const task = "plan" in prepared ? undefined : prepared.prepared.task;
-      const maxSteps = request.requested.maxSteps ?? Math.min(task?.metadata.maxSteps ?? plan.agent.metadata.maxSteps ?? request.module.maxSessionSteps, request.module.maxSessionSteps);
+      const plan = prepared.plan;
+      const maxSteps = request.requested.maxSteps ?? request.module.maxSessionSteps;
       const maxToolCallsPerStep = request.requested.maxToolCallsPerStep ?? request.module.maxToolCallsPerStep;
       const runTimeoutMs = request.requested.runTimeoutMs ?? request.module.runTimeoutMs;
-      const modelProfile = request.requested.modelProfile ?? task?.metadata.modelProfile ?? plan.agent.metadata.modelProfile ?? null;
+      const modelProfile = request.requested.modelProfile ?? plan.agent.modelProfile ?? null;
       if (maxSteps > request.module.maxSessionSteps || maxToolCallsPerStep > request.module.maxToolCallsPerStep || runTimeoutMs > request.module.runTimeoutMs) {
         throw new AgentRuntimeError("AgentSession requested limits must not exceed module limits.");
       }
@@ -616,7 +574,6 @@ export class AgentExecutionDriver {
       [request.module.toolDefaultTimeoutMs, "AgentSession.toolDefaultTimeoutMs"], [request.module.scopeDisposeTimeoutMs, "AgentSession.scopeDisposeTimeoutMs"],
     ] as const) assertPositiveInteger(value, field);
     for (const [value, field] of [[request.requested.maxSteps, "AgentSession.maxSteps"], [request.requested.maxToolCallsPerStep, "AgentSession.maxToolCallsPerStep"], [request.requested.runTimeoutMs, "AgentSession.runTimeoutMs"]] as const) assertPositiveInteger(value ?? undefined, field);
-    if (request.taskName !== null && request.taskName.trim().length === 0) throw new AgentRuntimeError("AgentSession.taskName must be non-empty.");
   }
 
   private initialCheckpoint(plan: PreparedAgentPlan, resolved: {
@@ -624,14 +581,11 @@ export class AgentExecutionDriver {
     readonly providerTimeoutMs: number; readonly toolDefaultTimeoutMs: number; readonly scopeDisposeTimeoutMs: number;
   }): AgentExecutionCheckpointV1 {
     const input = normalizeJsonValue(plan.options.input, "agentSession.input");
-    const task = plan.taskFinalization?.task.metadata.name;
     return agentExecutionCheckpointV1({
       version: "bazis.agent-execution-state/v1",
       invocation: {
-        kind: task === undefined ? "agent" : "task",
         invocationId: plan.invocationId,
-        agentName: plan.agent.metadata.name,
-        taskName: task ?? null,
+        agentName: plan.agent.name,
         input,
         metadata: plan.metadata,
         options: {
@@ -691,12 +645,6 @@ export class AgentExecutionDriver {
     const contextLimits = checkpointContextLimits(context);
     const toolOptions = checkpointToolExecutionOptions(tool, agent, checkpoint.invocation.invocationId);
     const sessionToolTimeouts = checkpointToolTimeouts(tool);
-    let taskFinalization: TaskFinalizationPlan | undefined;
-    if (checkpoint.invocation.kind === "task") {
-      const task = this.registry.getTask(agent.metadata.name, checkpoint.invocation.taskName!);
-      if (!task) throw new AgentRuntimeError(`Task "${checkpoint.invocation.taskName}" is not registered on Agent "${agent.metadata.name}".`);
-      taskFinalization = { task, timeoutMs: providerTimeoutMs, signal: undefined };
-    }
     return {
       agent,
       invocationId: checkpoint.invocation.invocationId,
@@ -718,9 +666,7 @@ export class AgentExecutionDriver {
         modelProfile,
         maxOutputTokens: optionNullablePositiveInteger(output.maxOutputTokens, "checkpoint.options.output.maxOutputTokens"),
         temperature: optionNullableFiniteNonNegative(output.temperature, "checkpoint.options.output.temperature"),
-        ...(taskFinalization === undefined ? {} : { output: this.taskOutputContract(taskFinalization.task) }),
       },
-      taskFinalization,
     };
   }
 
@@ -737,7 +683,7 @@ export class AgentExecutionDriver {
       assertPositiveInteger(options.maxSteps, "agentRuntime.maxSteps");
       assertPositiveInteger(options.maxToolCallsPerStep, "agentRuntime.maxToolCallsPerStep");
       assertNonNegativeInteger(options.timeoutMs, "agentRuntime.timeoutMs");
-      maxSteps = options.maxSteps ?? this.registry.getAgent(agentName)?.metadata.maxSteps ?? this.defaultMaxSteps;
+      maxSteps = options.maxSteps ?? this.defaultMaxSteps;
       maxToolCallsPerStep = options.maxToolCallsPerStep ?? this.defaultMaxToolCallsPerStep;
       timeoutMs = options.timeoutMs === 0 ? undefined : options.timeoutMs ?? this.defaultTimeoutMs;
       modelProfile = optionalText(options.modelProfile, "agentRuntime.modelProfile");
@@ -745,9 +691,6 @@ export class AgentExecutionDriver {
         this.defaultContextLimits,
         normalizeAgentContextLimits(options.contextLimits, "agentRuntime.contextLimits"),
       );
-      if (this.hasConcreteModelOption || options.model !== undefined) {
-        throw new AgentRuntimeError("Concrete model selection is owned by Infra; use modelProfile instead.");
-      }
     } catch (error) {
       return { ok: false, result: runtimeResult({ invocationId, agentName, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_RUNTIME_OPTIONS_INVALID", errorMessageOf(error)), metadata: Object.freeze({}) }) };
     }
@@ -757,22 +700,13 @@ export class AgentExecutionDriver {
       return { ok: false, result: runtimeResult({ invocationId, agentName, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_NOT_REGISTERED", `Agent "${agentName}" is not registered.`), metadata }) };
     }
 
-    let declaredInput: unknown = options.input;
-    if (agent.metadata.input !== undefined) {
-      const prepared = await this.prepareTaskContract(agent.metadata.input, options.input, "input", timeoutMs, options.signal, "agent");
-      if (!prepared.ok) {
-        return { ok: false, result: runtimeResult({ invocationId, agentName: agent.metadata.name, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: this.agentContractError(prepared.error, "input"), metadata }) };
-      }
-      declaredInput = prepared.value;
-    }
-
     let messages: AgentMessage[];
     let seenToolCallIds: Set<string>;
     try {
-      messages = this.initialMessages({ ...options, input: declaredInput });
+      messages = this.initialMessages(options);
       seenToolCallIds = this.initialToolCallIds(messages);
     } catch (error) {
-      return { ok: false, result: runtimeResult({ invocationId, agentName: agent.metadata.name, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_INPUT_INVALID", errorMessageOf(error)), metadata }) };
+      return { ok: false, result: runtimeResult({ invocationId, agentName: agent.name, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_INPUT_INVALID", errorMessageOf(error)), metadata }) };
     }
 
     return {
@@ -790,59 +724,7 @@ export class AgentExecutionDriver {
         seenToolCallIds,
         tools: this.toolContracts(agent),
         executorToolOptions: this.executorToolOptions(options.toolExecution),
-        options: { ...options, id: invocationId, input: declaredInput },
-      },
-    };
-  }
-
-  private async prepareTask(
-    agentName: string,
-    taskName: string,
-    input: unknown,
-    options: AgentRuntimeTaskInvokeOptions,
-  ): Promise<TaskPreparation> {
-    const invocationId = options.id ?? generatedInvocationId();
-    const task = this.registry.getTask(agentName, taskName);
-    if (!task) {
-      return { ok: false, result: runtimeResult({ invocationId, agentName, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_TASK_NOT_REGISTERED", `Task "${taskName}" is not registered on Agent "${agentName}".`), metadata: Object.freeze({ taskName }) }) };
-    }
-
-    let timeoutMs: number | undefined;
-    try {
-      assertNonNegativeInteger(options.timeoutMs, "agentRuntime.timeoutMs");
-      timeoutMs = options.timeoutMs === 0 ? undefined : options.timeoutMs ?? this.defaultTimeoutMs;
-    } catch (error) {
-      return { ok: false, result: runtimeResult({ invocationId, agentName, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_RUNTIME_OPTIONS_INVALID", errorMessageOf(error)), metadata: Object.freeze({ taskName }) }) };
-    }
-
-    let preparedInput: unknown = input;
-    if (task.metadata.input !== undefined) {
-      const prepared = await this.prepareTaskContract(task.metadata.input, input, "input", timeoutMs, options.signal, "task");
-      if (!prepared.ok) {
-        return { ok: false, result: runtimeResult({ invocationId, agentName: task.agent.metadata.name, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: prepared.error, metadata: Object.freeze({ taskName: task.metadata.name }) }) };
-      }
-      preparedInput = prepared.value;
-    }
-
-    const agent = await this.prepareAgent(task.agent.metadata.name, {
-      ...options,
-      id: invocationId,
-      input: preparedInput,
-      output: this.taskOutputContract(task) ?? options.output,
-      modelProfile: options.modelProfile ?? task.metadata.modelProfile,
-      maxSteps: options.maxSteps ?? task.metadata.maxSteps,
-      metadata: this.taskInvocationMetadata(options.metadata, task),
-    });
-    if (!agent.ok) return agent;
-    return {
-      ok: true,
-      prepared: {
-        task,
-        timeoutMs,
-        plan: {
-          ...agent.plan,
-          taskFinalization: { task, timeoutMs, signal: options.signal },
-        },
+        options: { ...options, id: invocationId },
       },
     };
   }
@@ -906,7 +788,7 @@ export class AgentExecutionDriver {
         let idempotencyKey: string;
         try {
           idempotencyKey = !session
-            ? this.toolIdempotencyKey(plan.options.toolExecution, { invocationId: plan.invocationId, agentName: plan.agent.metadata.name, call })
+            ? this.toolIdempotencyKey(plan.options.toolExecution, { invocationId: plan.invocationId, agentName: plan.agent.name, call })
             : this.sessionIdempotencyKey(plan.invocationId, call.id);
         } catch (error) {
           if (session) throw bridge.boundaryError(checkpoint);
@@ -922,7 +804,7 @@ export class AgentExecutionDriver {
         const result = await this.toolExecutor.execute(call, {
           ...plan.executorToolOptions,
           ...(toolTimeoutMs === undefined ? {} : { timeoutMs: toolTimeoutMs }),
-          agentName: plan.agent.metadata.name,
+          agentName: plan.agent.name,
           invocationId: plan.invocationId,
           metadata: plan.metadata,
           signal,
@@ -966,7 +848,7 @@ export class AgentExecutionDriver {
         const candidate = bridge.evolve(checkpoint, {
           phase: "terminal", steps: checkpoint.steps, messages: checkpoint.messages, responses: checkpoint.responses,
           toolResults: checkpoint.toolResults, seenToolCallIds: checkpoint.seenToolCallIds, pendingToolBatch: undefined,
-          terminal: { status: "failed", error: runtimeError("AGENT_MAX_STEPS_EXCEEDED", `Agent "${plan.agent.metadata.name}" exceeded maxSteps (${plan.maxSteps}).`, { maxSteps: plan.maxSteps }) },
+          terminal: { status: "failed", error: runtimeError("AGENT_MAX_STEPS_EXCEEDED", `Agent "${plan.agent.name}" exceeded maxSteps (${plan.maxSteps}).`, { maxSteps: plan.maxSteps }) },
         });
         const stopped = await control(candidate);
         return stopped ?? terminal(candidate, this.resultFromCheckpoint(plan, candidate));
@@ -980,10 +862,10 @@ export class AgentExecutionDriver {
         const context = this.contextBuilder.build({ invocationId: plan.invocationId, agent: plan.agent, messages: checkpoint.messages, metadata: plan.metadata, limits: plan.contextLimits });
         modelRequest = agentModelRequest({
           invocationId: plan.invocationId, messages: context.messages, tools: plan.tools,
-          output: this.providerOutputContract(plan.agent.metadata.output === undefined ? plan.options.output : this.agentOutputContract(plan.agent)),
+          output: this.providerOutputContract(plan.options.output),
           modelProfile: plan.modelProfile,
           maxOutputTokens: plan.options.maxOutputTokens, temperature: plan.options.temperature,
-          metadata: { ...plan.metadata, agentName: plan.agent.metadata.name, step, modelProfile: plan.modelProfile ?? null, agentContext: context.metadata },
+          metadata: { ...plan.metadata, agentName: plan.agent.name, step, modelProfile: plan.modelProfile ?? null, agentContext: context.metadata },
         });
       } catch (error) {
         const candidate = bridge.evolve(checkpoint, {
@@ -999,7 +881,7 @@ export class AgentExecutionDriver {
       } catch {
         return suspend("before-model-rejected");
       }
-      const response = await this.completeModel(modelRequest, plan.agent.metadata.name, plan.modelProfile, plan.metadata, signal, plan.timeoutMs,
+      const response = await this.completeModel(modelRequest, plan.agent.name, plan.modelProfile, plan.metadata, signal, plan.timeoutMs,
         plan.options.onTextDelta ? text => plan.options.onTextDelta!(Object.freeze({ step, text })) : undefined);
       if (!response.ok) {
         const candidate = bridge.evolve(checkpoint, {
@@ -1010,7 +892,7 @@ export class AgentExecutionDriver {
         const stopped = await committedControl(candidate);
         return stopped ?? terminal(candidate, this.resultFromCheckpoint(plan, candidate));
       }
-      const candidate = await this.modelCandidate(plan, checkpoint, step, response.value, signal, bridge);
+      const candidate = await this.modelCandidate(plan, checkpoint, step, response.value, bridge);
       try { await boundary.afterModelSettlement(checkpoint, candidate.state, step, { response: response.value }); } catch { throw bridge.boundaryError(checkpoint); }
       const stopped = await committedControl(candidate.state);
       if (stopped !== undefined) return stopped;
@@ -1025,13 +907,13 @@ export class AgentExecutionDriver {
   private resultFromCheckpoint(plan: PreparedAgentPlan, checkpoint: EngineProgress): AgentRuntimeResult {
     const terminal = checkpoint.terminal;
     if (terminal === undefined) throw new AgentRuntimeError("terminal checkpoint is required.");
-    return runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.metadata.name, status: terminal.status,
+    return runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: terminal.status,
       steps: checkpoint.steps, messages: checkpoint.messages, responses: checkpoint.responses, toolResults: checkpoint.toolResults,
       finalMessage: terminal.finalMessage, output: terminal.output, error: terminal.error, metadata: plan.metadata });
   }
 
   private async modelCandidate<TState extends EngineProgress>(
-    plan: PreparedAgentPlan, checkpoint: TState, step: number, response: AgentModelResponse, signal: AbortSignal | undefined, bridge: PhaseBridge<TState>,
+    plan: PreparedAgentPlan, checkpoint: TState, step: number, response: AgentModelResponse, bridge: PhaseBridge<TState>,
   ): Promise<{ readonly state: TState; readonly result?: AgentRuntimeResult }> {
     const rejected = (code: string, message: string, retainResponse = true): { readonly state: TState; readonly result: AgentRuntimeResult } => {
       const state = bridge.evolve(checkpoint, { phase: "terminal", steps: step, messages: checkpoint.messages,
@@ -1053,25 +935,11 @@ export class AgentExecutionDriver {
     const messages = message === undefined ? checkpoint.messages : [...checkpoint.messages, message];
     let result: AgentRuntimeResult;
     if (response.finishReason !== "stop" || message === undefined) {
-      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.metadata.name, status: "failed", steps: step, messages, responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, finalMessage: message, metadata: plan.metadata,
+      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: "failed", steps: step, messages, responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, finalMessage: message, metadata: plan.metadata,
         error: runtimeError("AGENT_PROVIDER_STOPPED", `Model provider stopped with finishReason "${response.finishReason}".`) });
     } else {
-      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.metadata.name, status: "completed", steps: step, messages, responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, finalMessage: message, metadata: plan.metadata });
-      if (plan.agent.metadata.output !== undefined) {
-        try {
-          const output = this.parseTaskOutput(message);
-          const prepared = await this.prepareTaskContract(plan.agent.metadata.output, output, "output", plan.timeoutMs, signal, "agent");
-          result = prepared.ok
-            ? runtimeResult({ ...result, output: prepared.value })
-            : this.failedTaskResult(result, this.agentContractError(prepared.error, "output"));
-        } catch (error) {
-          result = this.failedTaskResult(result, runtimeError("AGENT_OUTPUT_INVALID", errorMessageOf(error)));
-        }
-      }
-      if (plan.agent.metadata.output === undefined && plan.taskFinalization?.task.metadata.output === undefined && plan.options.output?.mode === "json") {
-        result = this.validateExplicitOutput(result, plan.options.output);
-      }
-      if (result.status === "completed") result = await this.finalizeCompleted(plan, result, signal);
+      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: "completed", steps: step, messages, responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, finalMessage: message, metadata: plan.metadata });
+      if (plan.options.output?.mode === "json") result = this.validateExplicitOutput(result, plan.options.output);
     }
     const state = bridge.evolve(checkpoint, { phase: "terminal", steps: step, messages: result.messages, responses: result.responses, toolResults: result.toolResults, seenToolCallIds: checkpoint.seenToolCallIds, pendingToolBatch: undefined,
       terminal: result.status === "completed" ? { status: "completed", finalMessage: result.finalMessage, output: result.output } : { status: "failed", finalMessage: result.finalMessage, error: result.error! } });
@@ -1080,20 +948,20 @@ export class AgentExecutionDriver {
 
   private validateExplicitOutput(result: AgentRuntimeResult, contract: AgentOutputContract): AgentRuntimeResult {
     try {
-      const output = normalizeJsonValue(this.parseTaskOutput(result.finalMessage), "agent.output");
+      const output = normalizeJsonValue(this.parseJsonOutput(result.finalMessage), "agent.output");
       const declared = contract.schema;
       if (declared !== undefined) {
         const generated = declared.kind === "class" ? getGeneratedOpenApiMetadata().schemas[declared.name] : undefined;
         if (declared.kind === "class" && generated === undefined) {
-          return this.failedTaskResult(result, runtimeError("AGENT_OUTPUT_SCHEMA_UNAVAILABLE", `Output class "${declared.name}" has no generated JSON schema.`));
+          return this.failedResult(result, runtimeError("AGENT_OUTPUT_SCHEMA_UNAVAILABLE", `Output class "${declared.name}" has no generated JSON schema.`));
         }
         const schema = declared.kind === "json-schema" ? declared.schema : inlineGeneratedSchema(generated, getGeneratedOpenApiMetadata().schemas);
         const issues = validateAgentJsonSchema(output, schema);
-        if (issues.length > 0) return this.failedTaskResult(result, runtimeError("AGENT_OUTPUT_INVALID", "Agent output failed JSON Schema validation.", { schema: declared.name, issues }));
+        if (issues.length > 0) return this.failedResult(result, runtimeError("AGENT_OUTPUT_INVALID", "Agent output failed JSON Schema validation.", { schema: declared.name, issues }));
       }
       return runtimeResult({ ...result, output });
     } catch (error) {
-      return this.failedTaskResult(result, runtimeError("AGENT_OUTPUT_INVALID", errorMessageOf(error)));
+      return this.failedResult(result, runtimeError("AGENT_OUTPUT_INVALID", errorMessageOf(error)));
     }
   }
 
@@ -1108,174 +976,33 @@ export class AgentExecutionDriver {
       evolve(previous, progress) { return Object.freeze({ ...previous, ...progress }); },
       boundaryError() { return new AgentRuntimeError("in-memory execution boundary rejected a transition."); },
     };
-    const resolvedPlan = { ...plan, modelProfile: plan.modelProfile ?? plan.agent.metadata.modelProfile ?? this.defaultModelProfile };
+    const resolvedPlan = { ...plan, modelProfile: plan.modelProfile ?? plan.agent.modelProfile ?? this.defaultModelProfile };
     const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, plan.options.signal, inMemoryBridge, false);
     if (outcome.kind === "terminal") return outcome.result;
     throw new AgentRuntimeError("in-memory execution cannot suspend.");
   }
-  async invokeTask(
-    agentName: string,
-    taskName: string,
-    input: unknown,
-    options: AgentRuntimeTaskInvokeOptions = {},
-  ): Promise<AgentRuntimeResult> {
-    const preparation = await this.prepareTask(agentName, taskName, input, options);
-    if (!preparation.ok) return preparation.result;
-    return this.drive(preparation.prepared.plan);
-  }
-
-  private async prepareTaskContract(
-    contract: Class<object>,
-    value: unknown,
-    direction: "input" | "output",
-    timeoutMs?: number,
-    signal?: AbortSignal,
-    contractKind: "agent" | "task" = "task",
-  ): Promise<PreparedTaskContract> {
-    if (signal?.aborted) {
-      return { ok: false, error: runtimeError("AGENT_ABORTED", "Agent runtime invocation was aborted.") };
-    }
-    try {
-      value = value instanceof contract
-        ? agentModelJson(value, `task.${direction}`)
-        : normalizeJsonValue(value, `task.${direction}`);
-    } catch (error) {
-      return { ok: false, error: runtimeError(direction === "input" ? "AGENT_TASK_INPUT_INVALID" : "AGENT_TASK_OUTPUT_INVALID", errorMessageOf(error)) };
-    }
-    const name = getGeneratedOpenApiSchemaName(contract) ?? classDebugName(contract);
-    if (!isObjectRecord(value)) {
-      return {
-        ok: false,
-        error: runtimeError(
-          contractKind === "agent"
-            ? direction === "input" ? "AGENT_INPUT_INVALID" : "AGENT_OUTPUT_INVALID"
-            : direction === "input" ? "AGENT_TASK_INPUT_INVALID" : "AGENT_TASK_OUTPUT_INVALID",
-          `${contractKind === "agent" ? "Agent" : "Task"} ${direction} schema "${name}" expects a JSON object.`,
-        ),
-      };
-    }
-
-    const generated = getGeneratedOpenApiMetadata().schemas[name];
-    if (generated === undefined && this.taskSchemaValidator === undefined) {
-      return {
-        ok: false,
-        error: runtimeError(
-          "AGENT_TASK_SCHEMA_VALIDATOR_MISSING",
-          `Task ${direction} schema "${name}" has no generated JSON schema or configured validator.`,
-        ),
-      };
-    }
-    if (generated !== undefined) {
-      const issues = validateAgentJsonSchema(value, inlineGeneratedSchema(generated, getGeneratedOpenApiMetadata().schemas));
-      if (issues.length > 0) {
-        return {
-          ok: false,
-          error: runtimeError(
-            direction === "input" ? "AGENT_TASK_INPUT_VALIDATION_FAILED" : "AGENT_TASK_OUTPUT_VALIDATION_FAILED",
-            `Task ${direction} failed generated schema validation.`,
-            { schema: name, issues },
-          ),
-        };
-      }
-    }
-
-    let instance: object;
-    try {
-      instance = bindAgentModel(contract, value);
-    } catch (error) {
-      return {
-        ok: false,
-        error: runtimeError(
-          direction === "input" ? "AGENT_TASK_INPUT_INVALID" : "AGENT_TASK_OUTPUT_INVALID",
-          errorMessageOf(error),
-        ),
-      };
-    }
-
-    if (this.taskSchemaValidator !== undefined) {
-      try {
-        const validation = await timed(
-          Promise.resolve(this.taskSchemaValidator.validate(instance)),
-          timeoutMs,
-          () => undefined,
-          signal,
-        );
-        if (!validation || typeof validation.isValid !== "boolean" || !Array.isArray(validation.errors)) {
-          throw new AgentRuntimeError("task schema validator returned an invalid result.");
-        }
-        if (!validation.isValid) {
-          return {
-            ok: false,
-            error: runtimeError(
-              direction === "input" ? "AGENT_TASK_INPUT_VALIDATION_FAILED" : "AGENT_TASK_OUTPUT_VALIDATION_FAILED",
-              `Task ${direction} failed model validation.`,
-              {
-                schema: name,
-                issues: validation.errors.map((issue) => ({
-                  property: String(issue.property),
-                  message: String(issue.message),
-                  ...(issue.code !== undefined ? { code: String(issue.code) } : {}),
-                })),
-              },
-            ),
-          };
-        }
-      } catch (error) {
-        if (error instanceof AgentRuntimeTimeoutError) {
-          return {
-            ok: false,
-            error: runtimeError("AGENT_TASK_SCHEMA_VALIDATION_TIMEOUT", `Task ${direction} schema validation timed out.`, { schema: name }),
-          };
-        }
-        if (error instanceof AgentRuntimeAbortError) {
-          return { ok: false, error: runtimeError("AGENT_ABORTED", "Agent runtime invocation was aborted.") };
-        }
-        return {
-          ok: false,
-          error: runtimeError(
-            "AGENT_TASK_SCHEMA_VALIDATION_FAILED",
-            `Task ${direction} schema validation failed: ${errorMessageOf(error)}`,
-            { schema: name },
-          ),
-        };
-      }
-    }
-
-    try {
-      return { ok: true, instance, value: agentModelJson(instance, `task.${direction}`) };
-    } catch (error) {
-      return {
-        ok: false,
-        error: runtimeError(
-          direction === "input" ? "AGENT_TASK_INPUT_INVALID" : "AGENT_TASK_OUTPUT_INVALID",
-          errorMessageOf(error),
-        ),
-      };
-    }
-  }
-
-  private parseTaskOutput(message: AgentMessage | undefined): unknown {
+  private parseJsonOutput(message: AgentMessage | undefined): unknown {
     if (message === undefined) {
-      throw new AgentRuntimeError("Task provider response does not contain a final message.");
+      throw new AgentRuntimeError("Model response does not contain a final message.");
     }
     if (message.content.length === 1 && message.content[0]?.kind === "data") {
       return message.content[0].value;
     }
     if (!message.content.every((part) => part.kind === "text")) {
-      throw new AgentRuntimeError("Task JSON output must contain only text or one data part.");
+      throw new AgentRuntimeError("JSON output must contain only text or one data part.");
     }
     const text = message.content.map((part) => part.kind === "text" ? part.text : "").join("\n").trim();
     if (text.length === 0) {
-      throw new AgentRuntimeError("Task JSON output is empty.");
+      throw new AgentRuntimeError("JSON output is empty.");
     }
     try {
       return JSON.parse(text) as unknown;
     } catch {
-      throw new AgentRuntimeError("Task JSON output is malformed.");
+      throw new AgentRuntimeError("JSON output is malformed.");
     }
   }
 
-  private failedTaskResult(result: AgentRuntimeResult, error: AgentToolError): AgentRuntimeResult {
+  private failedResult(result: AgentRuntimeResult, error: AgentToolError): AgentRuntimeResult {
     return runtimeResult({
       invocationId: result.invocationId,
       agentName: result.agentName,
@@ -1288,47 +1015,6 @@ export class AgentExecutionDriver {
       error,
       metadata: result.metadata,
     });
-  }
-
-  private async finalizeCompleted(plan: PreparedAgentPlan, result: AgentRuntimeResult, currentSignal?: AbortSignal): Promise<AgentRuntimeResult> {
-    const finalization = plan.taskFinalization;
-    if (finalization === undefined || finalization.task.metadata.output === undefined) {
-      return result;
-    }
-    let outputValue: unknown;
-    try {
-      outputValue = this.parseTaskOutput(result.finalMessage);
-    } catch (error) {
-      return this.failedTaskResult(result, runtimeError("AGENT_TASK_OUTPUT_INVALID", errorMessageOf(error)));
-    }
-    const preparedOutput = await this.prepareTaskContract(
-      finalization.task.metadata.output,
-      outputValue,
-      "output",
-      finalization.timeoutMs,
-      currentSignal,
-      "task",
-    );
-    if (!preparedOutput.ok) {
-      return this.failedTaskResult(result, preparedOutput.error);
-    }
-    return runtimeResult({
-      invocationId: result.invocationId,
-      agentName: result.agentName,
-      status: "completed",
-      steps: result.steps,
-      messages: result.messages,
-      responses: result.responses,
-      toolResults: result.toolResults,
-      finalMessage: result.finalMessage,
-      output: preparedOutput.value,
-      metadata: result.metadata,
-    });
-  }
-
-  private agentContractError(error: AgentToolError, direction: "input" | "output"): AgentToolError {
-    if (error.code === "AGENT_TASK_SCHEMA_VALIDATION_TIMEOUT" || error.code === "AGENT_ABORTED") return error;
-    return runtimeError(direction === "input" ? "AGENT_INPUT_INVALID" : "AGENT_OUTPUT_INVALID", error.message, error.details);
   }
 
   private initialMessages(options: AgentRuntimeInvokeOptions): AgentMessage[] {
@@ -1396,47 +1082,6 @@ export class AgentExecutionDriver {
     const generated = schemas[output.schema.name];
     if (generated === undefined) return output;
     return agentOutputContract({ ...output, schema: agentJsonSchema(output.schema.name, inlineGeneratedSchema(generated, schemas), { strict: output.schema.strict }) });
-  }
-
-  private taskOutputContract(task: AgentTaskDefinition): AgentOutputContract | undefined {
-    if (task.metadata.output === undefined) {
-      return undefined;
-    }
-    return agentOutputContract({
-      mode: "json",
-      schema: this.schemaContract(task.metadata.output),
-    });
-  }
-
-  private agentOutputContract(agent: AgentDefinition): AgentOutputContract | undefined {
-    if (agent.metadata.output === undefined) {
-      return undefined;
-    }
-    return agentOutputContract({ mode: "json", schema: this.schemaContract(agent.metadata.output) });
-  }
-
-  private schemaContract(model: NonNullable<ToolDefinition["metadata"]["input"]>) {
-    const name = getGeneratedOpenApiSchemaName(model) ?? classDebugName(model);
-    const schemas = getGeneratedOpenApiMetadata().schemas;
-    const generated = schemas[name];
-    if (generated === undefined) {
-      return agentClassSchema(name);
-    }
-    return agentJsonSchema(name, inlineGeneratedSchema(generated, schemas) as JsonObject);
-  }
-
-  private taskInvocationMetadata(metadata: unknown, task: AgentTaskDefinition): unknown {
-    const taskMetadata = {
-      taskName: task.metadata.name,
-      taskMethodName: task.metadata.methodName,
-    };
-    if (metadata === undefined) {
-      return taskMetadata;
-    }
-    if (metadata !== null && typeof metadata === "object" && !Array.isArray(metadata)) {
-      return { ...(metadata as Record<string, unknown>), ...taskMetadata };
-    }
-    return metadata;
   }
 
   private async completeModel(

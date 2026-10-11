@@ -37,7 +37,7 @@ const STABLE_BAZIS_BARRELS = new Set([
 
 const ALLOWED_TYPESCRIPT_IMPORTS = new Set([
   posix(path.join(BAZIS, "cli/moduleRegistration.ts")),
-  posix(path.join(BAZIS, "core/scripts/agent-codegen.ts")),
+  posix(path.join(BAZIS, "core/scripts/tool-codegen.ts")),
   posix(path.join(BAZIS, "core/scripts/di-generate.ts")),
   posix(path.join(BAZIS, "core/scripts/di-generate-target.ts")),
   posix(path.join(BAZIS, "core/scripts/orm-predicate-codegen.ts")),
