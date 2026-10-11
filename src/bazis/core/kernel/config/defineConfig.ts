@@ -156,7 +156,8 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
     const issues: string[] = [];
     // A wrong value names what came and where to change it: the variable that
     // supplied it, or the variables that can override the value from the code.
-    const got = (raw: unknown) => raw === undefined ? "" : `, got ${JSON.stringify(String(raw)).slice(0, 80)}`;
+    // A key with a sensitive name never shows its value.
+    const got = (key: string, raw: unknown) => raw === undefined || isSensitiveKey(fullKey(key)) ? "" : `, got ${JSON.stringify(String(raw)).slice(0, 80)}`;
     const source = (key: string, selected: { readonly name: string } | undefined) => ` (${selected ? selected.name : names.get(key)!.join(", ")})`;
     for (const key of keys) {
       const base = schema.default[key]!;
@@ -179,23 +180,31 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       let value: ConfigValueType | undefined;
       if (type === "secret") {
         if (typeof raw !== "string" || !raw.trim()) issues.push(`${fullKey(key)} — required non-empty secret is not set (${names.get(key)!.join(", ")})`);
+        // A secret default in the code is a development value; production must
+        // get the secret from a source or declare its own value explicitly.
+        // No "apiKey: …" in the hint: the console redaction would hide it.
+        else if (environment === "production" && selected === undefined && override === undefined) issues.push(`${fullKey(key)} — production would use the development default secret from the code; set ${names.get(key)!.join(" or ")}, or declare ${key} in the production section`);
         else value = new Secret(raw);
       } else if (type === "number") {
         const parsed = Number(raw);
-        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)} — expected a finite number${got(raw)}${source(key, selected)}`);
+        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)} — expected a finite number${got(key, raw)}${source(key, selected)}`);
         else value = parsed;
       } else if (type === "boolean") {
         const normalized = String(raw).toLowerCase();
         if (normalized === "true" || normalized === "1") value = true;
         else if (normalized === "false" || normalized === "0") value = false;
-        else issues.push(`${fullKey(key)} — expected a boolean (true, false, 1, 0)${got(raw)}${source(key, selected)}`);
+        else issues.push(`${fullKey(key)} — expected a boolean (true, false, 1, 0)${got(key, raw)}${source(key, selected)}`);
       } else if (typeof raw === "string") value = raw;
       else issues.push(`${fullKey(key)} — expected a string`);
       if (value === undefined) continue;
-      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)} — ${JSON.stringify(value)} is not allowed, use one of: ${base.values.join(", ")}${source(key, selected)}`);
+      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)} — ${isSensitiveKey(fullKey(key)) ? "the value" : JSON.stringify(value)} is not allowed, use one of: ${base.values.join(", ")}${source(key, selected)}`);
       try {
         const issue = validators[key]?.(value);
-        if (issue) issues.push(`${fullKey(key)} — ${issue}`);
+        // A validator may quote its own value; hide it in that message only.
+        // Replacing secrets across the whole text turned a one-letter secret
+        // into "m***il.***piKey".
+        const sensitive = value instanceof Secret ? value.reveal() : typeof value === "string" && isSensitiveKey(fullKey(key)) ? value : "";
+        if (issue) issues.push(`${fullKey(key)} — ${sensitive.trim() ? issue.replaceAll(sensitive, "***") : issue}`);
       } catch { issues.push(`${fullKey(key)} — validator failed`); }
       values.set(key, value);
       inspection.push(Object.freeze({ key: fullKey(key), type: type as ConfigInspection["type"], env: names.get(key)!, source: selected?.source ?? (override === undefined ? "default" : environment), value: safeValue(fullKey(key), value) }));
@@ -203,11 +212,7 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
     if (issues.length) {
       // "key — text", not "key: text": the console redaction would read
       // "db.password: required" as a secret value and hide the word "required".
-      let message = issues.join("; ");
-      for (const [key, value] of values) {
-        const sensitive = value instanceof Secret ? value.reveal() : typeof value === "string" && isSensitiveKey(key) ? value : undefined;
-        if (sensitive) message = message.replaceAll(sensitive, "***");
-      }
+      const message = issues.join("; ");
       throw new KernelError(`Invalid configuration (environment "${environment}"): ${message}.`);
     }
     const rows = Object.freeze(inspection);

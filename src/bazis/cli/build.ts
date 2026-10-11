@@ -10,6 +10,13 @@ export interface BuildOptions {
   readonly bin: boolean;
   /** Executable path relative to the project; default `bin/<package name>`. */
   readonly outfile?: string;
+  /** Let the executable read `.env` files from its working directory (off by default). */
+  readonly dotenv?: boolean;
+}
+
+export interface CompileOptions {
+  /** Let the executable read `.env`, `.env.local`, `.env.<NODE_ENV>` from its working directory. */
+  readonly dotenv?: boolean;
 }
 
 /**
@@ -103,7 +110,7 @@ export async function runBuild(cwd: string, options: BuildOptions, codegen: Code
   if (typecheck !== 0 || !options.bin) return typecheck;
   const outfile = path.resolve(cwd, options.outfile ?? path.join("bin", await binaryName(cwd)));
   log(`[bazis] compile ${path.relative(cwd, outfile)}...`);
-  return compileBinary(bun, await projectEntry(cwd), outfile);
+  return compileBinary(bun, await projectEntry(cwd), outfile, { dotenv: options.dotenv });
 }
 
 /**
@@ -111,11 +118,18 @@ export async function runBuild(cwd: string, options: BuildOptions, codegen: Code
  * `.<hash>.bun-build` file in its working directory and cannot remove it when
  * that executable is read-only or carries `uchg` (scripts/bazis-bun). Compile
  * from a private directory and remove it afterwards.
+ *
+ * By default a Bun executable reads `bunfig.toml` and `.env` files from the
+ * directory it is started in: a `preload` in such a bunfig runs foreign code
+ * inside the application, and a stray `.env` silently changes its settings.
+ * The executable gets its settings from the real environment instead;
+ * `dotenv: true` restores reading `.env`. A bunfig is never read.
  */
-export function compileBinary(bun: string, entry: string, outfile: string): number {
+export function compileBinary(bun: string, entry: string, outfile: string, options: CompileOptions = {}): number {
   const workDir = mkdtempSync(path.join(tmpdir(), "bazis-compile-"));
+  const autoload = ["--no-compile-autoload-bunfig", options.dotenv === true ? "--compile-autoload-dotenv" : "--no-compile-autoload-dotenv"];
   try {
-    const result = Bun.spawnSync([bun, "build", "--compile", path.resolve(entry), "--outfile", path.resolve(outfile)],
+    const result = Bun.spawnSync([bun, "build", "--compile", ...autoload, path.resolve(entry), "--outfile", path.resolve(outfile)],
       { cwd: workDir, stdout: "inherit", stderr: "inherit" });
     return result.exitCode ?? 1;
   } finally {

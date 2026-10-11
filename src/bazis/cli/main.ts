@@ -16,6 +16,7 @@ export const USAGE = `Usage:
   bazis test [<bun test args>]                Codegen, then bun test
   bazis build                                 Codegen and typecheck
   bazis build --bin [--outfile <path>]        Also compile a standalone executable (default bin/<name>)
+  bazis build --bin --dotenv                  The executable also reads .env files from its working directory
   bazis --help
   g can also be written as generate.
 
@@ -85,7 +86,7 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
     if (parsed.kind === "codegen") return await runtime.codegen(process.cwd(), parsed.target);
     if (parsed.kind === "dev") return await runDev(process.cwd(), runtime.codegen, runtime.log, { watch: parsed.watch });
     if (parsed.kind === "test") return await runTest(process.cwd(), parsed.args, runtime.codegen);
-    if (parsed.kind === "build") return await runBuild(process.cwd(), { bin: parsed.bin, outfile: parsed.outfile }, runtime.codegen, runtime.log);
+    if (parsed.kind === "build") return await runBuild(process.cwd(), { bin: parsed.bin, outfile: parsed.outfile, dotenv: parsed.dotenv }, runtime.codegen, runtime.log);
     if (parsed.kind === "new") {
       const result = await generateProject({ name: parsed.name, outputPath: parsed.outputPath, frameworkPath: parsed.frameworkPath, linkFramework: parsed.linkFramework, vendor: parsed.vendor, dryRun: parsed.dryRun });
       runtime.log(`[bazis] ${result.dryRun ? "planned" : "created"} project: ${result.projectDir}`);

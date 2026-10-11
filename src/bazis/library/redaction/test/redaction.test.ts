@@ -32,6 +32,20 @@ describe("sensitive redaction", () => {
     expect(redactSensitiveText("password=super-secret token: abcdefghijk")).toBe("password=*** token: ***");
   });
 
+  test("redacts credentials embedded in URLs", () => {
+    expect(redactSensitiveText("connect failed postgres://app:pa55word@db:5432/app")).toBe(
+      "connect failed postgres://***:***@db:5432/app",
+    );
+    expect(redactSensitiveText("clone https://ghp_abcdef123@github.com/x/y.git")).toBe("clone https://***@github.com/x/y.git");
+    expect(redactSensitiveText("see https://example.com/a@b and mail ann@example.com")).toBe(
+      "see https://example.com/a@b and mail ann@example.com",
+    );
+    expect(redactSensitive({ dsn: "redis://:s3cret@cache:6379" })).toEqual({ dsn: "redis://***:***@cache:6379" });
+    const error = redactSensitive(new Error("SMTP rejected smtp://mailer:live-key@smtp.local")) as { message: string; stack: string };
+    expect(error.message).toBe("SMTP rejected smtp://***:***@smtp.local");
+    expect(error.stack).not.toContain("live-key");
+  });
+
   test("handles circular objects", () => {
     const value: { self?: unknown; token: string } = { token: "secret" };
     value.self = value;

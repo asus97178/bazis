@@ -1,4 +1,4 @@
-import { redactSensitive, type SensitiveRedactionOptions } from "../../../library/redaction";
+import { redactSensitive, redactSensitiveText, type SensitiveRedactionOptions } from "../../../library/redaction";
 import type { LogFields, LogLevel, Logger } from "./Logger";
 import { getRequestId, getTraceparent } from "../correlation/requestContext";
 
@@ -16,7 +16,10 @@ export interface ConsoleLoggerOptions {
   readonly minLevel?: LogLevel;
   /** Prefix tag, e.g. the app name. */
   readonly name?: string;
-  /** Structured fields are redacted by default; pass false only for trusted local debugging. */
+  /**
+   * The message and structured fields are redacted by default (secret keys, `password=…`,
+   * bearer tokens, URL credentials); pass false only for trusted local debugging.
+   */
   readonly redaction?: SensitiveRedactionOptions | false;
   /**
    * Inside a request, add `requestId` (and `traceparent`, when the request
@@ -83,6 +86,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const line = this.requestContext ? withRequestContext(fields) : fields;
-    LEVEL_SINK[level](`${this.prefix}${level}: ${message}${formatFields(line, this.redaction)}`);
+    const text = this.redaction === false ? message : redactSensitiveText(message, this.redaction);
+    LEVEL_SINK[level](`${this.prefix}${level}: ${text}${formatFields(line, this.redaction)}`);
   }
 }

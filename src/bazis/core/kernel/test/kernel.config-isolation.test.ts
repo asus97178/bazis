@@ -150,7 +150,7 @@ describe("built-in connector configuration isolation", () => {
     test(`${routed ? "deferred LLM router" : "LLM connector"} uses its kernel view`, async () => {
       const declaration = defineConfig("isolation_llm", {
         default: { provider: "local-test", model: "test-model", baseUrl: "https://example.invalid", apiKey: secret("test-key") },
-        production: { model: "prod-model" },
+        production: { model: "prod-model", apiKey: secret("prod-key") },
       });
       const created: LlmConnectionOptions[] = [];
       const adapter = { kind: "isolation-probe", create(options: LlmConnectionOptions): AgentModelProvider {

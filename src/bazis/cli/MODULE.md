@@ -15,6 +15,7 @@ bunx bazis test [<bun test arguments>]  # codegen, then bun test
 bunx bazis build                       # codegen and a type check (tsc --noEmit)
 bunx bazis build --bin                 # + the executable bin/<name from package.json>
 bunx bazis build --bin --outfile dist/app
+bunx bazis build --bin --dotenv        # the executable also reads .env files from its working directory
 ```
 
 Implementation: [build.ts](build.ts). The entry point comes from `bazis.config.json`
@@ -40,6 +41,12 @@ it changes with every source edit.
 `.bun-build` in the working directory if its executable is read-only or has the `uchg`
 flag. The Bun for child processes is `scripts/bazis-bun`, otherwise `BAZIS_BUN_BIN`,
 otherwise `bun` from PATH.
+Since 0.98.29 the executable does not read `bunfig.toml` from the directory it starts in
+(`--no-compile-autoload-bunfig`: a `preload` there would run foreign code inside the
+application) and, unless built with `--dotenv`, does not read `.env`, `.env.local`,
+`.env.<NODE_ENV>` either (`--no-compile-autoload-dotenv`): a binary gets its settings
+from the real environment. `bazis dev` and `bazis test` run from sources and still
+read `.env`. `bazis new` ignores `.env` and `.env.*` in git, except `.env.example`.
 
 The `agent run` command (a client of the application chat API) moved into the osnova
 application: `bun run agent:run` and `src/app/modules/agent-chat/client/AgentClient.service.ts`.
@@ -113,7 +120,7 @@ binary check are in the [DI passport](../core/di/MODULE.md).
 | `registerModuleInSource` | [moduleRegistration.ts](moduleRegistration.ts) | Host source, absolute paths, class | TypeScript with the import and registration |
 | Templates | [templates/module.ts](templates/module.ts), [templates/pack.ts](templates/pack.ts), [templates/passport.ts](templates/passport.ts) | The normalized name and profile | Files and `MODULE.md` |
 | `runCodegen` | [codegen.ts](codegen.ts) | cwd and target | Runs the framework generator for the project, the exit code |
-| `runDev`, `runBuild`, `compileBinary` | [build.ts](build.ts) | cwd, `{ bin, outfile }`, the codegen function | Runs the application; type check; an executable without `.bun-build` in the project |
+| `runDev`, `runBuild`, `compileBinary` | [build.ts](build.ts) | cwd, `{ bin, outfile, dotenv }`, the codegen function | Runs the application; type check; an executable without `.bun-build` in the project |
 
 The CLI itself uses no DI, ORM, HTTP, AI or background. Generated modules connect the
 existing public ORM/DI APIs; codegen wires the constructor dependencies.

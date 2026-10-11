@@ -88,6 +88,28 @@ describe("defineConfig", () => {
     expect(() => config.ensureValid()).toThrow(/jwt.admin.secret/);
   });
 
+  test("production does not start on a secret default from the code (0.98.29)", () => {
+    const config = defineConfig("mail", { default: { host: "localhost", apiKey: secret("dev-key") } });
+    expect(() => config.resolve("production")).toThrow(
+      'Invalid configuration (environment "production"): mail.apiKey — production would use the development default secret from the code; set BAZIS_MAIL__APIKEY, or declare apiKey in the production section.',
+    );
+    // Development and test keep the default.
+    expect(config.resolve("development").get("apiKey").reveal()).toBe("dev-key");
+    expect(config.resolve("test").get("apiKey").reveal()).toBe("dev-key");
+  });
+
+  test("production accepts a secret from a source or its own declared value (0.98.29)", () => {
+    const config = defineConfig("mail", { default: { apiKey: secret("dev-key") } });
+    process.env.BAZIS_MAIL__APIKEY = "live-key";
+    try {
+      expect(config.resolve("production").get("apiKey").reveal()).toBe("live-key");
+    } finally {
+      delete process.env.BAZIS_MAIL__APIKEY;
+    }
+    const explicit = defineConfig("mail", { default: { apiKey: secret("dev-key") }, production: { apiKey: secret("shared-key") } });
+    expect(explicit.resolve("production").get("apiKey").reveal()).toBe("shared-key");
+  });
+
   test("a non-numeric env value fails fast", () => {
     process.env.BAZIS_HTTP__PORT = "abc";
     const config = defineConfig({ default: { "http.port": 3000 } });

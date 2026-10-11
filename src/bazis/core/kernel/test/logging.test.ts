@@ -54,6 +54,20 @@ describe("ConsoleLogger", () => {
       console.info = original;
     }
   });
+
+  test("redacts credentials in the message text too", () => {
+    const lines: string[] = [];
+    const original = console.info;
+    console.info = (m?: unknown) => void lines.push(String(m));
+    try {
+      new ConsoleLogger().info("connecting postgres://app:pa55word@db/app with password=hunter22");
+      new ConsoleLogger({ redaction: false }).info("raw postgres://app:pa55word@db/app");
+      expect(lines[0]).toBe("info: connecting postgres://***:***@db/app with password=***");
+      expect(lines[1]).toBe("info: raw postgres://app:pa55word@db/app");
+    } finally {
+      console.info = original;
+    }
+  });
 });
 
 describe("kernel registers LOGGER", () => {

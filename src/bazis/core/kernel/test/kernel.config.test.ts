@@ -11,7 +11,11 @@ import {
   jsonFileSource,
   loadConfiguration,
   memorySource,
+  secretFilesSource,
 } from "../index";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("Kernel configuration", () => {
   test("sources merge in order, later wins", async () => {
@@ -51,6 +55,35 @@ describe("Kernel configuration", () => {
     const missing = await loadConfiguration([jsonFileSource("/nonexistent.json", { optional: true })]);
     expect(missing.keys()).toHaveLength(0);
     await expect(loadConfiguration([jsonFileSource("/nonexistent.json")])).rejects.toThrow(KernelError);
+  });
+
+  test("secret files source reads one value per file, as Docker and Kubernetes mount them (0.98.29)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "bazis-secrets-"));
+    try {
+      await writeFile(join(dir, "db.password"), "p@ss\n");
+      await writeFile(join(dir, "BAZIS_MAIL__APIKEY"), "mail-key\r\n");
+      await writeFile(join(dir, ".hidden"), "x");
+      // Kubernetes: keys are symlinks into a hidden ..data directory.
+      await mkdir(join(dir, "..data"));
+      await writeFile(join(dir, "..data", "auth.signingKey"), "-----BEGIN KEY-----\nabc\n-----END KEY-----\n");
+      await symlink(join(dir, "..data", "auth.signingKey"), join(dir, "auth.signingKey"));
+      await mkdir(join(dir, "nested"));
+
+      const config = await loadConfiguration([secretFilesSource(dir), envSource({ variables: { BAZIS_DB__PASSWORD: "from-env" } })]);
+      expect(config.get("db.password")).toBe("from-env");
+      expect(config.origin("db.password").source).toBe("env(BAZIS_*)");
+      expect(config.get("mail.apikey")).toBe("mail-key");
+      expect(config.origin("mail.apikey").source).toBe(`files(${dir})`);
+      expect(config.get("auth.signingkey")).toBe("-----BEGIN KEY-----\nabc\n-----END KEY-----");
+      expect([...config.keys()].sort()).toEqual(["auth.signingkey", "db.password", "mail.apikey"]);
+
+      await writeFile(join(dir, "big"), "x".repeat(64 * 1024 + 1));
+      await expect(loadConfiguration([secretFilesSource(dir)])).rejects.toThrow(`Secret file "${join(dir, "big")}" is larger than 65536 bytes.`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+    expect((await loadConfiguration([secretFilesSource("/nonexistent-secrets", { optional: true })])).keys()).toHaveLength(0);
+    await expect(loadConfiguration([secretFilesSource("/nonexistent-secrets")])).rejects.toThrow('Secret directory "/nonexistent-secrets" cannot be read (ENOENT).');
   });
 
   test("Secret never leaks through logs", async () => {

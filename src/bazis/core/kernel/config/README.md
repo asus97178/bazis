@@ -26,6 +26,16 @@ Flat Configuration key names are case-insensitive. A later source also wins
 between the canonical name and an explicit env alias.
 Numbers are finite; an empty string never becomes zero; a Secret does not allow an
 empty or whitespace value. TypeScript forbids unsupported object types.
+In `production` a Secret whose value would come from the `default` section (no source
+supplied it and the `production` section does not declare it) is an error: a secret
+default in the code is a development value. `production: { key: secret("…") }`
+declares a production value explicitly.
+
+`secretFilesSource(directory, { optional })` reads secret files as Docker and Kubernetes
+mount them (`/run/secrets`): one file per value, the file name is the key (`db.password`)
+or its variable (`BAZIS_DB__PASSWORD`), trailing line breaks are removed, hidden entries
+(Kubernetes `..data`) and directories are skipped, a file over 64 KiB is an error.
+Errors name the file, never its content. A missing directory is an error unless `optional`.
 
 A declaration stores no chosen environment, values or cache. `get/has/ensureValid`
 stay for standalone reading of the process env, but `ensureValid` no longer

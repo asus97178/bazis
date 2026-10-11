@@ -287,7 +287,10 @@ describe("HTTP: health endpoint", () => {
     const app = await startServer({ health: { exposeDetails: true } }, providers);
     try {
       const response = await fetch(`${app.base}/health`);
-      expect(await response.text()).toContain("postgres://admin:secret@db.internal/app");
+      // Details are shown; credentials inside them stay redacted (0.98.29).
+      const body = await response.text();
+      expect(body).toContain("postgres://***:***@db.internal/app");
+      expect(body).not.toContain("admin:secret");
     } finally {
       await app.dispose();
     }

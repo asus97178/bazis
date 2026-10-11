@@ -98,10 +98,11 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["test", "src/a.test.ts", "-t", "health"])).toEqual({ kind: "test", args: ["src/a.test.ts", "-t", "health"] });
     expect(parseCliArgs(["test", "--", "--bail"])).toEqual({ kind: "test", args: ["--bail"] });
     expect(parseCliArgs(["build", "--watch"]).kind).toBe("error");
-    expect(parseCliArgs(["build"])).toEqual({ kind: "build", bin: false, outfile: undefined });
-    expect(parseCliArgs(["build", "--bin"])).toEqual({ kind: "build", bin: true, outfile: undefined });
-    expect(parseCliArgs(["build", "--bin", "--outfile", "dist/app"])).toEqual({ kind: "build", bin: true, outfile: "dist/app" });
-    for (const args of [["build", "--outfile", "dist/app"], ["dev", "--bin"], ["build", "extra"], ["codegen", "--bin"], ["g", "module", "Task", "--bin"]]) {
+    expect(parseCliArgs(["build"])).toEqual({ kind: "build", bin: false, outfile: undefined, dotenv: false });
+    expect(parseCliArgs(["build", "--bin"])).toEqual({ kind: "build", bin: true, outfile: undefined, dotenv: false });
+    expect(parseCliArgs(["build", "--bin", "--outfile", "dist/app"])).toEqual({ kind: "build", bin: true, outfile: "dist/app", dotenv: false });
+    expect(parseCliArgs(["build", "--bin", "--dotenv"])).toEqual({ kind: "build", bin: true, outfile: undefined, dotenv: true });
+    for (const args of [["build", "--outfile", "dist/app"], ["build", "--dotenv"], ["dev", "--dotenv"], ["dev", "--bin"], ["build", "extra"], ["codegen", "--bin"], ["g", "module", "Task", "--bin"]]) {
       expect(parseCliArgs(args).kind).toBe("error");
     }
   });

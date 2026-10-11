@@ -4,6 +4,48 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.98.29 — 2026-10-11
+
+### Added
+
+- `secretFilesSource(directory, { optional })` in `bazis/core/kernel`: secret
+  files as Docker and Kubernetes mount them (`/run/secrets`). One file per
+  value; the file name is the key (`db.password`) or its variable
+  (`BAZIS_DB__PASSWORD`). Trailing line breaks are removed; hidden entries
+  (Kubernetes `..data`) and directories are skipped; a file over 64 KiB is an
+  error. Errors name the file, never its content.
+- `bazis build --bin --dotenv`: the executable reads `.env` files from its
+  working directory, as before this release.
+
+### Changed
+
+- In `production` a secret whose value would come from the `default` section
+  stops the startup: `mail.apiKey — production would use the development
+  default secret from the code; set BAZIS_MAIL__APIKEY, or declare apiKey in
+  the production section`. Before, `secret("dev-key")` without a `production`
+  entry silently ran production on the development key. A value from a
+  source, or an explicit `production: { apiKey: secret("…") }`, works as before.
+- An executable from `bazis build --bin` no longer reads `bunfig.toml` from the
+  directory it starts in: a `preload` there ran foreign code inside the
+  application. It also no longer reads `.env`, `.env.local` and
+  `.env.<NODE_ENV>` unless built with `--dotenv`; settings come from the real
+  environment. `bazis dev` and `bazis test` still read `.env`.
+- `bazis new` ignores `.env.*` in git too (Bun reads `.env.local` and
+  `.env.<NODE_ENV>`), except `.env.example`.
+
+### Fixed
+
+- Credentials in URLs are redacted: `postgres://app:pa55word@db/app` becomes
+  `postgres://***:***@db/app` in log fields, logged errors and their stacks,
+  health details and startup failures. Before, an error with such a URL
+  reached the log with the password.
+- `ConsoleLogger` redacts the message text with the same rules as the fields
+  (`password=…`, bearer tokens, URL credentials); `redaction: false` turns both off.
+- A configuration error with a short secret set no longer loses letters: the
+  value of every secret was replaced across the whole message, so a secret `a`
+  turned `mail.apiKey` into `m***il.***piKey`. A validator message hides its own
+  value only, and a wrong value of a key with a sensitive name is not quoted.
+
 ## 0.98.28 — 2026-10-11
 
 ### Added

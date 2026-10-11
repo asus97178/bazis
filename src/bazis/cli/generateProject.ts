@@ -164,7 +164,8 @@ function buildProjectFiles(name: string, dependency: string, frameworkMode: Fram
     ["package.json", `${JSON.stringify(manifest, null, 2)}\n`],
     ["tsconfig.json", `${JSON.stringify(tsconfig, null, 2)}\n`],
     ["bazis.config.json", `${JSON.stringify(codegen, null, 2)}\n`],
-    [".gitignore", "node_modules/\nbin/\nsrc/generated/\n.env\n"],
+    // Bun reads .env, .env.local and .env.<NODE_ENV>: none of them belongs in git.
+    [".gitignore", "node_modules/\nbin/\nsrc/generated/\n.env\n.env.*\n!.env.example\n"],
     [".env.example", "# Copy to .env (Bun loads it automatically).\nBAZIS_ENV=development\nHOST=127.0.0.1\nPORT=3000\n"],
     ["src/app/test/health.test.ts", HEALTH_TEST],
     ["AGENTS.md", "# Working on this bazis project\n\nBefore changing the application, read the [module architecture](docs/architecture/MODULE_ARCHITECTURE.md). Create new modules only with `bunx bazis g module` or `bunx bazis g pack`; fill in the generated `MODULE.md` afterwards. Only codegen updates `src/generated/`.\n"],

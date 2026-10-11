@@ -19,6 +19,8 @@ const DEFAULT_SENSITIVE_FRAGMENTS = [
 const SECRET_TEXT_PATTERN =
   /\b(password|passwd|passphrase|secret|token|api[-_]?key|cookie|set-cookie|private[-_]?key|client[-_]?secret)\b(\s*[:=]\s*)("[^"]*"|'[^']*'|[^,\s}]+)/gi;
 const BEARER_TEXT_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
+// Credentials in a URL: postgres://user:password@host, https://token@host.
+const URL_USERINFO_PATTERN = /\b([a-z][a-z0-9+.-]*:\/\/)([^\s/?#@]+)@/gi;
 
 export interface SensitiveRedactionOptions {
   readonly replacement?: string;
@@ -162,5 +164,7 @@ function normalizeKey(key: string): string {
 function redactText(value: string, replacement: string): string {
   return value
     .replace(SECRET_TEXT_PATTERN, (_match, name: string, separator: string) => `${name}${separator}${replacement}`)
-    .replace(BEARER_TEXT_PATTERN, (_match, scheme: string) => `${scheme} ${replacement}`);
+    .replace(BEARER_TEXT_PATTERN, (_match, scheme: string) => `${scheme} ${replacement}`)
+    .replace(URL_USERINFO_PATTERN, (_match, scheme: string, userinfo: string) =>
+      `${scheme}${userinfo.includes(":") ? `${replacement}:${replacement}` : replacement}@`);
 }

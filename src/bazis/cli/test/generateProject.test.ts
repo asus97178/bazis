@@ -66,6 +66,7 @@ describe("new project", () => {
     expect(manifest.scripts.bazis).toBeUndefined();
     expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("atomic module");
     expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toContain("registerBazisGeneratedRuntime");
+    expect((await readFile(path.join(outputPath, ".gitignore"), "utf8")).split("\n")).toEqual(expect.arrayContaining([".env", ".env.*", "!.env.example"]));
     await expect(generateProject(options)).rejects.toThrow("already exists");
     await expect(generateProject({ name: "Bad", outputPath: path.join(root, "bad"), frameworkPath: root })).rejects.toThrow("Local Bazis package not found");
     await expect(generateProject({ name: "Orphan", outputPath: path.join(root, "missing/parent/orphan"), frameworkPath })).rejects.toThrow("Parent directory does not exist");

@@ -1,3 +1,5 @@
+import { readdir, stat } from "node:fs/promises";
+import path from "node:path";
 import { KernelError } from "../errors";
 import type { ConfigSource } from "../types";
 
@@ -92,6 +94,62 @@ export function jsonFileSource(path: string, options?: { readonly optional?: boo
         throw new KernelError(`Configuration file "${path}" must contain a JSON object at the top level.`);
       }
       return flatten(parsed as ConfigTree);
+    },
+  };
+}
+
+/** Largest secret file read by {@link secretFilesSource}: keys and certificates are a few KiB. */
+const SECRET_FILE_MAX_BYTES = 64 * 1024;
+
+/**
+ * Secret files of a directory, as Docker and Kubernetes mount them
+ * (`/run/secrets`). Each file is one value; its name is the key, written as
+ * the key (`db.password`) or as its variable (`BAZIS_DB__PASSWORD`). Trailing
+ * line breaks are removed. Hidden entries (Kubernetes `..data`) and
+ * directories are skipped. Errors name the file, never its content.
+ */
+export function secretFilesSource(directory: string, options?: { readonly optional?: boolean }): ConfigSource {
+  return {
+    description: `files(${directory})`,
+    load: async () => {
+      let names: string[];
+      try {
+        names = await readdir(directory);
+      } catch (error) {
+        if (options?.optional === true && (error as NodeJS.ErrnoException).code === "ENOENT") {
+          return {};
+        }
+        throw new KernelError(`Secret directory "${directory}" cannot be read (${(error as NodeJS.ErrnoException).code ?? "error"}).`);
+      }
+      const result: Record<string, string> = {};
+      for (const name of names.sort()) {
+        if (name.startsWith(".")) {
+          continue;
+        }
+        const file = path.join(directory, name);
+        let text: string;
+        try {
+          // stat follows the symlinks Kubernetes uses for each key.
+          const info = await stat(file);
+          if (!info.isFile()) {
+            continue;
+          }
+          if (info.size > SECRET_FILE_MAX_BYTES) {
+            throw new KernelError(`Secret file "${file}" is larger than ${SECRET_FILE_MAX_BYTES} bytes.`);
+          }
+          text = await Bun.file(file).text();
+        } catch (error) {
+          if (error instanceof KernelError) throw error;
+          throw new KernelError(`Secret file "${file}" cannot be read (${(error as NodeJS.ErrnoException).code ?? "error"}).`);
+        }
+        const key = name.toUpperCase().startsWith(ENV_PREFIX)
+          ? name.slice(ENV_PREFIX.length).toLowerCase().replaceAll("__", ".")
+          : name.toLowerCase();
+        if (key.length > 0) {
+          result[key] = text.replace(/[\r\n]+$/, "");
+        }
+      }
+      return result;
     },
   };
 }

@@ -29,7 +29,7 @@ export {
   type ValidatableConfig,
 } from "./config/defineConfig";
 export { addConfigOptions, configOptions, type ConfigOptionsBinding } from "./config/addConfigOptions";
-export { argsSource, envSource, jsonFileSource, memorySource } from "./config/sources";
+export { argsSource, envSource, jsonFileSource, memorySource, secretFilesSource } from "./config/sources";
 
 export {
   EVENT_HANDLER,
