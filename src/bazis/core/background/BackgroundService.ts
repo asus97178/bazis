@@ -1,4 +1,4 @@
-import type { HostedService, HostedServiceDiagnostics } from "../di";
+import type { HostedService, HostedServiceDiagnostics, HostedServiceHealth } from "../di";
 import { backgroundOptionsOf } from "./decorator";
 import { delay } from "./delay";
 import { redactSensitive } from "../../library/redaction";
@@ -56,6 +56,8 @@ export abstract class BackgroundService implements HostedService {
 
   /** The application logger, passed by the kernel; console until then. */
   private diagnostics?: HostedServiceDiagnostics;
+  /** Set when the service stopped for good after a crash: `/health` reports it. */
+  private terminated?: string;
 
   public constructor(options?: BackgroundServiceOptions) {
     // Explicit `super(...)` options win over `@Background({...})` metadata.
@@ -67,6 +69,15 @@ export abstract class BackgroundService implements HostedService {
 
   /** The background workload. Must observe `signal` for cooperative shutdown. */
   protected abstract execute(signal: AbortSignal): void | Promise<void>;
+
+  /**
+   * Unhealthy once the service stopped for good: it crashed without a restart
+   * policy, or used up its restarts. A pause before a restart, a tick failure
+   * of a periodic service and a normal end of `execute` stay healthy.
+   */
+  public checkHealth(): HostedServiceHealth {
+    return this.terminated === undefined ? { healthy: true } : { healthy: false, details: this.terminated };
+  }
 
   public useDiagnostics(diagnostics: HostedServiceDiagnostics): void {
     this.diagnostics = diagnostics;
@@ -119,9 +130,11 @@ export abstract class BackgroundService implements HostedService {
         this.reportError(error, restarts);
         if (restarts >= maxRestarts) {
           // Without this line the service would just go quiet.
-          report(this.diagnostics, "error", this.constructor.name, maxRestarts === 0
+          const stopped = maxRestarts === 0
             ? "stopped after a crash and will not run again (no restart policy)"
-            : `stopped after ${maxRestarts} restart${maxRestarts === 1 ? "" : "s"} and will not run again`, { restarts });
+            : `stopped after ${maxRestarts} restart${maxRestarts === 1 ? "" : "s"} and will not run again`;
+          report(this.diagnostics, "error", this.constructor.name, stopped, { restarts });
+          this.terminated = `${stopped}: ${error instanceof Error ? error.message : String(error)}`;
           return;
         }
         restarts += 1;

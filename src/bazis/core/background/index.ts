@@ -10,6 +10,5 @@ export {
   type BackgroundServiceOptions,
   type PeriodicBackgroundServiceOptions,
 } from "./BackgroundService";
-export { backgroundModule, type BackgroundModuleConfig } from "./backgroundModule";
 export { Background, backgroundOptionsOf, type BackgroundDecoratorOptions } from "./decorator";
 export { delay } from "./delay";

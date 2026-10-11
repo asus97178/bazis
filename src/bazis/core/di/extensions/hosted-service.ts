@@ -22,7 +22,18 @@ export interface HostedServiceDiagnostics {
   warn(message: string, fields?: Readonly<Record<string, unknown>>): void;
 }
 
+/** What a hosted service reports to `/health`. */
+export interface HostedServiceHealth {
+  readonly healthy: boolean;
+  readonly details?: string;
+}
+
 export interface HostedService {
+  /**
+   * The service's own state for `/health`. A `background` service of a module
+   * is reported as `background:<Class>`; without this method it is healthy.
+   */
+  checkHealth?(): HostedServiceHealth;
   /** Shared validators see real service identities, including inside supervised wrappers. */
   readonly planValidator?: HostedServicePlanValidator;
   /** Receives the application logger before start, when one is registered. */
@@ -38,6 +49,15 @@ export interface HostedService {
 }
 
 export const HOSTED_SERVICE = createToken<HostedService>("IHostedService");
+
+/** A health check contributed by a hosted service; the kernel reports it next to its own checks. */
+export interface HostedServiceHealthCheck {
+  readonly name: string;
+  check(): HostedServiceHealth;
+}
+
+/** Enumerable: one entry per `background` service of the module graph. */
+export const HOSTED_SERVICE_HEALTH = createToken<HostedServiceHealthCheck>("BazisHostedServiceHealth");
 
 interface HostedServiceResolver {
   resolveAll(token: typeof HOSTED_SERVICE): readonly HostedService[];

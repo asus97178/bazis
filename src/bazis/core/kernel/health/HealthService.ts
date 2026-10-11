@@ -1,4 +1,4 @@
-import type { ServiceResolver } from "../../di";
+import { HOSTED_SERVICE_HEALTH, type ServiceResolver } from "../../di";
 import { redactSensitiveText } from "../../../library/redaction";
 import { awaitAbortable } from "../internal/awaitAbortable";
 import { KernelError } from "../errors";
@@ -21,7 +21,8 @@ export class HealthService {
     const timeoutMs = bounded(options.timeoutMs ?? 5000, "timeoutMs", 2147483647);
     const checkTimeoutMs = bounded(options.checkTimeoutMs ?? 1000, "checkTimeoutMs", 2147483647);
     const concurrency = bounded(options.concurrency ?? 4, "concurrency", 1024);
-    const checks = this.resolver.resolveAll(HEALTH_CHECK);
+    // Hosted services (background) report whether they still run.
+    const checks: readonly HealthCheck[] = [...this.resolver.resolveAll(HEALTH_CHECK), ...this.resolver.resolveAll(HOSTED_SERVICE_HEALTH)];
     const entries: HealthReportEntry[] = new Array(checks.length);
     const report = new AbortController();
     const timer = setTimeout(() => report.abort(new Error("Health report timed out.")), timeoutMs);

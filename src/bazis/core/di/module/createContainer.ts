@@ -1,6 +1,6 @@
 import { DiContainer } from "../container";
 import { ServiceCollection } from "../ServiceCollection";
-import { HOSTED_SERVICE, type HostedService } from "../extensions/hosted-service";
+import { HOSTED_SERVICE, HOSTED_SERVICE_HEALTH, type HostedService } from "../extensions/hosted-service";
 import { SERVICE_PROVIDER, SERVICE_PROVIDER_BY_TYPE } from "../extensions/service-provider-token";
 import { isClassProvider, ProviderDefinition, type Provider } from "../provider";
 import { getClassDeps } from "../internal/classDeps";
@@ -161,6 +161,13 @@ export function createContainer(rootModule: BazisModuleRef, options?: CreateCont
         collection.add(singleton(ServiceClass));
         collection.add(
           DI.singleton(DI.factoryProviderWithResolver(HOSTED_SERVICE, [], (resolver) => resolver.resolve(ServiceClass))),
+        );
+        // `/health` sees a service that stopped for good, not only the process.
+        collection.add(
+          DI.singleton(DI.factoryProviderWithResolver(HOSTED_SERVICE_HEALTH, [], (resolver) => {
+            const service = resolver.resolve(ServiceClass);
+            return { name: `background:${ServiceClass.name}`, check: () => service.checkHealth?.() ?? { healthy: true } };
+          })),
         );
       }
     }

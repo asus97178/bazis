@@ -4,7 +4,6 @@ import {
   Background,
   BackgroundService,
   PeriodicBackgroundService,
-  backgroundModule,
   delay,
 } from "@/core/background";
 
@@ -289,9 +288,9 @@ class Recorder extends BackgroundService {
   }
 }
 
-describe("backgroundModule: DI wiring", () => {
+describe("background of a module: DI wiring", () => {
   test("registers a service as HOSTED_SERVICE and the kernel can run it", async () => {
-    @Module({ imports: [backgroundModule({ services: [Recorder] })] })
+    @Module({ background: [Recorder] })
     class AppModule {}
 
     const container = createContainer(AppModule, { validateOnBuild: true });
