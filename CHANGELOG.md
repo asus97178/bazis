@@ -4,6 +4,21 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.4 — 2026-10-13
+
+### Fixed
+
+- A failing audit sink no longer shows its error text to the model: a
+  `fail-closed` call returns `TOOL_AUDIT_FAILED` with `Tool audit failed.`
+  (the outcome-unknown variant keeps its code and fixed text). Before, the
+  message carried the sink's exception, such as the audit database address.
+- Audit failures are logged as `Agent tool audit failed` with the phase, the
+  mode (`fail-closed`, `best-effort`, `required` for hook evidence), the tool,
+  the call id and the error with its stack. In `best-effort` mode the call
+  still goes on, but a lost audit entry is no longer silent. Late failures —
+  a deferred scope disposal, a deferred settlement audit — go to the
+  application logger instead of a bare `console.error`.
+
 ## 0.99.3 — 2026-10-12
 
 ### Fixed

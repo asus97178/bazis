@@ -115,6 +115,10 @@ audit. A hook that throws, times out or returns an invalid answer is logged as
 `AgentRuntime` at start, so wrong runtime options or enforcement hooks without
 an audit sink stop the application with a configuration error.
 
+An audit sink that fails is logged as `Agent tool audit failed` with the
+phase and mode, in `best-effort` too, where the call goes on; the model sees
+only `Tool audit failed.`.
+
 Retries are opt-in. `write` and `external` tools need an idempotency key before
 the executor repeats them. Runtime-generated keys include both the invocation id
 and the unique model call id; `toolExecution.idempotencyKeyForCall` gives a

@@ -811,7 +811,8 @@ export class AgentToolExecutor {
     });
     // Observer evidence is deliberately best effort and uses an independent
     // bounded write: it cannot alter the already-terminal Tool result.
-    await awaitHook(Promise.resolve().then(() => auditSinkFunction(this.auditSink!)(entry)), undefined, timeoutMs);
+    const recorded = await awaitHook(Promise.resolve().then(() => auditSinkFunction(this.auditSink!)(entry)), undefined, timeoutMs);
+    if (recorded.kind !== "value") this.logAuditFailure("observer", settlement.toolName, settlement.callId, settlement.agentName, "best-effort", recorded);
   }
 
   private async executePipeline(
@@ -1195,8 +1196,12 @@ export class AgentToolExecutor {
     if (!this.auditSink) return true;
     try {
       const outcome = await awaitHook(Promise.resolve().then(() => auditSinkFunction(this.auditSink!)({ kind: "agent-tool", phase, callId: call.id, toolName: tool.metadata.name, input: redactSensitive(normalizeJsonValue(call.input, "hook.audit.input"), this.hookRedaction), tool: { name: tool.metadata.name, sideEffect: tool.metadata.sideEffect, approval: tool.metadata.approval, tags: tool.metadata.tags ?? [] }, startedAtUnixMs: startedAt, finishedAtUnixMs: Date.now(), durationMs: Date.now() - startedAt, metadata: redactSensitive(metadata, this.hookRedaction) as JsonObject, hook })), signal, timeoutMs);
+      if (outcome.kind !== "value") this.logAuditFailure(phase, call.name, call.id, options.agentName, "required", outcome);
       return outcome.kind !== "value";
-    } catch { return true; }
+    } catch (error) {
+      this.logAuditFailure(phase, call.name, call.id, options.agentName, "required", { kind: "failed", error });
+      return true;
+    }
   }
 
   private frameworkTerminalAuditTimeout(remainingMs: number | undefined): number {
@@ -1216,8 +1221,12 @@ export class AgentToolExecutor {
         result: redactSensitive(result, this.hookRedaction) as AgentToolResult,
         startedAtUnixMs: startedAt, finishedAtUnixMs: Date.now(), durationMs: Date.now() - startedAt,
       })), signal, timeoutMs);
+      if (outcome.kind !== "value") this.logAuditFailure("result", result.name, result.callId, undefined, "required", outcome);
       return outcome.kind !== "value";
-    } catch { return true; }
+    } catch (error) {
+      this.logAuditFailure("result", result.name, result.callId, undefined, "required", { kind: "failed", error });
+      return true;
+    }
   }
 
   private hasMandatoryHooks(): boolean {
@@ -1965,6 +1974,7 @@ export class AgentToolExecutor {
       (error: unknown) => ({ ok: false, error } as const),
     );
     const outcome = await awaitHook(settled, signal, timeoutMs);
+    if (outcome.kind === "timeout") this.logAuditFailure(entry.phase, entry.toolName, entry.callId, entry.agentName, audit.failureMode, outcome);
     if (outcome.kind !== "value") return outcome;
     return outcome.value.ok
       ? { kind: "value", value: undefined }
@@ -1980,6 +1990,8 @@ export class AgentToolExecutor {
     originalResult: AgentToolResult | undefined,
     error: unknown,
   ): AgentToolResult | undefined {
+    // Logged in both modes: in best-effort the call goes on, and the lost entry is visible only here.
+    this.logAuditFailure(entry.phase, entry.toolName, entry.callId, entry.agentName, audit.failureMode, { kind: "failed", error });
     if (audit.failureMode === "best-effort") return undefined;
     const sideEffectingSuccess = entry.phase === "result"
       && originalResult?.status === "success"
@@ -1991,8 +2003,8 @@ export class AgentToolExecutor {
         call,
         outcomeUnknown ? "TOOL_AUDIT_FAILED_OUTCOME_UNKNOWN" : "TOOL_AUDIT_FAILED",
         outcomeUnknown
-          ? `Tool result audit failed after an outcome-unknown side-effecting operation; retry safety is unknown: ${errorMessageOf(error)}`
-          : `Tool audit failed: ${errorMessageOf(error)}`,
+          ? "Tool result audit failed after an outcome-unknown side-effecting operation; retry safety is unknown."
+          : "Tool audit failed.",
         metadata,
         startedAt,
         {
@@ -2042,12 +2054,12 @@ export class AgentToolExecutor {
       .then(async (result) => {
         const error = await this.disposeScope(scope, scopeDisposeTimeoutMs);
         if (error !== undefined) {
-          console.error("[agent-tool] deferred scope disposal failed:", redactSensitive(error));
+          this.reportDeferred("Agent tool scope disposal failed", { tool: call.name, callId: call.id, error: redactSensitive(error) });
         }
         await onSettled(result);
       })
       .catch((error: unknown) => {
-        console.error("[agent-tool] deferred settlement handling failed:", redactSensitive(errorMessageOf(error)));
+        this.reportDeferred("Agent tool settlement handling failed", { tool: call.name, callId: call.id, error: redactSensitive(error) });
       });
   }
 
@@ -2056,10 +2068,35 @@ export class AgentToolExecutor {
     try {
       await auditSinkFunction(audit.sink)(entry);
     } catch (error) {
-      console.error("[agent-tool] deferred settlement audit failed:", redactSensitive(errorMessageOf(error)));
+      this.logAuditFailure(entry.phase, entry.toolName, entry.callId, entry.agentName, audit.failureMode, { kind: "failed", error });
     }
   }
 
+
+  /**
+   * The audit sink did not record an entry. `mode` is how the call treated it:
+   * `fail-closed` stopped it, `best-effort` let it go on, `required` is hook evidence.
+   */
+  private logAuditFailure(
+    phase: string,
+    toolName: string,
+    callId: string,
+    agentName: string | undefined,
+    mode: AgentToolAuditFailureMode | "required",
+    outcome: HookOutcome<unknown>,
+  ): void {
+    if (outcome.kind === "value" || outcome.kind === "cancelled") return;
+    this.logger?.error("Agent tool audit failed", {
+      phase, mode, agent: agentName ?? null, tool: toolName, callId,
+      ...(outcome.kind === "timeout" ? { reason: "timed out" } : outcome.error === undefined ? {} : { error: redactSensitive(outcome.error) }),
+    });
+  }
+
+  /** Late failures after the call returned; without an application logger they still reach stderr. */
+  private reportDeferred(message: string, fields: Record<string, unknown>): void {
+    if (this.logger) this.logger.error(message, fields);
+    else console.error(`[agent-tool] ${message}`, fields);
+  }
 
   /** A hook that failed, timed out or answered nonsense; a cancelled run is not a failure. */
   private logHookFailure(
