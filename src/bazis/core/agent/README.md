@@ -108,6 +108,13 @@ details stay out of the LLM — and goes to the application log with its stack
 call failed`. The LLM connectors pass the application logger; a runtime created
 by hand takes `options.logger`.
 
+An enforcement hook that denies a call explains why with `message` — it reaches
+the model as written, with `reasonCode` in `error.details`, and both go to the
+audit. A hook that throws, times out or returns an invalid answer is logged as
+`Agent tool hook failed` with the error. `llmConnect` and `llmRouter` build
+`AgentRuntime` at start, so wrong runtime options or enforcement hooks without
+an audit sink stop the application with a configuration error.
+
 Retries are opt-in. `write` and `external` tools need an idempotency key before
 the executor repeats them. Runtime-generated keys include both the invocation id
 and the unique model call id; `toolExecution.idempotencyKeyForCall` gives a

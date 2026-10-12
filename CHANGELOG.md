@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.3 — 2026-10-12
+
+### Fixed
+
+- The `message` of an enforcement hook's `deny` reaches the model:
+  `{ decision: "deny", reasonCode: "ORDER_LIMIT", message: "Orders over 1000
+  are cancelled by a manager" }` gives the tool result `TOOL_HOOK_DENIED` with
+  that message and `details.reasonCode`, so the agent can explain the refusal.
+  The audit entry of the hook has the message too. Before, the message was
+  checked and dropped, and the model saw only a generic denial.
+- A hook that throws, times out or returns an invalid answer is logged as
+  `Agent tool hook failed` with the hook, tool, call id and the error with its
+  stack (secrets masked). Before, only the audit said `failed`, and the error
+  was lost.
+- An `AgentRuntime` that cannot be built — wrong `AGENT_RUNTIME_OPTIONS`,
+  enforcement or settlement hooks without an audit sink — stops the
+  application at start: `[bazis] configuration error: AgentRuntime: Agent Tool
+  enforcement and settlement hooks require constructor auditSink.` Before, the
+  application started, `/health` answered 200, and every agent request failed
+  with 500.
+
 ## 0.99.2 — 2026-10-12
 
 ### Changed

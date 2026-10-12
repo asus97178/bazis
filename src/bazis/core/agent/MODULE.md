@@ -128,6 +128,12 @@ created.`); the error with its stack goes to `AgentRuntimeOptions.logger`
 failures except an abort are logged as `Agent model call failed`; the LLM
 connectors pass the application `LOGGER`.
 
+An enforcement `deny` carries `message` to the model (`TOOL_HOOK_DENIED`,
+`details.reasonCode`) and to the audit projection; without it the generic text
+stays. Hook failures, timeouts and invalid answers are logged as `Agent tool hook
+failed`. The LLM connectors resolve `AgentRuntime` in a hosted service at start
+and turn a construction error into a `DiError` (`AgentRuntime: …`).
+
 A started `write` / `external` that is interrupted before `execute` finishes gets
 `TOOL_TIMEOUT_OUTCOME_UNKNOWN` or `TOOL_ABORTED_OUTCOME_UNKNOWN`. The code is kept
 with hooks connected; settlement gets `outcomeKnown: false`.
