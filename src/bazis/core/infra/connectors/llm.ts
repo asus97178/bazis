@@ -1,6 +1,7 @@
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { AGENT_MODEL_PROVIDER, AGENT_RUNTIME_OPTIONS, AgentRuntime, type AgentModelProvider } from "../../agent";
 import { DI, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
+import { LOGGER } from "../../kernel/logging/Logger";
 import { reader, requireValue } from "../connectorConfig";
 import { InfraError, type InfraConnector } from "../InfraConnector";
 import { identifyConnector } from "../connectorIdentity";
@@ -62,7 +63,8 @@ export function resolveLlmConnectionOptions<T extends LlmConfigShape>(
 export const agentRuntimeProviders: readonly ProviderDefinition[] = Object.freeze([
   DI.singleton(DI.factoryProviderWithResolver(AgentRuntime, [AGENT_MODEL_PROVIDER], (resolver, model: AgentModelProvider) => {
     const services = resolver.resolve(SERVICE_PROVIDER);
-    return new AgentRuntime(services, model, services.has(AGENT_RUNTIME_OPTIONS) ? services.resolve(AGENT_RUNTIME_OPTIONS) : {});
+    const options = services.has(AGENT_RUNTIME_OPTIONS) ? services.resolve(AGENT_RUNTIME_OPTIONS) : {};
+    return new AgentRuntime(services, model, { ...options, logger: options.logger ?? services.tryResolve(LOGGER) });
   })),
 ]);
 

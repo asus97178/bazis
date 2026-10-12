@@ -83,6 +83,7 @@ export {
   AgentRuntimeError,
   AgentSemanticError,
   AgentToolExecutionError,
+  ToolError,
   ApproximateAgentContextTokenEstimator,
   DefaultAgentContextBuilder,
   Tool,

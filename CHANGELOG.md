@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.2 — 2026-10-12
+
+### Changed
+
+- An exception thrown by a tool no longer shows its text to the model: the
+  model gets `Tool execution failed.` (`Tool could not be created.` when the
+  constructor fails), so database hosts, SQL and other internals stay out of
+  the LLM and out of its answer to the user. To tell the model why on
+  purpose, throw `ToolError`: `throw new ToolError("Product kiwi is no longer
+  sold")` reaches the model as written. `AgentToolPreCommitError` is a
+  `ToolError` and keeps its message too.
+
+### Fixed
+
+- Failures of agents are logged. An unexpected tool exception is written as
+  `Agent tool failed` with the agent, tool, call id, code and the error with
+  its stack (secrets masked); a write with an unknown outcome as `Agent tool
+  outcome unknown`; a failed or timed-out model call as `Agent model call
+  failed`. Before, they were only in the run result, and the stack was lost.
+  The LLM connectors pass the application logger; `new AgentRuntime(...)`
+  takes `options.logger`.
+
 ## 0.99.1 — 2026-10-12
 
 ### Added
