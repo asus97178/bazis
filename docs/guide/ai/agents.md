@@ -441,6 +441,6 @@ test("support agent looks the order up and answers", async () => {
 ## Дальше
 
 - [Инструменты](tools.md)
-- Хуки инструментов и аудит
+- [Хуки инструментов и аудит](hooks.md)
 - LLM-коннекторы
 - [Тестирование](../fundamentals/testing.md)
