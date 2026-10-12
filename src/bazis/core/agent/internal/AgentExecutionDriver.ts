@@ -3,6 +3,7 @@ import { describeTool } from "../Tool.contract";
 import type { ServiceProvider } from "../../di";
 import { getGeneratedOpenApiMetadata } from "../../http/OpenApi/generatedOpenApiRegistry";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
+import type { Logger } from "../../kernel/logging/Logger";
 import { AgentRuntimeError } from "../errors";
 import { validateAgentJsonSchema } from "./AgentJsonSchema";
 import type { AgentDefinition, AgentRegistry } from "../AgentRegistry";
@@ -80,6 +81,11 @@ export interface AgentRuntimeOptions {
   readonly contextBuilder?: AgentContextBuilder;
   readonly contextLimits?: AgentContextLimits;
   readonly toolExecutorOptions?: AgentToolExecutorOptions;
+  /**
+   * Where failures of the model and unexpected tool failures go, with their
+   * stack. The LLM connectors pass the application logger.
+   */
+  readonly logger?: Logger;
 }
 
 export interface AgentRuntimeInvokeOptions {
@@ -503,6 +509,7 @@ export class AgentExecutionDriver {
   readonly defaultTimeoutMs?: number;
   private readonly defaultContextLimits?: AgentContextLimits;
   private readonly contextBuilder: AgentContextBuilder;
+  private readonly logger?: Logger;
 
   constructor(
     services: ServiceProvider,
@@ -521,7 +528,8 @@ export class AgentExecutionDriver {
       : options.timeoutMs ?? DEFAULT_MODEL_TIMEOUT_MS;
     this.defaultContextLimits = normalizeAgentContextLimits(options.contextLimits, "AgentRuntime.contextLimits");
     this.contextBuilder = options.contextBuilder ?? new DefaultAgentContextBuilder();
-    this.toolExecutor = new AgentToolExecutor(services, registry, options.toolExecutorOptions);
+    this.logger = options.logger;
+    this.toolExecutor = new AgentToolExecutor(services, registry, options.toolExecutorOptions, options.logger);
   }
 
   async invoke(agentName: string, options: AgentRuntimeInvokeOptions = {}): Promise<AgentRuntimeResult> {
@@ -1122,6 +1130,7 @@ export class AgentExecutionDriver {
       try {
         return { ok: true, value: normalizeProviderResponse(rawResponse) };
       } catch (error) {
+        this.logger?.error("Agent model call failed", { agent: agentName, invocationId: request.invocationId, code: "AGENT_PROVIDER_RESPONSE_INVALID", error: redactSensitive(error) });
         return {
           ok: false,
           error: runtimeError("AGENT_PROVIDER_RESPONSE_INVALID", `Model provider returned an invalid response: ${errorMessageOf(error)}`),
@@ -1133,6 +1142,9 @@ export class AgentExecutionDriver {
         : error instanceof AgentRuntimeAbortError
           ? "AGENT_ABORTED"
           : "AGENT_PROVIDER_FAILED";
+      if (code !== "AGENT_ABORTED") {
+        this.logger?.error("Agent model call failed", { agent: agentName, invocationId: request.invocationId, code, error: redactSensitive(error) });
+      }
       return { ok: false, error: runtimeError(code, errorMessageOf(error)) };
     } finally {
       acceptingText = false;

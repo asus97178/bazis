@@ -100,6 +100,14 @@ Tool input and output are validated by the model validator
 otherwise. Audit entries redact `input`, `result` and execution `metadata`
 by default using `bazis/library/redaction`.
 
+A tool reports a failure to the model with `throw new ToolError("Product
+kiwi is no longer sold")`: the message reaches the model as written. Any other
+exception from `execute` reaches the model as `Tool execution failed.` — internal
+details stay out of the LLM — and goes to the application log with its stack
+(`Agent tool failed`). Failures of the model itself are logged as `Agent model
+call failed`. The LLM connectors pass the application logger; a runtime created
+by hand takes `options.logger`.
+
 Retries are opt-in. `write` and `external` tools need an idempotency key before
 the executor repeats them. Runtime-generated keys include both the invocation id
 and the unique model call id; `toolExecution.idempotencyKeyForCall` gives a

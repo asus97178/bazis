@@ -7,7 +7,8 @@ import { assertAgentToolHookIdV1, getAgentModuleContributionsV1, type AgentModul
 import type { AgentToolBeforeEffectEventV1, AgentToolEnforcementDecisionV1, AgentToolHookContextV1, AgentToolRequiredHookRefV1, AgentToolAuditHookProjectionV1, AgentToolSettlementEventV1 } from "./AgentToolHooks";
 import { agentModelJson } from "./internal/AgentModelBinding";
 import { redactSensitive, type SensitiveRedactionOptions } from "../../library/redaction";
-import { AgentSetupError, AgentToolExecutionError, AgentToolPreCommitError } from "./errors";
+import { AgentSetupError, AgentToolExecutionError, AgentToolPreCommitError, ToolError } from "./errors";
+import type { Logger } from "../kernel/logging/Logger";
 import type { AgentRegistry, ToolDefinition } from "./AgentRegistry";
 import type { JsonObject, JsonValue, AgentToolCall, AgentToolResult } from "./semantic";
 import { agentToolCall, agentToolResult, normalizeJsonValue } from "./semantic";
@@ -430,6 +431,8 @@ export class AgentToolExecutor {
     private readonly services: ServiceProvider,
     private readonly registry: AgentRegistry,
     options: AgentToolExecutorOptions = {},
+    /** Where unexpected tool failures go with their stack; the model sees a generic message. */
+    private readonly logger?: Logger,
   ) {
     assertNonNegativeInteger(options.defaultTimeoutMs, "AgentToolExecutor.defaultTimeoutMs");
     assertPositiveInteger(options.scopeDisposeTimeoutMs, "AgentToolExecutor.scopeDisposeTimeoutMs");
@@ -1530,15 +1533,12 @@ export class AgentToolExecutor {
           );
         });
         const code = this.interruptionCode(error, tool, executionState);
+        if (code.endsWith("_OUTCOME_UNKNOWN")) {
+          this.logger?.error("Agent tool outcome unknown", { agent: agentName ?? null, tool: call.name, callId: call.id, code, phase: executionState.phase });
+        }
         return this.errorResult(call, code, executionState.timedOut ? "Tool execution timed out." : errorMessageOf(error), this.attemptMetadata(metadata, attempt), startedAt, { phase: executionState.phase });
       }
-      result = this.errorResult(
-        call,
-        "TOOL_EXECUTION_FAILED",
-        errorMessageOf(error),
-        this.attemptMetadata(metadata, attempt),
-        startedAt,
-      );
+      result = this.failedResult(call, agentName, "TOOL_EXECUTION_FAILED", error, "Tool execution failed.", this.attemptMetadata(metadata, attempt), startedAt);
     } finally {
       detach?.();
     }
@@ -1582,13 +1582,7 @@ export class AgentToolExecutor {
         ? await contributed[0]!.activation.activateAsync(scope)
         : await scope.resolveAsync(tool.target);
     } catch (error) {
-      return this.errorResult(
-        call,
-        "TOOL_RESOLVE_FAILED",
-        `Tool resolve failed: ${errorMessageOf(error)}`,
-        this.attemptMetadata(metadata, attempt),
-        startedAt,
-      );
+      return this.failedResult(call, agentName, "TOOL_RESOLVE_FAILED", error, "Tool could not be created.", this.attemptMetadata(metadata, attempt), startedAt);
     }
 
     if (signal.aborted) {
@@ -1638,12 +1632,14 @@ export class AgentToolExecutor {
       const explicitlyPreCommit = error instanceof AgentToolPreCommitError;
       const outcomeUnknown = !explicitlyPreCommit
         && (tool.metadata.sideEffect === "write" || tool.metadata.sideEffect === "external");
-      return this.errorResult(
+      return this.failedResult(
         call,
+        agentName,
         outcomeUnknown ? "TOOL_EXECUTION_FAILED_OUTCOME_UNKNOWN" : "TOOL_EXECUTION_FAILED",
+        error,
         outcomeUnknown
-          ? `Tool "${tool.metadata.name}" threw after side-effect execution started; retry safety is unknown: ${errorMessageOf(error)}`
-          : errorMessageOf(error),
+          ? `Tool "${tool.metadata.name}" threw after side-effect execution started; retry safety is unknown.`
+          : "Tool execution failed.",
         this.attemptMetadata(metadata, attempt),
         startedAt,
         outcomeUnknown ? { sideEffect: tool.metadata.sideEffect, phase: "execute" } : undefined,
@@ -1664,13 +1660,7 @@ export class AgentToolExecutor {
       return this.postExecutionOutcome(
         call,
         tool,
-        this.errorResult(
-          call,
-          "TOOL_OUTPUT_INVALID",
-          `Tool output processing failed: ${errorMessageOf(error)}`,
-          this.attemptMetadata(metadata, attempt),
-          startedAt,
-        ),
+        this.failedResult(call, agentName, "TOOL_OUTPUT_INVALID", error, "Tool output processing failed.", this.attemptMetadata(metadata, attempt), startedAt),
         metadata,
         startedAt,
         attempt,
@@ -1692,13 +1682,7 @@ export class AgentToolExecutor {
       return this.postExecutionOutcome(
         call,
         tool,
-        this.errorResult(
-          call,
-          "TOOL_RESULT_INVALID",
-          errorMessageOf(error),
-          this.attemptMetadata(metadata, attempt),
-          startedAt,
-        ),
+        this.failedResult(call, agentName, "TOOL_RESULT_INVALID", error, "Tool result is invalid.", this.attemptMetadata(metadata, attempt), startedAt),
         metadata,
         startedAt,
         attempt,
@@ -2055,6 +2039,27 @@ export class AgentToolExecutor {
     }
   }
 
+
+  /**
+   * A tool's own failure: a ToolError message reaches the model as written;
+   * anything else is replaced by `fallback` and logged with its stack.
+   */
+  private failedResult(
+    call: AgentToolCall,
+    agentName: string | undefined,
+    code: string,
+    error: unknown,
+    fallback: string,
+    metadata: JsonObject,
+    startedAt: number,
+    details?: JsonObject,
+  ): AgentToolResult {
+    if (error instanceof ToolError) {
+      return this.errorResult(call, code, error.message, metadata, startedAt, details);
+    }
+    this.logger?.error("Agent tool failed", { agent: agentName ?? null, tool: call.name, callId: call.id, code, error: redactSensitive(error) });
+    return this.errorResult(call, code, fallback, metadata, startedAt, details);
+  }
 
   private errorResult(
     call: AgentToolCall,

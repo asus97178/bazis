@@ -15,6 +15,7 @@ export {
   AgentSetupError,
   AgentToolExecutionError,
   AgentToolPreCommitError,
+  ToolError,
 } from "./errors";
 export {
   AGENT_RUNTIME_OPTIONS,

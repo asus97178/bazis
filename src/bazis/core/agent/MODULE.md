@@ -120,6 +120,14 @@ The described scope has no database of its own, migrations, HTTP routes, UI or
 background jobs. The passed metadata/DTOs do not become process configuration. The
 global HTTP validator is not picked implicitly: Agent uses the validator passed to it.
 
+An exception from `execute`, the Tool constructor or output processing reaches
+the model as a generic message (`Tool execution failed.`, `Tool could not be
+created.`); the error with its stack goes to `AgentRuntimeOptions.logger`
+(`Agent tool failed`). Only `ToolError` (and its subclass
+`AgentToolPreCommitError`) carries its message to the model as written. Model
+failures except an abort are logged as `Agent model call failed`; the LLM
+connectors pass the application `LOGGER`.
+
 A started `write` / `external` that is interrupted before `execute` finishes gets
 `TOOL_TIMEOUT_OUTCOME_UNKNOWN` or `TOOL_ABORTED_OUTCOME_UNKNOWN`. The code is kept
 with hooks connected; settlement gets `outcomeKnown: false`.
