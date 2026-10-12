@@ -1,6 +1,6 @@
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { AGENT_MODEL_PROVIDER, AGENT_RUNTIME_OPTIONS, AgentRuntime, type AgentModelProvider } from "../../agent";
-import { DI, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
+import { DI, DiError, HOSTED_SERVICE, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
 import { LOGGER } from "../../kernel/logging/Logger";
 import { reader, requireValue } from "../connectorConfig";
 import { InfraError, type InfraConnector } from "../InfraConnector";
@@ -66,6 +66,19 @@ export const agentRuntimeProviders: readonly ProviderDefinition[] = Object.freez
     const options = services.has(AGENT_RUNTIME_OPTIONS) ? services.resolve(AGENT_RUNTIME_OPTIONS) : {};
     return new AgentRuntime(services, model, { ...options, logger: options.logger ?? services.tryResolve(LOGGER) });
   })),
+  // Builds the runtime at start: wrong options or hooks without an audit sink
+  // stop the application instead of failing every agent request.
+  DI.singleton(DI.factoryProviderWithResolver(HOSTED_SERVICE, [], (resolver) => ({
+    start() {
+      try {
+        resolver.resolve(AgentRuntime);
+      } catch (error) {
+        if (error instanceof DiError) throw error;
+        throw new DiError(`AgentRuntime: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+    stop() {},
+  }))),
 ]);
 
 export function llmConnect<T extends LlmConfigShape>(

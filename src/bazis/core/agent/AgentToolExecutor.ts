@@ -327,14 +327,14 @@ function isSettlementResult(value: unknown): value is { readonly status: "record
   } catch { return false; }
 }
 
-type HookOutcome<T> = { readonly kind: "value"; readonly value: T } | { readonly kind: "timeout" } | { readonly kind: "cancelled" } | { readonly kind: "failed" };
+type HookOutcome<T> = { readonly kind: "value"; readonly value: T } | { readonly kind: "timeout" } | { readonly kind: "cancelled" } | { readonly kind: "failed"; readonly error?: unknown };
 
 async function awaitHook<T>(operation: Promise<T>, signal: AbortSignal | undefined, timeoutMs: number | undefined): Promise<HookOutcome<T>> {
   // Observe both branches even after the caller's deadline wins: a late hook
   // rejection must never become an unhandled process-level rejection.
   const observed: Promise<HookOutcome<T>> = operation
     .then((value): HookOutcome<T> => ({ kind: "value", value }))
-    .catch((): HookOutcome<T> => ({ kind: "failed" }));
+    .catch((error: unknown): HookOutcome<T> => ({ kind: "failed", error }));
   if (signal?.aborted) return { kind: "cancelled" };
   let timer: ReturnType<typeof setTimeout> | undefined;
   let detach: (() => void) | undefined;
@@ -646,6 +646,7 @@ export class AgentToolExecutor {
         tier: this.isPlatformHook(record) ? "platform" : "application", order: registration.order ?? 0,
         outcome: "failed",
       };
+      let hookError: unknown;
       const postEffect = state.executeStarted;
       const configuredTimeoutMs = registration.timeoutMs ?? 5_000;
       const remainingMs = !postEffect && state.deadlineUnixMs !== undefined
@@ -683,6 +684,7 @@ export class AgentToolExecutor {
         const activated = await awaitHook(record.activation.activateAsync(scope), controller.signal, boundedTimeoutMs);
         if (activated.kind !== "value") {
           if (activated.kind === "timeout") controller.abort();
+          if (activated.kind === "failed") hookError = activated.error;
           projection = { ...projection, outcome: activated.kind === "timeout" ? "timed-out" : activated.kind === "cancelled" ? (state.callerSignal?.aborted ? "cancelled" : "timed-out") : "failed" };
           terminal = this.errorResult(call, "TOOL_HOOK_SETTLEMENT_FAILED", "Agent Tool settlement handler was unavailable.", metadata, startedAt);
         } else {
@@ -695,6 +697,7 @@ export class AgentToolExecutor {
             const outcome = await awaitHook(Promise.resolve((handler.settle as (value: AgentToolSettlementEventV1, context: AgentToolHookContextV1) => unknown)(event, context)), controller.signal, invocationTimeoutMs);
             if (outcome.kind === "timeout") controller.abort();
             if (outcome.kind !== "value") {
+              if (outcome.kind === "failed") hookError = outcome.error;
               projection = { ...projection, outcome: outcome.kind === "timeout" ? "timed-out" : outcome.kind === "cancelled" ? (state.callerSignal?.aborted ? "cancelled" : "timed-out") : "failed" };
               terminal = this.errorResult(call, "TOOL_HOOK_SETTLEMENT_FAILED", "Agent Tool settlement failed.", metadata, startedAt);
             } else if (!isSettlementResult(outcome.value)) {
@@ -707,17 +710,20 @@ export class AgentToolExecutor {
           }
         }
         }
-      } catch {
+      } catch (error) {
+        hookError = error;
         projection = { ...projection, outcome: "failed" };
         terminal = this.errorResult(call, "TOOL_HOOK_SETTLEMENT_FAILED", "Agent Tool settlement failed.", metadata, startedAt);
       } finally {
         detach?.();
         const disposeError = await this.disposeScope(scope, this.scopeDisposeTimeoutMs);
         if (disposeError !== undefined) {
+          hookError ??= disposeError;
           projection = { ...projection, outcome: "failed" };
           terminal = this.errorResult(call, "TOOL_HOOK_SETTLEMENT_FAILED", "Agent Tool settlement disposal failed.", metadata, startedAt);
         }
       }
+      this.logHookFailure(projection, call, event.agentName, hookError);
       const evidenceRemainingMs = postEffect || state.deadlineUnixMs === undefined
         ? registration.timeoutMs ?? 5_000
         : Math.max(0, Math.min(registration.timeoutMs ?? 5_000, state.deadlineUnixMs - Date.now()));
@@ -744,6 +750,7 @@ export class AgentToolExecutor {
       if (registration.kind !== "observer") continue;
       const scope = this.services.createScope();
       let outcome: AgentToolAuditHookProjectionV1["outcome"] = "failed";
+      let hookError: unknown;
       const timeoutMs = registration.timeoutMs ?? 5_000;
       const controller = new AbortController();
       const detach = attachAbortForwarding(options.signal, controller);
@@ -752,6 +759,7 @@ export class AgentToolExecutor {
         const activated = await awaitHook(record.activation.activateAsync(scope), controller.signal, timeoutMs);
         if (activated.kind !== "value") {
           if (activated.kind === "timeout") controller.abort();
+          if (activated.kind === "failed") hookError = activated.error;
           outcome = activated.kind === "timeout" ? "timed-out" : activated.kind === "cancelled" ? "cancelled" : "failed";
         } else {
           const handler = activated.value as { observe?: unknown };
@@ -764,15 +772,22 @@ export class AgentToolExecutor {
               Math.max(1, context.deadlineUnixMs - Date.now()),
             );
             if (observed.kind === "timeout" || observed.kind === "value") controller.abort();
+            if (observed.kind === "failed") hookError = observed.error;
             outcome = observed.kind === "value" ? "recorded" : observed.kind === "timeout" ? "timed-out" : observed.kind === "cancelled" ? "cancelled" : "failed";
           }
         }
-      } catch {
+      } catch (error) {
+        hookError = error;
         outcome = controller.signal.aborted && options.signal?.aborted ? "cancelled" : "failed";
       } finally {
         detach?.();
-        if (await this.disposeScope(scope, this.scopeDisposeTimeoutMs) !== undefined) outcome = "failed";
+        const disposeError = await this.disposeScope(scope, this.scopeDisposeTimeoutMs);
+        if (disposeError !== undefined) {
+          hookError ??= disposeError;
+          outcome = "failed";
+        }
       }
+      this.logHookFailure({ kind: registration.kind, id: registration.id, version: registration.version, outcome }, { id: settlement.callId, name: settlement.toolName }, settlement.agentName, hookError);
       await this.recordObserverHook(settlement, registration, record, outcome, timeoutMs);
     }
   }
@@ -1086,6 +1101,7 @@ export class AgentToolExecutor {
         tier: isPlatform(record) ? "platform" : "application", order: registration.order ?? 0,
         outcome: "failed",
       };
+      let hookError: unknown;
       const configuredTimeoutMs = registration.timeoutMs ?? 5_000;
       const remainingMs = executionState.deadlineUnixMs === undefined
         ? undefined : Math.max(0, executionState.deadlineUnixMs - Date.now());
@@ -1102,6 +1118,7 @@ export class AgentToolExecutor {
         const activated = await awaitHook(record.activation.activateAsync(scope), controller.signal, timeoutMs);
         if (activated.kind !== "value") {
           if (activated.kind === "timeout") controller.abort();
+          if (activated.kind === "failed") hookError = activated.error;
           projection = { ...projection, outcome: activated.kind === "timeout" ? "timed-out" : activated.kind === "cancelled" ? "cancelled" : "failed" };
           terminal = this.errorResult(call, activated.kind === "timeout" ? "TOOL_HOOK_TIMEOUT" : activated.kind === "cancelled" ? "TOOL_HOOK_CANCELLED" : "TOOL_HOOK_UNAVAILABLE", "Agent Tool enforcement handler was unavailable.", metadata, startedAt);
         } else {
@@ -1113,27 +1130,31 @@ export class AgentToolExecutor {
             if (outcome.kind === "timeout") controller.abort();
             if (outcome.kind === "timeout") { projection = { ...projection, outcome: "timed-out" }; terminal = this.errorResult(call, "TOOL_HOOK_TIMEOUT", "Agent Tool enforcement hook timed out.", metadata, startedAt); }
             else if (outcome.kind === "cancelled") { projection = { ...projection, outcome: "cancelled" }; terminal = this.errorResult(call, "TOOL_HOOK_CANCELLED", "Agent Tool enforcement hook was cancelled.", metadata, startedAt); }
-            else if (outcome.kind === "failed") { terminal = this.errorResult(call, "TOOL_HOOK_FAILED", "Agent Tool enforcement hook failed.", metadata, startedAt); }
+            else if (outcome.kind === "failed") { hookError = outcome.error; terminal = this.errorResult(call, "TOOL_HOOK_FAILED", "Agent Tool enforcement hook failed.", metadata, startedAt); }
             else if (!isHookDecision(outcome.value)) { projection = { ...projection, outcome: "invalid-result" }; terminal = this.errorResult(call, "TOOL_HOOK_DECISION_INVALID", "Agent Tool enforcement hook returned an invalid decision.", metadata, startedAt); }
             else {
               const decision = outcome.value;
-              projection = { ...projection, outcome: decision.decision === "allow" ? "allowed" : "denied", ...(decision.decision === "deny" && decision.reasonCode ? { reasonCode: decision.reasonCode } : {}), ...(decision.evidence ? { evidence: redactSensitive(normalizeHookEvidence(decision.evidence), this.hookRedaction) as JsonObject } : {}) };
-              if (decision.decision === "deny") terminal = this.deniedResult(call, "TOOL_HOOK_DENIED", "Tool execution was denied by an enforcement hook.", {}, metadata, startedAt);
+              projection = { ...projection, outcome: decision.decision === "allow" ? "allowed" : "denied", ...(decision.decision === "deny" && decision.reasonCode ? { reasonCode: decision.reasonCode } : {}), ...(decision.decision === "deny" && decision.message ? { message: redactSensitive(decision.message) as string } : {}), ...(decision.evidence ? { evidence: redactSensitive(normalizeHookEvidence(decision.evidence), this.hookRedaction) as JsonObject } : {}) };
+              // The hook's message is meant for the model, like a ToolError; reasonCode helps it branch.
+              if (decision.decision === "deny") terminal = this.deniedResult(call, "TOOL_HOOK_DENIED", decision.message ?? "Tool execution was denied by an enforcement hook.", decision.reasonCode ? { reasonCode: decision.reasonCode } : {}, metadata, startedAt);
             }
           }
         }
         }
-      } catch {
+      } catch (error) {
+        hookError = error;
         projection = { ...projection, outcome: "failed" };
         terminal = this.errorResult(call, options.signal?.aborted ? "TOOL_HOOK_CANCELLED" : "TOOL_HOOK_FAILED", "Agent Tool enforcement hook failed.", metadata, startedAt);
       } finally {
         detach?.();
         const disposeError = await this.disposeScope(scope, this.scopeDisposeTimeoutMs);
         if (disposeError !== undefined) {
+          hookError ??= disposeError;
           projection = { ...projection, outcome: "failed" };
           terminal = this.errorResult(call, "TOOL_HOOK_FAILED", "Agent Tool enforcement hook disposal failed.", metadata, startedAt);
         }
       }
+      this.logHookFailure(projection, call, agentName, hookError);
       const evidenceRemainingMs = executionState.deadlineUnixMs === undefined
         ? registration.timeoutMs ?? 5_000
         : Math.max(0, Math.min(registration.timeoutMs ?? 5_000, executionState.deadlineUnixMs - Date.now()));
@@ -2039,6 +2060,20 @@ export class AgentToolExecutor {
     }
   }
 
+
+  /** A hook that failed, timed out or answered nonsense; a cancelled run is not a failure. */
+  private logHookFailure(
+    hook: Pick<AgentToolAuditHookProjectionV1, "kind" | "id" | "version" | "outcome">,
+    call: Pick<AgentToolCall, "id" | "name">,
+    agentName: string | undefined,
+    error: unknown,
+  ): void {
+    if (hook.outcome !== "failed" && hook.outcome !== "timed-out" && hook.outcome !== "invalid-result") return;
+    this.logger?.error("Agent tool hook failed", {
+      hook: `${hook.kind}:${hook.id}@${hook.version}`, outcome: hook.outcome, agent: agentName ?? null, tool: call.name, callId: call.id,
+      ...(error === undefined ? {} : { error: redactSensitive(error) }),
+    });
+  }
 
   /**
    * A tool's own failure: a ToolError message reaches the model as written;
