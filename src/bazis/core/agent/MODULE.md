@@ -134,6 +134,12 @@ stays. Hook failures, timeouts and invalid answers are logged as `Agent tool hoo
 failed`. The LLM connectors resolve `AgentRuntime` in a hosted service at start
 and turn a construction error into a `DiError` (`AgentRuntime: …`).
 
+A failed or timed-out audit write is logged as `Agent tool audit failed` with
+`phase`, `mode` (`fail-closed`, `best-effort`, `required` for hook evidence),
+tool, call id and the error; the model gets `Tool audit failed.` without the
+sink's text. Late failures (deferred scope disposal, settlement audit) use the
+application logger too, falling back to stderr.
+
 A started `write` / `external` that is interrupted before `execute` finishes gets
 `TOOL_TIMEOUT_OUTCOME_UNKNOWN` or `TOOL_ABORTED_OUTCOME_UNKNOWN`. The code is kept
 with hooks connected; settlement gets `outcomeKnown: false`.
