@@ -260,5 +260,5 @@ lab.flaky-write: AgentToolPreCommitError, затем успех
 ## Дальше
 
 - [Агенты](agents.md)
-- Хуки инструментов и аудит
+- [Хуки инструментов и аудит](hooks.md)
 - [Проверка данных](../overview/validation.md)
