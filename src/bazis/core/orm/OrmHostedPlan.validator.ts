@@ -1,6 +1,6 @@
 import type { HostedService, HostedServicePlanValidator } from "../di";
 import { SchemaAdmissionError } from "../../library/orm";
-import { isOrmProviderLifecycle, isStrictSchemaPrerequisiteLifecycle } from "./strictSchemaHostedIdentity";
+import { describePhaseConflict, isOrmProviderLifecycle, isStrictSchemaPrerequisiteLifecycle } from "./strictSchemaHostedIdentity";
 
 /** Stateless strategy shared by ORM lifecycles; it owns no connection or application state. */
 export const ormHostedPlanValidator: HostedServicePlanValidator = Object.freeze({ validate: validateOrmHostedPlan });
@@ -18,7 +18,7 @@ function validateOrmHostedPlan(services: readonly HostedService[]): void {
         || (service as { __bazisOrmOwnedStoreAdmission?: unknown }).__bazisOrmOwnedStoreAdmission === true
         || (service as { __bazisOrmLegacyLifecycle?: unknown }).__bazisOrmLegacyLifecycle === true
         || isStrictSchemaPrerequisiteLifecycle(service);
-      if (!framework && (service.phase ?? 0) < 0) throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", "Application hosted services must use phase 0 or later with ORM owned-store admission.");
+      if (!framework && (service.phase ?? 0) < 0) throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", `Application hosted services must use phase 0 or later with ORM owned-store admission: ${describePhaseConflict(service)}`);
     }
   }
   const strict = services.filter((service): service is HostedService & { readonly __bazisSchemaAdmission: { readonly owner?: string; readonly unit: readonly string[]; readonly tables: readonly string[]; readonly foreignKeys: readonly { readonly source: string; readonly target: string }[] } } =>
@@ -59,7 +59,7 @@ function validateOrmHostedPlan(services: readonly HostedService[]): void {
       || (service as { __bazisSchemaAdmission?: unknown }).__bazisSchemaAdmission !== undefined
       || (service as { __bazisOrmOwnedStoreAdmission?: unknown }).__bazisOrmOwnedStoreAdmission === true;
     if (!framework && (service.phase ?? 0) < 0) {
-      throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", "Application hosted services must use phase 0 or later with schema admission.");
+      throw new SchemaAdmissionError("ORM_SCHEMA_HOSTED_PHASE_CONFLICT", `Application hosted services must use phase 0 or later with schema admission: ${describePhaseConflict(service)}`);
     }
   }
 }
