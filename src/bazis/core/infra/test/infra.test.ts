@@ -8,11 +8,11 @@ import {
   InfraError,
   InfraLifecycle,
   OpenSearchClient,
-  OPENSEARCH,
+  IOpenSearch,
   openSearchConnect,
-  POSTGRES,
+  IPostgres,
   postgres,
-  REDIS,
+  IRedis,
   redisConnect,
   type InfraManifest,
   type InfraConnector,
@@ -79,24 +79,24 @@ describe("@Infra manifest", () => {
 
     const meta = AppInfra as unknown as { global?: boolean; exports?: readonly unknown[]; config?: readonly unknown[] };
     expect(meta.global).toBe(true);
-    expect(meta.exports).toEqual([POSTGRES, REDIS, OPENSEARCH]);
+    expect(meta.exports).toEqual([IPostgres, IRedis, IOpenSearch]);
     expect(meta.config).toEqual([dbConfig, redisConfig, searchConfig]);
   });
 
   test("resolves each connector client under its token (constructed, not connected)", () => {
     const container = containerFor(appManifest());
 
-    const sql = container.resolve(POSTGRES);
+    const sql = container.resolve(IPostgres);
     expect(typeof sql.unsafe).toBe("function");
     expect(typeof sql.close).toBe("function");
 
-    expect(container.resolve(REDIS)).toBeInstanceOf(RedisClient);
-    expect(container.resolve(OPENSEARCH)).toBeInstanceOf(OpenSearchClient);
+    expect(container.resolve(IRedis)).toBeInstanceOf(RedisClient);
+    expect(container.resolve(IOpenSearch)).toBeInstanceOf(OpenSearchClient);
   });
 
   test("client is a singleton shared with its lifecycle", () => {
     const container = containerFor(appManifest());
-    expect(container.resolve(POSTGRES)).toBe(container.resolve(POSTGRES));
+    expect(container.resolve(IPostgres)).toBe(container.resolve(IPostgres));
   });
 
   test("registers one hosted lifecycle per connector with the early phase", () => {
@@ -175,7 +175,7 @@ describe("@Infra manifest", () => {
 describe("config objects (defineConfig → connector)", () => {
   test("connector reads declared keys from the config object", () => {
     const container = containerFor({ db: postgres(dbConfig) });
-    expect(typeof container.resolve(POSTGRES).unsafe).toBe("function");
+    expect(typeof container.resolve(IPostgres).unsafe).toBe("function");
   });
 
   test("secret declared in the config is revealed for the connection", () => {
@@ -183,7 +183,7 @@ describe("config objects (defineConfig → connector)", () => {
       default: { host: "localhost", port: 5432, database: "app", username: "postgres", password: secret("hunter2") },
     });
     const container = containerFor({ db: postgres(withSecret) });
-    expect(typeof container.resolve(POSTGRES).unsafe).toBe("function");
+    expect(typeof container.resolve(IPostgres).unsafe).toBe("function");
   });
 
   test("redis connection URL may be declared as a Secret", () => {
@@ -202,7 +202,7 @@ describe("config objects (defineConfig → connector)", () => {
       default: { host: "", port: 5432, database: "app", username: "postgres", password: secret("x") },
     });
     const container = containerFor({ db: postgres(broken) });
-    expect(() => container.resolve(POSTGRES)).toThrow(/"host" is required/);
+    expect(() => container.resolve(IPostgres)).toThrow(/"host" is required/);
   });
 
   test("opensearch requires a url", () => {
@@ -210,7 +210,7 @@ describe("config objects (defineConfig → connector)", () => {
       default: { url: "", username: "admin", password: secret("x") },
     });
     const container = containerFor({ search: openSearchConnect(broken) });
-    expect(() => container.resolve(OPENSEARCH)).toThrow(InfraError);
+    expect(() => container.resolve(IOpenSearch)).toThrow(InfraError);
   });
 
   test("opensearch client trims trailing slash from the url", () => {

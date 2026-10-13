@@ -17,6 +17,8 @@ const DEFAULT_INFRA_PHASE = -100;
  */
 export class InfraLifecycle<TClient> implements HostedService {
   public readonly phase: number;
+  /** The manifest key, as in `/health`: `infra:db`. */
+  public readonly diagnosticName: string;
   private client?: TClient;
   private created = false;
   private disposed = false;
@@ -33,6 +35,7 @@ export class InfraLifecycle<TClient> implements HostedService {
     this.client = client;
     this.created = client !== undefined;
     this.phase = connector.phase ?? DEFAULT_INFRA_PHASE;
+    this.diagnosticName = `infra:${name}`;
     bindConnectorLifecycle(connector, this);
   }
 

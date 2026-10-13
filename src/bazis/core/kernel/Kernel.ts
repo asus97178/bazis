@@ -95,7 +95,7 @@ export class Kernel {
     let startupDisposal: Promise<void> | undefined;
     if (this.options.startupTimeoutMs > 0) {
       startupTimer = setTimeout(
-        () => abortController.abort(new StartupTimeoutError(this.options.startupTimeoutMs)),
+        () => abortController.abort(new StartupTimeoutError(this.options.startupTimeoutMs, this.coordinator.startingServiceName)),
         this.options.startupTimeoutMs,
       );
     }
