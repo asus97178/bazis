@@ -35,10 +35,14 @@ const server = `import { runApp } from "bazis/core/app";
 import { AppModule } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
-const port = 20000 + Math.floor(Math.random() * 20000);
+// A port the OS has just handed out, not a random guess that another process may hold.
+const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+const port = probe.port;
+probe.stop(true);
 void runApp(AppModule, { http: { hostname: "127.0.0.1", port } });
 const url = "http://127.0.0.1:" + port + "/ping/ann/upper";
-for (let i = 0; i < 100 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);
+// A loaded CI runner can take several seconds to start the app: wait up to 20.
+for (let i = 0; i < 400 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);
 console.log(JSON.stringify(await fetch(url).then((r) => r.json())));
 process.exit(0);
 `;

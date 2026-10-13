@@ -42,10 +42,14 @@ import { ThingsController } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
 @Module({ controllers: [ThingsController], exports: [] }) class Root {}
-const port = 20000 + Math.floor(Math.random() * 20000);
+// A port the OS has just handed out, not a random guess that another process may hold.
+const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+const port = probe.port;
+probe.stop(true);
 void runApp(Root, { http: { hostname: "127.0.0.1", port } });
 const base = "http://127.0.0.1:" + port;
-for (let i = 0; i < 100 && !(await fetch(base + "/orgs/acme/things/1").then(() => true, () => false)); i++) await Bun.sleep(50);
+// A loaded CI runner can take several seconds to start the app: wait up to 20.
+for (let i = 0; i < 400 && !(await fetch(base + "/orgs/acme/things/1").then(() => true, () => false)); i++) await Bun.sleep(50);
 const get = (url: string) => fetch(base + url).then(async (r) => [r.status, await r.json()]);
 console.log(JSON.stringify([await get("/orgs/acme/things/7"), await get("/orgs/acme/things/files/a/b.txt"), await get("/orgs/acme/things/raw/x/y?limit=3")]));
 process.exit(0);

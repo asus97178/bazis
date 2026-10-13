@@ -55,7 +55,10 @@ const server = `import { runApp } from "bazis/core/app";
 import { AppModule } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
-const port = 20000 + Math.floor(Math.random() * 20000);
+// A port the OS has just handed out, not a random guess that another process may hold.
+const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+const port = probe.port;
+probe.stop(true);
 const running = runApp(AppModule, { http: { hostname: "127.0.0.1", port } });
 const url = "http://127.0.0.1:" + port + "/db";
 for (let i = 0; i < 60 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);
