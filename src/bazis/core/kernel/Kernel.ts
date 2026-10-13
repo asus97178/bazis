@@ -15,6 +15,9 @@ import { validateTimeout } from "./internal/validateTimeout";
 import { awaitShutdown } from "./internal/awaitShutdown";
 import { awaitAbortable } from "./internal/awaitAbortable";
 import { reportDiagnosticFailure } from "./internal/reportDiagnosticFailure";
+import { StartupReport } from "./report/StartupReport";
+import type { BazisModuleRef } from "../di";
+import type { StartupBatchTiming } from "./LifecycleCoordinator";
 
 export interface KernelTimings {
   readonly configMs: number;
@@ -30,6 +33,12 @@ export interface KernelRuntimeOptions {
   readonly startupReport: boolean;
   /** Start the infrastructure and the schema only, then stop (BAZIS_SCHEMA_ONLY). */
   readonly schemaOnly?: boolean;
+  /** Facts for the startup screen; a fresh one when absent. */
+  readonly report?: StartupReport;
+  /** The application root module, for the module tree of the startup screen. */
+  readonly root?: BazisModuleRef;
+  /** Renders the startup screen in place of the `bazis started` log line. */
+  readonly onStarted?: (kernel: Kernel) => void;
 }
 
 interface StopRequest {
@@ -56,6 +65,7 @@ export class Kernel {
   private shutdownPromise?: Promise<void>;
   private startupCleanupFailure?: unknown;
   private startupAbort?: AbortController;
+  private ownReport?: StartupReport;
 
   public constructor(
     public readonly container: DiContainer,
@@ -74,6 +84,42 @@ export class Kernel {
 
   public get isStarted(): boolean {
     return this.state === "started";
+  }
+
+  /** What subsystems recorded while starting: connections, schema, routes. */
+  public get report(): StartupReport {
+    this.ownReport ??= this.options.report ?? new StartupReport();
+    return this.ownReport;
+  }
+
+  /** The application root module, when the builder knows it. */
+  public get rootModule(): BazisModuleRef | undefined {
+    return this.options.root;
+  }
+
+  /** Configuration and container build time, and the moment the build began. */
+  public get buildTimings(): KernelTimings {
+    return this.timings;
+  }
+
+  /** Wall time of every started group of hosted services. */
+  public get startTimings(): readonly StartupBatchTiming[] {
+    return this.coordinator.startTimings;
+  }
+
+  /** Hosted services whose start failed. */
+  public get failedServices(): readonly string[] {
+    return this.coordinator.failedServiceNames;
+  }
+
+  /** Hosted services whose start is running now. */
+  public get startingServices(): readonly string[] {
+    return this.coordinator.startingServiceNames;
+  }
+
+  /** From the start of the build to a started application, ms; 0 before. */
+  public get startupDurationMs(): number {
+    return this.startupMs;
   }
 
   public start(): Promise<void> {
@@ -396,6 +442,14 @@ export class Kernel {
   }
 
   private printStartupReport(): void {
+    if (this.options.onStarted !== undefined) {
+      try {
+        this.options.onStarted(this);
+        return;
+      } catch {
+        // A broken screen falls back to the log line below.
+      }
+    }
     const logger = this.container.tryResolve(LOGGER);
     const fields = {
       environment: this.environment.name,

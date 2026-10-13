@@ -110,14 +110,15 @@ older than this controller. Run `bazis codegen` (bazis dev, bazis test and bazis
 
 Codegen разбирает только файлы, до которых можно дойти по `import` от
 точки входа. Модуль, который никто не импортирует, не попадает в
-приложение — и codegen не молчит об этом, а останавливается:
+приложение: codegen пропускает его и предупреждает:
 
 ```text
-BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/app/modules/orders/Orders.module.ts
+[WARN]  src/app/modules/orders/Orders.module.ts is not imported from the entrypoint — skipped
 ```
 
 Обычная причина — модуль создан, но не добавлен в `imports` корневого
-`AppModule`. `bazis g module` добавляет его сам.
+`AppModule`. `bazis g module` добавляет его сам; после `--no-register`
+модуль ждёт, пока вы его импортируете, а остальной проект собирается.
 
 ### Несколько точек входа
 
@@ -155,7 +156,6 @@ Codegen останавливается с кодом ошибки и место�
 | `BAZIS_DI_CONFIG_UNKNOWN` | `ConfigView<T>`, а `defineConfig<T>` с таким типом нет | Объявить настройки с типом в угловых скобках |
 | `BAZIS_DI_CONFIG_AMBIGUOUS` | `ConfigView<T>` подходит к нескольким `defineConfig<T>` | Оставить одно объявление на тип |
 | `BAZIS_HTTP_BINDING_UNRESOLVED` | Аргумент метода контроллера нельзя связать с запросом — например, два параметра-класса, а тело у запроса одно | Оставить одну модель тела; заголовки и сырое тело читать через `HttpContext` |
-| `BAZIS_CODEGEN_SOURCE_UNASSIGNED` | Файл не достижим ни из одной точки входа | Импортировать модуль или добавить цель |
 | `BAZIS_CODEGEN_CONFIG_INVALID` | Ошибка в `bazis.config.json` | Исправить файл |
 
 ## Дальше

@@ -27,3 +27,13 @@ export function requireValue(value: unknown, field: string, kind: string): strin
   }
   return value;
 }
+
+/**
+ * Environment variables that set the given keys of a config, for the fix
+ * hints of a connection failure: `BAZIS_DB__HOST`.
+ */
+export function settingNames(config: object, configs: ConfigRegistry | undefined, keys: readonly string[]): string[] {
+  const view = configs?.get(config as AppConfig<object>) as { inspect?: () => readonly { key: string; env: readonly string[] }[] } | undefined;
+  const rows = view?.inspect?.() ?? [];
+  return keys.flatMap((key) => rows.find((row) => row.key === key || row.key.endsWith(`.${key}`))?.env.slice(0, 1) ?? []);
+}

@@ -98,7 +98,7 @@ test("all targets share one root Program and the target pipeline emits every cha
   expect(await Bun.file("src/generated/bazis/targets/demo/runtime.ts").exists()).toBe(false);
 }, 60_000);
 
-test("removing the provisioning target returns its DI source to fail-closed unassigned diagnostics", async () => {
+test("removing the provisioning target leaves its DI source out of codegen with a warning", async () => {
   const base = {
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler" }, include: ["src/**/*.ts"] }),
     "src/provisioning.ts": "export class Provisioner { constructor(private readonly authority: IAuthority) {} }\n",
@@ -115,9 +115,11 @@ test("removing the provisioning target returns its DI source to fail-closed unas
   });
   try {
     expect((await runGeneratorTarget(assigned, "all")).exit).toBe(0);
-    const rejected = await runGeneratorTarget(unassigned, "all");
-    expect(rejected.exit).not.toBe(0);
-    expect(rejected.output).toContain("BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/provisioning.ts");
+    // An unimported source is skipped, not fatal: `g module --no-register` must not break codegen.
+    const skipped = await runGeneratorTarget(unassigned, "all");
+    expect(skipped.exit).toBe(0);
+    expect(skipped.output).toContain("WARNING: BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/provisioning.ts");
+    expect(await Bun.file(path.join(unassigned, "src/generated/bazis/deps.ts")).text()).not.toContain("Provisioner");
   } finally {
     await Promise.all([rm(assigned, { recursive: true, force: true }), rm(unassigned, { recursive: true, force: true })]);
   }
@@ -138,7 +140,7 @@ test("a generic third target receives only its static reachable application slic
   expect(reached).toEqual(new Set([projectPath(third), projectPath(feature)]));
 });
 
-test("fails closed from the shared candidate index for real DI, HTTP, Tool and Module markers", async () => {
+test("warns about every unimported DI, HTTP, Tool and Module source from the shared candidate index", async () => {
   const root = await temporaryProject({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", experimentalDecorators: true }, include: ["src/**/*.ts"] }),
     "bazis.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
@@ -153,8 +155,8 @@ test("fails closed from the shared candidate index for real DI, HTTP, Tool and M
   });
   try {
     const result = await runGenerator(root);
-    expect(result.exit).not.toBe(0);
-    const diagnostics = result.output.split("\n").filter((line) => line.includes("BAZIS_CODEGEN_SOURCE_UNASSIGNED")).map((line) => line.replace(/^error: /, ""));
+    expect(result.exit).toBe(0);
+    const diagnostics = result.output.split("\n").filter((line) => line.includes("BAZIS_CODEGEN_SOURCE_UNASSIGNED")).map((line) => line.replace(/^\[di:generate\] WARNING: /, "").replace(/: not imported.*$/, ""));
     expect(diagnostics).toEqual([
       "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/a-request.ts",
       "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/b-list.ts",
@@ -164,7 +166,8 @@ test("fails closed from the shared candidate index for real DI, HTTP, Tool and M
       "BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/z-tool.ts",
     ]);
     expect(await Bun.file(path.join(root, "src/generated/bazis/sentinel.ts")).text()).toBe("untouched\n");
-    expect(await Bun.file(path.join(root, "src/generated/bazis/deps.ts")).exists()).toBe(false);
+    const deps = await Bun.file(path.join(root, "src/generated/bazis/deps.ts")).text();
+    for (const skipped of ["DiSource", "ControllerSource", "ToolSource", "FeatureModule"]) expect(deps).not.toContain(skipped);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -229,7 +232,7 @@ test("reports deterministic dynamic-edge locations and leaves outputs untouched"
   try {
     const result = await runGenerator(root);
     expect(result.exit).not.toBe(0);
-    expect(result.output.split("\n").filter((line) => line.includes("BAZIS_CODEGEN_DYNAMIC_EDGE_UNRESOLVED")).map((line) => line.replace(/^error: /, ""))).toEqual([
+    expect(result.output.split("\n").filter((line) => line.includes("BAZIS_CODEGEN_DYNAMIC_EDGE_UNRESOLVED")).map((line) => line.replace(/^\[di:generate\] ERROR: /, ""))).toEqual([
       "BAZIS_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:2",
       "BAZIS_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:4",
     ]);
@@ -253,6 +256,45 @@ test("disk transaction restores backups, removes newly-created finals and cleans
     expect(await Bun.file(path.join(root, "src/generated/bazis/deps.ts")).text()).toBe("previous-deps\n");
     expect(await Bun.file(path.join(root, "src/generated/bazis/bindings.ts")).exists()).toBe(false);
     expect((await readdir(root)).filter((name) => name.startsWith(".bazis-codegen-stage-"))).toEqual([]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("BAZIS_CODEGEN_REPORT gets the targets, generated files and warnings as JSON instead of console output", async () => {
+  const root = await temporaryProject({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", experimentalDecorators: true }, include: ["src/**/*.ts"] }),
+    "bazis.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "src/index.ts": "export const root = true;\n",
+    "src/stray.ts": "export class Stray { constructor(private readonly widget: IWidget) {} }\n",
+  });
+  const report = path.join(root, "report.json");
+  try {
+    const result = await runGenerator(root, { BAZIS_CODEGEN_REPORT: report });
+    expect(result.exit).toBe(0);
+    expect(result.output.trim()).toBe("");
+    const json = await Bun.file(report).json() as { ok: boolean; targets: { name: string }[]; outputs: string[]; warnings: string[]; errors: string[] };
+    expect(json.ok).toBe(true);
+    expect(json.targets.map((target) => target.name)).toEqual(["production"]);
+    expect(json.outputs).toContain("src/generated/bazis/deps.ts");
+    expect(json.warnings).toEqual(["BAZIS_CODEGEN_SOURCE_UNASSIGNED: src/stray.ts: not imported from the entrypoint of any target; codegen skipped it."]);
+    expect(json.errors).toEqual([]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("a failed codegen lists its errors without a stack trace", async () => {
+  const root = await temporaryProject({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler" }, include: ["src/**/*.ts"] }),
+    "bazis.config.json": JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }),
+    "src/index.ts": "const name = 'x';\nimport(name);\n",
+  });
+  try {
+    const result = await runGenerator(root);
+    expect(result.exit).toBe(1);
+    expect(result.output).toContain("[di:generate] ERROR: BAZIS_CODEGEN_DYNAMIC_EDGE_UNRESOLVED: production:src/index.ts:2");
+    expect(result.output).not.toMatch(/^\s+at /m);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

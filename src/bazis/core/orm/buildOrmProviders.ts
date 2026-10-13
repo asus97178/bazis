@@ -1,7 +1,7 @@
 import { DI, HOSTED_SERVICE, type InjectionToken, type ModuleOwnedContributionSnapshot, type ProviderDefinition, type ProviderDependencyList, type ServiceResolver } from "../di";
 import { getGeneratedClassDeps } from "../di/module/autoDeps";
 import { resolveDependencyList } from "../di/internal/resolveDependencyList";
-import { HEALTH_CHECK } from "../kernel";
+import { HEALTH_CHECK, StartupReport } from "../kernel";
 import { DbContextOptions, OrmError, type DatabaseProvider, type DbContext } from "../../library/orm";
 import { OrmLifecycle } from "./OrmLifecycle";
 import { ownedStoreLifecycleFor, ownedStoreLifecycleHealthFor } from "./OrmOwnedStoreLifecycle";
@@ -56,7 +56,10 @@ function createOrmLifecycle<TContext extends DbContext>(
   config: OrmBuildConfig<TContext>,
   options: DbContextOptions,
   ownsConnection: boolean,
+  serviceProvider: unknown,
 ): OrmLifecycle {
+  const services = serviceProvider as { has?(token: unknown): boolean; resolve?(token: unknown): unknown };
+  const report = services.has?.(StartupReport) ? services.resolve?.(StartupReport) as StartupReport : undefined;
   return new OrmLifecycle(
     options,
     config.ensureCreated === true,
@@ -65,6 +68,7 @@ function createOrmLifecycle<TContext extends DbContext>(
     config.runMigrationsOnStart === true,
     ownsConnection,
     config.context.name,
+    report,
   );
 }
 
@@ -115,7 +119,7 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
             });
             return ownedStoreLifecycleFor(container, provider, records);
           }
-          return createOrmLifecycle(current, createContextOptions(current, provider), false);
+          return createOrmLifecycle(current, createContextOptions(current, provider), false, serviceProvider);
         }),
       ),
     ];
@@ -138,7 +142,7 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
     // Standalone mode: the context owns its provider and closes it.
     DI.singleton(DI.factoryProvider(HOSTED_SERVICE, [SERVICE_PROVIDER], (serviceProvider) => {
       const current = effectiveConfigFor(serviceProvider, registrationIdentity, config);
-      return createOrmLifecycle(current, current === config && optionsAtModuleCall !== undefined ? optionsAtModuleCall : createContextOptions(current, provider), true);
+      return createOrmLifecycle(current, current === config && optionsAtModuleCall !== undefined ? optionsAtModuleCall : createContextOptions(current, provider), true, serviceProvider);
     })),
   ];
   return providers;

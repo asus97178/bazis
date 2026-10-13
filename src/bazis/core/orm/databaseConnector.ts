@@ -1,4 +1,5 @@
-import { errorMessage, InfraError, reader, requireValue, postgresConnectionOptions, type InfraConnector, type PostgresConfigShape } from "../infra";
+import { errorMessage, InfraError, reader, requireValue, postgresConnectionOptions, settingNames, type InfraConnector, type PostgresConfigShape } from "../infra";
+import { postgresAddress, serverVersion } from "../infra/connectors/postgres";
 import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
@@ -88,6 +89,9 @@ export function ormBazisConnect(
 ): InfraConnector<DatabaseProvider> {
   // Where the connection goes, for the startup error; never the password.
   let target = "PostgreSQL";
+  let address: string | undefined;
+  let pool: number | undefined;
+  let settings: string[] = [];
   return {
     token: DATABASE_PROVIDER,
     config,
@@ -95,6 +99,9 @@ export function ormBazisConnect(
     create(configs) {
       const c = reader(config, configs);
       target = `PostgreSQL at ${String(c.get("host"))}:${String(c.get("port"))} (database "${String(c.get("database"))}", user "${String(c.get("username"))}")`;
+      address = postgresAddress({ hostname: String(c.get("host")), port: String(c.get("port")), database: String(c.get("database")), username: String(c.get("username")) });
+      pool = c.has("max") && typeof c.get("max") === "number" ? c.get("max") as number : undefined;
+      settings = settingNames(config, configs, ["host", "port", "database", "username", "password"]);
       return buildPostgresProvider(config, configs);
     },
     async connect(provider, signal) {
@@ -110,6 +117,15 @@ export function ormBazisConnect(
     },
     async dispose(provider) {
       await provider.close();
+    },
+    async describe(provider, { connected }) {
+      const version = connected ? await serverVersion((sql) => provider.query(sql, [])) : undefined;
+      return {
+        kind: version === undefined ? "PostgreSQL" : `PostgreSQL ${version}`,
+        ...(address === undefined ? {} : { address }),
+        details: [`pool ${pool ?? 10}`],
+        settings,
+      };
     },
     healthCheck(provider, signal) {
       return provider.ping(signal);

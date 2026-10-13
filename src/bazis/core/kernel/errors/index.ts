@@ -3,3 +3,4 @@ export { KernelError } from "./KernelError";
 export { ShutdownTimeoutError } from "./ShutdownTimeoutError";
 export { StartupAbortedError } from "./StartupAbortedError";
 export { StartupTimeoutError } from "./StartupTimeoutError";
+export { StartupFailuresError, type StartupFailure } from "./StartupFailuresError";

@@ -1,7 +1,7 @@
 import { createToken, type InjectionToken } from "../../di";
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
-import { reader, requireValue } from "../connectorConfig";
-import { InfraError, type InfraConnector } from "../InfraConnector";
+import { reader, requireValue, settingNames } from "../connectorConfig";
+import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 
 /** Default cluster request timeout (ms): fail fast instead of hanging. */
@@ -124,6 +124,11 @@ export class OpenSearchClient {
   }
 
   /** Healthy only for explicitly accepted cluster states. */
+  /** Cluster address without credentials. */
+  public get url(): string {
+    return this.base;
+  }
+
   public async ping(signal?: AbortSignal): Promise<boolean> {
     try {
       const health = await this.clusterHealth(signal);
@@ -289,17 +294,39 @@ export function openSearchConnect<T extends OpenSearchConfigShape>(
   config: AppConfig<T>,
   options: OpenSearchConnectorOptions = {},
 ): InfraConnector<OpenSearchClient> {
+  const settings = new WeakMap<OpenSearchClient, string[]>();
   return {
     token: options.token ?? IOpenSearch,
     config,
     create(configs) {
-      return new OpenSearchClient(buildOpenSearchOptions(config, options, configs));
+      const client = new OpenSearchClient(buildOpenSearchOptions(config, options, configs));
+      settings.set(client, settingNames(config, configs, ["url", "username", "password"]));
+      return client;
     },
     async connect(client, signal) {
-      const alive = await client.ping(signal);
-      if (!alive) {
-        throw new InfraError(`Infra connector "opensearch": cluster is not reachable or unhealthy.`);
+      let status: string | undefined;
+      try {
+        status = (await client.clusterHealth(signal))?.status;
+      } catch (error) {
+        throw new InfraError(`Infra connector "opensearch": cannot reach ${client.url} — ${errorMessage(error)}`);
       }
+      if (status !== "green" && status !== "yellow") {
+        throw new InfraError(`Infra connector "opensearch": cluster ${client.url} is unhealthy (status ${status ?? "unknown"}).`);
+      }
+    },
+    async describe(client, { connected, signal }) {
+      if (!connected) return { kind: "OpenSearch", address: client.url, settings: settings.get(client) ?? [] };
+      const [info, health] = await Promise.all([
+        client.request<{ version?: { number?: string; distribution?: string } }>("GET", "/", undefined, signal),
+        client.clusterHealth(signal),
+      ]);
+      const product = info.version?.distribution === "opensearch" || info.version?.distribution === undefined ? "OpenSearch" : info.version.distribution;
+      return {
+        kind: info.version?.number ? `${product} ${info.version.number}` : product,
+        address: client.url,
+        details: [health.status],
+        settings: settings.get(client) ?? [],
+      };
     },
     dispose(client) {
       client.dispose();

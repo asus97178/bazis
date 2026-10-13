@@ -40,6 +40,12 @@ export interface HostedService {
   useDiagnostics?(diagnostics: HostedServiceDiagnostics): void;
   /** Name in startup diagnostics, such as `infra:db`; the class name by default. */
   readonly diagnosticName?: string;
+  /**
+   * Starts together with neighbouring `concurrentStart` services of the same
+   * phase instead of one by one, and their failures are reported together.
+   * For independent work such as connections of the infrastructure manifest.
+   */
+  readonly concurrentStart?: boolean;
   start(signal?: AbortSignal): void | Promise<void>;
   stop(): void | Promise<void>;
   /**

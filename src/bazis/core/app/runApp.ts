@@ -259,7 +259,10 @@ function normalizeAbsolutePath(path: string): string {
  */
 export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}): Promise<number> {
   await loadBazisGeneratedRuntime();
-  return Bazis.run(composeApp(root, options), options.kernel, options.configure);
+  return Bazis.run(composeApp(root, options), options.kernel, (builder) => {
+    builder.useApplicationRoot(root);
+    options.configure?.(builder);
+  });
 }
 
 /**

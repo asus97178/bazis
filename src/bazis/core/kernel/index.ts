@@ -11,6 +11,7 @@ export { ConsoleLogger, type ConsoleLoggerOptions } from "./logging/ConsoleLogge
 
 export { Configuration, loadConfiguration } from "./config/Configuration";
 export { ConfigRegistry } from "./config/ConfigRegistry";
+export { ConfigValidationError, type ConfigIssue, type ConfigIssueKind } from "./config/ConfigValidationError";
 export { Secret } from "./config/Secret";
 export {
   defineConfig,
@@ -86,7 +87,18 @@ export {
   ShutdownTimeoutError,
   StartupAbortedError,
   StartupTimeoutError,
+  StartupFailuresError,
+  type StartupFailure,
 } from "./errors";
+export {
+  StartupReport,
+  type ConnectionDescription,
+  type ConnectionFact,
+  type ListenerFact,
+  type RouteFact,
+  type SchemaFact,
+  type TimingFact,
+} from "./report/StartupReport";
 export type {
   ConfigSource,
   EnvironmentName,

@@ -1,6 +1,9 @@
 import type { InjectionToken, ModuleConfig, ModuleExport, ProviderDefinition } from "../di";
 import { redactSensitiveText } from "../../library/redaction";
 import type { ConfigRegistry } from "../kernel/config/ConfigRegistry";
+import type { ConnectionDescription } from "../kernel/report/StartupReport";
+
+export type { ConnectionDescription };
 
 /**
  * Infrastructure connector contract: one shape for "a connection to something
@@ -59,6 +62,16 @@ export interface InfraConnector<TClient = unknown> {
    * registered for this connector.
    */
   healthCheck?(client: TClient, signal?: AbortSignal): Promise<boolean> | boolean;
+
+  /**
+   * What the startup screen and a startup failure show about the connection:
+   * product and version, the address without credentials, short facts, and
+   * the settings that change the address. Called after a successful
+   * {@link connect} with `connected: true` (it may ask the server for its
+   * version) and after a failed one with `connected: false` (from the config
+   * only). Its errors are ignored, and it has one second.
+   */
+  describe?(client: TClient, state: { readonly connected: boolean; readonly signal?: AbortSignal }): ConnectionDescription | Promise<ConnectionDescription>;
 
   /**
    * Extra providers the connector adds to the infrastructure module besides

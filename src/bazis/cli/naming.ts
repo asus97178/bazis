@@ -43,6 +43,9 @@ export function parseModuleName(raw: string): ModuleNaming {
   if (input.length === 0) {
     throw new Error("Module name is required.");
   }
+  if (!/^[a-zA-Z]/.test(input)) {
+    throw new Error(`Invalid module name "${input}": it must start with a letter (then letters, digits and hyphens).`);
+  }
   if (!/^[a-zA-Z][a-zA-Z0-9]*(?:-[a-zA-Z0-9]+)*$/.test(input)) {
     throw new Error(`Invalid module name "${input}". Use letters, digits, and hyphens only.`);
   }

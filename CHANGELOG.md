@@ -4,6 +4,82 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.0 — 2026-10-14
+
+### Added
+
+- Startup screen. On an interactive terminal an application shows what it
+  started: configuration sections with masked secrets and their source,
+  every connection with its server version, address and time, schema
+  changes, the module tree (controllers, services, tables, background jobs,
+  tools, exports), routes with their protection, warnings (open routes,
+  development secrets), startup timing, and a SUCCESS banner with the Local,
+  Network, Health and OpenAPI links. A failed start marks the failed stage,
+  skips the later ones with a reason, and shows one panel per problem: where,
+  the cause, what to change (the environment variables and the file that
+  declared the config). `BAZIS_UI=1` turns the screen on outside a terminal,
+  `BAZIS_UI=0` keeps the `bazis started` log line. It follows
+  `startupReport`, so it is off in production unless enabled.
+- Output in English or Russian: `--lang ru`, `BAZIS_LANG`, `"language"` in
+  `bazis.config.json` (`bazis new` writes it from the system locale), then the
+  system locale. Framing, statuses and hints are translated; driver error
+  texts stay as they are.
+- `bazis/library/terminal`: terminal detection (`NO_COLOR`, `FORCE_COLOR`,
+  CI), the colour palette, `Screen` (header, sections, steps with a spinner,
+  banners, panels, problem boxes with code frames) and the en/ru messages.
+- `InfraConnector.describe(client, { connected })`: product and version,
+  address without credentials, short facts and the settings that change the
+  address. PostgreSQL, the ORM connection, Redis/Valkey, OpenSearch and LLM
+  connectors implement it.
+- `StartupReport` in the container: subsystems record connections, schema
+  changes, routes and listeners for the screen. `Kernel.report`,
+  `Kernel.startTimings`, `Kernel.failedServices`.
+- `HostedService.concurrentStart`: neighbouring services of one phase start
+  together. `StartupFailuresError` lists every failure with its service name.
+- `ConfigValidationError` with structured `issues` (key, kind, environment
+  variables, the variable that brought a wrong value, allowed values, the
+  declaring file).
+- `llmConnect(…, { checkOnStart })`: the provider is checked at start (`GET
+  /models` of an OpenAI-compatible API, five seconds), so a wrong key or
+  address stops the start instead of the first agent request. `checkOnStart:
+  false` turns it off.
+- `BAZIS_CODEGEN_REPORT=<file>`: the generator writes its targets, counts,
+  generated files, warnings and errors as JSON instead of console lines.
+
+### Changed (breaking)
+
+- Every CLI command prints a screen instead of `[bazis] …` lines: the logo
+  with the command, steps with counts and time, and a SUCCESS or FAILED
+  banner. Scripts that parsed the old lines need the exit code instead.
+- Connections of the infrastructure manifest start in parallel, and all
+  failures are reported at once (`StartupFailuresError` when there are
+  several). Before, they started one by one and the first failure stopped the
+  start.
+- Invalid keys of several configs come as one `ConfigValidationError`
+  instead of an `AggregateError`.
+- An LLM connector checks its provider at start; use `checkOnStart: false`
+  for a provider that is not reachable at start.
+- A source with DI, HTTP, Tool or Module code that no target imports is a
+  warning, not a codegen failure: codegen skips it. `bazis g module
+  --no-register` no longer breaks codegen of the whole project.
+
+### Fixed
+
+- Codegen errors are listed one per line without a Bun stack; the CLI shows
+  each with the code around it. An unknown dependency points at the
+  constructor parameter, and `SQL`/`RedisClient` suggest `IPostgres`/`IRedis`.
+- A module without a database says what to connect: `no database is
+  connected, but TaskDbContext, OrdersDbContext use one` and `@Infra({ db:
+  ormBazisConnect(dbConfig) })`, instead of `Missing dependency
+  "DatabaseProvider"` for every context. `bazis g module` with `--minimal` or
+  `--full` mentions the database.
+- `bazis build` ends with a SUCCESS banner; `--bin` shows the executable size
+  and how to run it. Type errors show the code around them.
+- The `health.test.ts` of a new project takes a free port from the operating
+  system instead of a random one.
+- A module name starting with a digit says it must start with a letter.
+- An unreachable OpenSearch names its address and the cause.
+
 ## 0.99.6 — 2026-10-13
 
 ### Changed (breaking)

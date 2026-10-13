@@ -10,6 +10,17 @@ import { corsOptionsOf } from "../Middleware/cors";
 import { normalizeResult } from "../Results/normalize";
 import type { ApiVersioningOptions, RouteMiddlewareComposer } from "../options";
 import { createAuthorizeComposer } from "../Authorization/authorizeComposer";
+import { resolveAuthorizeMeta } from "../Authorization/metadata";
+
+/** A registered route as the startup screen lists it. */
+export interface RegisteredRoute {
+  readonly method: string;
+  readonly path: string;
+  readonly handler: string;
+  /** No `@Authorize`, or `@AllowAnonymous`. */
+  readonly open: boolean;
+  readonly anonymous: boolean;
+}
 import { Router, type RouteAction } from "./Router";
 import { joinPaths, parseTemplate } from "./template";
 
@@ -29,6 +40,8 @@ interface ActionPipeline {
  */
 export class RouterBuilder {
   private readonly authorizeComposer = createAuthorizeComposer();
+  /** Every route of the last {@link build}, in registration order. */
+  readonly routes: RegisteredRoute[] = [];
 
   constructor(
     /** Middleware prepended to every route: [logger?, cors?, errorHandler, ...global]. */
@@ -92,6 +105,14 @@ export class RouterBuilder {
         const fullPath = joinPaths(this.globalPrefix, versionSegment, meta.prefix, declaration.template);
         const versionKey = useUrlVersioning ? "" : (version ?? "");
         router.register(parseTemplate(fullPath), declaration.httpMethod, versionKey, routeAction);
+        const access = resolveAuthorizeMeta(controllerClass, methodName);
+        this.routes.push(Object.freeze({
+          method: declaration.httpMethod,
+          path: fullPath,
+          handler: routeAction.name,
+          open: access.allowAnonymous === true || access.authorize === undefined,
+          anonymous: access.allowAnonymous === true,
+        }));
       }
     }
   }

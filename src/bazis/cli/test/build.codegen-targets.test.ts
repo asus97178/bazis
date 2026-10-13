@@ -3,6 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { runBuild, runDev, runTest } from "../build";
+import { createScreens, lineOutput } from "../ui";
+
+const quiet = () => createScreens(lineOutput(() => {}), lineOutput(() => {}), "en");
 
 // bazis dev/test/build generate every target of bazis.config.json. Before, they
 // generated only the default one and a second entrypoint (a worker) kept stale code.
@@ -27,8 +30,8 @@ function recordingCodegen(targets: (string | undefined)[]) {
 test("dev, test and build run codegen for all targets", async () => {
   const root = await project();
   const targets: (string | undefined)[] = [];
-  expect(await runDev(root, recordingCodegen(targets), () => {})).toBe(3);
-  expect(await runTest(root, [], recordingCodegen(targets))).toBe(3);
-  expect(await runBuild(root, { bin: false }, recordingCodegen(targets), () => {})).toBe(3);
+  expect(await runDev(root, recordingCodegen(targets), quiet())).toBe(3);
+  expect(await runTest(root, [], recordingCodegen(targets), quiet())).toBe(3);
+  expect(await runBuild(root, { bin: false }, recordingCodegen(targets), quiet())).toBe(3);
   expect(targets).toEqual(["all", "all", "all"]);
 });

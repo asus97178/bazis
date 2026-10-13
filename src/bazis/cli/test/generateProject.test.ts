@@ -87,11 +87,12 @@ describe("new project", () => {
   test("CLI command prints the created path without running codegen", async () => {
     const root = await fixture();
     const logs: string[] = [];
-    const runtime: CliRuntime = { log: (message) => logs.push(message), error: (message) => logs.push(message), codegen: async () => { throw new Error("unexpected codegen"); } };
+    const runtime: CliRuntime = { log: (message) => logs.push(message), error: (message) => logs.push(message), language: "en", codegen: async () => { throw new Error("unexpected codegen"); } };
     expect(await runCli(["new", "Demo", "--path", path.join(root, "demo"), "--framework", frameworkPath], runtime)).toBe(0);
-    expect(logs.join("\n")).toContain("created project:");
-    expect(logs.join("\n")).toContain('Framework dependency: "bazis": "^');
-    expect(logs.join("\n")).toContain("bun install");
+    const output = logs.join("\n");
+    expect(output).toContain("project Demo is created");
+    expect(output).toContain("bazis ^");
+    expect(output).toContain("bun install");
   });
 
   test("relocated snapshot runs codegen without the original framework source tree", async () => {
