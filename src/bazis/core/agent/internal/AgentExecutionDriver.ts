@@ -4,7 +4,7 @@ import type { ServiceProvider } from "../../di";
 import { getGeneratedOpenApiMetadata } from "../../http/OpenApi/generatedOpenApiRegistry";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 import type { Logger } from "../../kernel/logging/Logger";
-import { AgentRuntimeError } from "../errors";
+import { AgentModelTimeoutError, AgentRuntimeError } from "../errors";
 import { validateAgentJsonSchema } from "./AgentJsonSchema";
 import type { AgentDefinition, AgentRegistry } from "../AgentRegistry";
 import {
@@ -1137,7 +1137,7 @@ export class AgentExecutionDriver {
         };
       }
     } catch (error) {
-      const code = error instanceof AgentRuntimeTimeoutError
+      const code = error instanceof AgentRuntimeTimeoutError || error instanceof AgentModelTimeoutError
         ? "AGENT_PROVIDER_TIMEOUT"
         : error instanceof AgentRuntimeAbortError
           ? "AGENT_ABORTED"

@@ -14,6 +14,7 @@ export {
   AgentSemanticError,
   AgentSetupError,
   AgentToolExecutionError,
+  AgentModelTimeoutError,
   AgentToolPreCommitError,
   ToolError,
 } from "./errors";

@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.5 — 2026-10-13
+
+### Fixed
+
+- `llmRouter` reports a fallback: when a profile fails and its `fallback`
+  answers, the application log gets `LLM model profile failed, using
+  fallback` with the profile, the fallback, the agent and the error (secrets
+  masked). Before, a broken or slow primary model was hidden behind the
+  fallback's answers. Infra connectors pass the application logger to a client
+  that takes it (`useDiagnostics`).
+- An agent naming a model profile `llmRouter` does not serve fails before the
+  model is called: `check` and `run` throw `AgentSetupError` — `Agent
+  "support": model profile "creative" is not configured (configured: fast,
+  reasoning).` Before, the definition passed `check`, and every run failed
+  with `AGENT_PROVIDER_FAILED`. With `llmConnect` any profile is still
+  accepted. A provider lists its profiles with the optional
+  `AgentModelProvider.modelProfiles()`.
+- The connector's own `timeoutMs` is reported as `AGENT_PROVIDER_TIMEOUT`,
+  like the runtime's deadline, instead of `AGENT_PROVIDER_FAILED`. A custom
+  provider signals it by throwing `AgentModelTimeoutError`.
+
 ## 0.99.4 — 2026-10-13
 
 ### Fixed

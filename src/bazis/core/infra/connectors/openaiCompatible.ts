@@ -1,4 +1,5 @@
 import {
+  AgentModelTimeoutError,
   agentMessage,
   agentModelResponse,
   agentToolCall,
@@ -490,7 +491,7 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
     const detach = attachAbortForwarding(signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal, abort);
     const timeout = this.requestTimeoutMs === undefined
       ? undefined
-      : setTimeout(() => abort.abort(new Error("OpenAI-compatible request timed out.")), this.requestTimeoutMs);
+      : setTimeout(() => abort.abort(new AgentModelTimeoutError("OpenAI-compatible request timed out.")), this.requestTimeoutMs);
     try {
       abort.signal.throwIfAborted();
       const response = await this.fetcher(`${this.baseUrl}${path}`, {

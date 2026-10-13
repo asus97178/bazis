@@ -16,6 +16,12 @@ export interface AgentModelProvider {
     request: AgentModelRequest,
     context: AgentModelProviderContext,
   ): AgentModelResponse | Promise<AgentModelResponse>;
+  /**
+   * Model profiles this provider serves, when it routes by profile
+   * (`llmRouter`). AgentRuntime rejects an agent naming another profile before
+   * the model is called. Without it any profile is passed through.
+   */
+  modelProfiles?(): readonly string[];
 }
 
 export const AGENT_MODEL_PROVIDER = createToken<AgentModelProvider>("AgentModelProvider");
