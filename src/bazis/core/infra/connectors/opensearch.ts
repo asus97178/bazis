@@ -3,6 +3,7 @@ import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { reader, requireValue, settingNames } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
+import { identifyConnector } from "../connectorIdentity";
 
 /** Default cluster request timeout (ms): fail fast instead of hanging. */
 const DEFAULT_OPENSEARCH_TIMEOUT_MS = 5000;
@@ -295,7 +296,7 @@ export function openSearchConnect<T extends OpenSearchConfigShape>(
   options: OpenSearchConnectorOptions = {},
 ): InfraConnector<OpenSearchClient> {
   const settings = new WeakMap<OpenSearchClient, string[]>();
-  return {
+  return identifyConnector({
     token: options.token ?? IOpenSearch,
     config,
     create(configs) {
@@ -334,5 +335,5 @@ export function openSearchConnect<T extends OpenSearchConfigShape>(
     healthCheck(client, signal) {
       return client.ping(signal);
     },
-  };
+  }, "opensearch");
 }

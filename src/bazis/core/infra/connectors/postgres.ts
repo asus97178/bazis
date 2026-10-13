@@ -3,6 +3,7 @@ import { createToken, type InjectionToken } from "../../di";
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { reader, requireValue, settingNames } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
+import { identifyConnector } from "../connectorIdentity";
 
 /**
  * PostgreSQL client (native Bun `SQL`, no external dependencies) of the
@@ -83,7 +84,7 @@ export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, op
     throw new InfraError("postgres shutdownTimeoutMs must be an integer 0..2147483647");
   }
   const described = new WeakMap<SQL, { options: { hostname?: string; port?: number; database?: string; username?: string; max?: number }; settings: string[] }>();
-  return {
+  return identifyConnector({
     token: options.token ?? IPostgres,
     config,
     create(configs) {
@@ -118,7 +119,7 @@ export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, op
         return false;
       }
     },
-  };
+  }, "postgres");
 }
 
 /** `postgres@127.0.0.1:5432/app`: user, host, port and database, never the password. */

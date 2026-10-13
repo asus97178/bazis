@@ -4,6 +4,19 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.1 — 2026-10-14
+
+### Fixed
+
+- An application with `ensureCreated` on PostgreSQL and a Redis, OpenSearch
+  or raw `postgres()` connector in `@Infra` starts. Before, it failed with
+  `ORM_SCHEMA_HOSTED_PHASE_CONFLICT: Application hosted services must use
+  phase 0 or later with schema admission`: exact schema admission accepted
+  only the LLM connector before application services. Framework connectors
+  are now recognised the same way; a custom or changed connector is still
+  refused at a negative phase, and the error names it and says to set
+  `phase: 0` on it.
+
 ## 0.100.0 — 2026-10-14
 
 ### Added

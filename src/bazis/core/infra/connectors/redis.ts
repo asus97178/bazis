@@ -12,6 +12,7 @@ import { RedisDistributedCacheBackend, type RedisDistributedCacheTuning } from "
 import { reader, requireValue, settingNames } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 import { redactSensitiveText } from "../../../library/redaction";
+import { identifyConnector } from "../connectorIdentity";
 
 const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 5_000;
 
@@ -115,7 +116,7 @@ export function redisConnect<T extends RedisConfigShape>(
       ? undefined
       : distributedCacheProviders(cache === "distributed" ? {} : withoutMode(cache), token);
 
-  return {
+  return identifyConnector({
     token,
     config,
     providers: cacheProviders,
@@ -166,7 +167,7 @@ export function redisConnect<T extends RedisConfigShape>(
         return false;
       }
     },
-  };
+  }, "redis");
 }
 
 function redisUrl(value: unknown): string {
