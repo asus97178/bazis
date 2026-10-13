@@ -143,6 +143,11 @@ await this.agents.run(support, {
 conversation message when trimming old history. Provider requests include
 `metadata.agentContext.trace` so context assembly is inspectable.
 
+With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
+not serve; a fallback to another profile is logged as `LLM model profile
+failed, using fallback`. A model provider that gives up after its own deadline
+throws `AgentModelTimeoutError`, and the run reports `AGENT_PROVIDER_TIMEOUT`.
+
 LLM clients are registered by infra connectors. Agents name a model profile;
 infra owns provider URLs, model ids, limits and fallback:
 

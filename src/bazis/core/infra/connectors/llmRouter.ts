@@ -1,6 +1,9 @@
 import type { AppConfig } from "../../kernel";
+import type { HostedServiceDiagnostics } from "../../di";
+import { redactSensitive } from "../../../library/redaction";
 import {
   AGENT_MODEL_PROVIDER,
+  AgentModelTimeoutError,
   AgentRuntime,
   agentModelRequest,
   type AgentModelProvider,
@@ -194,11 +197,13 @@ export class LlmModelRouter implements AgentModelProvider {
   private initializePromise?: Promise<void>;
   private disposePromise?: Promise<void>;
   private disposed = false;
+  private diagnostics?: HostedServiceDiagnostics;
 
   public constructor(
     profiles: readonly RuntimeProfile[],
     private readonly defaultProfile: string,
     private readonly factories: readonly (() => RuntimeProfile)[] = [],
+    private readonly profileNames: readonly string[] = profiles.map((profile) => profile.name),
   ) {
     for (let index = 0; index < profiles.length; index += 1) {
       const profile = profiles[index] as RuntimeProfile;
@@ -211,6 +216,16 @@ export class LlmModelRouter implements AgentModelProvider {
     await this.initialize();
     const requested = request.modelProfile ?? context.modelProfile ?? this.defaultProfile;
     return this.completeWithProfile(request, context, requested, new Set<string>());
+  }
+
+  /** Profile names an agent may use in `modelProfile`. */
+  public modelProfiles(): readonly string[] {
+    return this.profileNames;
+  }
+
+  /** The application logger: a fallback is reported, not silent. */
+  public useDiagnostics(diagnostics: HostedServiceDiagnostics): void {
+    this.diagnostics = diagnostics;
   }
 
   public connect(signal?: AbortSignal): Promise<void> {
@@ -363,11 +378,15 @@ export class LlmModelRouter implements AgentModelProvider {
       // A second model must not silently append a new answer to already visible text.
       if (fallback !== undefined && !emittedText) {
         if (context.signal.aborted) throw new LlmModelRouterError("LLM model request was cancelled before provider dispatch.");
+        this.diagnostics?.warn("LLM model profile failed, using fallback", {
+          profile: profileName, fallback, agent: context.agentName, invocationId: context.invocationId, error: redactSensitive(error),
+        });
         return this.completeWithProfile(request, context, fallback, visited);
       }
-      throw new LlmModelRouterError(
-        `LLM model profile "${profileName}" failed: ${errorMessageOf(error)}`,
-      );
+      const message = `LLM model profile "${profileName}" failed: ${errorMessageOf(error)}`;
+      // Keep a timeout a timeout: the run reports it as AGENT_PROVIDER_TIMEOUT.
+      if (error instanceof AgentModelTimeoutError) throw new AgentModelTimeoutError(message);
+      throw new LlmModelRouterError(message);
     } finally {
       acceptingText = false;
     }
@@ -432,7 +451,7 @@ export function llmRouter(
           options: profile.options,
         });
       });
-      return new LlmModelRouter([], defaultProfile, factories);
+      return new LlmModelRouter([], defaultProfile, factories, entries.map(([name]) => name));
     },
     connect(client, signal) {
       return client instanceof LlmModelRouter ? client.connect(signal) : undefined;

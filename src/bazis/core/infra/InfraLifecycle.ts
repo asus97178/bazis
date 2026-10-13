@@ -1,4 +1,4 @@
-import type { HostedService } from "../di";
+import type { HostedService, HostedServiceDiagnostics } from "../di";
 import { InfraError, type InfraConnector } from "./InfraConnector";
 import { bindConnectorLifecycle } from "./connectorIdentity";
 import { awaitAbortable } from "../kernel/internal/awaitAbortable";
@@ -22,6 +22,7 @@ export class InfraLifecycle<TClient> implements HostedService {
   private disposed = false;
   private startPromise?: Promise<void>;
   private disposePromise?: Promise<void>;
+  private diagnostics?: HostedServiceDiagnostics;
 
   public constructor(
     private readonly name: string,
@@ -40,8 +41,20 @@ export class InfraLifecycle<TClient> implements HostedService {
     if (!this.created) {
       this.client = this.connector.create(this.configs);
       this.created = true;
+      this.forwardDiagnostics();
     }
     return this.client as TClient;
+  }
+
+  /** The application logger reaches a client that reports on its own, such as `llmRouter` falling back. */
+  public useDiagnostics(diagnostics: HostedServiceDiagnostics): void {
+    this.diagnostics = diagnostics;
+    if (this.created) this.forwardDiagnostics();
+  }
+
+  private forwardDiagnostics(): void {
+    const client = this.client as { useDiagnostics?: (diagnostics: HostedServiceDiagnostics) => void } | undefined;
+    if (this.diagnostics !== undefined && typeof client?.useDiagnostics === "function") client.useDiagnostics(this.diagnostics);
   }
 
   public start(signal?: AbortSignal): Promise<void> {

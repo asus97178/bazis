@@ -82,6 +82,7 @@ export {
   AgentRuntime,
   AgentRuntimeError,
   AgentSemanticError,
+  AgentModelTimeoutError,
   AgentToolExecutionError,
   ToolError,
   ApproximateAgentContextTokenEstimator,

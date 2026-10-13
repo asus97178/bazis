@@ -1,5 +1,6 @@
 import { createToken, type ServiceProvider } from "../di";
 import { modelValidatorAdapter } from "../../library/validation";
+import { AgentSetupError } from "./errors";
 import type { AgentDataDefinition } from "./AgentDataDefinition";
 import { AgentRegistry, type ToolDefinition } from "./AgentRegistry";
 import {
@@ -62,6 +63,15 @@ export class AgentRuntime {
     return this.catalog.listTools();
   }
 
+  /** A profile the model provider does not serve fails before the model is called. */
+  private assertModelProfile(agentName: string, profile: string | undefined): void {
+    if (profile === undefined || typeof this.modelProvider.modelProfiles !== "function") return;
+    const configured = this.modelProvider.modelProfiles();
+    if (!configured.includes(profile)) {
+      throw new AgentSetupError(`Agent "${agentName}": model profile "${profile}" is not configured (configured: ${[...configured].sort().join(", ")}).`);
+    }
+  }
+
   /**
    * Checks a definition the way `run` does, without calling the model: an
    * invalid field or a tool name not registered in `@Module.tools` throws
@@ -69,6 +79,7 @@ export class AgentRuntime {
    */
   check(definition: AgentDataDefinition): void {
     AgentRegistry.fromDefinition(definition, this.catalog.listTools());
+    this.assertModelProfile(definition.name, definition.modelProfile);
   }
 
   /**
@@ -78,6 +89,7 @@ export class AgentRuntime {
    */
   async run(definition: AgentDataDefinition, options: AgentRuntimeInvokeOptions = {}): Promise<AgentRuntimeResult> {
     const registry = AgentRegistry.fromDefinition(definition, this.catalog.listTools());
+    this.assertModelProfile(definition.name, options.modelProfile ?? definition.modelProfile);
     const driver = new AgentExecutionDriver(this.services, registry, this.modelProvider, this.options);
     return driver.invoke(definition.name, options);
   }

@@ -47,6 +47,17 @@ export class AgentToolPreCommitError extends ToolError {
   }
 }
 
+/**
+ * A model provider gave up on a request after its own deadline (for example
+ * the connector's `timeoutMs`). The run reports it as AGENT_PROVIDER_TIMEOUT.
+ */
+export class AgentModelTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentModelTimeoutError";
+  }
+}
+
 /** Error thrown when the agent runtime is configured incorrectly. */
 export class AgentRuntimeError extends Error {
   constructor(message: string) {
