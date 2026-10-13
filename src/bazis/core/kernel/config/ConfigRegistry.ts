@@ -2,6 +2,7 @@ import { DI, type ProviderDefinition } from "../../di";
 import { KernelError } from "../errors";
 import type { EnvironmentName } from "../types";
 import type { Configuration } from "./Configuration";
+import { ConfigValidationError } from "./ConfigValidationError";
 import { isConfigDefinition, type AppConfig, type ConfigDefinition, type ConfigInspection, type ConfigView, type ValidatableConfig } from "./defineConfig";
 
 /** One immutable set of resolved module configurations per kernel. */
@@ -28,6 +29,10 @@ export class ConfigRegistry {
         errors.push(error);
         issues.push(error instanceof Error ? error.message : "Configuration validation failed.");
       }
+    }
+    // Invalid keys of every config come as one error, so they are fixed in one pass.
+    if (errors.length > 1 && errors.every((error) => error instanceof ConfigValidationError)) {
+      throw new ConfigValidationError(environment, errors.flatMap((error) => (error as ConfigValidationError).issues));
     }
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) throw new AggregateError(errors, `Configuration validation failed:\n${issues.join("\n")}`);

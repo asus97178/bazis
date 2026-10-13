@@ -2,7 +2,7 @@ import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { AGENT_MODEL_PROVIDER, AGENT_RUNTIME_OPTIONS, AgentRuntime, type AgentModelProvider } from "../../agent";
 import { DI, DiError, HOSTED_SERVICE, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
 import { LOGGER } from "../../kernel/logging/Logger";
-import { reader, requireValue } from "../connectorConfig";
+import { reader, requireValue, settingNames } from "../connectorConfig";
 import { InfraError, type InfraConnector } from "../InfraConnector";
 import { identifyConnector } from "../connectorIdentity";
 
@@ -28,6 +28,12 @@ export interface LlmConnectionOptions {
 export interface LlmConnectorOptions {
   /** Request timeout. Defaults to 60s; `0` explicitly disables it. */
   readonly timeoutMs?: number;
+  /**
+   * Check the provider at start (the adapter's `connect`: `GET /models` for an
+   * OpenAI-compatible API, five seconds), so a wrong key or address stops the
+   * start instead of the first agent request. Default `true`.
+   */
+  readonly checkOnStart?: boolean;
 }
 
 export interface LlmProviderAdapter {
@@ -86,16 +92,31 @@ export function llmConnect<T extends LlmConfigShape>(
   adapter: LlmProviderAdapter,
   options: LlmConnectorOptions = {},
 ): InfraConnector<AgentModelProvider> {
+  const described = new WeakMap<AgentModelProvider, { connection: LlmConnectionOptions; settings: string[] }>();
   return identifyConnector({
     token: AGENT_MODEL_PROVIDER,
     config,
     providers: agentRuntimeProviders,
     exports: [AgentRuntime],
     create(configs) {
-      return adapter.create(resolveLlmConnectionOptions(config, options, configs));
+      const connection = resolveLlmConnectionOptions(config, options, configs);
+      const provider = adapter.create(connection);
+      described.set(provider, { connection, settings: settingNames(config, configs, ["baseUrl", "apiKey"]) });
+      return provider;
     },
     connect(provider, signal) {
+      if (options.checkOnStart === false) return;
       return adapter.connect?.(provider, signal);
+    },
+    describe(provider, { connected }) {
+      const known = described.get(provider);
+      if (known === undefined) return {};
+      return {
+        kind: `${known.connection.provider} · ${known.connection.model}`,
+        address: known.connection.baseUrl,
+        details: connected && options.checkOnStart !== false && adapter.connect !== undefined ? ["checked"] : [],
+        settings: known.settings,
+      };
     },
     dispose(provider) {
       return adapter.dispose?.(provider);

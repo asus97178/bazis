@@ -93,6 +93,9 @@
       "bazis/library/redaction": [
         "./src/bazis/library/redaction/index.ts"
       ],
+      "bazis/library/terminal": [
+        "./src/bazis/library/terminal/index.ts"
+      ],
       "bazis/library/ui": [
         "./src/bazis/library/ui/index.ts"
       ],

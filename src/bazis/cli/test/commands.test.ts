@@ -25,7 +25,7 @@ function runtime(exitCode = 0) {
   const calls: { cwd: string; target?: string }[] = [];
   const logs: string[] = [];
   const adapter: CliRuntime = {
-    log: (message) => logs.push(message), error: (message) => logs.push(message),
+    log: (message) => logs.push(message), error: (message) => logs.push(message), language: "en",
     codegen: async (cwd, target) => { calls.push({ cwd, target }); return exitCode; },
   };
   return { adapter, calls, logs };

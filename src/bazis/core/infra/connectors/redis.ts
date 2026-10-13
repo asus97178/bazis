@@ -9,7 +9,7 @@ import {
 import { createToken, DI, type InjectionToken, type ProviderDefinition } from "../../di";
 import type { AppConfig, Secret } from "../../kernel";
 import { RedisDistributedCacheBackend, type RedisDistributedCacheTuning } from "../cache/RedisDistributedCacheBackend";
-import { reader, requireValue } from "../connectorConfig";
+import { reader, requireValue, settingNames } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 import { redactSensitiveText } from "../../../library/redaction";
 
@@ -109,6 +109,7 @@ export function redisConnect<T extends RedisConfigShape>(
     throw new InfraError("redisConnect connectTimeoutMs must be a positive integer.");
   }
   const urls = new WeakMap<RedisClient, string>();
+  const settings = new WeakMap<RedisClient, string[]>();
   const cacheProviders =
     cache === undefined
       ? undefined
@@ -123,7 +124,18 @@ export function redisConnect<T extends RedisConfigShape>(
       const url = redisUrl(reader(config, configs).get("url"));
       const client = new RedisClient(url);
       urls.set(client, url);
+      settings.set(client, settingNames(config, configs, ["url"]));
       return client;
+    },
+    async describe(client, { connected }) {
+      const info = connected ? String(await client.send("INFO", ["server"])) : "";
+      const valkey = /valkey_version:([^\r\n]+)/.exec(info)?.[1];
+      const redis = /redis_version:([^\r\n]+)/.exec(info)?.[1];
+      return {
+        kind: valkey ? `Valkey ${valkey}` : redis ? `Redis ${redis}` : "Redis",
+        address: redisAddress(urls.get(client) ?? ""),
+        settings: settings.get(client) ?? [],
+      };
     },
     async connect(client) {
       // The address without a password: it names the server in the error.
@@ -171,4 +183,14 @@ function redisUrl(value: unknown): string {
 function withoutMode(cache: { readonly mode: "distributed" } & RedisDistributedCacheTuning): RedisDistributedCacheTuning {
   const { mode: _mode, ...tuning } = cache;
   return tuning;
+}
+
+/** `127.0.0.1:6379/0` without the scheme, user and password. */
+function redisAddress(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}:${parsed.port || "6379"}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+  } catch {
+    return redactSensitiveText(url);
+  }
 }

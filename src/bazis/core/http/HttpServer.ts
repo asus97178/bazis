@@ -1,6 +1,6 @@
 import type { Class, HostedService, ServiceProvider, ServiceResolver, ServiceScope } from "../di";
 import { loadBazisGeneratedRuntime } from "../generatedRuntime";
-import { Environment, HealthService, LOGGER, type HealthReport } from "../kernel";
+import { Environment, HealthService, LOGGER, StartupReport, type HealthReport } from "../kernel";
 import { redactSensitive } from "../../library/redaction";
 import { HttpContext } from "./HttpContext/HttpContext";
 import { holdResponseScope } from "./HttpContext/responseLifetime";
@@ -182,6 +182,7 @@ export class HttpServer implements HostedService {
       this.collectRouteComposer(),
     );
     this.router = builder.build(this.options.controllers);
+    const routes = builder.routes;
     this.readVersion = createVersionReader(this.options.versioning);
     this.docs = prepareOpenApiDocs({
       option: this.options.docs,
@@ -230,7 +231,37 @@ export class HttpServer implements HostedService {
           error: (error) => this.transportError(error),
         }),
       );
-    }
+    }    this.reportStarted(routes);
+  }
+
+  /** Routes and the address for the startup screen. */
+  private reportStarted(routes: readonly import("./Routing/RouterBuilder").RegisteredRoute[]): void {
+    const report = this.resolver.tryResolve(StartupReport);
+    const server = this.server;
+    if (report === undefined || server === undefined) return;
+    report.routes(routes.map((route) => ({
+      method: route.method,
+      path: route.path.startsWith("/") ? route.path : `/${route.path}`,
+      handler: route.handler,
+      open: route.open,
+      ...(route.anonymous ? { access: "anonymous" } : {}),
+    })));
+    const builtIn = [
+      ...(this.healthPath === undefined ? [] : [{ method: "GET", path: this.healthPath }]),
+      ...(this.docs === undefined ? [] : [{ method: "GET", path: this.docs.uiPath }, { method: "GET", path: this.docs.specPath }]),
+    ];
+    report.routes(builtIn.map((route) => ({ ...route, handler: "", open: true, builtIn: true })));
+    const hostname = server.hostname ?? "0.0.0.0";
+    const shown = hostname === "0.0.0.0" || hostname === "::" ? "localhost" : hostname.includes(":") ? `[${hostname}]` : hostname;
+    const url = `http://${shown}:${server.port}`;
+    report.listener({
+      protocol: "http",
+      url,
+      hostname,
+      port: server.port ?? 0,
+      ...(this.healthPath === undefined ? {} : { health: `${url}${this.healthPath}` }),
+      ...(this.docs === undefined ? {} : { docs: `${url}${this.docs.uiPath}` }),
+    });
   }
 
   private async startBunServer(create: (listen: ListenOptions) => ReturnType<typeof Bun.serve>): Promise<ReturnType<typeof Bun.serve>> {

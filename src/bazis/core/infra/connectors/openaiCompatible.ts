@@ -22,10 +22,14 @@ import {
   type LlmProviderAdapter,
 } from "./llm";
 import { readOpenAiTextStream } from "./openaiTextStream";
+import { InfraError } from "../InfraConnector";
+import { redactSensitiveText } from "../../../library/redaction";
 
 const DEFAULT_CHAT_COMPLETIONS_PATH = "/chat/completions";
 const DEFAULT_HEALTH_PATH = "/models";
 const DEFAULT_MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+/** The start check is short: a provider that does not answer in five seconds is not ready. */
+const START_CHECK_TIMEOUT_MS = 5_000;
 
 export interface OpenAiCompatibleAdapterOptions {
   readonly fetch?: OpenAiCompatibleFetch;
@@ -390,11 +394,21 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
 
   public async ping(signal?: AbortSignal): Promise<boolean> {
     try {
-      await this.request(this.healthPath, "GET", undefined, signal);
+      await this.probe(signal);
       return true;
     } catch {
       return false;
     }
+  }
+
+  /** Base URL of the provider, for diagnostics. */
+  public get address(): string {
+    return this.baseUrl;
+  }
+
+  /** The health request that rejects with the reason: wrong key, address, no answer. */
+  public async probe(signal?: AbortSignal): Promise<void> {
+    await this.request(this.healthPath, "GET", undefined, signal);
   }
 
   /** End active requests and reject subsequent calls through this provider. */
@@ -580,6 +594,17 @@ export function openAiCompatibleAdapter(options: OpenAiCompatibleAdapterOptions 
   return {
     create(connection) {
       return new OpenAiCompatibleModelProvider(connection, options);
+    },
+    async connect(provider, signal) {
+      if (!healthCheckEnabled || !(provider instanceof OpenAiCompatibleModelProvider)) return;
+      const deadline = AbortSignal.timeout(START_CHECK_TIMEOUT_MS);
+      try {
+        await provider.probe(signal === undefined ? deadline : AbortSignal.any([signal, deadline]));
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        const reason = deadline.aborted ? `no answer within ${START_CHECK_TIMEOUT_MS} ms` : error instanceof Error ? error.message : String(error);
+        throw new InfraError(`Infra connector "llm": ${provider.address} is not available — ${redactSensitiveText(reason)}`);
+      }
     },
     dispose(provider) {
       if (provider instanceof OpenAiCompatibleModelProvider) provider.dispose();

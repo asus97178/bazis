@@ -3,7 +3,7 @@ import type { Token } from "../di";
 import { LIFECYCLE_HOOK } from "./lifecycleHooks";
 import { LOGGER } from "./logging/Logger";
 import type { LifecycleHook } from "./types";
-import { ShutdownTimeoutError } from "./errors";
+import { ShutdownTimeoutError, StartupFailuresError, type StartupFailure } from "./errors";
 import { awaitAbortable } from "./internal/awaitAbortable";
 import { resolveHostedServices, validateHostedServicePlan } from "../di/extensions/hosted-service";
 import { awaitShutdown } from "./internal/awaitShutdown";
@@ -21,11 +21,28 @@ interface LifecycleResolver {
  * the {@link Kernel}, which bounds the whole graceful-stop sequence.
  */
 export class LifecycleCoordinator {
-  private startingName?: string;
+  private readonly pending = new Set<string>();
+  private readonly timings: StartupBatchTiming[] = [];
+  private readonly failed: string[] = [];
 
-  /** The hosted service whose `start` is running now, for the startup timeout. */
+  /** Hosted services whose start failed, for the failure screen. */
+  public get failedServiceNames(): readonly string[] {
+    return this.failed;
+  }
+
+  /** The hosted services whose `start` is running now, for the startup timeout. */
   public get startingServiceName(): string | undefined {
-    return this.startingName;
+    return this.pending.size === 0 ? undefined : [...this.pending].join(", ");
+  }
+
+  /** The same as a list, for the waiting indicator of the startup screen. */
+  public get startingServiceNames(): readonly string[] {
+    return [...this.pending];
+  }
+
+  /** Wall time of every started batch, in start order. */
+  public get startTimings(): readonly StartupBatchTiming[] {
+    return this.timings;
   }
 
   private hooks: readonly LifecycleHook[] = [];
@@ -85,10 +102,17 @@ export class LifecycleCoordinator {
 
       const phases = groupByPhase(hosted);
       for (let phaseIndex = 0; phaseIndex < phases.length; phaseIndex += 1) {
-        const group = phases[phaseIndex] as HostedService[];
-        for (let index = 0; index < group.length; index += 1) {
-          const service = group[index] as HostedService;
-          this.startingName = service.diagnosticName ?? service.constructor?.name;
+        for (const batch of batchesOf(phases[phaseIndex] as HostedService[])) {
+          if (batch.length > 1) {
+            await this.startBatch(batch, signal);
+            continue;
+          }
+          // One service starts inline: a failed start reaches the rollback
+          // below before a late stop of an abandoned start is scheduled.
+          const service = batch[0] as HostedService;
+          const name = serviceName(service);
+          const startedAt = performance.now();
+          this.pending.add(name);
           const starting = Promise.resolve().then(() => {
             signal?.throwIfAborted();
             return service.start(signal);
@@ -96,6 +120,7 @@ export class LifecycleCoordinator {
           try {
             await awaitAbortable(starting, signal);
           } catch (error) {
+            this.failed.push(name);
             if (signal?.aborted) {
               // A legacy service may ignore the signal and finish after startup
               // has already been cancelled. Observe it and stop it immediately
@@ -103,9 +128,11 @@ export class LifecycleCoordinator {
               void starting.then(() => service.stop()).catch(() => undefined);
             }
             throw error;
+          } finally {
+            this.pending.delete(name);
+            this.timings.push(Object.freeze({ names: Object.freeze([name]), phase: service.phase ?? 0, ms: performance.now() - startedAt }));
           }
           this.started.push(service);
-          this.startingName = undefined;
         }
       }
       this.hostedCount = this.started.length;
@@ -124,6 +151,50 @@ export class LifecycleCoordinator {
           throw cleanupError;
         }
         throw new AggregateError([error, cleanupError], "Startup failed and rollback also failed.", { cause: error });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Starts one service, or several `concurrentStart` services together. Every
+   * failure of the batch is reported at once: three unreachable connections
+   * are three problems on one screen, not three restarts.
+   */
+  private async startBatch(batch: readonly HostedService[], signal?: AbortSignal): Promise<void> {
+    const names = batch.map(serviceName);
+    for (const name of names) this.pending.add(name);
+    const startedAt = performance.now();
+    const results = await Promise.allSettled(batch.map((service) => this.startService(service, signal)));
+    for (const name of names) this.pending.delete(name);
+    this.timings.push(Object.freeze({ names: Object.freeze(names), phase: batch[0]?.phase ?? 0, ms: performance.now() - startedAt }));
+    const failures: StartupFailure[] = [];
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") this.started.push(batch[index] as HostedService);
+      else {
+        failures.push(Object.freeze({ name: names[index] as string, error: result.reason }));
+        this.failed.push(names[index] as string);
+      }
+    });
+    if (failures.length === 0) return;
+    // A timeout or a stop request aborts every pending start with one reason.
+    if (signal?.aborted || failures.length === 1) throw (failures[0] as StartupFailure).error;
+    throw new StartupFailuresError(failures);
+  }
+
+  private async startService(service: HostedService, signal?: AbortSignal): Promise<void> {
+    const starting = Promise.resolve().then(() => {
+      signal?.throwIfAborted();
+      return service.start(signal);
+    });
+    try {
+      await awaitAbortable(starting, signal);
+    } catch (error) {
+      if (signal?.aborted) {
+        // A legacy service may ignore the signal and finish after startup
+        // has already been cancelled. Observe it and stop it immediately
+        // so the late listener/connection cannot escape rollback.
+        void starting.then(() => service.stop()).catch(() => undefined);
       }
       throw error;
     }
@@ -204,6 +275,27 @@ export class LifecycleCoordinator {
       throw this.rollbackError;
     }
   }
+}
+
+export interface StartupBatchTiming {
+  readonly names: readonly string[];
+  readonly phase: number;
+  readonly ms: number;
+}
+
+function serviceName(service: HostedService): string {
+  return service.diagnosticName ?? service.constructor?.name ?? "HostedService";
+}
+
+/** Neighbouring `concurrentStart` services start together; the rest one by one, in order. */
+function batchesOf(group: readonly HostedService[]): HostedService[][] {
+  const batches: HostedService[][] = [];
+  for (const service of group) {
+    const last = batches.at(-1);
+    if (service.concurrentStart === true && last !== undefined && last[0]?.concurrentStart === true) last.push(service);
+    else batches.push([service]);
+  }
+  return batches;
 }
 
 /** Groups by ascending `phase` (default 0), keeping registration order inside a group. */

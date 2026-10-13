@@ -34,6 +34,29 @@ const isFrameworkSourcePath = (file: string): boolean => FRAMEWORK_SOURCE !== nu
 const APP_GENERATED_DIR = "src/generated/bazis";
 let activeGeneratedDir = APP_GENERATED_DIR;
 const plannedWrites = new Map<string, string>();
+/**
+ * `BAZIS_CODEGEN_REPORT=<file>`: the CLI renders the result itself. The
+ * generator then prints nothing and writes what it did, warned about and
+ * failed on as JSON to that file.
+ */
+const REPORT_FILE = process.env.BAZIS_CODEGEN_REPORT || undefined;
+interface CodegenTargetReport {
+  readonly name: string; readonly sources: number; readonly deps: number; readonly controllers: number;
+  readonly requestModels: number; readonly listModels: number; readonly tools: number; readonly ms: number;
+}
+const codegenReport = {
+  ok: false,
+  ms: 0,
+  targets: [] as CodegenTargetReport[],
+  outputs: [] as string[],
+  warnings: [] as string[],
+  errors: [] as string[],
+};
+const reportInfo = (message: string): void => { if (REPORT_FILE === undefined) console.log(message); };
+const reportWarning = (message: string): void => {
+  if (!codegenReport.warnings.includes(message)) codegenReport.warnings.push(message);
+  if (REPORT_FILE === undefined) console.warn(`[di:generate] WARNING: ${message}`);
+};
 const plannedRemovals = new Set<string>();
 
 // Test-only fault injection for the generator's private disk transaction. It
@@ -146,7 +169,7 @@ const FRAMEWORK_INTERNAL_PREFIXES = FRAMEWORK_SOURCE === null ? [] : [
   "core/di/", "core/kernel/", "core/http/", "core/grpc/", "core/http-client/", "core/background/",
   "core/agent/", "core/websocket/", "core/cache/", "library/validation/", "library/boundary/",
   "library/orm/", "library/jwt/", "library/jsonapi/", "library/openapi/", "core/orm/", "core/infra/",
-  "core/app/", "library/http-client/",
+  "core/app/", "library/http-client/", "library/terminal/",
 ].map((prefix) => `${FRAMEWORK_SOURCE}/${prefix}`);
 
 // A declaration is an identity; short names are local to their source/module.
@@ -299,7 +322,24 @@ function toPascalIdentifier(value: string): string {
     .join("");
 }
 
-await runConfiguredTargets();
+const codegenStartedAt = performance.now();
+try {
+  await runConfiguredTargets();
+  codegenReport.ok = true;
+} catch (error) {
+  // Errors are listed one per line; a stack says nothing to the application author.
+  if (codegenReport.errors.length === 0) {
+    const message = error instanceof Error ? error.message : String(error);
+    codegenReport.errors.push(...message.split("\n").filter((line) => line.trim().length > 0));
+  }
+  if (REPORT_FILE === undefined) {
+    for (const line of codegenReport.errors) console.error(`[di:generate] ERROR: ${line}`);
+  }
+  process.exitCode = 1;
+} finally {
+  codegenReport.ms = performance.now() - codegenStartedAt;
+  if (REPORT_FILE !== undefined) await Bun.write(REPORT_FILE, JSON.stringify(codegenReport));
+}
 
 async function runConfiguredTargets(): Promise<void> {
   const totalStartedAt = performance.now();
@@ -361,9 +401,15 @@ async function runConfiguredTargets(): Promise<void> {
   // slice and renderer state. Only a collision *inside* that slice is fatal.
   const candidateIndex = createSourceCandidateIndex(programFiles);
   const boundaryDiagnostics: string[] = [];
+  const unassigned: string[] = [];
   for (const [file] of programFiles) {
     if (isFrameworkSourcePath(file)) continue;
-    if (!owners.has(file) && candidateIndex.get(file)) boundaryDiagnostics.push(`BAZIS_CODEGEN_SOURCE_UNASSIGNED: ${file}`);
+    if (!owners.has(file) && candidateIndex.get(file)) unassigned.push(file);
+  }
+  // A module that is not imported yet (bazis g module --no-register) is not
+  // part of any application: skip it with a warning instead of failing.
+  for (const file of unassigned.sort((left, right) => left.localeCompare(right))) {
+    reportWarning(`BAZIS_CODEGEN_SOURCE_UNASSIGNED: ${file}: not imported from the entrypoint of any target; codegen skipped it.`);
   }
   for (const [name, reachable] of reachableByTarget) {
     for (const file of reachable) {
@@ -389,7 +435,8 @@ async function runConfiguredTargets(): Promise<void> {
   const writeStartedAt = performance.now();
   await commitPlannedWrites();
   const writeMs = performance.now() - writeStartedAt;
-  console.log(`[di:generate] programFactories=1 programSources=${programFiles.size} targets=${names.join(",")} configMs=${configMs.toFixed(1)} programMs=${programMs.toFixed(1)} discoveryMs=${discoveryMs.toFixed(1)} analysisMs=${analysisMs.toFixed(1)} targetMs=${targetMs.toFixed(1)} renderMs=${renderMs.toFixed(1)} writeMs=${writeMs.toFixed(1)} totalMs=${(performance.now() - totalStartedAt).toFixed(1)} eligible=${eligible} candidates=${candidates} outputs=${plannedWrites.size}`);
+  codegenReport.outputs.push(...[...plannedWrites.keys()].sort((left, right) => left.localeCompare(right)));
+  reportInfo(`[di:generate] programFactories=1 programSources=${programFiles.size} targets=${names.join(",")} configMs=${configMs.toFixed(1)} programMs=${programMs.toFixed(1)} discoveryMs=${discoveryMs.toFixed(1)} analysisMs=${analysisMs.toFixed(1)} targetMs=${targetMs.toFixed(1)} renderMs=${renderMs.toFixed(1)} writeMs=${writeMs.toFixed(1)} totalMs=${(performance.now() - totalStartedAt).toFixed(1)} eligible=${eligible} candidates=${candidates} outputs=${plannedWrites.size}`);
 }
 
 function createSourceCandidateIndex(files: ReadonlyMap<string, ts.SourceFile>): ReadonlyMap<string, boolean> {
@@ -500,8 +547,12 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
   if (!production) {
     stageWrite(`${generatedDir}/bootstrap.ts`, 'import { registerBazisGeneratedRuntime } from "./runtime";\n\nawait registerBazisGeneratedRuntime();\n');
   }
-  for (const warning of warnings) console.warn(`[di:generate] WARNING: ${warning}`);
-  console.log(`[di:generate] target=${name} sources=${sourceEntries.length} deps=${classDeps.size} controllers=${Object.keys(httpBindings).length} requestModels=${requestModelImports.length} listModels=${listModelImports.length} tools=${tools.toolCount} prepassMs=${prepassMs.toFixed(1)} analysisMs=${analysisMs.toFixed(1)} totalMs=${(performance.now() - startedAt).toFixed(1)}`);
+  for (const warning of warnings) reportWarning(warning);
+  codegenReport.targets.push({
+    name, sources: sourceEntries.length, deps: classDeps.size, controllers: Object.keys(httpBindings).length,
+    requestModels: requestModelImports.length, listModels: listModelImports.length, tools: tools.toolCount, ms: performance.now() - startedAt,
+  });
+  reportInfo(`[di:generate] target=${name} sources=${sourceEntries.length} deps=${classDeps.size} controllers=${Object.keys(httpBindings).length} requestModels=${requestModelImports.length} listModels=${listModelImports.length} tools=${tools.toolCount} prepassMs=${prepassMs.toFixed(1)} analysisMs=${analysisMs.toFixed(1)} totalMs=${(performance.now() - startedAt).toFixed(1)}`);
   return {
     analysisMs,
     renderMs: performance.now() - renderStartedAt,
@@ -525,9 +576,7 @@ function failOnFatalErrors(): void {
   if (fatalErrors.length === 0) {
     return;
   }
-  for (let index = 0; index < fatalErrors.length; index += 1) {
-    console.error(`[di:generate] ERROR: ${fatalErrors[index]}`);
-  }
+  codegenReport.errors.push(...fatalErrors);
   throw new Error(`di:generate failed with ${fatalErrors.length} fatal codegen error(s).`);
 }
 

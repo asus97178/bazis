@@ -5,6 +5,8 @@ import { Configuration } from "./Configuration";
 import { Secret } from "./Secret";
 import { ENV_PREFIX } from "./sources";
 import { isSensitiveKey, redactSensitiveText } from "../../../library/redaction";
+import { ConfigValidationError, type ConfigIssue, type ConfigIssueKind } from "./ConfigValidationError";
+import { callerFile } from "./callerFile";
 
 type Stand = "development" | "test" | "production";
 type Primitive = string | number | boolean;
@@ -126,6 +128,8 @@ export function defineConfig<T extends object>(schema: SchemaFor<T>): ConfigDefi
 export function defineConfig<T extends object>(prefix: string, schema: SchemaFor<T>): ConfigDefinition<T>;
 export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, maybeSchema?: ConfigSchema<Defaults>): ConfigDefinition<ConfigShape> {
   const prefix = typeof prefixOrSchema === "string" ? prefixOrSchema : "";
+  // The file that declared the config, for "declared in" of a startup failure.
+  const declaredIn = callerFile(new Error().stack);
   const input = typeof prefixOrSchema === "string" ? maybeSchema! : prefixOrSchema;
   const schema = Object.freeze({
     default: Object.freeze(Object.fromEntries(Object.entries(input.default).map(([key, value]) => [key, copyCell(value)]))),
@@ -153,12 +157,17 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
     if (!["development", "test", "production"].includes(environment)) throw new KernelError("Unknown configuration environment.");
     const values = new Map<string, ConfigValueType>();
     const inspection: ConfigInspection[] = [];
-    const issues: string[] = [];
+    const issues: ConfigIssue[] = [];
+    const issue = (key: string, kind: ConfigIssueKind, message: string, extra: Partial<ConfigIssue> = {}) => issues.push(Object.freeze({
+      key: fullKey(key), section: prefix, kind, message, env: names.get(key)!, environment,
+      ...(declaredIn === undefined ? {} : { declaredIn }), ...extra,
+    }));
     // A wrong value names what came and where to change it: the variable that
     // supplied it, or the variables that can override the value from the code.
     // A key with a sensitive name never shows its value.
     const got = (key: string, raw: unknown) => raw === undefined || isSensitiveKey(fullKey(key)) ? "" : `, got ${JSON.stringify(String(raw)).slice(0, 80)}`;
     const source = (key: string, selected: { readonly name: string } | undefined) => ` (${selected ? selected.name : names.get(key)!.join(", ")})`;
+    const from = (selected: { readonly name: string } | undefined): Partial<ConfigIssue> => selected ? { source: selected.name } : {};
     for (const key of keys) {
       const base = schema.default[key]!;
       const override = schema[environment]?.[key];
@@ -175,46 +184,41 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       const priority = Math.max(...candidates.map(candidate => candidate.priority));
       const winners = candidates.filter(candidate => candidate.priority === priority);
       const selected = winners[0];
-      if (winners.some(candidate => candidate.raw !== selected?.raw)) issues.push(`${fullKey(key)} — conflicting environment aliases`);
+      if (winners.some(candidate => candidate.raw !== selected?.raw)) issue(key, "conflict", "conflicting environment aliases");
       const raw = selected?.raw ?? (isSecret(cell) || isEnum(cell) ? cell.default : cell);
       let value: ConfigValueType | undefined;
       if (type === "secret") {
-        if (typeof raw !== "string" || !raw.trim()) issues.push(`${fullKey(key)} — required non-empty secret is not set (${names.get(key)!.join(", ")})`);
+        if (typeof raw !== "string" || !raw.trim()) issue(key, "missing-secret", `required non-empty secret is not set (${names.get(key)!.join(", ")})`);
         // A secret default in the code is a development value; production must
         // get the secret from a source or declare its own value explicitly.
         // No "apiKey: …" in the hint: the console redaction would hide it.
-        else if (environment === "production" && selected === undefined && override === undefined) issues.push(`${fullKey(key)} — production would use the development default secret from the code; set ${names.get(key)!.join(" or ")}, or declare ${key} in the production section`);
+        else if (environment === "production" && selected === undefined && override === undefined) issue(key, "development-secret", `production would use the development default secret from the code; set ${names.get(key)!.join(" or ")}, or declare ${key} in the production section`);
         else value = new Secret(raw);
       } else if (type === "number") {
         const parsed = Number(raw);
-        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issues.push(`${fullKey(key)} — expected a finite number${got(key, raw)}${source(key, selected)}`);
+        if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issue(key, "number", `expected a finite number${got(key, raw)}${source(key, selected)}`, from(selected));
         else value = parsed;
       } else if (type === "boolean") {
         const normalized = String(raw).toLowerCase();
         if (normalized === "true" || normalized === "1") value = true;
         else if (normalized === "false" || normalized === "0") value = false;
-        else issues.push(`${fullKey(key)} — expected a boolean (true, false, 1, 0)${got(key, raw)}${source(key, selected)}`);
+        else issue(key, "boolean", `expected a boolean (true, false, 1, 0)${got(key, raw)}${source(key, selected)}`, from(selected));
       } else if (typeof raw === "string") value = raw;
-      else issues.push(`${fullKey(key)} — expected a string`);
+      else issue(key, "string", "expected a string");
       if (value === undefined) continue;
-      if (isEnum(base) && !base.values.includes(value as string | number)) issues.push(`${fullKey(key)} — ${isSensitiveKey(fullKey(key)) ? "the value" : JSON.stringify(value)} is not allowed, use one of: ${base.values.join(", ")}${source(key, selected)}`);
+      if (isEnum(base) && !base.values.includes(value as string | number)) issue(key, "enum", `${isSensitiveKey(fullKey(key)) ? "the value" : JSON.stringify(value)} is not allowed, use one of: ${base.values.join(", ")}${source(key, selected)}`, { ...from(selected), allowed: Object.freeze(base.values.map(String)) });
       try {
-        const issue = validators[key]?.(value);
+        const problem = validators[key]?.(value);
         // A validator may quote its own value; hide it in that message only.
         // Replacing secrets across the whole text turned a one-letter secret
         // into "m***il.***piKey".
         const sensitive = value instanceof Secret ? value.reveal() : typeof value === "string" && isSensitiveKey(fullKey(key)) ? value : "";
-        if (issue) issues.push(`${fullKey(key)} — ${sensitive.trim() ? issue.replaceAll(sensitive, "***") : issue}`);
-      } catch { issues.push(`${fullKey(key)} — validator failed`); }
+        if (problem) issue(key, "validator", sensitive.trim() ? problem.replaceAll(sensitive, "***") : problem, from(selected));
+      } catch { issue(key, "validator", "validator failed", from(selected)); }
       values.set(key, value);
       inspection.push(Object.freeze({ key: fullKey(key), type: type as ConfigInspection["type"], env: names.get(key)!, source: selected?.source ?? (override === undefined ? "default" : environment), value: safeValue(fullKey(key), value) }));
     }
-    if (issues.length) {
-      // "key — text", not "key: text": the console redaction would read
-      // "db.password: required" as a secret value and hide the word "required".
-      const message = issues.join("; ");
-      throw new KernelError(`Invalid configuration (environment "${environment}"): ${message}.`);
-    }
+    if (issues.length) throw new ConfigValidationError(environment, issues);
     const rows = Object.freeze(inspection);
     return Object.freeze({
       environment,

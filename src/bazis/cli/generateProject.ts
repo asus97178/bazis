@@ -1,6 +1,7 @@
 import path from "node:path";
 import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { parseModuleName } from "./naming";
+import { parseLanguage, systemLanguage } from "../library/terminal";
 
 export interface GenerateProjectOptions {
   readonly name: string;
@@ -159,7 +160,9 @@ function buildProjectFiles(name: string, dependency: string, frameworkMode: Fram
     },
     include: ["src/**/*"],
   };
-  const codegen = { version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } };
+  // Output language of the CLI and the startup screen, from the system locale; BAZIS_LANG and --lang override it.
+  const language = parseLanguage(systemLanguage()) ?? "en";
+  const codegen = { version: 1, defaultTarget: "production", language, targets: { production: { entrypoints: ["src/index.ts"] } } };
   return [
     ["package.json", `${JSON.stringify(manifest, null, 2)}\n`],
     ["tsconfig.json", `${JSON.stringify(tsconfig, null, 2)}\n`],
@@ -184,7 +187,10 @@ const HEALTH_TEST = `import { expect, test } from "bun:test";
 
 // Starts the app from source exactly as \`bazis dev\` does and checks /health.
 test("app starts and answers /health", async () => {
-  const port = String(20000 + Math.floor(Math.random() * 20000));
+  // A free port from the operating system, not a random guess that may be taken.
+  const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
+  const port = String(probe.port);
+  probe.stop(true);
   const app = Bun.spawn([process.execPath, "run", "src/index.ts"], { env: { ...process.env, HOST: "127.0.0.1", PORT: port }, stdout: "ignore", stderr: "inherit" });
   try {
     let status = 0;

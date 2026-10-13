@@ -1,4 +1,12 @@
 import type { Class } from "../di";
+import { registerModuleDescriber } from "../kernel/report/moduleTree";
+import { toolMetadataOf } from "./metadata";
+
+// The module tree of the startup screen: `orders.summary · read`.
+registerModuleDescriber((metadata) => (metadata.tools ?? []).map((tool) => {
+  const meta = toolMetadataOf(tool);
+  return { kind: "tool" as const, text: meta === undefined ? tool.name : `${meta.name} · ${meta.sideEffect}` };
+}));
 
 export { Tool } from "./decorators/Tool";
 export { describeTool } from "./Tool.contract";

@@ -1,7 +1,7 @@
 import { SQL } from "bun";
 import { createToken, type InjectionToken } from "../../di";
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
-import { reader, requireValue } from "../connectorConfig";
+import { reader, requireValue, settingNames } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 
 /**
@@ -82,11 +82,23 @@ export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, op
   if (!Number.isSafeInteger(shutdownTimeoutMs) || shutdownTimeoutMs < 0 || shutdownTimeoutMs > 2147483647) {
     throw new InfraError("postgres shutdownTimeoutMs must be an integer 0..2147483647");
   }
+  const described = new WeakMap<SQL, { options: { hostname?: string; port?: number; database?: string; username?: string; max?: number }; settings: string[] }>();
   return {
     token: options.token ?? IPostgres,
     config,
     create(configs) {
-      return new SQL(postgresConnectionOptions(config, configs));
+      const connection = postgresConnectionOptions(config, configs);
+      const client = new SQL(connection);
+      described.set(client, { options: connection as { hostname?: string; port?: number; database?: string; username?: string; max?: number }, settings: settingNames(config, configs, ["host", "port", "database", "username", "password"]) });
+      return client;
+    },
+    async describe(client, { connected }) {
+      const known = described.get(client);
+      const version = connected ? await serverVersion((sql) => client.unsafe(sql)) : undefined;
+      return {
+        kind: version === undefined ? "PostgreSQL" : `PostgreSQL ${version}`,
+        ...(known === undefined ? {} : { address: postgresAddress(known.options), details: [`pool ${known.options.max ?? 10}`], settings: known.settings }),
+      };
     },
     async connect(client) {
       try {
@@ -107,4 +119,16 @@ export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, op
       }
     },
   };
+}
+
+/** `postgres@127.0.0.1:5432/app`: user, host, port and database, never the password. */
+export function postgresAddress(options: { readonly hostname?: string; readonly port?: number | string; readonly database?: string; readonly username?: string }): string {
+  return `${options.username ?? ""}${options.username ? "@" : ""}${options.hostname ?? "localhost"}:${options.port ?? 5432}/${options.database ?? ""}`;
+}
+
+/** `17.6` from `SHOW server_version`; undefined when the server does not say. */
+export async function serverVersion(query: (sql: string) => Promise<unknown>): Promise<string | undefined> {
+  const rows = await query("SHOW server_version") as readonly Record<string, unknown>[];
+  const value = rows[0]?.server_version;
+  return typeof value === "string" ? value.split(" ")[0] : undefined;
 }

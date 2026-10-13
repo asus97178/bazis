@@ -11,7 +11,7 @@ import {
   type BazisModuleRef,
   type ProviderDefinition,
 } from "../di";
-import { ConfigRegistry, HEALTH_CHECK } from "../kernel";
+import { ConfigRegistry, HEALTH_CHECK, StartupReport } from "../kernel";
 import { InfraError, type InfraConnector } from "./InfraConnector";
 import { InfraLifecycle } from "./InfraLifecycle";
 
@@ -83,7 +83,13 @@ function buildInfraDefinitions(manifest: InfraManifest): {
     // a failing factory elsewhere cannot leave a created resource without cleanup.
     const ownerToken = createToken<InfraLifecycle<unknown>>(`infra:${name}:lifetime`);
     const owner = DI.singleton(DI.factoryProviderWithResolver(ownerToken, [], (resolver) =>
-      new InfraLifecycle(name, connector, undefined, resolver.has(ConfigRegistry) ? resolver.resolve(ConfigRegistry) : undefined)));
+      new InfraLifecycle(
+        name,
+        connector,
+        undefined,
+        resolver.has(ConfigRegistry) ? resolver.resolve(ConfigRegistry) : undefined,
+        resolver.has(StartupReport) ? resolver.resolve(StartupReport) : undefined,
+      )));
     instances.set(owner, { name, token: connector.token });
     providers.push(owner);
     providers.push(

@@ -3,6 +3,9 @@ import { InfraError, type InfraConnector } from "./InfraConnector";
 import { bindConnectorLifecycle } from "./connectorIdentity";
 import { awaitAbortable } from "../kernel/internal/awaitAbortable";
 import type { ConfigRegistry } from "../kernel/config/ConfigRegistry";
+import type { ConnectionDescription, StartupReport } from "../kernel/report/StartupReport";
+
+const DESCRIBE_TIMEOUT_MS = 1_000;
 
 const DEFAULT_INFRA_PHASE = -100;
 
@@ -19,6 +22,8 @@ export class InfraLifecycle<TClient> implements HostedService {
   public readonly phase: number;
   /** The manifest key, as in `/health`: `infra:db`. */
   public readonly diagnosticName: string;
+  /** Connections of one manifest are independent: they start together and fail together. */
+  public readonly concurrentStart = true;
   private client?: TClient;
   private created = false;
   private disposed = false;
@@ -31,6 +36,7 @@ export class InfraLifecycle<TClient> implements HostedService {
     private readonly connector: InfraConnector<TClient>,
     client?: TClient,
     private readonly configs?: ConfigRegistry,
+    private readonly report?: StartupReport,
   ) {
     this.client = client;
     this.created = client !== undefined;
@@ -66,11 +72,21 @@ export class InfraLifecycle<TClient> implements HostedService {
   }
 
   private async connect(signal?: AbortSignal): Promise<void> {
+    const startedAt = performance.now();
     try {
       signal?.throwIfAborted();
       const client = this.getClient();
+      this.report?.connection({ name: this.name, status: "wait" });
       await awaitAbortable(Promise.resolve(this.connector.connect(client, signal)), signal);
+      const ms = performance.now() - startedAt;
+      this.report?.connection({ name: this.name, status: "up", ms, ...(await this.describe(client, true, signal)) });
     } catch (error) {
+      const ms = performance.now() - startedAt;
+      if (this.report !== undefined) {
+        const description = this.created ? await this.describe(this.client as TClient, false) : {};
+        // A start cut short by the timeout is still waiting, not refused.
+        this.report.connection({ name: this.name, status: signal?.aborted ? "wait" : "down", ms, error, ...description });
+      }
       try {
         await this.dispose();
       } catch (cleanupError) {
@@ -80,6 +96,17 @@ export class InfraLifecycle<TClient> implements HostedService {
         );
       }
       throw error;
+    }
+  }
+
+  private async describe(client: TClient, connected: boolean, signal?: AbortSignal): Promise<ConnectionDescription> {
+    if (this.connector.describe === undefined) return {};
+    const timeout = AbortSignal.timeout(DESCRIBE_TIMEOUT_MS);
+    const combined = signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
+    try {
+      return await awaitAbortable(Promise.resolve(this.connector.describe(client, { connected, signal: combined })), combined);
+    } catch {
+      return {};
     }
   }
 

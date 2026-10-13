@@ -13,6 +13,7 @@ import { ConsoleLogger } from "./logging/ConsoleLogger";
 import { LOGGER, type Logger } from "./logging/Logger";
 import type { ConfigSource, EnvironmentName, KernelOptions, UnhandledErrorPolicy } from "./types";
 import { validateTimeout } from "./internal/validateTimeout";
+import { StartupReport } from "./report/StartupReport";
 
 /** Root module or a profile factory (Spring profiles, but explicit). */
 export type RootModuleInput = BazisModuleRef | ((environment: Environment) => BazisModuleRef);
@@ -49,6 +50,14 @@ export class KernelBuilder {
   private startupReport?: boolean;
   private schemaOnly?: boolean;
   private logger?: Logger;
+  private startupScreen?: (kernel: Kernel) => void;
+  private applicationRoot?: BazisModuleRef;
+  private builtReport?: StartupReport;
+
+  /** Facts of the last {@link build}, also when it failed after the configuration was read. */
+  public get report(): StartupReport | undefined {
+    return this.builtReport;
+  }
 
   public constructor(private readonly rootModule: RootModuleInput) {}
 
@@ -105,6 +114,25 @@ export class KernelBuilder {
   }
 
   /**
+   * Renders the startup screen instead of the `bazis started` log line, and
+   * makes subsystems record their facts for it rather than print them.
+   * `Bazis.run` sets it on an interactive terminal.
+   */
+  public useStartupScreen(render: (kernel: Kernel) => void): this {
+    this.startupScreen = render;
+    return this;
+  }
+
+  /**
+   * @internal The application's own root module, inside the hosts `runApp`
+   * wraps it in: the module tree of the startup screen starts from it.
+   */
+  public useApplicationRoot(root: BazisModuleRef): this {
+    this.applicationRoot = root;
+    return this;
+  }
+
+  /**
    * Replacements for registered providers, for tests (see `createContainer`
    * `overrides`): registered after the whole graph and visible to every module.
    */
@@ -138,6 +166,12 @@ export class KernelBuilder {
     const userRoot = resolveUserRoot(this.rootModule, environment);
     const configs = collectModuleConfigs([userRoot]);
     const configRegistry = new ConfigRegistry(configs, environment.name, configuration);
+    const startupReport = this.startupReport ?? !environment.isProduction;
+    // The screen replaces the report line, so it follows the same switch.
+    const screen = this.startupScreen !== undefined && startupReport;
+    const report = new StartupReport(screen);
+    report.configuration(configRegistry.inspect());
+    this.builtReport = report;
 
     // Kernel infrastructure is a global module: any user module can depend on
     // Environment / Configuration / ApplicationLifetime / EventBus without
@@ -146,6 +180,7 @@ export class KernelBuilder {
     @Module({
       providers: [
         DI.singleton(DI.valueProvider(ConfigRegistry, configRegistry)),
+        DI.singleton(DI.valueProvider(StartupReport, report)),
         ...configRegistry.providers,
         DI.singleton(DI.valueProvider(Environment, environment)),
         DI.singleton(DI.valueProvider(Configuration, configuration)),
@@ -179,8 +214,11 @@ export class KernelBuilder {
       shutdownTimeoutMs: this.shutdownTimeoutMs,
       signals: this.signals,
       unhandledErrorPolicy: this.unhandledErrorPolicy,
-      startupReport: this.startupReport ?? !environment.isProduction,
+      startupReport,
       schemaOnly: this.schemaOnly ?? schemaOnlyFromProcess(),
+      report,
+      root: this.applicationRoot ?? userRoot,
+      ...(screen ? { onStarted: this.startupScreen } : {}),
     });
   }
 }

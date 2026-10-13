@@ -13,6 +13,7 @@ export { paginate, type PageResult } from "./listQuery";
 export { databaseErrorStatus } from "./databaseErrorStatus";
 
 import { registerModuleMetadataExpander, type BazisModuleRef } from "../di";
+import { registerModuleDescriber } from "../kernel/report/moduleTree";
 import { OrmOwnedStoreAdmissionError, type DbContext } from "../../library/orm";
 import { registerRepositoryEncapsulationHook } from "./encapsulationHook";
 import { ormModule, type OrmModuleConfig } from "./ormModule";
@@ -59,6 +60,16 @@ function declaredOwnedStore(config: OrmModuleConfig<DbContext>): unknown {
   if (!("value" in descriptor)) throw new OrmOwnedStoreAdmissionError("ORM_OWNED_STORE_IDENTITY_MISMATCH", "ORM_OWNED_STORE_IDENTITY_MISMATCH");
   return descriptor.value;
 }
+
+// The module tree of the startup screen: `Task, Comment · TaskDbContext`.
+registerModuleDescriber((metadata) => {
+  const orm = (metadata as { ormBazis?: OrmModuleConfig<DbContext> | readonly OrmModuleConfig<DbContext>[] }).ormBazis;
+  if (orm === undefined) return [];
+  return (Array.isArray(orm) ? orm : [orm]).map((config: OrmModuleConfig<DbContext>) => ({
+    kind: "table" as const,
+    text: `${(config.entities ?? []).map((entity) => (entity as { name?: string }).name ?? "entity").join(", ") || "no entities"} · ${(config.context as { name?: string } | undefined)?.name ?? "DbContext"}`,
+  }));
+});
 
 registerModuleMetadataExpander((metadata): readonly BazisModuleRef[] => {
   const orm = (metadata as { ormBazis?: OrmModuleConfig<DbContext> | readonly OrmModuleConfig<DbContext>[] }).ormBazis;

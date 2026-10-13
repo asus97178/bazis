@@ -2,6 +2,7 @@ import { ormHostedPlanValidator } from "./OrmHostedPlan.validator";
 import type { HostedService } from "../di";
 import { DatabaseFacade, type DbContextOptions, type EnsureCreatedWithMigrationsResult, type Migration } from "../../library/orm";
 import { compileExpectedSchema } from "../../library/orm/Schema/ExpectedSchema";
+import type { StartupReport } from "../kernel/report/StartupReport";
 
 /**
  * ORM lifecycle hosted service: at start it (optionally) creates the schema or
@@ -11,6 +12,8 @@ import { compileExpectedSchema } from "../../library/orm/Schema/ExpectedSchema";
 export class OrmLifecycle implements HostedService {
   readonly planValidator = ormHostedPlanValidator;
   readonly phase: number;
+  /** `schema:TaskDbContext` in startup diagnostics and timings. */
+  readonly diagnosticName: string;
   /** Internal hosted-plan marker; public hosted services never receive it. */
   readonly __bazisOrmLegacyLifecycle = true;
   /**
@@ -48,7 +51,9 @@ export class OrmLifecycle implements HostedService {
      */
     private readonly ownsConnection: boolean = true,
     contextName = "DbContext",
+    private readonly report?: StartupReport,
   ) {
+    this.diagnosticName = `schema:${contextName}`;
     const modes = [ensureCreated && "ensureCreated", migrateOnStart && "migrateOnStart", runMigrationsOnStart && migrations.length > 0 && "migrations"].filter(Boolean);
     this.withMigrations = ensureCreated && runMigrationsOnStart && migrations.length > 0;
     this.__bazisSchemaOwner = Object.freeze({ context: contextName, mode: modes.join(" + ") || "none" });
@@ -73,38 +78,55 @@ export class OrmLifecycle implements HostedService {
 
   async start(): Promise<void> {
     const database = new DatabaseFacade(this.options.provider, this.options.model);
+    const startedAt = performance.now();
+    // The startup screen lists the changes; without it they are logged as before.
+    const log = this.report?.screen !== true;
+    const applied: string[] = [], migrated: string[] = [], baselined: string[] = [], warnings: string[] = [];
     try {
       if (this.ensureCreated) {
         const result: Partial<EnsureCreatedWithMigrationsResult> & Pick<EnsureCreatedWithMigrationsResult, "warnings"> = this.withMigrations ? await database.ensureCreatedWithMigrations(this.migrations) : await database.ensureCreated();
         // Logged in execution order: migrations, schema changes, then the baseline record.
         if (result.migrated && result.migrated.length > 0) {
-          console.info(`[orm:migrations] applied: ${result.migrated.join(", ")}`);
+          migrated.push(...result.migrated);
+          if (log) console.info(`[orm:migrations] applied: ${result.migrated.join(", ")}`);
         }
         if (result.applied && result.applied.length > 0) {
-          console.info(`[orm:schema] applied ${result.applied.length} operation(s): ${result.applied.join(", ")}`);
+          applied.push(...result.applied);
+          if (log) console.info(`[orm:schema] applied ${result.applied.length} operation(s): ${result.applied.join(", ")}`);
         }
         if (result.baselined && result.baselined.length > 0) {
-          console.info(`[orm:migrations] baseline: the schema was created from the model, recorded as applied without running: ${result.baselined.join(", ")}`);
+          baselined.push(...result.baselined);
+          if (log) console.info(`[orm:migrations] baseline: the schema was created from the model, recorded as applied without running: ${result.baselined.join(", ")}`);
         }
         for (const warning of result.warnings) {
-          console.warn(`[orm:schema] ${warning}`);
+          warnings.push(warning);
+          if (log) console.warn(`[orm:schema] ${warning}`);
         }
       }
       if (this.migrateOnStart) {
         const result = await database.migrate();
         if (result.applied > 0) {
-          console.info(`[orm:migrate] applied ${result.applied} operation(s): ${result.operations.join(", ")}`);
+          applied.push(...result.operations);
+          if (log) console.info(`[orm:migrate] applied ${result.applied} operation(s): ${result.operations.join(", ")}`);
         }
         for (const warning of result.warnings) {
-          console.warn(`[orm:migrate] ${warning}`);
+          warnings.push(warning);
+          if (log) console.warn(`[orm:migrate] ${warning}`);
         }
       }
       if (this.runMigrationsOnStart && this.migrations.length > 0 && !this.withMigrations) {
         const result = await database.migrateVersioned(this.migrations);
         if (result.applied.length > 0) {
-          console.info(`[orm:migrations] applied: ${result.applied.join(", ")}`);
+          migrated.push(...result.applied);
+          if (log) console.info(`[orm:migrations] applied: ${result.applied.join(", ")}`);
         }
       }
+      if (this.__bazisSchemaOwner.mode !== "none") this.report?.schema({
+        context: this.__bazisSchemaOwner.context,
+        mode: this.__bazisSchemaOwner.mode,
+        applied, migrated, baselined, warnings,
+        ms: performance.now() - startedAt,
+      });
     } catch (error) {
       if (!this.ownsConnection) {
         throw error;

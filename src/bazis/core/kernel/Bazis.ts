@@ -5,6 +5,7 @@ import { KernelError, ShutdownTimeoutError } from "./errors";
 import type { KernelOptions } from "./types";
 import { redactSensitiveText } from "../../library/redaction";
 import { formatStartupFailure } from "./startupFailure";
+import { StartupScreen, startupScreenEnabled } from "./report/StartupScreen";
 
 /**
  * Entry-point facade.
@@ -31,12 +32,26 @@ export class Bazis {
     if (options) {
       builder.useOptions(options);
     }
+    // On a terminal the start is a screen: what started, or what failed and why.
+    const screen = startupScreenEnabled() ? new StartupScreen() : undefined;
+    let stopWaiting: (() => void) | undefined;
+    if (screen !== undefined && options?.startupReport !== false) {
+      builder.useStartupScreen((started) => {
+        stopWaiting?.();
+        screen.started(started);
+      });
+    }
     configure?.(builder);
 
     let kernel: Kernel;
     try {
       kernel = await builder.build();
     } catch (error) {
+      if (screen !== undefined && !(error instanceof ShutdownTimeoutError)) {
+        screen.failed(error, undefined, builder.report);
+        process.exitCode = 1;
+        return 1;
+      }
       if (error instanceof DiError || error instanceof KernelError) {
         console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
         process.exitCode = 1;
@@ -46,10 +61,13 @@ export class Bazis {
     }
 
     try {
+      if (kernel.report.screen) stopWaiting = screen?.waiting(kernel);
       const exitCode = await kernel.run();
+      stopWaiting?.();
       process.exitCode = exitCode;
       return exitCode;
     } catch (error) {
+      stopWaiting?.();
       if (error instanceof ShutdownTimeoutError) {
         // Graceful shutdown is stuck: hanging handles would keep the process
         // alive forever, so this is the one place a hard exit is correct.
@@ -58,7 +76,9 @@ export class Bazis {
       }
       // Configuration problems surfacing at start (e.g. options fail-fast)
       // deserve the same friendly output as build-time ones.
-      if (error instanceof DiError || error instanceof KernelError) {
+      if (screen !== undefined) {
+        screen.failed(error, kernel);
+      } else if (error instanceof DiError || error instanceof KernelError) {
         console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
       } else {
         console.error(`[bazis] application failed: ${formatStartupFailure(error)}`);
