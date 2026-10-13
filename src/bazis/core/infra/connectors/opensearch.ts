@@ -134,8 +134,12 @@ export class OpenSearchClient {
   }
 }
 
-/** OpenSearch client token for injection into application services. */
-export const OPENSEARCH: InjectionToken<OpenSearchClient> = createToken<OpenSearchClient>("OpenSearch");
+/**
+ * OpenSearch client of the `openSearchConnect()` connector, injected by type:
+ * `constructor(private readonly search: IOpenSearch)`.
+ */
+export interface IOpenSearch extends OpenSearchClient {}
+export const IOpenSearch = createToken<IOpenSearch>("IOpenSearch") as InjectionToken<OpenSearchClient>;
 
 /**
  * Config interface required by the OpenSearch connector. The search subsystem
@@ -278,7 +282,7 @@ async function readBoundedText(response: Response, maxBytes: number, label: stri
  * });
  * @Infra({ search: openSearchConnect(searchConfig) })
  * export class AppInfra {}
- * // injection by token: scoped(ISearchService, SearchService, [OPENSEARCH] as const)
+ * // by type: class SearchService { constructor(private readonly search: IOpenSearch) {} }
  * ```
  */
 export function openSearchConnect<T extends OpenSearchConfigShape>(
@@ -286,7 +290,7 @@ export function openSearchConnect<T extends OpenSearchConfigShape>(
   options: OpenSearchConnectorOptions = {},
 ): InfraConnector<OpenSearchClient> {
   return {
-    token: options.token ?? OPENSEARCH,
+    token: options.token ?? IOpenSearch,
     config,
     create(configs) {
       return new OpenSearchClient(buildOpenSearchOptions(config, options, configs));

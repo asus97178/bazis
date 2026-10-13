@@ -21,6 +21,13 @@ interface LifecycleResolver {
  * the {@link Kernel}, which bounds the whole graceful-stop sequence.
  */
 export class LifecycleCoordinator {
+  private startingName?: string;
+
+  /** The hosted service whose `start` is running now, for the startup timeout. */
+  public get startingServiceName(): string | undefined {
+    return this.startingName;
+  }
+
   private hooks: readonly LifecycleHook[] = [];
   /** Hosted services in actual start order (stop iterates in reverse). */
   private readonly started: HostedService[] = [];
@@ -81,6 +88,7 @@ export class LifecycleCoordinator {
         const group = phases[phaseIndex] as HostedService[];
         for (let index = 0; index < group.length; index += 1) {
           const service = group[index] as HostedService;
+          this.startingName = service.diagnosticName ?? service.constructor?.name;
           const starting = Promise.resolve().then(() => {
             signal?.throwIfAborted();
             return service.start(signal);
@@ -97,6 +105,7 @@ export class LifecycleCoordinator {
             throw error;
           }
           this.started.push(service);
+          this.startingName = undefined;
         }
       }
       this.hostedCount = this.started.length;

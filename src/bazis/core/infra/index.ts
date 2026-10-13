@@ -10,10 +10,10 @@ export { reader, requireValue, type ConfigReader } from "./connectorConfig";
 export { codexAppServerConnect, CODEX_APP_SERVER } from "./connectors/codex";
 export { CodexError, RU_CODEX_MESSAGES, type CodexErrorCode, CODEX_MODEL_ID, CODEX_REASONING_EFFORT, type CodexClient, type CodexConfigShape, type CodexLogin, type CodexLoginMethod, type CodexModel, type CodexStatus, type CodexRunInput, type CodexChatMessage, type CodexTool, type CodexToolCall, type CodexToolResult } from "./connectors/codex/contracts";
 
-export { postgres, POSTGRES, postgresConnectionOptions, type PostgresConfigShape, type PostgresSslMode, type PostgresConnectorOptions } from "./connectors/postgres";
+export { postgres, IPostgres, postgresConnectionOptions, type PostgresConfigShape, type PostgresSslMode, type PostgresConnectorOptions } from "./connectors/postgres";
 export {
   redisConnect,
-  REDIS,
+  IRedis,
   type RedisConfigShape,
   type RedisConnectorCacheMode,
   type RedisConnectorOptions,
@@ -26,7 +26,7 @@ export {
 } from "./cache";
 export {
   openSearchConnect,
-  OPENSEARCH,
+  IOpenSearch,
   OpenSearchClient,
   type OpenSearchClientOptions,
   type OpenSearchConfigShape,

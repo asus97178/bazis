@@ -11,9 +11,17 @@ import type { AppConfig, Secret } from "../../kernel";
 import { RedisDistributedCacheBackend, type RedisDistributedCacheTuning } from "../cache/RedisDistributedCacheBackend";
 import { reader, requireValue } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
+import { redactSensitiveText } from "../../../library/redaction";
 
-/** Redis/Valkey client (native Bun `RedisClient`, no external dependencies). */
-export const REDIS: InjectionToken<RedisClient> = createToken<RedisClient>("Redis");
+const DEFAULT_REDIS_CONNECT_TIMEOUT_MS = 5_000;
+
+/**
+ * Redis/Valkey client (native Bun `RedisClient`, no external dependencies) of
+ * the `redisConnect()` connector, injected by type:
+ * `constructor(private readonly redis: IRedis)`.
+ */
+export interface IRedis extends RedisClient {}
+export const IRedis = createToken<IRedis>("IRedis") as InjectionToken<RedisClient>;
 
 /**
  * Config interface required by the Redis connector. The subsystem config
@@ -30,6 +38,12 @@ export type RedisConnectorCacheMode =
 
 export interface RedisConnectorOptions {
   readonly token?: InjectionToken<RedisClient>;
+  /**
+   * How long the start waits for the first connection, ms (default 5000).
+   * The Bun client keeps retrying a refused connection; without a bound an
+   * unreachable Redis held the whole start until its timeout.
+   */
+  readonly connectTimeoutMs?: number;
   /**
    * Publishes a distributed cache backend on top of the client: `{ cache: "distributed" }`.
    * For fine tuning use `{ cache: { mode: "distributed", keyPrefix, ... } }`.
@@ -81,7 +95,7 @@ function distributedCacheProviders(tuning: RedisDistributedCacheTuning, token: I
  * export const redisConfig = defineConfig("redis", { default: { url: "redis://localhost:6379" } });
  * @Infra({ cache: redisConnect(redisConfig, { cache: "distributed" }) })
  * export class AppInfra {}
- * // injection by token: scoped(ISessionsService, SessionsService, [REDIS] as const)
+ * // by type: class SessionsService { constructor(private readonly redis: IRedis) {} }
  * ```
  */
 export function redisConnect<T extends RedisConfigShape>(
@@ -89,7 +103,12 @@ export function redisConnect<T extends RedisConfigShape>(
   options: RedisConnectorOptions = {},
 ): InfraConnector<RedisClient> {
   const cache = options.cache;
-  const token = options.token ?? REDIS;
+  const token = options.token ?? IRedis;
+  const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_REDIS_CONNECT_TIMEOUT_MS;
+  if (!Number.isSafeInteger(connectTimeoutMs) || connectTimeoutMs <= 0) {
+    throw new InfraError("redisConnect connectTimeoutMs must be a positive integer.");
+  }
+  const urls = new WeakMap<RedisClient, string>();
   const cacheProviders =
     cache === undefined
       ? undefined
@@ -101,13 +120,28 @@ export function redisConnect<T extends RedisConfigShape>(
     providers: cacheProviders,
     exports: cacheProviders ? [DISTRIBUTED_CACHE_BACKEND, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE, IDistributedCache] : undefined,
     create(configs) {
-      return new RedisClient(redisUrl(reader(config, configs).get("url")));
+      const url = redisUrl(reader(config, configs).get("url"));
+      const client = new RedisClient(url);
+      urls.set(client, url);
+      return client;
     },
     async connect(client) {
+      // The address without a password: it names the server in the error.
+      const target = redactSensitiveText(urls.get(client) ?? "redis");
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new InfraError(`Infra connector "redis": failed to connect to ${target} within ${connectTimeoutMs} ms.`)), connectTimeoutMs);
+      });
       try {
-        await client.connect();
+        await Promise.race([client.connect(), deadline]);
       } catch (error) {
-        throw new InfraError(`Infra connector "redis": failed to connect — ${errorMessage(error)}`);
+        if (error instanceof InfraError) {
+          client.close();
+          throw error;
+        }
+        throw new InfraError(`Infra connector "redis": failed to connect to ${target} — ${errorMessage(error)}`);
+      } finally {
+        clearTimeout(timer);
       }
     },
     dispose(client) {

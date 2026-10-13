@@ -4,8 +4,13 @@ import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { reader, requireValue } from "../connectorConfig";
 import { errorMessage, InfraError, type InfraConnector } from "../InfraConnector";
 
-/** PostgreSQL client (native Bun `SQL`, no external dependencies). */
-export const POSTGRES: InjectionToken<SQL> = createToken<SQL>("Postgres");
+/**
+ * PostgreSQL client (native Bun `SQL`, no external dependencies) of the
+ * `postgres()` connector, injected by type:
+ * `constructor(private readonly sql: IPostgres)`.
+ */
+export interface IPostgres extends SQL {}
+export const IPostgres = createToken<IPostgres>("IPostgres") as InjectionToken<SQL>;
 
 /**
  * Config interface required by the PostgreSQL connector. The database subsystem
@@ -69,7 +74,7 @@ export function postgresConnectionOptions(config: AppConfig<PostgresConfigShape>
  * });
  * @Infra({ db: postgres(dbConfig) })
  * export class AppInfra {}
- * // injection by token: scoped(IReportsService, ReportsService, [POSTGRES] as const)
+ * // by type: class ReportsService { constructor(private readonly sql: IPostgres) {} }
  * ```
  */
 export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, options: PostgresConnectorOptions = {}): InfraConnector<SQL> {
@@ -78,7 +83,7 @@ export function postgres<T extends PostgresConfigShape>(config: AppConfig<T>, op
     throw new InfraError("postgres shutdownTimeoutMs must be an integer 0..2147483647");
   }
   return {
-    token: options.token ?? POSTGRES,
+    token: options.token ?? IPostgres,
     config,
     create(configs) {
       return new SQL(postgresConnectionOptions(config, configs));

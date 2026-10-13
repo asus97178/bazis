@@ -4,6 +4,29 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.99.6 — 2026-10-13
+
+### Changed (breaking)
+
+- Infra clients are injected by type: `constructor(private readonly sql:
+  IPostgres, private readonly redis: IRedis, private readonly search:
+  IOpenSearch)`, with no explicit deps list. `IPostgres`, `IRedis` and
+  `IOpenSearch` replace the `POSTGRES`, `REDIS` and `OPENSEARCH` tokens; a
+  second instance of a connector still takes its own `token` option.
+
+### Fixed
+
+- An unreachable Redis fails the start in `connectTimeoutMs` (default 5000)
+  with `Infra connector "redis": failed to connect to redis://***:***@host:port
+  within 5000 ms.` Before, the Bun client retried a refused connection
+  forever, and the start hung until the 30-second startup timeout. Reconnects
+  while the application runs are unchanged.
+- The startup timeout names the hosted service still starting — `Application
+  startup did not finish within 30000ms; still starting: infra:cache.` — and
+  is reported as `application failed`, not as a configuration error.
+  `HostedService.diagnosticName` gives the name; infra connectors use
+  `infra:<manifest key>`, other services their class name.
+
 ## 0.99.5 — 2026-10-13
 
 ### Fixed

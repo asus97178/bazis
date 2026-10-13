@@ -38,6 +38,8 @@ export interface HostedService {
   readonly planValidator?: HostedServicePlanValidator;
   /** Receives the application logger before start, when one is registered. */
   useDiagnostics?(diagnostics: HostedServiceDiagnostics): void;
+  /** Name in startup diagnostics, such as `infra:db`; the class name by default. */
+  readonly diagnosticName?: string;
   start(signal?: AbortSignal): void | Promise<void>;
   stop(): void | Promise<void>;
   /**

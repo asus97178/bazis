@@ -47,6 +47,11 @@ export class SupervisedHostedService implements HostedService {
     });
   }
 
+  public get diagnosticName(): string | undefined {
+    const service = this.inner ?? this.prepared;
+    return service === undefined ? undefined : service.diagnosticName ?? service.constructor.name;
+  }
+
   /** Passed on to every attempt's service before it starts. */
   public useDiagnostics(diagnostics: HostedServiceDiagnostics): void {
     this.diagnostics = diagnostics;
