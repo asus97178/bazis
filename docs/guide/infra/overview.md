@@ -105,10 +105,25 @@ Redis недоступен:
   redis://127.0.0.1:56999 within 5000 ms.
 
 OpenSearch недоступен:
-[bazis] application failed: InfraError: Infra connector "opensearch": cluster is not reachable or unhealthy.
+[bazis] application failed: InfraError: Infra connector "opensearch": cannot reach
+  http://127.0.0.1:59299 — OpenSearch GET /_cluster/health request failed: Unable to connect. …
 ```
 
 Пароли в адресах и сообщениях замаскированы.
+
+Подключения проверяются одновременно. Если не удалось несколько, сообщение
+перечисляет все — их можно исправить за один раз:
+
+```text
+[bazis] application failed: StartupFailuresError: 3 services failed to start: infra:db, infra:cache, infra:search.
+  - InfraError: Infra connector "postgres": failed to connect — password authentication failed for user "postgres"
+  - InfraError: Infra connector "redis": failed to connect to redis://127.0.0.1:56999 within 5000 ms.
+  - InfraError: Infra connector "opensearch": cannot reach http://127.0.0.1:59299 — …
+```
+
+В терминале вместо этих строк — экран с панелью на каждое подключение,
+адресом и переменными, которые стоит проверить (см.
+[Команды CLI](../cli/commands.md#если-запуск-не-удался)).
 
 Если что-то не ответило совсем, срабатывает общий срок старта — 30 секунд
 (`runApp(…, { kernel: { startupTimeoutMs } })`). Сообщение называет, что
@@ -122,7 +137,8 @@ OpenSearch недоступен:
 > [!NOTE]
 > Срок подключения Redis и имя зависшего сервиса — с версии 0.99.6. Раньше
 > недоступный Redis держал старт 30 секунд, а сообщение не называло
-> причину.
+> причину. Одновременная проверка подключений и адрес OpenSearch в
+> ошибке — с версии 0.100.0.
 
 ## Здоровье
 
