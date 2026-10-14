@@ -86,13 +86,12 @@ export function renderCodegen(ui: CliOutput, report: CodegenReport, cwd: string,
     commandFailed(ui.err, t.failure.codegen(report.errors.length), report.errors.map((error) => codegenProblem(error, cwd, ui.err)), 1, footer);
     return;
   }
+  // Files always; the rest only when the project has them.
   const counts = target === undefined ? [] : [
     s.num(target.sources, t.noun("file", target.sources)),
-    s.num(target.deps, t.noun("dep", target.deps)),
-    s.num(target.controllers, t.noun("controller", target.controllers)),
-    s.num(target.requestModels, t.noun("requestModel", target.requestModels)),
-    s.num(target.listModels, t.noun("list", target.listModels)),
-    s.num(target.tools, t.noun("tool", target.tools)),
+    ...([[target.deps, "dep"], [target.controllers, "controller"], [target.requestModels, "requestModel"], [target.listModels, "list"], [target.tools, "tool"]] as const)
+      .filter(([value]) => value > 0)
+      .map(([value, noun]) => s.num(value, t.noun(noun, value))),
   ];
   s.step("ok", t.step.codegen, counts.join(s.dot), time);
   const directories = new Map<string, string[]>();

@@ -62,6 +62,14 @@ describe("terminal style", () => {
     expect(count(ru, 21, "route")).toBe("21 маршрут");
     expect(count(messages("en"), 2, "problem")).toBe("2 problems");
   });
+
+  test("«из N» takes the genitive", () => {
+    const ru = messages("ru");
+    expect(ru.failure.infra(1, 1)).toBe("инфраструктура недоступна · 1 из 1 подключения");
+    expect(ru.failure.infra(2, 3)).toBe("инфраструктура недоступна · 2 из 3 подключений");
+    expect(ru.failure.infra(1, 21)).toBe("инфраструктура недоступна · 1 из 21 подключения");
+    expect(ru.failure.infra(1, 11)).toBe("инфраструктура недоступна · 1 из 11 подключений");
+  });
 });
 
 describe("screen", () => {

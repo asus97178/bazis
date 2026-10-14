@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { formatStartupFailure } from "../startupFailure";
+import { StartupFailuresError } from "../errors";
 
 class SchemaError extends Error {
   readonly code = "ORM_SCHEMA_MIGRATION_REQUIRED";
@@ -30,4 +31,16 @@ test("secrets in a startup failure are redacted and non-errors are inspected", (
 test("a message that already starts with its code is not prefixed twice", () => {
   const error = Object.assign(new Error("ORM_OWNED_STORE_DRIFT: Owned store \"acme.notes\" differs."), { name: "OrmOwnedStoreAdmissionError", code: "ORM_OWNED_STORE_DRIFT" });
   expect(formatStartupFailure(error).split("\n")[0]).toBe('OrmOwnedStoreAdmissionError: ORM_OWNED_STORE_DRIFT: Owned store "acme.notes" differs.');
+});
+
+test("services that failed together are listed once, without kernel frames or an inspected copy", () => {
+  const text = formatStartupFailure(new StartupFailuresError([
+    { name: "infra:db", error: new Error('Infra connector "postgres": failed to connect — refused') },
+    { name: "infra:cache", error: new Error('Infra connector "redis": failed to connect within 5000 ms.') },
+  ]));
+  expect(text).toBe([
+    "StartupFailuresError: 2 services failed to start: infra:db, infra:cache.",
+    '  - Error: Infra connector "postgres": failed to connect — refused',
+    '  - Error: Infra connector "redis": failed to connect within 5000 ms.',
+  ].join("\n"));
 });

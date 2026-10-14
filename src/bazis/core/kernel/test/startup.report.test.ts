@@ -140,6 +140,7 @@ describe("startup screen", () => {
     const screen = new StartupScreen({ stdout: out.output, stderr: buffer().output, language: "en", header: false });
     const root: BazisModuleRef = { config };
     const kernel = await Bazis.createBuilder(root).useEnvironment("development").useStartupScreen((started) => screen.started(started)).build();
+    kernel.report.schema({ context: "TaskDbContext", mode: "ensureCreated", applied: ["create table tasks"], migrated: [], baselined: [], warnings: [] });
     await kernel.start();
     await kernel.stop();
     const text = out.text();
@@ -148,6 +149,8 @@ describe("startup screen", () => {
     expect(text).toContain("token ← development default (set BAZIS_APP__TOKEN in production)");
     expect(text).toContain("app.token uses the development default from the code.");
     expect(text).toContain("STARTUP");
+    // The count is of database contexts, not of PostgreSQL schemas.
+    expect(text).toContain("1 operation · 1 database context");
     expect(text).toContain("SUCCESS");
   });
 });
