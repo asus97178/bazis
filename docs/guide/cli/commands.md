@@ -10,7 +10,7 @@ bunx bazis <команда> [опции]
 В `package.json` нового проекта уже есть скрипты: `bun run dev`,
 `bun run test`, `bun run build`, `bun run build:bin`, `bun run codegen`.
 
-Все примеры проверены на bazis 0.100.1.
+Все примеры проверены на bazis 0.100.2.
 
 | Команда | Что делает |
 | --- | --- |
@@ -34,7 +34,7 @@ bunx bazis <команда> [опции]
 
 ```text
   █▀▀▄ ▄▀▀▄ ▀▀▀█ ▀█▀ █▀▀▀    [BUILD]  shop 0.1.0
-  █▀▀▄ █▀▀█ ▄▀▀  ░█░ ▀▀▀█    bazis 0.100.1 · bun 1.4.0
+  █▀▀▄ █▀▀█ ▄▀▀  ░█░ ▀▀▀█    bazis 0.100.2 · bun 1.4.0
   ▀▀▀  ▀  ▀ ▀▀▀▀ ▀▀▀ ▀▀▀▀    target typecheck
 
   ── BUILD ───────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ bunx bazis <команда> [опции]
     └─ [СБОЙ    ]  db       PostgreSQL   cannot connect to PostgreSQL at 127.0.0.1:56999 …
 
   ════════════════════════════════════════════════════════════════════════
-    ✖  ПРОВАЛ   инфраструктура недоступна · 1 из 1 подключение
+    ✖  ПРОВАЛ   инфраструктура недоступна · 1 из 1 подключения
   ════════════════════════════════════════════════════════════════════════
 ```
 
@@ -98,7 +98,7 @@ bunx bazis new Shop --dry-run   # показать файлы, ничего не
     …
     └─ + README.md
 
-  ◆  bazis ^0.100.1 from npm
+  ◆  bazis ^0.100.2 from npm
 
     ✔  SUCCESS   project Shop is created
 
@@ -291,7 +291,7 @@ PORT=3100 bunx bazis dev       # другой порт
     └─ [UP  ]  db       PostgreSQL 17.11    postgres@127.0.0.1:55432/cli_shop · pool 10 · 25 ms
 
   ── DATABASE SCHEMA ─────────────────────────────────────── ensureCreated
-  [OK  ]  schema          2 operations · 1 schema                         24 ms
+  [OK  ]  schema          2 operations · 1 database context               21 ms
     ├─ + create table orders
     └─ + create unique index ix_orders_email on orders (email)
 
