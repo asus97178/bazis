@@ -6,7 +6,7 @@
 конфигурацию, порядок старта, `/health`, внедрение — даёт
 [`@Infra`](overview.md).
 
-Пример проверен на bazis 0.99.6 с локальным сервером вместо внешнего
+Пример проверен на bazis 0.99.6 (совет о `phase: 0` — на 0.100.1) с локальным сервером вместо внешнего
 сервиса.
 
 ## Клиент
@@ -104,6 +104,7 @@ export function notifyConnect(config: AppConfig<NotifyConfigShape>): InfraConnec
 | `dispose(client)` | При остановке | Закрывает соединения |
 | `healthCheck(client, signal)` | На каждый `/health` | Жив ли сервис; без него проверки `infra:<имя>` не будет |
 | `phase` | — | Порядок старта, по умолчанию `-100`: раньше HTTP-сервера |
+| `describe(client, { connected })` | После подключения и после сбоя | Что показать на экране запуска: продукт и версия, адрес без пароля, переменные адреса. Необязательно |
 
 `reader(config, configs)` читает значения конфигурации с учётом окружения
 и переменных `BAZIS_…`. `requireValue` — что значение задано, иначе
@@ -195,6 +196,20 @@ POST /signup/ann → {"welcomeId":1,"auditId":2}
   `redactSensitiveText` из `bazis/library/redaction` маскирует пароль.
 - **Клиент без глобального состояния.** Всё — в экземпляре: тогда работают
   [два экземпляра](overview.md#два-экземпляра-одного-типа) с разными токенами.
+- **Рядом с `ensureCreated` — `phase: 0`.** Если модуль создаёт схему
+  через `ensureCreated` на PostgreSQL, до сервисов приложения стартуют
+  только коннекторы фреймворка. Свой коннектор с фазой по умолчанию
+  остановит старт:
+
+  ```text
+  [bazis] application failed: SchemaAdmissionError [ORM_SCHEMA_HOSTED_PHASE_CONFLICT]:
+    Application hosted services must use phase 0 or later with schema admission:
+    infra:notify (phase -100) is not a framework connector; a custom or changed
+    connector starts at phase 0 or later: set phase: 0 on it.
+  ```
+
+  Добавьте в коннектор `phase: 0` — он подключится вместе с сервисами
+  приложения, до HTTP-сервера.
 - **`create` ничего не подключает.** Подключение — в `connect`: тогда старт
   сообщает об ошибке в одном месте и с понятным текстом.
 
