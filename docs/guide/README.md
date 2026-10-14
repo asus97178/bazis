@@ -103,11 +103,11 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 ## 11. Развёртывание
 
-- ⏳ Один исполняемый файл
-- ⏳ Настройка продакшена
-- ⏳ Docker
-- ⏳ Плавная остановка и health
-- ⏳ Платформы
+- ✅ [Один исполняемый файл](deployment/single-executable.md) — сборка, что попадает внутрь, запуск, среда production, шаг схемы
+- ✅ [Настройка продакшена](deployment/production.md) — точка входа для production, переменные окружения, журнал, сроки, порядок выкладки
+- ✅ [Docker](deployment/docker.md) — двухэтапный образ, healthcheck без curl, секреты, Compose с шагом схемы
+- ✅ [Плавная остановка и health](deployment/graceful-shutdown.md) — `SIGTERM`, срок остановки и коды выхода, `/health`, проверки Kubernetes
+- ✅ [Платформы](deployment/platforms.md) — glibc и musl, Linux-файл с Mac, systemd
 
 ## 12. Рецепты
 
