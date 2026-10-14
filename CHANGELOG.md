@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.2 — 2026-10-14
+
+### Fixed
+
+- Russian output uses the genitive after «из N»: `1 из 1 подключения`,
+  `2 из 3 подключений` (was `1 из 1 подключение`).
+- The codegen step lists only non-zero counts: `2 files · 1 controller`
+  instead of `2 files · 0 deps · 1 controller · 0 request models · …`.
+- The schema step counts database contexts (`1 database context`), not
+  `1 schema`.
+- Without a terminal, a start where several connections failed prints the
+  list of failures only: no kernel stack frames and no inspected `failures`
+  copy after it.
+
 ## 0.100.1 — 2026-10-14
 
 ### Fixed

@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { PLAIN, Screen } from "../../library/terminal";
 import { typeProblems } from "../build";
-import { codegenProblem } from "../codegen";
+import { codegenProblem, renderCodegen } from "../codegen";
+import { createScreens, lineOutput } from "../ui";
 import { extractLanguage, runCli } from "../main";
 import { parseModuleName } from "../naming";
 import { generateProject } from "../generateProject";
@@ -31,6 +32,15 @@ describe("CLI output", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+
+  test("the codegen step lists only what the project has", () => {
+    const lines: string[] = [];
+    const ui = createScreens(lineOutput((line) => lines.push(line)), lineOutput((line) => lines.push(line)), "en");
+    renderCodegen(ui, { ok: true, ms: 400, targets: [{ name: "production", sources: 2, deps: 0, controllers: 1, requestModels: 0, listModels: 0, tools: 0, ms: 1 }], outputs: [], warnings: [], errors: [] }, process.cwd());
+    const step = lines.find((line) => line.includes("codegen")) ?? "";
+    expect(step).toContain("2 files · 1 controller");
+    expect(step).not.toContain(" 0 ");
   });
 
   test("tsc errors become problems with their position and continuation lines", async () => {

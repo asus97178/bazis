@@ -113,7 +113,7 @@ export class StartupScreen {
     if (schemas.length > 0) {
       const operations = schemas.flatMap((schema) => [...schema.migrated.map((name) => `migration ${name}`), ...schema.applied]);
       s.section(t.section.schema, s.muted([...new Set(schemas.map((schema) => schema.mode))].join(", ")));
-      s.step("ok", t.step.schema, operations.length === 0 ? s.muted(t.schema.none) : [s.num(operations.length, t.noun("operation", operations.length)), s.num(schemas.length, t.noun("schema", schemas.length))].join(s.dot), formatDuration(stageMs(kernel, "schema")));
+      s.step("ok", t.step.schema, operations.length === 0 ? s.muted(t.schema.none) : [s.num(operations.length, t.noun("operation", operations.length)), s.num(schemas.length, t.noun("context", schemas.length))].join(s.dot), formatDuration(stageMs(kernel, "schema")));
       const shown = operations.slice(0, 12).map((operation) => ({ text: `${s.strong("+", PALETTE.lime)} ${s.text(operation)}` }));
       if (operations.length > 12) shown.push({ text: s.muted(`… ${t.common.plus} ${operations.length - 12}`) });
       s.tree(shown, this.indent);

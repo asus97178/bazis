@@ -31,6 +31,7 @@ const NOUNS_EN = {
   test: ["test", "tests", "tests"],
   change: ["change", "changes", "changes"],
   part: ["part", "parts", "parts"],
+  context: ["database context", "database contexts", "database contexts"],
 } as const satisfies Record<string, Forms>;
 
 export type Noun = keyof typeof NOUNS_EN;
@@ -58,7 +59,18 @@ const NOUNS_RU: Record<Noun, Forms> = {
   test: ["тест", "теста", "тестов"],
   change: ["изменение", "изменения", "изменений"],
   part: ["часть", "части", "частей"],
+  context: ["контекст базы данных", "контекста базы данных", "контекстов базы данных"],
 };
+
+/** Genitive after «из N»: «из 1 подключения», «из 3 подключений», «из 21 подключения». */
+const GENITIVE_RU: Partial<Record<Noun, readonly [one: string, many: string]>> = {
+  connection: ["подключения", "подключений"],
+};
+
+function genitiveRu(count: number, noun: Noun): string {
+  const forms = GENITIVE_RU[noun] ?? [NOUNS_RU[noun][1], NOUNS_RU[noun][2]];
+  return count % 10 === 1 && count % 100 !== 11 ? forms[0] : forms[1];
+}
 
 function formEn(count: number, forms: Forms): string {
   return count === 1 ? forms[0] : forms[1];
@@ -316,7 +328,7 @@ const ru: Messages = {
   },
   failure: {
     config: (count) => `конфигурация с ошибками · ${count} ${formRu(count, NOUNS_RU.problem)}`,
-    infra: (down, total) => `инфраструктура недоступна · ${down} из ${total} ${formRu(total, NOUNS_RU.connection)}`,
+    infra: (down, total) => `инфраструктура недоступна · ${down} из ${total} ${genitiveRu(total, "connection")}`,
     timeout: (seconds) => `запуск не уложился в ${seconds}`,
     di: "внедрение зависимостей не собрано",
     codegen: (count) => `кодогенерация не удалась · ${count} ${formRu(count, NOUNS_RU.error)}`,
