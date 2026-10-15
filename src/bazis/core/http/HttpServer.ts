@@ -231,7 +231,8 @@ export class HttpServer implements HostedService {
           error: (error) => this.transportError(error),
         }),
       );
-    }    this.reportStarted(routes);
+    }
+    this.reportStarted(routes);
   }
 
   /** Routes and the address for the startup screen. */
@@ -369,7 +370,8 @@ export class HttpServer implements HostedService {
     }
   }
 
-  private async dispatch(request: Request, clientIp?: string): Promise<Response> {
+  private async dispatch(incoming: Request, clientIp?: string): Promise<Response> {
+    const request = this.withAbsoluteUrl(incoming);
     let response: Response;
     try {
       response = await this.handle(request, clientIp);
@@ -393,6 +395,18 @@ export class HttpServer implements HostedService {
       applySecurityHeaders(response, this.options.securityHeaders ?? {});
     }
     return response;
+  }
+
+  /**
+   * HTTP/1.0 allows a request without `Host`; Bun then gives a path, not a
+   * URL. Such a request is addressed to this server, so it gets the server's
+   * own origin and the rest of the pipeline sees an ordinary absolute URL.
+   */
+  private withAbsoluteUrl(request: Request): Request {
+    if (URL.canParse(request.url)) return request;
+    const server = this.server;
+    const host = server?.hostname === undefined || server.hostname === "0.0.0.0" || server.hostname === "::" ? "localhost" : server.hostname.includes(":") ? `[${server.hostname}]` : server.hostname;
+    return new Request(new URL(request.url, `http://${host}:${server?.port ?? 80}`).href, request);
   }
 
   private async handle(request: Request, clientIp?: string): Promise<Response> {
