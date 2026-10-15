@@ -4,6 +4,16 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.3 — 2026-10-15
+
+### Fixed
+
+- An HTTP/1.0 request without a `Host` header — valid in HTTP/1.0 and sent
+  by some load balancer health checks — is served. Before, it got `500` and
+  `[http] transport failed: TypeError: Invalid URL` in the log, because Bun
+  gives such a request a path instead of a URL. It is now resolved against
+  the server's own address.
+
 ## 0.100.2 — 2026-10-14
 
 ### Fixed
