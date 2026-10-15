@@ -31,7 +31,9 @@ export interface LlmConnectorOptions {
   /**
    * Check the provider at start (the adapter's `connect`: `GET /models` for an
    * OpenAI-compatible API, five seconds), so a wrong key or address stops the
-   * start instead of the first agent request. Default `true`.
+   * start instead of the first agent request. By default it runs in
+   * development and production and not in the `test` environment, where a
+   * test replaces the model; `true` checks there too, `false` never checks.
    */
   readonly checkOnStart?: boolean;
 }
@@ -92,7 +94,7 @@ export function llmConnect<T extends LlmConfigShape>(
   adapter: LlmProviderAdapter,
   options: LlmConnectorOptions = {},
 ): InfraConnector<AgentModelProvider> {
-  const described = new WeakMap<AgentModelProvider, { connection: LlmConnectionOptions; settings: string[] }>();
+  const described = new WeakMap<AgentModelProvider, { connection: LlmConnectionOptions; settings: string[]; check: boolean }>();
   return identifyConnector({
     token: AGENT_MODEL_PROVIDER,
     config,
@@ -101,11 +103,14 @@ export function llmConnect<T extends LlmConfigShape>(
     create(configs) {
       const connection = resolveLlmConnectionOptions(config, options, configs);
       const provider = adapter.create(connection);
-      described.set(provider, { connection, settings: settingNames(config, configs, ["baseUrl", "apiKey"]) });
+      // The environment of this kernel's configuration: tests do not call the real provider.
+      const environment = (configs?.get(config) as { environment?: string } | undefined)?.environment;
+      const check = options.checkOnStart ?? environment !== "test";
+      described.set(provider, { connection, settings: settingNames(config, configs, ["baseUrl", "apiKey"]), check });
       return provider;
     },
     connect(provider, signal) {
-      if (options.checkOnStart === false) return;
+      if (described.get(provider)?.check === false || options.checkOnStart === false) return;
       return adapter.connect?.(provider, signal);
     },
     describe(provider, { connected }) {
@@ -114,7 +119,7 @@ export function llmConnect<T extends LlmConfigShape>(
       return {
         kind: `${known.connection.provider} · ${known.connection.model}`,
         address: known.connection.baseUrl,
-        details: connected && options.checkOnStart !== false && adapter.connect !== undefined ? ["checked"] : [],
+        details: connected && known.check && adapter.connect !== undefined ? ["checked"] : [],
         settings: known.settings,
       };
     },

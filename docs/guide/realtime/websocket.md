@@ -303,6 +303,20 @@ websocket: { adapter: (services) => new RedisWebSocketAdapter(services.resolve(I
 > экземпляр не принимается. Раньше адаптеру нужен был отдельный клиент
 > Redis, созданный вне `@Infra`.
 
+Адаптер хранит в Redis сессии и неотправленные сообщения, поэтому
+требует, чтобы Redis не терял записи: `appendonly yes`,
+`appendfsync always`, `no-appendfsync-on-rewrite no`,
+`maxmemory-policy noeviction`. Иначе приложение не стартует и называет,
+что изменить:
+
+```text
+WebSocketDeliveryError [DURABILITY_CONFIGURATION]: WebSocket delivery needs a Redis that does not lose writes:
+  appendonly is no, needs yes; appendfsync is everysec, needs always. Set them in redis.conf or with CONFIG SET;
+  otherwise undelivered messages and sessions may be lost.
+```
+
+Подробный пример — в рецепте [Несколько экземпляров с Redis](../recipes/multiple-instances.md).
+
 ## Дальше
 
 - [Авторизация](../overview/authorization.md)

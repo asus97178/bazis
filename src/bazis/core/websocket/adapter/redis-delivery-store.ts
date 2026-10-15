@@ -14,6 +14,14 @@ export interface RedisReliableDeliveryOptions {
   readonly maxReadBytes?: number;
 }
 
+/** Redis settings without which an acknowledged write may be lost. */
+const DURABLE_REDIS: Readonly<Record<string, string>> = Object.freeze({
+  appendonly: "yes",
+  appendfsync: "always",
+  "no-appendfsync-on-rewrite": "no",
+  "maxmemory-policy": "noeviction",
+});
+
 export class RedisRoomDeliveryStore implements ReliableRoomDelivery {
   private readonly limits: Required<Omit<RedisReliableDeliveryOptions, "requireAof">>;
   private readonly requireAof: boolean;
@@ -47,9 +55,18 @@ export class RedisRoomDeliveryStore implements ReliableRoomDelivery {
     if (Array.isArray(settings)) for (let i = 0; i < settings.length; i += 2) values.set(settings[i]!, settings[i + 1]!);
     else for (const [key, value] of Object.entries(settings)) values.set(key, value);
     const info = await this.operations.send("INFO", ["persistence"]) as string;
-    if (values.get("appendonly") !== "yes" || values.get("appendfsync") !== "always" || values.get("maxmemory-policy") !== "noeviction"
-      || values.get("no-appendfsync-on-rewrite") !== "no"
-      || !info.includes("aof_last_write_status:ok") || !info.includes("loading:0")) throw new WebSocketDeliveryError("DURABILITY_CONFIGURATION");
+    const problems = Object.entries(DURABLE_REDIS)
+      .filter(([name, needed]) => values.get(name) !== needed)
+      .map(([name, needed]) => `${name} is ${values.get(name) ?? "unknown"}, needs ${needed}`);
+    if (!info.includes("aof_last_write_status:ok")) problems.push("the last append-only file write failed (aof_last_write_status)");
+    if (!info.includes("loading:0")) problems.push("Redis is still loading its data");
+    if (problems.length > 0) {
+      throw new WebSocketDeliveryError(
+        "DURABILITY_CONFIGURATION",
+        `WebSocket delivery needs a Redis that does not lose writes: ${problems.join("; ")}. `
+          + "Set them in redis.conf or with CONFIG SET; otherwise undelivered messages and sessions may be lost.",
+      );
+    }
   }
 
   async publish(request: ReliableRoomPublication): Promise<ReliableBroadcastReceipt> {
