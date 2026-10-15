@@ -4,6 +4,37 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.4 — 2026-10-15
+
+### Changed (breaking)
+
+- `runApp({ websocket: { adapter } })` takes a function of the application's
+  services: `adapter: (services) => new RedisWebSocketAdapter(services.resolve(IRedis))`.
+  The adapter is built when the HTTP server starts, so it uses the Redis
+  client of `@Infra`. A ready adapter instance is refused at start with the
+  way to build one.
+
+### Added
+
+- The WebSocket token check gets the application's services:
+  `authenticator: (token, context) => context.services.resolve(AuthTokens)…`.
+  Before, it had to build its own token issuer outside DI.
+- `connectionCache(stores, connection?)` in `bazis/core/cache`: the
+  `IDistributedCache` of one connection that services inject by type.
+
+### Fixed
+
+- `@OutputRedisCache` works without `cache: memory()`: it needs only the
+  distributed backend of `@Infra`. Before, without the cache module it did
+  nothing and said nothing.
+- `@OutputRedisCache` without a distributed backend stops the start and
+  names the route, with or without `cache: memory()`. Before, the error came
+  on the first request, or not at all.
+- `IDistributedCache.evictByTag(tag)` also evicts the `@OutputRedisCache`
+  responses of its connection, as `ICache.evictByTag` does in memory. Before,
+  it evicted only `@CacheableRedis` values, and every instance kept serving
+  the old responses until they expired.
+
 ## 0.100.3 — 2026-10-15
 
 ### Fixed

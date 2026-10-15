@@ -214,6 +214,19 @@ featured() { ... }
 `@OutputRedisCache` с Redis: подключение Redis и поведение при его
 недоступности — в главе [Кэширование](../realtime/caching.md#общий-кэш-в-redis-cacheableredis).
 
+`@OutputRedisCache` нужен только Redis с `cache: "distributed"` в `@Infra`,
+модуль `memory()` для него не обязателен. Без такого подключения
+приложение не стартует:
+
+```text
+@OutputRedisCache on PricesController.list requires a distributed backend
+(add redisConnect(redisConfig, { cache: "distributed" }) to your @Infra manifest)
+```
+
+> [!NOTE]
+> С версии 0.100.4. Раньше без `cache: memory()` декоратор молча ничего
+> не делал, а без Redis ошибка приходила на первом запросе.
+
 ## Дальше
 
 - [Ограничение частоты запросов](rate-limit.md)

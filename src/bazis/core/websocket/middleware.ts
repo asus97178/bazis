@@ -1,3 +1,4 @@
+import type { ServiceResolver } from "../di";
 import type { SocketUser } from "./types";
 import { JwtError } from "../../library/jwt";
 import { UnauthorizedError } from "../http";
@@ -23,6 +24,11 @@ export interface WsAuthenticationContext {
   readonly namespace: string;
   readonly path?: string;
   readonly request?: Request;
+  /**
+   * The application's services, for a token check that needs them
+   * (`services.resolve(AuthTokens)`). Set by `runApp({ websocket })`.
+   */
+  readonly services?: ServiceResolver;
 }
 
 export type WsAccessTokenAuthenticator = (
