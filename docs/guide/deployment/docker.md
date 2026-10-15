@@ -4,7 +4,7 @@
 на втором файл кладётся в небольшой Debian. В итоговом образе нет ни Bun,
 ни `node_modules`, ни исходников.
 
-Все примеры проверены на bazis 0.100.2, образах `oven/bun:1.4.0` и
+Все примеры проверены на bazis 0.100.2 (`HEALTHCHECK` — и на 0.100.3), образах `oven/bun:1.4.0` и
 `debian:bookworm-slim`, Docker Compose 5.1 и PostgreSQL 17.
 
 ## Dockerfile
@@ -52,7 +52,18 @@ src/generated
   само получает `SIGTERM` от `docker stop`.
 - **`HEALTHCHECK` без `curl`**: в `debian:bookworm-slim` его нет, а `bash`
   умеет открыть TCP-соединение сам. Запрос — HTTP/1.1 с заголовком
-  `Host`.
+  `Host`: так он работает на любой версии.
+
+> [!NOTE]
+> До версии 0.100.3 запрос HTTP/1.0 без заголовка `Host` — так проверяют
+> здоровье некоторые балансировщики — получал `500` и строку
+> `[http] transport failed: Invalid URL` в журнале. С 0.100.3 он
+> обслуживается как обычный:
+>
+> ```text
+> GET /health HTTP/1.0   →   HTTP/1.1 200 OK
+>                            {"healthy":true,"checks":[{"name":"infra:db","healthy":true,…}]}
+> ```
 
 ```sh
 docker build -t shop .
