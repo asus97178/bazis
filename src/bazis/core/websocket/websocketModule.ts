@@ -35,8 +35,14 @@ export interface WebSocketModuleConfig {
   readonly allowQueryToken?: boolean;
   /** Default allowed origins when a gateway does not specify its own. */
   readonly cors?: { origins?: string[] };
-  /** Pluggable broadcast/session adapter (defaults to in-memory, single-node). */
-  readonly adapter?: WebSocketAdapter;
+  /**
+   * Broadcast/session adapter built from the application's services (the
+   * in-memory single-node adapter when absent). Several instances share rooms
+   * and sessions through Redis:
+   * `adapter: (services) => new RedisWebSocketAdapter(services.resolve(IRedis))`.
+   * Called when the HTTP server starts, after the infrastructure is connected.
+   */
+  readonly adapter?: (services: ServiceResolver) => WebSocketAdapter;
   /** Wire codec (defaults to JSON). */
   readonly codec?: PacketCodec;
   /** Default replay confirmation mode. A client can opt in with ?replay=client-ack. */
@@ -83,11 +89,12 @@ export function websocketModule(config: WebSocketModuleConfig): BazisModule {
         const logger = resolver.tryResolve(LOGGER);
         return new WebSocketServer({
           namespaces,
-          authenticator: config.authenticator ?? null,
+          // The token check gets the application's services, like the adapter.
+          authenticator: config.authenticator ? (token, context) => config.authenticator!(token, { ...context!, services: resolver }) : null,
           requireAuth: config.requireAuth ?? false,
           allowQueryToken: config.allowQueryToken ?? false,
           ...(config.cors?.origins ? { defaultCorsOrigins: config.cors.origins } : {}),
-          ...(config.adapter ? { adapter: config.adapter } : {}),
+          ...(config.adapter ? { adapter: buildAdapter(config.adapter, resolver) } : {}),
           ...(config.codec ? { codec: config.codec } : {}),
           ...(config.replayDelivery ? { replayDelivery: config.replayDelivery } : {}),
           ...(config.onDiagnostic ? { onDiagnostic: config.onDiagnostic } : {}),
@@ -113,4 +120,13 @@ export function websocketModule(config: WebSocketModuleConfig): BazisModule {
   class WebSocketModule {}
 
   return markGlobal(WebSocketModule);
+}
+
+function buildAdapter(factory: unknown, services: ServiceResolver): WebSocketAdapter {
+  if (typeof factory !== "function") {
+    throw new Error("websocket.adapter must be a function of the application services: adapter: (services) => new RedisWebSocketAdapter(services.resolve(IRedis)).");
+  }
+  const adapter = (factory as (services: ServiceResolver) => WebSocketAdapter)(services);
+  if (adapter === null || typeof adapter !== "object") throw new Error("websocket.adapter must return a WebSocket adapter.");
+  return adapter;
 }

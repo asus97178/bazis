@@ -3,6 +3,7 @@ import {
   CLASS_PROVIDER_HOOK,
   OptionsValidationError,
   singleton,
+  singletonFactoryWithResolver,
   singletonValue,
   type InjectionToken,
   type Options,
@@ -17,6 +18,7 @@ import type { CachedHttpPayload } from "../http/CachedHttpPayload";
 import { ICache } from "../ICache";
 import { MemoryCache } from "../MemoryCache";
 import { CACHE_POLICIES } from "../tokens/CACHE_POLICIES";
+import { DISTRIBUTED_OUTPUT_CACHE } from "../tokens/DISTRIBUTED_CACHE";
 import { CACHE_OPTIONS, validateCacheOptions, type CacheOptions } from "../types/CacheOptions";
 import type { CachePolicyRegistry } from "../types/CachePolicy";
 
@@ -113,22 +115,21 @@ function cacheOptionsProvider(config: CacheModuleConfig): ProviderDefinition {
 /** Registers the `@OutputCache` / `@OutputRedisCache` middleware via the HTTP DI token. */
 function outputCacheComposerProvider(config: CacheModuleConfig): ProviderDefinition {
   const token = config.token ?? ICache;
-  const compose = createRouteOutputCacheComposerWithOptions({
-    policies: config.policies ?? {},
-    globalEnabled: config.outputCache?.enabled !== false,
-    cacheToken: token as InjectionToken<ICache<CachedHttpPayload>>,
-    securityWarnings: {
-      behavior: outputCacheSecurityBehavior(config.outputCache),
-      requireAuthenticationByDefault: config.outputCache?.requireAuthenticationByDefault,
-    },
-    // Registries for `@OutputRedisCache` are published by Infra through DI.
-    // Without a registry the middleware reports an error on the first request.
-    distributedEnabled: true,
-  });
-  return singletonValue(ROUTE_MIDDLEWARE_COMPOSER, {
+  return singletonFactoryWithResolver(ROUTE_MIDDLEWARE_COMPOSER, [], (resolver) => ({
     order: OUTPUT_CACHE_COMPOSER_ORDER,
-    compose,
-  } satisfies RouteMiddlewareComposerRegistration);
+    compose: createRouteOutputCacheComposerWithOptions({
+      policies: config.policies ?? {},
+      globalEnabled: config.outputCache?.enabled !== false,
+      cacheToken: token as InjectionToken<ICache<CachedHttpPayload>>,
+      securityWarnings: {
+        behavior: outputCacheSecurityBehavior(config.outputCache),
+        requireAuthenticationByDefault: config.outputCache?.requireAuthenticationByDefault,
+      },
+      // `@OutputRedisCache` needs the backend Infra publishes; without one the
+      // start fails and names the route instead of every request failing.
+      distributedEnabled: resolver.has(DISTRIBUTED_OUTPUT_CACHE),
+    }),
+  } satisfies RouteMiddlewareComposerRegistration));
 }
 
 function outputCacheSecurityBehavior(options: CacheOutputCacheOptions | undefined): "throw" | "warn" | "ignore" {
