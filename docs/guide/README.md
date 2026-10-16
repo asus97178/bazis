@@ -116,7 +116,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Несколько экземпляров приложения с Redis](recipes/multiple-instances.md)
 - ✅ [Фоновая задача с базой данных](recipes/background-job.md)
 - ✅ [Инструмент агента, вызывающий сервис](recipes/agent-tool.md)
-- ⏳ Русская локализация
+- ✅ [Русская локализация](recipes/russian.md)
 - ✅ [Если вы пришли с NestJS](recipes/from-nestjs.md)
 - ✅ [Если вы пришли с ASP.NET Core](recipes/from-aspnet-core.md)
 

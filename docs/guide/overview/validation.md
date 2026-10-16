@@ -184,34 +184,33 @@ email!: string;
 zip?: string;
 ```
 
-Русские тексты для всех правил включаются одной строкой в начале
-`src/index.ts`:
+Русские тексты включает опция `language` приложения:
 
 ```ts
-import { MessageRegistry, RU_VALIDATION_MESSAGES } from "bazis/library/validation";
-
-MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES);
-```
-
-```text
-Поле "email" должно быть корректным email-адресом
-Поле "items[0].qty" должно быть не меньше 1
+await runApp(AppModule, { language: "ru", http: { … } });
 ```
 
 Переводятся все тексты ответа: сообщения правил, ошибки типов JSON и
-заголовок:
+заголовок. Свой `message` правила остаётся как есть:
 
 ```json
 {
   "error": "Проверка данных не пройдена",
-  "details": [{ "property": "age", "message": "Поле \"age\" должно иметь тип number, получено: string", "code": "type" }]
+  "details": [
+    { "property": "title", "message": "Поле \"title\": минимальная длина — 1", "code": "minLength" },
+    { "property": "year", "message": "Поле \"year\": ожидается число, получено: строка", "code": "type" }
+  ]
 }
 ```
+
+Тот же язык получают и остальные тексты фреймворка — `404`, `401`,
+пропущенный параметр. Подробно — в рецепте
+[Русская локализация](../recipes/russian.md).
 
 > [!NOTE]
 > Асинхронные `custom`-проверки, ошибки типов вместе с остальными
 > нарушениями, правила длины для массивов и перевод всех текстов работают с
-> версии 0.96.6.
+> версии 0.96.6, опция `language` — с 0.100.7.
 
 ## Дальше
 
