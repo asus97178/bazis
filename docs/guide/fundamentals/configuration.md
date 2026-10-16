@@ -150,8 +150,9 @@ await runApp(AppModule, {
 
 ```text
 [bazis] configuration error: Invalid configuration (environment "development"):
-mail.port — expected a finite number; mail.useTls — expected a boolean;
-mail.provider — value is not one of the declared enum values.
+mail.port — expected a finite number, got "abc" (BAZIS_MAIL__PORT);
+mail.useTls — expected a boolean (true, false, 1, 0), got "yes" (BAZIS_MAIL__USETLS);
+mail.provider — "sendgrid" is not allowed, use one of: smtp, ses (BAZIS_MAIL__PROVIDER).
 ```
 
 Своя проверка из `validate`:
@@ -159,6 +160,8 @@ mail.provider — value is not one of the declared enum values.
 ```text
 Invalid configuration (environment "development"): mail.port — must be a TCP port (1-65535).
 ```
+
+Все виды ошибок — в [справочнике](../reference/errors/startup.md#configvalidationerror).
 
 ## Секреты
 

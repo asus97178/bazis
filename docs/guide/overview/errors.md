@@ -189,6 +189,7 @@ GET /tasks/7 → 404 {"error":"task 7 not found","details":{"id":"7"}}
 
 ## Дальше
 
+- [Справочник ошибок](../reference/errors/README.md)
 - [Ответы](responses.md)
 - [Middleware](middleware.md)
 - [Авторизация](authorization.md)
