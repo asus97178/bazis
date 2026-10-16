@@ -111,14 +111,14 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 ## 12. Рецепты
 
-- ⏳ CRUD-модуль целиком
-- ⏳ JWT и защита маршрутов
-- ⏳ Несколько экземпляров приложения с Redis
-- ⏳ Фоновая задача с базой данных
-- ⏳ Инструмент агента, вызывающий сервис
+- ✅ [CRUD-модуль целиком](recipes/crud-module.md)
+- ✅ [JWT и защита маршрутов](recipes/jwt-auth.md)
+- ✅ [Несколько экземпляров приложения с Redis](recipes/multiple-instances.md)
+- ✅ [Фоновая задача с базой данных](recipes/background-job.md)
+- ✅ [Инструмент агента, вызывающий сервис](recipes/agent-tool.md)
 - ⏳ Русская локализация
-- ⏳ Если вы пришли с NestJS
-- ⏳ Если вы пришли с ASP.NET Core
+- ✅ [Если вы пришли с NestJS](recipes/from-nestjs.md)
+- ✅ [Если вы пришли с ASP.NET Core](recipes/from-aspnet-core.md)
 
 ## 13. Справочник
 
