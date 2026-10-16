@@ -175,14 +175,21 @@ await runApp(AppModule, {
   websocket: {
     requireAuth: true,
     cors: { origins: ["https://app.example.com"] },
-    authenticator: async (token) => {
+    authenticator: async (token, context) => {
       if (!token) return null;
-      const { payload } = await tokens.verifyAccess(token);
+      const { payload } = await context!.services!.resolve(AuthTokens).issuer.verifyAccess(token);
       return { id: String(payload.sub) };            // socket.data.user
     },
   },
 });
 ```
+
+`context.services` — сервисы приложения: проверка берёт тот же
+`AuthTokens`, что и HTTP-проверки, с ключом из настроек.
+
+> [!NOTE]
+> `context.services` — с версии 0.100.4. Раньше проверке токена
+> приходилось создавать свой издатель токенов вне DI.
 
 | Настройка | Что делает |
 | --- | --- |
@@ -279,10 +286,36 @@ new WebSocket(`wss://api.example.com/ws/chat?sid=${sid}`, [`bearer.${accessToken
 `401 Unauthorized`.
 
 Сессии и комнаты по умолчанию живут в памяти одного процесса. Для
-нескольких экземпляров за балансировщиком нужен адаптер Redis
-(`websocket: { adapter: new RedisWebSocketAdapter(client) }`): тогда
-`to(room)` доходит до клиентов других экземпляров, а сессия
-переживает переподключение к другому.
+нескольких экземпляров за балансировщиком нужен адаптер Redis: тогда
+`to(room)` доходит до клиентов других экземпляров, а сессия переживает
+переподключение к другому. Адаптер строится из сервисов приложения и
+берёт клиент Redis из `@Infra`:
+
+```ts
+import { IRedis } from "bazis/core/infra";
+import { RedisWebSocketAdapter } from "bazis/core/websocket";
+
+websocket: { adapter: (services) => new RedisWebSocketAdapter(services.resolve(IRedis)) }
+```
+
+> [!NOTE]
+> С версии 0.100.4 `adapter` — функция от сервисов приложения; готовый
+> экземпляр не принимается. Раньше адаптеру нужен был отдельный клиент
+> Redis, созданный вне `@Infra`.
+
+Адаптер хранит в Redis сессии и неотправленные сообщения, поэтому
+требует, чтобы Redis не терял записи: `appendonly yes`,
+`appendfsync always`, `no-appendfsync-on-rewrite no`,
+`maxmemory-policy noeviction`. Иначе приложение не стартует и называет,
+что изменить:
+
+```text
+WebSocketDeliveryError [DURABILITY_CONFIGURATION]: WebSocket delivery needs a Redis that does not lose writes:
+  appendonly is no, needs yes; appendfsync is everysec, needs always. Set them in redis.conf or with CONFIG SET;
+  otherwise undelivered messages and sessions may be lost.
+```
+
+Подробный пример — в рецепте [Несколько экземпляров с Redis](../recipes/multiple-instances.md).
 
 ## Дальше
 

@@ -52,6 +52,7 @@ export {
   type DistributedCachePing,
   type DistributedCacheSetOptions,
   IDistributedCache,
+  connectionCache,
 } from "./distributed";
 export {
   DISTRIBUTED_CACHE_BACKEND,

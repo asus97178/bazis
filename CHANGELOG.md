@@ -4,6 +4,62 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.6 — 2026-10-16
+
+### Fixed
+
+- In the `test` environment `/health` does not call the LLM provider
+  either: `infra:llm` reports healthy. 0.100.5 skipped only the start check,
+  so the template `health.test.ts` of an application with `llmConnect` still
+  got `503` from a provider it could not reach. `checkOnStart: false` keeps
+  skipping only the start check; `checkOnStart: true` calls the provider in
+  tests too.
+
+## 0.100.5 — 2026-10-16
+
+### Fixed
+
+- The LLM start check does not run in the `test` environment. Since 0.100.0
+  every test that started an application with `llmConnect` called the real
+  provider (`GET /models`) and failed without network or a real key, the
+  template `health.test.ts` included. `checkOnStart: true` checks in tests
+  too; `checkOnStart: false` never checks.
+- A Redis that may lose writes is refused by the WebSocket Redis adapter with
+  every wrong setting and the value it needs: `appendonly is no, needs yes;
+  appendfsync is everysec, needs always`. Before, the start said only
+  `WebSocket delivery rejected: DURABILITY_CONFIGURATION.`
+
+## 0.100.4 — 2026-10-15
+
+### Changed (breaking)
+
+- `runApp({ websocket: { adapter } })` takes a function of the application's
+  services: `adapter: (services) => new RedisWebSocketAdapter(services.resolve(IRedis))`.
+  The adapter is built when the HTTP server starts, so it uses the Redis
+  client of `@Infra`. A ready adapter instance is refused at start with the
+  way to build one.
+
+### Added
+
+- The WebSocket token check gets the application's services:
+  `authenticator: (token, context) => context.services.resolve(AuthTokens)…`.
+  Before, it had to build its own token issuer outside DI.
+- `connectionCache(stores, connection?)` in `bazis/core/cache`: the
+  `IDistributedCache` of one connection that services inject by type.
+
+### Fixed
+
+- `@OutputRedisCache` works without `cache: memory()`: it needs only the
+  distributed backend of `@Infra`. Before, without the cache module it did
+  nothing and said nothing.
+- `@OutputRedisCache` without a distributed backend stops the start and
+  names the route, with or without `cache: memory()`. Before, the error came
+  on the first request, or not at all.
+- `IDistributedCache.evictByTag(tag)` also evicts the `@OutputRedisCache`
+  responses of its connection, as `ICache.evictByTag` does in memory. Before,
+  it evicted only `@CacheableRedis` values, and every instance kept serving
+  the old responses until they expired.
+
 ## 0.100.3 — 2026-10-15
 
 ### Fixed

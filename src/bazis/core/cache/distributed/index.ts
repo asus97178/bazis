@@ -17,3 +17,4 @@ export type {
   DistributedCacheStores,
   DistributedCachePing,
 } from "./DistributedCacheStores";
+export { connectionCache } from "./connectionCache";

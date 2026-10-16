@@ -4,6 +4,7 @@ import {
   DISTRIBUTED_OUTPUT_CACHE,
   DISTRIBUTED_SERVICE_CACHE,
   IDistributedCache,
+  connectionCache,
   type DistributedCacheStores,
 } from "../../cache";
 import { createToken, DI, type InjectionToken, type ProviderDefinition } from "../../di";
@@ -79,9 +80,7 @@ function distributedCacheProviders(tuning: RedisDistributedCacheTuning, token: I
     // This connector's one connection by type, for services that evict tags or
     // read values; its name may be "default" or the configured `connection`.
     DI.singleton(
-      DI.factoryProvider(IDistributedCache, [DISTRIBUTED_CACHE_BACKEND], (backend: DistributedCacheStores) =>
-        backend.serviceCache.resolve(backend.serviceCache.connectionNames[0]),
-      ),
+      DI.factoryProvider(IDistributedCache, [DISTRIBUTED_CACHE_BACKEND], (backend: DistributedCacheStores) => connectionCache(backend)),
     ),
   ];
 }

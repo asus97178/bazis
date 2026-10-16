@@ -168,6 +168,9 @@ GET :3201/catalog/stock/pear  → {"stock":5,"instance":"a"}   посчитан�
   задавайте `key`.
 - `IDistributedCache` внедряется по типу. Кроме `evictByTag` у него есть
   `get`, `remove` и `getOrCreateAsync`.
+- `evictByTag` сбрасывает тег и в значениях `@CacheableRedis`, и в ответах
+  `@OutputRedisCache` того же подключения — как `ICache.evictByTag` в
+  памяти. Ответы в Redis — до версии 0.100.4 этот сброс их не трогал.
 
 > [!NOTE]
 > Внедрение `IDistributedCache` по типу — с версии 0.98.34. Раньше нужны

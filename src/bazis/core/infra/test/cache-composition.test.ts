@@ -146,6 +146,8 @@ describe("distributed cache composition", () => {
     const container = createContainer(infraModule({ cache: connector("orders", events) }));
     const shared = container.resolve(IDistributedCache);
     expect(shared.connectionName).toBe("orders");
-    expect(shared).toBe(container.resolve(DISTRIBUTED_SERVICE_CACHE).resolve("orders"));
+    // Since 0.100.4 it is the connection, not only its value store: evictByTag
+    // also drops @OutputRedisCache responses of that connection.
+    expect(shared.keyPrefix).toBe(container.resolve(DISTRIBUTED_SERVICE_CACHE).resolve("orders").keyPrefix);
   });
 });
