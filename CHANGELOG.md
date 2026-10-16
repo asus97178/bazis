@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.5 — 2026-10-16
+
+### Fixed
+
+- The LLM start check does not run in the `test` environment. Since 0.100.0
+  every test that started an application with `llmConnect` called the real
+  provider (`GET /models`) and failed without network or a real key, the
+  template `health.test.ts` included. `checkOnStart: true` checks in tests
+  too; `checkOnStart: false` never checks.
+- A Redis that may lose writes is refused by the WebSocket Redis adapter with
+  every wrong setting and the value it needs: `appendonly is no, needs yes;
+  appendfsync is everysec, needs always`. Before, the start said only
+  `WebSocket delivery rejected: DURABILITY_CONFIGURATION.`
+
 ## 0.100.4 — 2026-10-15
 
 ### Changed (breaking)
