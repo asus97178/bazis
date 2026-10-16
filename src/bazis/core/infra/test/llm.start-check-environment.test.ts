@@ -35,3 +35,30 @@ test("in development the provider is checked, and checkOnStart: true checks in t
     expect(run.requests).toEqual(["/v1/models"]);
   }
 });
+
+// 0.100.6: /health in the test environment does not reach the provider either;
+// on 0.100.5 infra:llm called GET /models and made the template health test fail.
+async function health(environment: "test" | "development", options?: LlmConnectorOptions) {
+  const requests: string[] = [];
+  const provider = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => { requests.push(new URL(request.url).pathname); return new Response("{}", { status: 401 }); } });
+  const config = defineConfig("llm", { default: { provider: "openai", model: "m", baseUrl: `http://127.0.0.1:${provider.port}/v1`, apiKey: secret("dev") } });
+  @Infra({ llm: llmConnect(config, openAiCompatibleAdapter(), options) })
+  class AppInfra {}
+  const kernel = await Bazis.createBuilder(AppInfra).useEnvironment(environment).useStartupReport(false).build();
+  try {
+    await kernel.start();
+    const report = await kernel.health();
+    return { healthy: report.checks.find((check) => check.name === "infra:llm")?.healthy, requests };
+  } finally {
+    await kernel.stop();
+    provider.stop(true);
+  }
+}
+
+test("in the test environment /health reports the LLM healthy without calling it", async () => {
+  expect(await health("test")).toEqual({ healthy: true, requests: [] });
+});
+
+test("checkOnStart: false skips only the start check: /health still asks the provider", async () => {
+  expect(await health("development", { checkOnStart: false })).toEqual({ healthy: false, requests: ["/v1/models"] });
+});

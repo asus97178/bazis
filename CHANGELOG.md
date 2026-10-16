@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.6 — 2026-10-16
+
+### Fixed
+
+- In the `test` environment `/health` does not call the LLM provider
+  either: `infra:llm` reports healthy. 0.100.5 skipped only the start check,
+  so the template `health.test.ts` of an application with `llmConnect` still
+  got `503` from a provider it could not reach. `checkOnStart: false` keeps
+  skipping only the start check; `checkOnStart: true` calls the provider in
+  tests too.
+
 ## 0.100.5 — 2026-10-16
 
 ### Fixed
