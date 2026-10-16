@@ -20,6 +20,7 @@ import {
   type UiProfileV1,
 } from "../../library/ui";
 import { modelValidatorAdapter } from "../../library/validation";
+import { createLocalize, type AppLanguage, type AppMessages } from "./messages";
 import {
   type RunAppUiOptions,
   type RunAppUiSurfaceOptions,
@@ -54,6 +55,22 @@ export interface RunAppOptions {
    * default. Pass your own to replace it.
    */
   readonly validator?: ModelValidator;
+  /**
+   * Language of the texts the framework writes into responses: validation
+   * messages, `Not Found`, `Unauthorized`, a missing parameter, malformed
+   * JSON, … Default `"en"`. Texts the application passes to an error itself
+   * (`new NotFoundError("Книга не найдена")`) are never changed.
+   *
+   * ```ts
+   * await runApp(AppModule, { language: "ru", http: { port: 3000 } });
+   * ```
+   */
+  readonly language?: AppLanguage;
+  /**
+   * Own texts for single framework messages, on top of `language`:
+   * `{ notFound: "Нет такой страницы", required: "Заполните {property}" }`.
+   */
+  readonly messages?: AppMessages;
   /** Fine-tuning of the kernel builder (logger, config sources, ...). */
   readonly configure?: (builder: KernelBuilder) => void;
   /**
@@ -271,6 +288,8 @@ export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}):
  * options ask for. Shared with `startTestApp`, so tests run the same graph.
  */
 export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): BazisModuleRef {
+  // Checked even without HTTP: an unknown language is a startup error.
+  const localize = createLocalize(options.language, options.messages);
   // Infrastructure and cache are global modules; add them to the graph next to the feature root.
   const globals: BazisModuleRef[] = [];
   if (options.infra !== undefined) {
@@ -308,6 +327,7 @@ export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): B
       options.http,
     );
     const httpRoot = httpModule({
+      localize,
       ...options.http,
       validator,
       imports: [httpAppRoot],

@@ -55,5 +55,5 @@ test("a string-only rule on an array names the array type", () => {
 
 test("the Russian set has the array texts", () => {
   MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES);
-  expect(issues({ items: [item(1)], tags: ["a"] })[0]?.message).toBe('Поле "tags" должно содержать не менее 2 элементов');
+  expect(issues({ items: [item(1)], tags: ["a"] })[0]?.message).toBe('Поле "tags": минимум элементов — 2');
 });

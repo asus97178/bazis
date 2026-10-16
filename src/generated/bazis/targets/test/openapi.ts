@@ -5,6 +5,26 @@ import type { GeneratedOpenApiMetadata } from "bazis/library/openapi";
 
 export const GENERATED_OPENAPI_METADATA: GeneratedOpenApiMetadata = {
   schemas: {
+    "AddBook": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 2
+        },
+        "year": {
+          "type": "integer"
+        },
+        "author": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "author",
+        "title",
+        "year"
+      ]
+    },
     "ConventionOrderDto": {
       "type": "object",
       "properties": {
@@ -24,6 +44,48 @@ export const GENERATED_OPENAPI_METADATA: GeneratedOpenApiMetadata = {
     }
   },
   operations: {
+    "BooksController": {
+      "add": {
+        "response": {
+          "$ref": "#/components/schemas/AddBook"
+        }
+      },
+      "admin": {
+        "response": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "boom": {},
+      "get": {
+        "errors": [
+          404
+        ]
+      },
+      "me": {
+        "response": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "search": {
+        "response": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "limit",
+            "q"
+          ]
+        }
+      }
+    },
     "ConventionController": {
       "createOrder": {
         "response": {

@@ -22,6 +22,7 @@ import { HTTP_ERROR_HOOK, ROUTE_MIDDLEWARE_COMPOSER, SERVER_MIDDLEWARE, sortByOr
 import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions, HttpServerOptions } from "./options";
 import { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
 import { HttpSetupError } from "./Errors/HttpError";
+import { EN_HTTP_MESSAGES, formatMessage, type HttpMessageKey, type MessageParams } from "./Errors/messages";
 import { getModelValidator, type ModelValidator } from "./Binding/modelValidator";
 
 const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
@@ -166,6 +167,7 @@ export class HttpServer implements HostedService {
       errorHandler({
         exposeDetails,
         ...(errorLogger ? { logger: errorLogger } : {}),
+        ...(this.options.localize ? { localize: this.options.localize } : {}),
         ...this.options.errorHandler,
         onUnexpectedError: this.collectErrorHook(),
       }),
@@ -384,13 +386,23 @@ export class HttpServer implements HostedService {
     return request.method === "HEAD" ? stripBody(response) : response;
   }
 
+  /** A response text the server writes itself, in the application language. */
+  private text(key: HttpMessageKey, params: MessageParams = {}): string {
+    const english = formatMessage(EN_HTTP_MESSAGES[key], params);
+    try {
+      return this.options.localize?.(key, params) ?? english;
+    } catch {
+      return english;
+    }
+  }
+
   private transportError(error: unknown): Response {
     try {
       console.error("[http] transport failed:", redactSensitive(error));
     } catch {
       // Best-effort diagnostics only.
     }
-    const response = json(500, { error: "Internal Server Error" });
+    const response = json(500, { error: this.text("internalServerError") });
     if (this.options.securityHeaders !== false) {
       applySecurityHeaders(response, this.options.securityHeaders ?? {});
     }
@@ -434,9 +446,9 @@ export class HttpServer implements HostedService {
     if (!segments) {
       if (this.maxBodyBytes !== undefined && exceedsBodyLimit(request, this.maxBodyBytes)) {
         return this.runShortCircuit(request, url, clientIp, () =>
-          json(413, { error: "Payload Too Large", details: { maxBytes: this.maxBodyBytes } }));
+          json(413, { error: this.text("payloadTooLarge"), details: { maxBytes: this.maxBodyBytes } }));
       }
-      return this.runShortCircuit(request, url, clientIp, () => json(400, { error: "Malformed request path" }));
+      return this.runShortCircuit(request, url, clientIp, () => json(400, { error: this.text("malformedPath") }));
     }
 
     const match = this.router!.match(request.method, segments, this.readVersion(request, url));
@@ -445,18 +457,18 @@ export class HttpServer implements HostedService {
       : this.maxBodyBytes;
     if (effectiveMaxBodyBytes !== undefined && exceedsBodyLimit(request, effectiveMaxBodyBytes)) {
       return this.runShortCircuit(request, url, clientIp, () =>
-        json(413, { error: "Payload Too Large", details: { maxBytes: effectiveMaxBodyBytes } }));
+        json(413, { error: this.text("payloadTooLarge"), details: { maxBytes: effectiveMaxBodyBytes } }));
     }
     if (match.kind === "not-found") {
-      return this.runShortCircuit(request, url, clientIp, () => json(404, { error: "Not Found" }));
+      return this.runShortCircuit(request, url, clientIp, () => json(404, { error: this.text("notFound") }));
     }
     if (match.kind === "method-not-allowed") {
       return this.runShortCircuit(request, url, clientIp, () =>
-        json(405, { error: "Method Not Allowed" }, { allow: match.allow.join(", ") }));
+        json(405, { error: this.text("methodNotAllowed") }, { allow: match.allow.join(", ") }));
     }
     if (match.kind === "unsupported-version") {
       return this.runShortCircuit(request, url, clientIp, () =>
-        json(400, { error: "Unsupported API version", details: { supported: match.supported } }));
+        json(400, { error: this.text("unsupportedApiVersion"), details: { supported: match.supported } }));
     }
 
     const scope = this.provider.createScope();
@@ -475,7 +487,7 @@ export class HttpServer implements HostedService {
       await runPipeline(match.action.chain, ctx);
       // The error boundary always sets a response on failure; an empty
       // response here means no middleware produced one.
-      const response = this.prepareClientResponse(ctx.response ?? json(404, { error: "Not Found" }), request);
+      const response = this.prepareClientResponse(ctx.response ?? json(404, { error: this.text("notFound") }), request);
       if (request.method === "HEAD") return stripBody(response);
       if (!response.body) return response;
       this.trackResponse(holdResponseScope(response, request.signal, () =>
@@ -520,7 +532,7 @@ export class HttpServer implements HostedService {
     let scopeTransferred = false;
     try {
       await runPipeline([...this.shortCircuitChain, terminal], ctx);
-      const response = this.prepareClientResponse(ctx.response ?? json(500, { error: "Internal Server Error" }), request);
+      const response = this.prepareClientResponse(ctx.response ?? json(500, { error: this.text("internalServerError") }), request);
       if (request.method === "HEAD") return stripBody(response);
       if (!response.body) return response;
       this.trackResponse(holdResponseScope(response, request.signal, () =>

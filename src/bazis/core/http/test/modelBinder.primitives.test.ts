@@ -34,12 +34,12 @@ test("HTTP binding accepts declared JSON types, null where declared and absent f
 });
 
 test("HTTP binding rejects a JSON value of another type with a 400 type error", () => {
-  expect(typeError({ done: "yes" })).toEqual([{ property: "done", message: 'Field "done" must be a boolean', code: "type" }]);
-  expect(typeError({ title: 5 })).toEqual([{ property: "title", message: 'Field "title" must be a string', code: "type" }]);
-  expect(typeError({ estimate: "5" })).toEqual([{ property: "estimate", message: 'Field "estimate" must be a number', code: "type" }]);
-  expect(typeError({ title: null })).toEqual([{ property: "title", message: 'Field "title" must be a string', code: "type" }]);
-  expect(typeError({ tags: "a" })).toEqual([{ property: "tags", message: 'Field "tags" must be a array', code: "type" }]);
-  expect(typeError({ tags: ["a", 1] })).toEqual([{ property: "tags[1]", message: 'Field "tags[1]" must be a string', code: "type" }]);
+  expect(typeError({ done: "yes" })).toEqual([{ property: "done", message: 'Field "done" must be a boolean', code: "type", params: { property: "done", expected: "boolean", actual: "string" } }]);
+  expect(typeError({ title: 5 })).toEqual([{ property: "title", message: 'Field "title" must be a string', code: "type", params: { property: "title", expected: "string", actual: "number" } }]);
+  expect(typeError({ estimate: "5" })).toEqual([{ property: "estimate", message: 'Field "estimate" must be a number', code: "type", params: { property: "estimate", expected: "number", actual: "string" } }]);
+  expect(typeError({ title: null })).toEqual([{ property: "title", message: 'Field "title" must be a string', code: "type", params: { property: "title", expected: "string", actual: "null" } }]);
+  expect(typeError({ tags: "a" })).toEqual([{ property: "tags", message: 'Field "tags" must be a array', code: "type", params: { property: "tags", expected: "array", actual: "string" } }]);
+  expect(typeError({ tags: ["a", 1] })).toEqual([{ property: "tags[1]", message: 'Field "tags[1]" must be a string', code: "type", params: { property: "tags[1]", expected: "string", actual: "number" } }]);
 });
 
 test("without primitiveTypes (gRPC, agents) values pass through as before", () => {

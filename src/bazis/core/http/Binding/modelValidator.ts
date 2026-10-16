@@ -11,6 +11,12 @@ export interface ModelValidationIssue {
   readonly property: string;
   readonly message: string;
   readonly code?: string;
+  /**
+   * Placeholder values of a message built from the engine template for `code`:
+   * the error handler re-renders it in the application language. Absent when
+   * the message is the rule's own text (`@Validator({ message })`).
+   */
+  readonly params?: Readonly<Record<string, unknown>>;
 }
 
 export interface ModelValidationResult {
@@ -22,10 +28,12 @@ export interface ModelValidator {
   validate(instance: object): ModelValidationResult;
   /** Async rules (custom checks returning a Promise). HTTP binding prefers it when present. */
   validateAsync?(instance: object): Promise<ModelValidationResult>;
-  /** Text for a JSON value of the wrong type; without it the binder uses its English default. */
-  typeMismatchMessage?(property: string, expected: string, actual: string): string;
-  /** Title of a 400 validation response; without it "Validation failed". */
-  failureTitle?(): string;
+  /**
+   * Text of a message the binder writes itself (`type`, `unknownField`,
+   * `validationFailed`) in the engine's current language; without it the
+   * binder uses English.
+   */
+  message?(code: string, params: Readonly<Record<string, unknown>>): string;
 }
 
 let activeValidator: ModelValidator | undefined;

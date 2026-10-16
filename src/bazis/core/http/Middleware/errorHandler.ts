@@ -2,7 +2,8 @@ import { REQUEST_ID_STATE_KEY, type Logger } from "../../kernel";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 import { HttpClientError, HttpErrorCode } from "../../../library/http-client/errors";
 import type { HttpContext } from "../HttpContext/HttpContext";
-import { HttpError } from "../Errors/HttpError";
+import { HttpError, ModelValidationError } from "../Errors/HttpError";
+import { EN_HTTP_MESSAGES, STATUS_MESSAGE_KEYS, type HttpMessageKey, type Localize } from "../Errors/messages";
 import { upstreamFailure } from "../Errors/upstreamFailure";
 import type { HttpMiddleware } from "./types";
 
@@ -33,6 +34,13 @@ export interface ErrorHandlerOptions {
    * passes the application `LOGGER`; without either, `console.error` is used.
    */
   logger?: Logger;
+  /**
+   * Renders framework texts (`Not Found`, validation messages, …) in the
+   * application language; `runApp` builds it from `language` and `messages`.
+   * Without it the texts stay English. Messages an application passes to an
+   * error itself are never changed.
+   */
+  localize?: Localize;
 }
 
 function jsonResponse(status: number, body: unknown, extraHeaders?: readonly [string, string][]): Response {
@@ -103,6 +111,7 @@ function safelyReportUnexpected(
  */
 export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware {
   const log = resolveErrorLog(options);
+  const text = textRenderer(options.localize);
   return async (ctx, next) => {
     try {
       await next();
@@ -125,14 +134,23 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
         if (headers !== undefined) {
           extra.push(...Object.entries(headers));
         }
+        const message = error.localized === undefined ? error.message : text(error.localized.key, error.localized.params, error.message);
+        const details = error instanceof ModelValidationError
+          ? error.errors.map((issue) => ({
+              property: issue.property,
+              message: issue.params === undefined || issue.code === undefined ? issue.message : text(issue.code, issue.params, issue.message),
+              code: issue.code,
+            }))
+          : error.details;
         ctx.response = safeJsonResponse(
           error.status,
-          error.details === undefined ? { error: error.message } : { error: error.message, details: error.details },
+          details === undefined ? { error: message } : { error: message, details },
           extra,
         );
         return;
       }
-      const [status, title] = unexpectedStatus(error, options.status);
+      const [status, key] = unexpectedStatus(error, options.status);
+      const title = text(key, {}, EN_HTTP_MESSAGES[key]);
       if (status >= 500) safelyReportUnexpected(options, log, ctx, error);
       ctx.response = options.exposeDetails
         ? safeJsonResponse(status, {
@@ -154,19 +172,27 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
  * and stays 500, like everything else. Upstream details never reach the
  * client; the log keeps the full error.
  */
-const REASONS: Readonly<Record<number, string>> = {
-  400: "Bad Request", 404: "Not Found", 409: "Conflict", 410: "Gone", 412: "Precondition Failed", 422: "Unprocessable Content",
-  423: "Locked", 429: "Too Many Requests", 500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable", 504: "Gateway Timeout",
-};
-
-function unexpectedStatus(error: unknown, mapper?: (error: unknown) => number | undefined): readonly [number, string] {
+function unexpectedStatus(error: unknown, mapper?: (error: unknown) => number | undefined): readonly [number, HttpMessageKey] {
   if (error instanceof HttpClientError && error.code !== undefined) {
-    return error.code === HttpErrorCode.Timeout ? [504, "Gateway Timeout"] : [502, "Bad Gateway"];
+    return error.code === HttpErrorCode.Timeout ? [504, "gatewayTimeout"] : [502, "badGateway"];
   }
   const upstream = upstreamFailure(error);
-  if (upstream !== undefined) return upstream === "timeout" ? [504, "Gateway Timeout"] : [502, "Bad Gateway"];
+  if (upstream !== undefined) return upstream === "timeout" ? [504, "gatewayTimeout"] : [502, "badGateway"];
   let mapped: number | undefined;
   try { mapped = mapper?.(error); } catch { mapped = undefined; }
-  if (mapped !== undefined && Number.isInteger(mapped) && mapped >= 400 && mapped <= 599) return [mapped, REASONS[mapped] ?? (mapped >= 500 ? "Server Error" : "Client Error")];
-  return [500, "Internal Server Error"];
+  if (mapped !== undefined && Number.isInteger(mapped) && mapped >= 400 && mapped <= 599) return [mapped, STATUS_MESSAGE_KEYS[mapped] ?? (mapped >= 500 ? "serverError" : "clientError")];
+  return [500, "internalServerError"];
+}
+
+/** Text of a message key in the application language, or the English fallback. */
+function textRenderer(localize: Localize | undefined): (key: string, params: Readonly<Record<string, unknown>> | undefined, fallback: string) => string {
+  if (localize === undefined) return (_key, _params, fallback) => fallback;
+  return (key, params, fallback) => {
+    try {
+      return localize(key, params ?? {}) ?? fallback;
+    } catch {
+      // A broken catalog must not turn an error response into a 500.
+      return fallback;
+    }
+  };
 }

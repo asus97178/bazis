@@ -47,7 +47,7 @@ More scenarios (complex conditions, async, nested objects) are in
 | `ValidationResult.ts` | the outcome: `isValid`, `errors`, `getErrorsFor`, `hasErrorsFor` |
 | `RuleEngine.ts` | the engine: one pass over the plan, sync/async, nested, cycle protection |
 | `RuleCompiler.ts` | compiles class rules into a plan + WeakMap cache (RegExp, enum Set) |
-| `MessageRegistry.ts` | message templates, placeholders, priority local > global > built-in; built-in texts are English, `RU_VALIDATION_MESSAGES` is a Russian set for `setDefaults` |
+| `MessageRegistry.ts` | message templates, placeholders, priority local > global > built-in; built-in texts are English, `RU_VALIDATION_MESSAGES` is a Russian set for `setDefaults` and `runApp({ language: "ru" })` |
 | `metadata.ts` | stores rules through `context.metadata` / `Symbol.metadata` |
 | `types/ValidatorOptions.ts` | all decorator options |
 | `types/ValidationCode.ts` | error codes |

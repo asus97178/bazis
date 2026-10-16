@@ -381,7 +381,7 @@ export class RuleEngine {
         params[key] = extra[key];
       }
     }
-    errors.push(new ValidationError(path, value, MessageRegistry.format(code, o.message, params), code));
+    errors.push(new ValidationError(path, value, MessageRegistry.format(code, o.message, params), code, o.message === undefined ? params : undefined));
   }
 
   private static failType(errors: ValidationError[], path: string, value: unknown, o: ValidatorOptions, expected: string): void {

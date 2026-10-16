@@ -22,12 +22,16 @@ export class ValidationError {
    * @param value Actual field value at check time.
    * @param message Human-readable message (placeholders already substituted).
    * @param code Machine-readable rule code, for example `"required"` or `"minLength"`.
+   * @param params Placeholder values when `message` comes from the template of
+   *   `code`: an application re-renders it in its language. The engine leaves
+   *   it out for a rule's own `message`.
    */
   constructor(
     readonly property: string,
     readonly value: unknown,
     readonly message: string,
     readonly code?: string,
+    readonly params?: Readonly<Record<string, unknown>>,
   ) {}
 
   /** Short `property: message` form, handy for logs. */

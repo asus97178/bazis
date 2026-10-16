@@ -4,11 +4,14 @@
 // Registers convention body models (class-typed action params) so they are
 // Target-local immutable descriptor; runtime publication is staged by runtime.ts.
 
-import { ConventionOrderDto as RequestModel_0 } from "../../../../bazis/core/http/test/fixtures/conventionControllers";
+import { AddBook as RequestModel_0 } from "../../../../bazis/core/app/test/fixtures/languageControllers";
+import { ConventionOrderDto as RequestModel_1 } from "../../../../bazis/core/http/test/fixtures/conventionControllers";
 
 export const GENERATED_REQUEST_MODELS = Object.freeze([
   RequestModel_0,
+  RequestModel_1,
 ]);
 export const GENERATED_REQUEST_MODEL_SHAPES = Object.freeze([
-  [RequestModel_0, Object.freeze({ "product": { primitive: "string" as const, }, "quantity": { primitive: "number" as const, } })] as const,
+  [RequestModel_0, Object.freeze({ "author": { primitive: "string" as const, }, "title": { primitive: "string" as const, }, "year": { primitive: "number" as const, } })] as const,
+  [RequestModel_1, Object.freeze({ "product": { primitive: "string" as const, }, "quantity": { primitive: "number" as const, } })] as const,
 ]);

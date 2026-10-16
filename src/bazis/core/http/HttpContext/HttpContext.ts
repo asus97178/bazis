@@ -1,5 +1,5 @@
 import type { ServiceScope } from "../../di";
-import { BadRequestError, PayloadTooLargeError } from "../Errors/HttpError";
+import { PayloadTooLargeError, frameworkBadRequest } from "../Errors/HttpError";
 import { ResponseBuilder } from "./ResponseBuilder";
 import type { ModelValidator } from "../Binding/modelValidator";
 
@@ -75,7 +75,7 @@ export class HttpContext {
       try {
         return JSON.parse(text) as T;
       } catch {
-        throw new BadRequestError("Malformed JSON in request body");
+        throw frameworkBadRequest("malformedJson");
       }
     });
     return this.bodyPromise as Promise<T>;
@@ -94,7 +94,7 @@ export class HttpContext {
         if (error instanceof PayloadTooLargeError) {
           throw error;
         }
-        throw new BadRequestError("Malformed form data in request body");
+        throw frameworkBadRequest("malformedForm");
       }) as ReturnType<Request["formData"]>;
   }
 

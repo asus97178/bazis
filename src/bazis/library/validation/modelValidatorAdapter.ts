@@ -7,6 +7,7 @@ interface AdapterValidationIssue {
   readonly property: string;
   readonly message: string;
   readonly code?: string;
+  readonly params?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -38,14 +39,11 @@ export const modelValidatorAdapter = {
     return toAdapterResult(instance, await Validator.validateAsync(instance));
   },
 
-  /** A JSON value of the wrong type, in the current `MessageRegistry` language. */
-  typeMismatchMessage(property: string, expected: string, actual: string): string {
-    return MessageRegistry.format("type", undefined, { property, expected, actual });
+  /** A binder message in the current `MessageRegistry` language. */
+  message(code: string, params: Readonly<Record<string, unknown>>): string {
+    return MessageRegistry.format(code, undefined, params);
   },
 
-  failureTitle(): string {
-    return MessageRegistry.format("validationFailed", undefined, {});
-  },
 };
 
 interface AdapterValidationResult {
@@ -59,6 +57,7 @@ function toAdapterResult(instance: object, result: ValidationResult): AdapterVal
       property: error.property,
       message: error.message,
       code: error.code,
+      ...(error.params === undefined ? {} : { params: error.params }),
     }));
     errors.push(...nestedInstanceErrors);
     return {
