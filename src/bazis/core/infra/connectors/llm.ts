@@ -34,6 +34,8 @@ export interface LlmConnectorOptions {
    * start instead of the first agent request. By default it runs in
    * development and production and not in the `test` environment, where a
    * test replaces the model; `true` checks there too, `false` never checks.
+   * The same choice applies to `/health`: in tests `infra:llm` does not call
+   * the provider and reports healthy.
    */
   readonly checkOnStart?: boolean;
 }
@@ -94,7 +96,7 @@ export function llmConnect<T extends LlmConfigShape>(
   adapter: LlmProviderAdapter,
   options: LlmConnectorOptions = {},
 ): InfraConnector<AgentModelProvider> {
-  const described = new WeakMap<AgentModelProvider, { connection: LlmConnectionOptions; settings: string[]; check: boolean }>();
+  const described = new WeakMap<AgentModelProvider, { connection: LlmConnectionOptions; settings: string[]; check: boolean; offline: boolean }>();
   return identifyConnector({
     token: AGENT_MODEL_PROVIDER,
     config,
@@ -106,7 +108,9 @@ export function llmConnect<T extends LlmConfigShape>(
       // The environment of this kernel's configuration: tests do not call the real provider.
       const environment = (configs?.get(config) as { environment?: string } | undefined)?.environment;
       const check = options.checkOnStart ?? environment !== "test";
-      described.set(provider, { connection, settings: settingNames(config, configs, ["baseUrl", "apiKey"]), check });
+      // In tests the provider is not reached at all, unless checkOnStart: true asks for it.
+      const offline = environment === "test" && options.checkOnStart !== true;
+      described.set(provider, { connection, settings: settingNames(config, configs, ["baseUrl", "apiKey"]), check, offline });
       return provider;
     },
     connect(provider, signal) {
@@ -126,8 +130,9 @@ export function llmConnect<T extends LlmConfigShape>(
     dispose(provider) {
       return adapter.dispose?.(provider);
     },
+    // Like the start check: a test does not reach the real provider.
     healthCheck: adapter.healthCheck
-      ? (provider, signal) => adapter.healthCheck?.(provider, signal) ?? false
+      ? (provider, signal) => described.get(provider)?.offline === true || (adapter.healthCheck?.(provider, signal) ?? false)
       : undefined,
   }, "llm");
 }
