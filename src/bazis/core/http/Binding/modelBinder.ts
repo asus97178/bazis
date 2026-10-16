@@ -1,5 +1,5 @@
 import type { Class } from "../../di";
-import { BadRequestError, ModelValidationError } from "../Errors/HttpError";
+import { ModelValidationError, frameworkBadRequest } from "../Errors/HttpError";
 import { getModelValidator, type ModelValidationIssue, type ModelValidationResult, type ModelValidator } from "./modelValidator";
 import {
   findRequestModelShape,
@@ -19,7 +19,7 @@ interface BindingTraversal {
   readonly options: ModelBindingOptions;
   /** Per-field binding problems; a bad field does not stop the other fields. */
   readonly issues: ModelValidationIssue[];
-  readonly typeMessage?: (property: string, expected: string, actual: string) => string;
+  readonly validator?: ModelValidator;
   nodes: number;
 }
 
@@ -74,12 +74,9 @@ export async function bindModelAsync<T extends object>(model: Class<T>, data: un
 
 function hydrate<T extends object>(model: Class<T>, data: unknown, validator: ModelValidator | undefined, options: ModelBindingOptions): { instance: T; traversal: BindingTraversal } {
   if (!isPlainJsonObject(data)) {
-    throw new BadRequestError("Request body must be a JSON object");
+    throw frameworkBadRequest("bodyNotObject");
   }
-  const traversal: BindingTraversal = {
-    stack: new WeakSet(), nodes: 0, options, issues: [],
-    typeMessage: validator?.typeMismatchMessage?.bind(validator),
-  };
+  const traversal: BindingTraversal = { stack: new WeakSet(), nodes: 0, options, issues: [], validator };
   const instance = hydrateModel(model as RequestModelClass, data, "", traversal, 0) as T;
   return { instance, traversal };
 }
@@ -92,7 +89,7 @@ function finish(traversal: BindingTraversal, validator: ModelValidator | undefin
   const bound = new Set(traversal.issues.map((issue) => issue.property));
   const errors = [...traversal.issues, ...(result?.errors ?? []).filter((error) => !bound.has(error.property))];
   if (errors.length > 0) {
-    throw new ModelValidationError(errors, validator?.failureTitle?.() ?? "Validation failed");
+    throw new ModelValidationError(errors, validator?.message?.("validationFailed", {}) ?? "Validation failed");
   }
 }
 
@@ -120,7 +117,7 @@ function hydrateModel(
         target[key] = bindField(model, key, target[key], source[key], fieldPath, traversal, depth + 1);
       } catch (error) {
         if (!(error instanceof BindingTypeError) && !(error instanceof ModelValidationError && error.errors.every((issue) => issue.code === "unknownField"))) throw error;
-        traversal.issues.push(...(error instanceof BindingTypeError ? [error.issue(traversal.typeMessage)] : error.errors));
+        traversal.issues.push(...error.errors.map((issue) => inValidatorLanguage(issue, traversal.validator)));
       }
     }
     return instance;
@@ -209,13 +206,15 @@ function hydrateField(
 
 /** A JSON value of the wrong type; the field is skipped and the binding goes on. */
 class BindingTypeError extends ModelValidationError {
-  constructor(readonly property: string, readonly expected: string, readonly actual: string) {
-    super([{ property, message: `Field "${property}" must be a ${expected}`, code: "type" }]);
+  constructor(property: string, expected: string, actual: string) {
+    super([{ property, message: `Field "${property}" must be a ${expected}`, code: "type", params: { property, expected, actual } }]);
   }
+}
 
-  issue(format?: (property: string, expected: string, actual: string) => string): ModelValidationIssue {
-    return { property: this.property, message: format?.(this.property, this.expected, this.actual) ?? this.errors[0]!.message, code: "type" };
-  }
+/** A binder issue in the validator's current language; the key stays for the response. */
+function inValidatorLanguage(issue: ModelValidationIssue, validator: ModelValidator | undefined): ModelValidationIssue {
+  if (validator?.message === undefined || issue.code === undefined || issue.params === undefined) return issue;
+  return { ...issue, message: validator.message(issue.code, issue.params) };
 }
 
 function bindingTypeError(property: string, expected: string, value: unknown): BindingTypeError {
@@ -319,7 +318,7 @@ function enterContainer(
 ): void {
   const property = path || "$";
   if (depth > MAX_JSON_DEPTH) {
-    throw new BadRequestError("Request body is too deeply nested", {
+    throw frameworkBadRequest("bodyTooDeep", undefined, {
       property,
       maxDepth: MAX_JSON_DEPTH,
     });
@@ -327,13 +326,13 @@ function enterContainer(
   const childCount = Array.isArray(value) ? value.length : Object.keys(value).length;
   traversal.nodes += 1 + childCount;
   if (traversal.nodes > MAX_JSON_NODES) {
-    throw new BadRequestError("Request body is too complex", {
+    throw frameworkBadRequest("bodyTooComplex", undefined, {
       property,
       maxNodes: MAX_JSON_NODES,
     });
   }
   if (traversal.stack.has(value)) {
-    throw new BadRequestError("Request body must be acyclic JSON", { property });
+    throw frameworkBadRequest("bodyCyclic", undefined, { property });
   }
   traversal.stack.add(value);
 }
@@ -352,7 +351,7 @@ function acceptKey(source: object, key: string, allowed: ReadonlySet<string> | u
   if (!FORBIDDEN_KEYS.has(key) && (allowed === undefined || allowed.has(key))) return true;
   if (options.unknownFields === "reject") {
     const property = path === "" ? key : `${path}.${key}`;
-    throw new ModelValidationError([{ property, message: `Field "${property}" is forbidden or not declared by the model.`, code: "unknownField" }]);
+    throw new ModelValidationError([{ property, message: `Field "${property}" is forbidden or not declared by the model.`, code: "unknownField", params: { property } }]);
   }
   return false;
 }

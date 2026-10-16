@@ -2,4 +2,5 @@
 // the validation library (it is the composition root, so it may use everything), hiding
 // infrastructure wiring from application code.
 export { runApp, type RunAppOptions } from "./runApp";
+export type { AppLanguage, AppMessages } from "./messages";
 export * from "./ui";

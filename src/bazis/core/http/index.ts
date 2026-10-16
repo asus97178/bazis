@@ -141,4 +141,5 @@ export {
   UnauthorizedError,
   UnsupportedMediaTypeError,
 } from "./Errors/HttpError";
+export { EN_HTTP_MESSAGES, RU_HTTP_MESSAGES, type HttpMessageKey, type Localize, type LocalizedMessage } from "./Errors/messages";
 export { markUpstreamFailure, upstreamFailure, type UpstreamFailure } from "./Errors/upstreamFailure";

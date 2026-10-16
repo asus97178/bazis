@@ -9,7 +9,8 @@
     },
     "test": {
       "entrypoints": [
-        "src/bazis/core/http/test/fixtures/conventionControllers.ts"
+        "src/bazis/core/http/test/fixtures/conventionControllers.ts",
+        "src/bazis/core/app/test/fixtures/languageControllers.ts"
       ]
     }
   }

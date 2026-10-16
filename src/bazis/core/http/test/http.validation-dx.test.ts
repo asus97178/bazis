@@ -43,9 +43,9 @@ test("a JSON type error is reported together with the other fields' rule errors"
   const result = await post({ email: "bad", age: "20", address: { city: "K" } });
   expect(result.title).toBe("Validation failed");
   expect(result.errors).toEqual([
-    { property: "age", message: 'Field "age" must be of type number, got: string', code: "type" },
-    { property: "email", message: 'Field "email" must be a valid email address', code: "email" },
-    { property: "address.city", message: 'Field "address.city" must be at least 2 characters long', code: "minLength" },
+    { property: "age", message: 'Field "age" must be of type number, got: string', code: "type", params: { property: "age", expected: "number", actual: "string" } },
+    { property: "email", message: 'Field "email" must be a valid email address', code: "email", params: { property: "email", value: "bad" } },
+    { property: "address.city", message: 'Field "address.city" must be at least 2 characters long', code: "minLength", params: { property: "address.city", value: "K", min: 2 } },
   ]);
 });
 
@@ -53,7 +53,7 @@ test("the Russian set translates type errors and the response title", async () =
   MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES);
   const result = await post({ email: "a@b.co", age: "20", address: { city: "Kazan" } });
   expect(result.title).toBe("Проверка данных не пройдена");
-  expect(result.errors).toEqual([{ property: "age", message: 'Поле "age" должно иметь тип number, получено: string', code: "type" }]);
+  expect(result.errors).toEqual([{ property: "age", message: 'Поле "age": ожидается число, получено: строка', code: "type", params: { property: "age", expected: "number", actual: "string" } }]);
 });
 
 test("an unknown error code falls back to the current language", () => {

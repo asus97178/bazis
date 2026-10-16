@@ -1,4 +1,5 @@
 import type { ModelValidationIssue } from "../Binding/modelValidator";
+import { englishHttpMessage, type HttpMessageKey, type LocalizedMessage, type MessageParams } from "./messages";
 
 /**
  * Base class for errors that map directly to an HTTP response.
@@ -10,53 +11,68 @@ export class HttpError extends Error {
     readonly status: number,
     message: string,
     readonly details?: unknown,
+    /**
+     * Key and parameters of the message: the error handler renders it in the
+     * application language (`runApp({ language, messages })`); `message` is the
+     * English text. Errors created with their own text have no key.
+     */
+    readonly localized?: LocalizedMessage,
   ) {
     super(message);
     this.name = new.target.name;
   }
 }
 
+/** Own text as is, or the framework text by key (translated at the response). */
+function textOf(message: string | undefined, key: HttpMessageKey, params?: MessageParams): readonly [string, LocalizedMessage | undefined] {
+  return message !== undefined ? [message, undefined] : [englishHttpMessage(key, params), params === undefined ? { key } : { key, params }];
+}
+
 export class BadRequestError extends HttpError {
-  constructor(message = "Bad Request", details?: unknown) {
-    super(400, message, details);
+  constructor(message?: string, details?: unknown) {
+    const [text, localized] = textOf(message, "badRequest");
+    super(400, text, details, localized);
   }
 }
 
 export class UnauthorizedError extends HttpError {
   readonly challenge = "Bearer";
 
-  constructor(message = "Unauthorized", details?: unknown) {
-    super(401, message, details);
+  constructor(message?: string, details?: unknown) {
+    const [text, localized] = textOf(message, "unauthorized");
+    super(401, text, details, localized);
   }
 }
 
 export class ForbiddenError extends HttpError {
-  constructor(message = "Forbidden", details?: unknown) {
-    super(403, message, details);
+  constructor(message?: string, details?: unknown) {
+    const [text, localized] = textOf(message, "forbidden");
+    super(403, text, details, localized);
   }
 }
 
 export class NotFoundError extends HttpError {
-  constructor(message = "Not Found", details?: unknown) {
-    super(404, message, details);
+  constructor(message?: string, details?: unknown) {
+    const [text, localized] = textOf(message, "notFound");
+    super(404, text, details, localized);
   }
 }
 
 export class MethodNotAllowedError extends HttpError {
   constructor(readonly allow: readonly string[]) {
-    super(405, "Method Not Allowed");
+    super(405, englishHttpMessage("methodNotAllowed"), undefined, { key: "methodNotAllowed" });
   }
 }
 
 export class UnsupportedMediaTypeError extends HttpError {
   constructor(expected: string) {
-    super(415, `Unsupported Media Type: expected ${expected}`);
+    super(415, englishHttpMessage("unsupportedMediaType", { expected }), undefined, { key: "unsupportedMediaType", params: { expected } });
   }
 }
 
 export class PayloadTooLargeError extends HttpError {
   constructor(maxBytes: number) {
-    super(413, "Payload Too Large", { maxBytes });
+    super(413, englishHttpMessage("payloadTooLarge"), { maxBytes }, { key: "payloadTooLarge" });
   }
 }
 
@@ -66,14 +82,14 @@ export class TooManyRequestsError extends HttpError {
     /** Extra response headers, for example `RateLimit-*` from {@link rateLimit}. */
     readonly headers?: Readonly<Record<string, string>>,
   ) {
-    super(429, "Too Many Requests");
+    super(429, englishHttpMessage("tooManyRequests"), undefined, { key: "tooManyRequests" });
   }
 }
 
 /**
  * Request body failed model validation (generated DTO binding + `@Validator`
  * rules on the DTO). The error handler renders it as 400 with the full list
- * of validation problems.
+ * of validation problems, each in the application language.
  */
 export class ModelValidationError extends BadRequestError {
   constructor(readonly errors: readonly ModelValidationIssue[], title = "Validation failed") {
@@ -82,6 +98,15 @@ export class ModelValidationError extends BadRequestError {
       errors.map((error) => ({ property: error.property, message: error.message, code: error.code })),
     );
   }
+
+  override readonly localized: LocalizedMessage = { key: "validationFailed" };
+}
+
+/** A 400 the framework writes itself: English text plus the key to translate it. */
+export function frameworkBadRequest(key: HttpMessageKey, params?: MessageParams, details?: unknown): BadRequestError {
+  return Object.assign(new BadRequestError(englishHttpMessage(key, params), details), {
+    localized: params === undefined ? { key } : { key, params },
+  }) as BadRequestError;
 }
 
 /**

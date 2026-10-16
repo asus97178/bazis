@@ -173,20 +173,25 @@ Import from the subpaths listed in `exports` of `package.json`:
 
 ## Language of built-in texts
 
-Built-in texts are English. Russian sets ship with the package; apply them
-once at startup:
+Built-in texts are English. Russian sets ship with the package:
 
 ```ts
-import { MessageRegistry, RU_VALIDATION_MESSAGES } from "bazis/library/validation";
 import { CodexError, RU_CODEX_MESSAGES } from "bazis/core/infra";
 import { RU_UI_LABELS } from "bazis/core/app";
 
-MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES); // validation errors
-CodexError.useMessages(RU_CODEX_MESSAGES);           // Codex connector errors
-await runApp(AppModule, { ui: { labels: RU_UI_LABELS, surfaces: [/* ... */] } }); // generated UI texts
+CodexError.useMessages(RU_CODEX_MESSAGES); // Codex connector errors
+await runApp(AppModule, {
+  language: "ru",                          // response texts: validation, 404/405, 401/403, binding errors
+  messages: { notFound: "Нет такой страницы" }, // optional: own texts for single keys
+  ui: { labels: RU_UI_LABELS, surfaces: [/* ... */] }, // generated UI texts
+});
 ```
 
-Either call also accepts your own texts for some codes.
+`language` is per application: it is applied when the response is written, so
+two apps in one process keep their own languages. Texts an application passes
+to an error itself (`new NotFoundError("…")`) are never changed. Outside an
+application, `MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES)` switches the
+standalone validation library.
 
 ## Status
 

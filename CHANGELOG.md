@@ -4,6 +4,42 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.7 — 2026-10-17
+
+### Added
+
+- `runApp(AppModule, { language: "ru" })` writes every framework text of a
+  response in Russian: validation messages and the `Validation failed` title,
+  the 404/405/413 written before routing, `Unauthorized`/`Forbidden`, a
+  missing or wrong query/route parameter, malformed JSON or form data, the
+  reason phrase of an unexpected error. Before, only validation rules followed
+  the global `MessageRegistry`; everything else stayed English and the
+  404/405 for an unknown route could not even be rewritten by a middleware.
+  `messages` replaces single texts on top of the language:
+  `{ notFound: "Нет такой страницы", required: "Заполните {property}" }`.
+  Texts an application passes to an error itself are never changed.
+- The language is applied per server when the response is written, so two
+  apps in one process keep their own languages. An unknown language stops the
+  start: `runApp: language "de" is not supported. Use one of: en, ru.`
+- `EN_HTTP_MESSAGES`, `RU_HTTP_MESSAGES` (`bazis/core/http`) and
+  `EN_VALIDATION_MESSAGES` (`bazis/library/validation`) list every key.
+
+### Changed
+
+- Russian validation texts no longer need plural forms: `Поле "title":
+  минимальная длина — 2` instead of `должно содержать не менее 1 символов`;
+  the same for `maxLength`, `length` and the array counts. The type error
+  names the types in Russian: `Поле "year": ожидается число, получено: строка`.
+- `HttpError` carries `localized` (message key and parameters) when the
+  framework wrote its text; `ValidationError` and `ModelValidationIssue`
+  carry `params` when the message came from a template.
+
+### Changed (breaking)
+
+- The `ModelValidator` port has one optional `message(code, params)` instead
+  of `typeMismatchMessage` and `failureTitle`. Only custom validators passed
+  to `runApp({ validator })` are affected.
+
 ## 0.100.6 — 2026-10-16
 
 ### Fixed

@@ -5,7 +5,7 @@
 export type MessageParams = Readonly<Record<string, unknown>>;
 
 /** Built-in default messages (English). */
-const BUILT_IN: Readonly<Record<string, string>> = {
+export const EN_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   validationFailed: "Validation failed",
   invalid: 'Field "{property}" is invalid ({code})',
   required: 'Field "{property}" is required',
@@ -39,30 +39,36 @@ const BUILT_IN: Readonly<Record<string, string>> = {
   customError: 'Check of field "{property}" failed with an error: {error}',
   asyncCustomInSyncCall:
     'Field "{property}": an async custom check is not supported by synchronous validate(); use validateAsync()',
-};
+  unknownField: 'Field "{property}" is forbidden or not declared by the model.',
+});
+const BUILT_IN = EN_VALIDATION_MESSAGES;
 
 /**
- * Russian texts for every built-in code. Apply once at startup:
+ * Russian texts for every built-in code. An application gets them with
+ * `runApp(AppModule, { language: "ru" })`; outside an application:
  * `MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES)`.
+ *
+ * Numbers stand after a dash ("минимальная длина — 5"), so no template needs
+ * a plural form. `typeName.*` keys translate the type names in `type`.
  */
 export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   validationFailed: "Проверка данных не пройдена",
   invalid: 'Поле "{property}" не прошло проверку ({code})',
   required: 'Поле "{property}" обязательно для заполнения',
   notEmpty: 'Поле "{property}" не должно быть пустым',
-  minLength: 'Поле "{property}" должно содержать не менее {min} символов',
-  maxLength: 'Поле "{property}" должно содержать не более {max} символов',
-  length: 'Поле "{property}" должно содержать от {min} до {max} символов',
-  minItems: 'Поле "{property}" должно содержать не менее {min} элементов',
-  maxItems: 'Поле "{property}" должно содержать не более {max} элементов',
-  itemCount: 'Поле "{property}" должно содержать от {min} до {max} элементов',
+  minLength: 'Поле "{property}": минимальная длина — {min}',
+  maxLength: 'Поле "{property}": максимальная длина — {max}',
+  length: 'Поле "{property}": длина — от {min} до {max}',
+  minItems: 'Поле "{property}": минимум элементов — {min}',
+  maxItems: 'Поле "{property}": максимум элементов — {max}',
+  itemCount: 'Поле "{property}": количество элементов — от {min} до {max}',
   contains: 'Поле "{property}" должно содержать "{contains}"',
   notContains: 'Поле "{property}" не должно содержать "{contains}"',
   pattern: 'Поле "{property}" не соответствует формату {pattern}',
   email: 'Поле "{property}" должно быть корректным email-адресом',
   url: 'Поле "{property}" должно быть корректным URL',
   uuid: 'Поле "{property}" должно быть корректным UUID',
-  type: 'Поле "{property}" должно иметь тип {expected}, получено: {actual}',
+  type: 'Поле "{property}": ожидается {expected}, получено: {actual}',
   min: 'Поле "{property}" должно быть не меньше {min}',
   max: 'Поле "{property}" должно быть не больше {max}',
   range: 'Поле "{property}" должно быть в диапазоне от {min} до {max}',
@@ -79,6 +85,15 @@ export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.f
   customError: 'Проверка поля "{property}" завершилась ошибкой: {error}',
   asyncCustomInSyncCall:
     'Поле "{property}": асинхронная custom-проверка не поддерживается синхронным validate(), используйте validateAsync()',
+  unknownField: 'Поле "{property}" запрещено или не объявлено в модели',
+  "typeName.string": "строка",
+  "typeName.number": "число",
+  "typeName.int": "целое число",
+  "typeName.boolean": "логическое значение",
+  "typeName.bool": "логическое значение",
+  "typeName.array": "массив",
+  "typeName.object": "объект",
+  "typeName.JSON object or array": "объект или массив",
 });
 
 /**
@@ -92,6 +107,8 @@ export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.f
 export class MessageRegistry {
   /** Current global templates: a copy of the built-in ones + overrides. */
   private static defaults: Record<string, string> = { ...BUILT_IN };
+  /** Only the templates set through {@link setDefaults}. */
+  private static overrides: Record<string, string> = {};
 
   /**
    * Overrides global messages for error codes.
@@ -107,6 +124,7 @@ export class MessageRegistry {
       const template = messages[code];
       if (typeof template === "string") {
         MessageRegistry.defaults[code] = template;
+        MessageRegistry.overrides[code] = template;
       }
     }
   }
@@ -114,6 +132,12 @@ export class MessageRegistry {
   /** Resets all global overrides to the built-in messages. */
   static reset(): void {
     MessageRegistry.defaults = { ...BUILT_IN };
+    MessageRegistry.overrides = {};
+  }
+
+  /** A template set through {@link setDefaults}, or `undefined`. */
+  static override(code: string): string | undefined {
+    return Object.prototype.hasOwnProperty.call(MessageRegistry.overrides, code) ? MessageRegistry.overrides[code] : undefined;
   }
 
   /**
@@ -136,6 +160,11 @@ export class MessageRegistry {
     return template.replace(/\{(\w+)\}/g, (placeholder, key: string) => {
       if (!Object.prototype.hasOwnProperty.call(params, key) || params[key] === undefined) {
         return placeholder;
+      }
+      const value = params[key];
+      if ((key === "expected" || key === "actual") && typeof value === "string") {
+        const typeName = MessageRegistry.defaults[`typeName.${value}`];
+        if (typeName !== undefined && Object.prototype.hasOwnProperty.call(MessageRegistry.defaults, `typeName.${value}`)) return typeName;
       }
       return MessageRegistry.stringify(params[key]);
     });

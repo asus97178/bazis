@@ -1,5 +1,5 @@
 import { ListQueryError, parseListQuery } from "../../../library/jsonapi";
-import { BadRequestError, UnsupportedMediaTypeError } from "../Errors/HttpError";
+import { UnsupportedMediaTypeError, frameworkBadRequest } from "../Errors/HttpError";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import type { ParameterBinding } from "./bindings";
 import { convertOr400 } from "./convert";
@@ -33,7 +33,7 @@ function bindValue(binding: ParameterBinding, raw: string | undefined, kind: str
     if (binding.optional) {
       return undefined;
     }
-    throw new BadRequestError(`Missing required ${kind} parameter "${binding.name}"`);
+    throw frameworkBadRequest("missingParameter", { kind, name: binding.name });
   }
   return binding.type && binding.type !== "string" ? convertOr400(raw, binding.type, binding.name ?? "?") : raw;
 }
@@ -114,7 +114,7 @@ export async function bindArguments(
           parsed = parseListQuery(ctx.url.searchParams, binding.listOptions);
         } catch (error) {
           if (error instanceof ListQueryError) {
-            throw new BadRequestError("Invalid list query", error.problems);
+            throw frameworkBadRequest("invalidListQuery", undefined, error.problems);
           }
           throw error;
         }
