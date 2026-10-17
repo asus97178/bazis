@@ -9,9 +9,11 @@ NestJS — переносится большая часть привычек. Н
 
 ## Коротко о различиях
 
-- **Декораторов на параметрах нет.** Ни `@Param`, ни `@Query`, ни
-  `@Body`: откуда брать значение, bazis понимает по имени и типу
-  параметра.
+- **Декораторов на параметрах нет — их нет в стандарте TypeScript.**
+  Откуда брать значение, bazis понимает по имени и типу параметра. Когда
+  нужно явно — тип-маркер: `size: FromQuery<number, "page_size">`,
+  `id: FromHeader<string, "x-request-id">`, модель строки запроса
+  `FromQuery<SearchQuery>`.
 - **Зависимости собирает кодогенерация.** Контейнер не читает
   `reflect-metadata`: `bazis codegen` (его запускают `dev`, `test` и
   `build`) записывает зависимости конструкторов в `src/generated`. Граф
@@ -34,7 +36,9 @@ NestJS — переносится большая часть привычек. Н
 | `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../overview/modules.md) |
 | `@Global()` | `@Global()` — так же | [Модули](../overview/modules.md#глобальные-модули) |
 | `@Injectable()` | Не нужен | |
-| `@Param()`, `@Query()`, `@Body()` | Имя и тип параметра метода | [Контроллеры](../overview/controllers.md#аргументы-методов) |
+| `@Param()`, `@Query()`, `@Body()` | Имя и тип параметра метода или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>` | [Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `@Headers("x-id")` | `FromHeader<string, "x-id">` | [Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `@Query() query: SearchDto` + `ValidationPipe` | `query: FromQuery<SearchQuery>` — модель строки запроса с `@Validator` | [Модели строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
 | `ParseIntPipe`, `ParseUUIDPipe` | Ограничение в маршруте: `:id(int)`, `:id(uuid)` | [Контроллеры](../overview/controllers.md#маршруты) |
 | `class-validator` + `ValidationPipe` | `@Validator` на полях класса; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
 | `Scope.DEFAULT` / `REQUEST` / `TRANSIENT` | `singleton` / `scoped` / `transient` | [Провайдеры](../overview/providers.md#время-жизни) |
@@ -314,7 +318,7 @@ export class WarmUp implements LifecycleHook {
 
 ```text
 GET  /books?q=du&limit=5          → {"items":[{"id":1,"title":"Dune","author":"Herbert"}],"servedAt":"now"}
-GET  /books                       → 400 {"error":"Missing required query parameter \"q\""}
+GET  /books                       → 400 {"error":"Validation failed","details":[{"property":"q","message":"Field \"q\" is required","code":"required"}]}
 GET  /books/1                     → {"id":1,"title":"Dune","author":"Herbert"}
 GET  /books/99                    → 404 {"error":"book 99 not found","details":{"id":99}}
 GET  /books/abc                   → 404 {"error":"Not Found"}            ← :id(int) не совпал

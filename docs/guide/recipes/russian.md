@@ -27,8 +27,8 @@ await runApp(AppModule, {
 ```text
 GET  /nope                           → 404 {"error":"Не найдено"}
 DELETE /books                        → 405 {"error":"Метод не поддерживается"}
-GET  /books                          → 400 {"error":"Не передан обязательный параметр \"q\""}
-GET  /books?q=a&limit=x              → 400 {"error":"Параметр \"limit\": ожидается число, получено: \"x\""}
+GET  /books                          → 400 … {"property":"q","message":"Поле \"q\" обязательно для заполнения","code":"required"}
+GET  /books?q=a&limit=x              → 400 … {"property":"limit","message":"Поле \"limit\": ожидается число, получено: строка","code":"type"}
 POST /books  без ключа               → 401 {"error":"Требуется аутентификация"}
 POST /books  x-admin-key: x          → 403 {"error":"Доступ запрещён"}
 POST /books  not json                → 400 {"error":"Тело запроса — некорректный JSON"}
@@ -192,7 +192,7 @@ const app = await startTestApp(AppModule, {
   http: { middleware: [bookErrors] },
 });
 expect(await (await app.fetch("/nope")).json()).toEqual({ error: "Такой страницы нет" });
-expect(await (await app.fetch("/books")).json()).toEqual({ error: 'Не передан обязательный параметр "q"' });
+expect((await (await app.fetch("/books")).json()).details).toEqual([{ property: "q", message: 'Поле "q" обязательно для заполнения', code: "required" }]);
 ```
 
 Чтобы настройки не расходились, вынесите их в одну функцию, как
