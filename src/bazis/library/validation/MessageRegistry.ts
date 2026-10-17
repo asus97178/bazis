@@ -40,6 +40,8 @@ export const EN_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.f
   asyncCustomInSyncCall:
     'Field "{property}": an async custom check is not supported by synchronous validate(); use validateAsync()',
   unknownField: 'Field "{property}" is forbidden or not declared by the model.',
+  duplicate: 'Parameter "{property}" must be given once',
+  tooManyValues: 'Parameter "{property}" accepts at most {max} values',
 });
 const BUILT_IN = EN_VALIDATION_MESSAGES;
 
@@ -86,6 +88,8 @@ export const RU_VALIDATION_MESSAGES: Readonly<Record<string, string>> = Object.f
   asyncCustomInSyncCall:
     'Поле "{property}": асинхронная custom-проверка не поддерживается синхронным validate(), используйте validateAsync()',
   unknownField: 'Поле "{property}" запрещено или не объявлено в модели',
+  duplicate: 'Параметр "{property}" передан несколько раз',
+  tooManyValues: 'Параметр "{property}": максимум значений — {max}',
   "typeName.string": "строка",
   "typeName.number": "число",
   "typeName.int": "целое число",

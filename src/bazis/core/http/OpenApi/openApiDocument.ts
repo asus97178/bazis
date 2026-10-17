@@ -122,6 +122,7 @@ function createOperation(input: CreateOperationInput): OpenApiCatalogOperation {
       input.versioning,
       version,
       routeParamSchemas(input.routeTemplate),
+      input.generated,
     ),
     requestBody: createRequestBody(input.bindings, input.action, input.generated),
     responses: {
@@ -173,6 +174,7 @@ function collectParameters(
   versioning: ApiVersioningOptions | undefined,
   version: string | undefined,
   routeSchemas: Readonly<Record<string, OpenApiSchema>>,
+  generated: GeneratedOpenApiMetadata,
 ): OpenApiParameter[] {
   const parameters: OpenApiParameter[] = [];
   for (const binding of bindings) {
@@ -197,6 +199,20 @@ function collectParameters(
           });
         }
         break;
+      case "header":
+        if (binding.name) {
+          parameters.push({
+            name: binding.name,
+            in: "header",
+            required: binding.optional !== true && binding.defaultValue === undefined,
+            schema: schemaForValueType(binding.type),
+          });
+        }
+        break;
+      case "queryModel":
+      case "headerModel":
+        parameters.push(...sourceModelParameters(binding, generated));
+        break;
       case "list":
         parameters.push(...listParameters(binding));
         break;
@@ -214,6 +230,35 @@ function collectParameters(
     });
   }
   return parameters;
+}
+
+/**
+ * One parameter per field of a query or header model, under its wire name.
+ * Types, rules and descriptions come from the generated schema of the model
+ * (the same schema a body model gets), `required` from its `@Validator` rules.
+ */
+function sourceModelParameters(binding: ParameterBinding, generated: GeneratedOpenApiMetadata): OpenApiParameter[] {
+  const schema = binding.model ? generated.schemas[binding.model.name] : undefined;
+  const properties = (schema?.properties ?? {}) as Readonly<Record<string, OpenApiSchema>>;
+  const required = new Set(Array.isArray(schema?.required) ? (schema.required as string[]) : []);
+  const location = binding.source === "headerModel" ? "header" : "query";
+  // In the order the class declares its fields, like the body schema.
+  const order = Object.keys(properties);
+  const position = (property: string) => { const index = order.indexOf(property); return index < 0 ? order.length : index; };
+  const fields = [...(binding.fields ?? [])].sort((left, right) => position(left.property) - position(right.property));
+  return fields.map((field) => {
+    const property = properties[field.property];
+    const fallback: OpenApiSchema = field.array ? { type: "array", items: { type: field.type } } : { type: field.type };
+    const description = typeof property?.description === "string" ? property.description : undefined;
+    return {
+      name: field.wire,
+      in: location,
+      required: required.has(field.property),
+      schema: property ?? fallback,
+      ...(description !== undefined ? { description } : {}),
+      ...(field.array ? { style: "form", explode: true } : {}),
+    };
+  });
 }
 
 function listParameters(binding: ParameterBinding): OpenApiParameter[] {

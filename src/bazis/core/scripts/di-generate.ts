@@ -194,7 +194,7 @@ let fatalErrors: string[] = [];
 
 // HTTP binding conventions inferred from controller method signatures.
 interface HttpBindingSpec {
-  source: "route" | "query" | "body" | "context" | "request" | "response" | "list";
+  source: "route" | "query" | "header" | "body" | "queryModel" | "headerModel" | "context" | "request" | "response" | "list";
   name?: string;
   type?: "int" | "number" | "bool" | "string";
   optional?: boolean;
@@ -244,6 +244,9 @@ const CONTEXT_TYPES: Record<string, HttpBindingSpec["source"]> = {
   Request: "request",
   ResponseBuilder: "response",
 };
+// Explicit argument sources of bazis/core/http: `size: FromQuery<number, "page_size">`.
+type SourceMarkerKind = "FromQuery" | "FromHeader" | "FromBody" | "FromRoute";
+const SOURCE_MARKERS: ReadonlySet<string> = new Set<SourceMarkerKind>(["FromQuery", "FromHeader", "FromBody", "FromRoute"]);
 let program: ts.Program;
 let programFiles = new Map<string, ts.SourceFile>();
 // Framework sources outside the scanned project (node_modules/bazis, vendor/bazis).
@@ -1464,6 +1467,25 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
       const paramName = param.name.text;
       const optional = param.questionToken !== undefined || param.initializer !== undefined;
       const typeNode = param.type;
+
+      // An explicit source: FromQuery<…>, FromHeader<…>, FromBody<…>, FromRoute<…>.
+      const marker = typeNode ? sourceMarker(typeNode) : undefined;
+      if (marker !== undefined) {
+        const spec = markerBindingSpec(marker, paramName, optional, routeParams);
+        if (typeof spec === "string") {
+          failed = spec;
+          break;
+        }
+        if (spec.source === "body") {
+          bodyCount += 1;
+          if (bodyCount > 1) {
+            failed = "more than one body (class-typed) parameter";
+            break;
+          }
+        }
+        specs.push(spec);
+        continue;
+      }
       const keywordType = typeNode ? typeNode.getText().trim() : undefined;
       const refName = typeNode ? getTypeReferenceName(typeNode) : undefined;
 
@@ -1511,11 +1533,82 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
     if (failed) {
       fatalErrors.push(
         `BAZIS_HTTP_BINDING_UNRESOLVED: controller "${controllerName}.${name}" (${filePath}): cannot infer bindings (${failed}). ` +
-          `Use supported parameter types; read headers or raw bodies through HttpContext, and inject services in the constructor.`,
+          `Use supported parameter types or mark the source with FromQuery/FromHeader/FromBody/FromRoute; read raw bodies through HttpContext, and inject services in the constructor.`,
       );
       continue;
     }
     (httpBindings[controllerName] ??= {})[name] = specs;
+  }
+}
+
+interface SourceMarker {
+  readonly kind: SourceMarkerKind;
+  readonly inner?: ts.TypeNode;
+  /** The name on the wire from the second type argument. */
+  readonly name?: string;
+  readonly problem?: string;
+}
+
+/**
+ * A parameter type that is one of the source markers of bazis/core/http,
+ * resolved through the type checker: an aliased import (`FromQuery as Q`)
+ * works, an application type that happens to be called FromQuery does not.
+ */
+function sourceMarker(node: ts.TypeNode): SourceMarker | undefined {
+  if (!ts.isTypeReferenceNode(node)) return undefined;
+  const typeName = ts.isQualifiedName(node.typeName) ? node.typeName.right : node.typeName;
+  const symbol = checker.getSymbolAtLocation(typeName);
+  if (symbol === undefined) return undefined;
+  const target = (symbol.flags & ts.SymbolFlags.Alias) !== 0 ? checker.getAliasedSymbol(symbol) : symbol;
+  const kind = target.getName();
+  if (!SOURCE_MARKERS.has(kind)) return undefined;
+  const fromFramework = target.declarations?.some((declaration) =>
+    /\/core\/http\/Binding\/sources(\.d)?\.ts$/.test(declaration.getSourceFile().fileName.replaceAll("\\", "/")));
+  if (!fromFramework) return undefined;
+  const [inner, name] = node.typeArguments ?? [];
+  const marker = kind as SourceMarkerKind;
+  if (inner === undefined) return { kind: marker, problem: `${kind} needs a type argument` };
+  if (name === undefined) return { kind: marker, inner };
+  if (ts.isLiteralTypeNode(name) && ts.isStringLiteral(name.literal) && name.literal.text.length > 0) {
+    return { kind: marker, inner, name: name.literal.text };
+  }
+  return { kind: marker, problem: `the name in ${kind}<…, "name"> must be a non-empty string literal` };
+}
+
+/** The binding of an explicitly sourced parameter, or why it cannot be bound. */
+function markerBindingSpec(marker: SourceMarker, paramName: string, optional: boolean, routeParams: ReadonlySet<string>): HttpBindingSpec | string {
+  if (marker.problem !== undefined || marker.inner === undefined) return marker.problem ?? `${marker.kind} needs a type argument`;
+  const inner = marker.inner;
+  const primitive = PRIMITIVE_QUERY_TYPES[inner.getText().trim()];
+  const elementKeyword = arrayElementKeyword(inner);
+  const element = elementKeyword !== undefined ? PRIMITIVE_QUERY_TYPES[elementKeyword] : undefined;
+  const model = getTypeReferenceName(inner);
+  const name = marker.name ?? paramName;
+  const type = (value: HttpBindingSpec["type"]) => (value === "string" ? undefined : value);
+  switch (marker.kind) {
+    case "FromRoute":
+      if (!routeParams.has(name)) return `FromRoute parameter "${name}" is not in the route template`;
+      if (primitive === undefined) return `FromRoute<${inner.getText()}> takes string, number or boolean`;
+      return { source: "route", name, type: type(primitive), optional };
+    case "FromQuery":
+      if (element !== undefined) return { source: "query", name, type: type(element), optional, array: true };
+      if (primitive !== undefined) return { source: "query", name, type: type(primitive), optional };
+      if (model !== undefined && marker.name === undefined) {
+        return listRequestClassNames.has(model) ? { source: "list", model, optional } : { source: "queryModel", model, optional };
+      }
+      return model !== undefined
+        ? `FromQuery<${model}, "…">: a query model takes no name; name its fields with @FromQuery("…")`
+        : `FromQuery<${inner.getText()}> takes string, number, boolean, an array of them or a query model class`;
+    case "FromHeader":
+      if (element !== undefined) return `FromHeader<${inner.getText()}>: a header takes one value`;
+      if (primitive !== undefined) return { source: "header", name, type: type(primitive), optional };
+      if (model !== undefined && marker.name === undefined) return { source: "headerModel", model, optional };
+      return model !== undefined
+        ? `FromHeader<${model}, "…">: a header model takes no name; name its fields with @FromHeader("…")`
+        : `FromHeader<${inner.getText()}> takes string, number, boolean or a header model class`;
+    case "FromBody":
+      if (model === undefined || primitive !== undefined || element !== undefined) return `FromBody<${inner.getText()}> takes a request-model class; read a raw body through HttpContext`;
+      return { source: "body", model, optional };
   }
 }
 
@@ -1619,7 +1712,7 @@ function resolveRequestModelImports(): RequestModelImport[] {
   for (const methods of Object.values(httpBindings)) {
     for (const specs of Object.values(methods)) {
       for (const spec of specs) {
-        if (spec.source === "body" && spec.model !== undefined) {
+        if ((spec.source === "body" || spec.source === "queryModel" || spec.source === "headerModel") && spec.model !== undefined) {
           modelNames.add(spec.model);
         }
       }
@@ -1956,7 +2049,7 @@ function usedOpenApiSchemaNames(
   for (const methods of Object.values(httpBindings)) {
     for (const specs of Object.values(methods)) {
       for (const spec of specs) {
-        if ((spec.source === "body" || spec.source === "list") && spec.model !== undefined) {
+        if ((spec.source === "body" || spec.source === "list" || spec.source === "queryModel" || spec.source === "headerModel") && spec.model !== undefined) {
           add(spec.model);
         }
       }

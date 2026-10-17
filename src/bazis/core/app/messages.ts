@@ -11,7 +11,7 @@ export type AppLanguage = "en" | "ru";
  * `validationFailed`, `unknownField` and type names (`typeName.number`).
  * Placeholders: `{property}`, `{min}`, `{name}`, … as in the built-in texts.
  */
-export type AppMessages = Partial<Record<HttpMessageKey | ValidationCode | "validationFailed" | "unknownField" | `typeName.${string}`, string>>;
+export type AppMessages = Partial<Record<HttpMessageKey | ValidationCode | "validationFailed" | "unknownField" | "duplicate" | "tooManyValues" | `typeName.${string}`, string>>;
 
 const CATALOGS: Readonly<Record<AppLanguage, Readonly<Record<string, string>>>> = {
   en: { ...EN_HTTP_MESSAGES, ...EN_VALIDATION_MESSAGES },

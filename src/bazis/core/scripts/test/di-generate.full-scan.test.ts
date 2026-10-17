@@ -50,6 +50,7 @@ test("codegen declares isolated production and test targets", async () => {
         entrypoints: [
           "src/bazis/core/http/test/fixtures/conventionControllers.ts",
           "src/bazis/core/app/test/fixtures/languageControllers.ts",
+          "src/bazis/core/http/test/fixtures/sourceControllers.ts",
         ],
       },
     },

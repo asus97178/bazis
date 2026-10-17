@@ -1,9 +1,10 @@
 import { optionsFromSchema } from "../../../library/jsonapi";
-import { AMBIGUOUS_REQUEST_MODEL, findRequestModelByName } from "./requestModelRegistry";
+import { AMBIGUOUS_REQUEST_MODEL, findRequestModelByName, findRequestModelShape } from "./requestModelRegistry";
+import { wireNamesOf } from "./sources";
 import { AMBIGUOUS_LIST_MODEL, findListModelByName } from "./listModelRegistry";
 import { HttpSetupError } from "../Errors/HttpError";
 import type { Class } from "../../di";
-import type { ParameterBinding } from "./bindings";
+import type { ParameterBinding, SourceModelField } from "./bindings";
 import type { GeneratedBindingSpec } from "./generatedSpec";
 
 type GeneratedControllerClass = abstract new (...args: never[]) => object;
@@ -32,8 +33,9 @@ export function registerGeneratedBindings(
  * - `HttpContext` / `Request` / `ResponseBuilder` -> context/raw request/builder;
  * - other primitives -> query (converted by type; `?`/default -> optional).
  *
- * Headers and raw bodies are read through HttpContext; services are injected
- * into the constructor. Any DTO class parameter is treated as the request body.
+ * An explicit source comes from the type markers FromQuery/FromHeader/FromBody/
+ * FromRoute, including query and header models; raw bodies are read through
+ * HttpContext; services are injected into the constructor. Any DTO class parameter is treated as the request body.
  * Model names are resolved once at startup; configuration errors are
  * `HttpSetupError` (fail fast).
  */
@@ -56,6 +58,14 @@ function toBinding(spec: GeneratedBindingSpec, controllerName: string, methodNam
       return { source: "route", name: spec.name, type: spec.type, optional: spec.optional };
     case "query":
       return { source: "query", name: spec.name, type: spec.type, optional: spec.optional, array: spec.array };
+    case "header":
+      return { source: "header", name: spec.name?.toLowerCase(), type: spec.type, optional: spec.optional };
+    case "queryModel":
+    case "headerModel": {
+      const source = spec.source === "queryModel" ? "query" : "header";
+      const model = resolveModel(spec, `${source} model`, controllerName, methodName, models);
+      return { source: spec.source, model, optional: spec.optional, fields: sourceModelFields(model, source, `${controllerName}.${methodName}`) };
+    }
     case "context":
       return { source: "context" };
     case "request":
@@ -83,28 +93,70 @@ function toBinding(spec: GeneratedBindingSpec, controllerName: string, methodNam
       }
       return { source: "list", model: ctor as Class<object>, listOptions: optionsFromSchema(ctor) };
     }
-    case "body": {
-      if (!spec.model) {
-        return { source: "body" };
-      }
-      // An explicit target controller always resolves through its own
-      // constructor-local index. Name fallback is legacy/default-only.
-      const model = models === undefined ? findRequestModelByName(spec.model) : models.get(spec.model);
-      if (model === undefined) {
-        throw new HttpSetupError(
-          `${controllerName}.${methodName}: body model "${spec.model}" is not registered. ` +
-            `Regenerate the target metadata; for an external DTO use @RequestModel() and import its module.`,
-        );
-      }
-      if (model === AMBIGUOUS_REQUEST_MODEL) {
-        throw new HttpSetupError(
-          `${controllerName}.${methodName}: body model name "${spec.model}" is ambiguous (several classes share it). ` +
-            `Rename one of the classes.`,
-        );
-      }
-      return { source: "body", model };
-    }
+    case "body":
+      return spec.model ? { source: "body", model: resolveModel(spec, "body model", controllerName, methodName, models) } : { source: "body" };
   }
+}
+
+function resolveModel(spec: GeneratedBindingSpec, label: string, controllerName: string, methodName: string, models?: ReadonlyMap<string, Class<object>>): Class<object> {
+  const name = spec.model ?? "";
+  // An explicit target controller always resolves through its own
+  // constructor-local index. Name fallback is legacy/default-only.
+  const model = models === undefined ? findRequestModelByName(name) : models.get(name);
+  if (model === undefined) {
+    throw new HttpSetupError(
+      `${controllerName}.${methodName}: ${label} "${name}" is not registered. ` +
+        `Regenerate the target metadata; for an external DTO use @RequestModel() and import its module.`,
+    );
+  }
+  if (model === AMBIGUOUS_REQUEST_MODEL) {
+    throw new HttpSetupError(
+      `${controllerName}.${methodName}: ${label} name "${name}" is ambiguous (several classes share it). ` +
+        `Rename one of the classes.`,
+    );
+  }
+  return model;
+}
+
+const FORBIDDEN_FIELDS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * The fields of a query or header model, resolved once at startup: the
+ * instance's own fields plus the generated shape, each with its wire name and
+ * type. Query strings and headers are flat strings, so a nested model field
+ * (or a header array) is a setup error instead of a silent `undefined`.
+ */
+function sourceModelFields(model: Class<object>, source: "query" | "header", action: string): readonly SourceModelField[] {
+  let instance: object;
+  try {
+    instance = new (model as unknown as new () => object)();
+  } catch (error) {
+    throw new HttpSetupError(`${action}: ${source} model "${model.name}" must be constructible without arguments: ${(error as Error).message}`);
+  }
+  const shape = findRequestModelShape(model as unknown as new () => object) ?? {};
+  const names = wireNamesOf(model, source);
+  const properties = new Set([...Object.keys(instance), ...Object.keys(shape), ...names.keys()]);
+  const fields: SourceModelField[] = [];
+  const wires = new Map<string, string>();
+  for (const property of properties) {
+    if (FORBIDDEN_FIELDS.has(property)) continue;
+    const field = shape[property];
+    if (field !== undefined && "model" in field) {
+      throw new HttpSetupError(`${action}: ${source} model "${model.name}" field "${property}" is an object; ${source} models take string, number, boolean${source === "query" ? " and arrays of them" : ""}.`);
+    }
+    const array = field?.array === true;
+    if (array && source === "header") {
+      throw new HttpSetupError(`${action}: header model "${model.name}" field "${property}" is an array; a header model field takes one value.`);
+    }
+    const wire = names.get(property) ?? (source === "header" ? property.toLowerCase() : property);
+    const other = wires.get(wire);
+    if (other !== undefined) {
+      throw new HttpSetupError(`${action}: ${source} model "${model.name}" binds "${wire}" to both "${other}" and "${property}".`);
+    }
+    wires.set(wire, property);
+    fields.push({ property, wire, type: field !== undefined && "primitive" in field ? field.primitive : "string", array });
+  }
+  return Object.freeze(fields);
 }
 
 /** Internal generated-runtime transaction support. */

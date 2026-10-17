@@ -60,8 +60,45 @@ Instead there are ASP.NET-style conventions that codegen infers from the signatu
 If no convention can be inferred (for example a union of string literals, no
 annotation or two body classes), `di:generate` fails with
 `BAZIS_HTTP_BINDING_UNRESOLVED`, the method name and the reason. The previous
-generated files are not replaced. Use a supported type; for headers and raw
-bodies take `ctx: HttpContext`, and inject services into the constructor.
+generated files are not replaced. Use a supported type or an explicit source
+(below); for raw bodies take `ctx: HttpContext`, and inject services into the
+constructor.
+
+### Explicit sources: `FromQuery`, `FromHeader`, `FromBody`, `FromRoute`
+
+When the convention is not what you want, the parameter type says where the
+value comes from. The markers are type aliases (erased at runtime) that codegen
+reads through the type checker; on a field of a query or header model the same
+names are field decorators that set the name on the wire:
+
+```ts
+export class SearchQuery {
+  @Validator({ required: true, minLength: 2 }) q!: string;
+  @FromQuery("page_size") @Validator({ integer: true, range: [1, 100] }) pageSize = 20;
+  tags: string[] = [];
+}
+export class TenantHeaders {
+  @FromHeader("x-tenant-id") @Validator({ required: true, uuid: true }) tenantId!: string;
+}
+
+@Get() search(query: FromQuery<SearchQuery>, headers: FromHeader<TenantHeaders>) {}
+@Get(":id") item(id: FromRoute<number>, size: FromQuery<number, "page_size"> = 10, requestId?: FromHeader<string, "x-request-id">) {}
+@Post() create(body: FromBody<CreateItem>) {}
+```
+
+- A query or header model is bound like a body and validated by its
+  `@Validator` rules before the action runs: every problem in one 400, under
+  the name the client sent (`page_size`, `x-tenant-id`).
+- Only declared fields are read; undeclared parameters are ignored. A repeated
+  single parameter is a 400 (`duplicate`), an array takes at most 100 values
+  (`tooManyValues`). Header names match case-insensitively.
+- Query models take `string`, `number`, `boolean` and arrays of them; header
+  models one value per field. A nested object is a startup `HttpSetupError`.
+- OpenAPI lists the model fields as `query`/`header` parameters with the
+  schema, rules and JSDoc of the model.
+- Misuse (`FromHeader<string[]>`, a name on a model, `FromRoute` outside the
+  template, `FromBody<string>`) is `BAZIS_HTTP_BINDING_UNRESOLVED`.
+
 Checking allowed values belongs to the Validator or the service.
 
 A `ctx: HttpContext` parameter stays a regular supported input. For older manual

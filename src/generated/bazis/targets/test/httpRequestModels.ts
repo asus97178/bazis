@@ -6,12 +6,21 @@
 
 import { AddBook as RequestModel_0 } from "../../../../bazis/core/app/test/fixtures/languageControllers";
 import { ConventionOrderDto as RequestModel_1 } from "../../../../bazis/core/http/test/fixtures/conventionControllers";
+import { CreateItem as RequestModel_2 } from "../../../../bazis/core/http/test/fixtures/sourceControllers";
+import { SearchQuery as RequestModel_3 } from "../../../../bazis/core/http/test/fixtures/sourceControllers";
+import { TenantHeaders as RequestModel_4 } from "../../../../bazis/core/http/test/fixtures/sourceControllers";
 
 export const GENERATED_REQUEST_MODELS = Object.freeze([
   RequestModel_0,
   RequestModel_1,
+  RequestModel_2,
+  RequestModel_3,
+  RequestModel_4,
 ]);
 export const GENERATED_REQUEST_MODEL_SHAPES = Object.freeze([
   [RequestModel_0, Object.freeze({ "author": { primitive: "string" as const, }, "title": { primitive: "string" as const, }, "year": { primitive: "number" as const, } })] as const,
   [RequestModel_1, Object.freeze({ "product": { primitive: "string" as const, }, "quantity": { primitive: "number" as const, } })] as const,
+  [RequestModel_2, Object.freeze({ "title": { primitive: "string" as const, } })] as const,
+  [RequestModel_3, Object.freeze({ "onlyNew": { primitive: "boolean" as const, }, "pageSize": { primitive: "number" as const, }, "q": { primitive: "string" as const, }, "sort": { primitive: "string" as const, }, "tags": { primitive: "string" as const, array: true, } })] as const,
+  [RequestModel_4, Object.freeze({ "tenantId": { primitive: "string" as const, }, "trace": { primitive: "string" as const, } })] as const,
 ]);

@@ -1,4 +1,5 @@
 import { ListQueryError, parseListQuery } from "../../../library/jsonapi";
+import { bindSourceModel } from "./sourceModelBinder";
 import { UnsupportedMediaTypeError, frameworkBadRequest } from "../Errors/HttpError";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import type { ParameterBinding } from "./bindings";
@@ -82,6 +83,13 @@ export async function bindArguments(
       }
       case "query":
         args[index] = binding.array ? bindArray(binding, ctx) : bindValue(binding, ctx.query(binding.name ?? ""), "query");
+        break;
+      case "header":
+        args[index] = bindValue(binding, ctx.header(binding.name ?? ""), "header");
+        break;
+      case "queryModel":
+      case "headerModel":
+        args[index] = await bindSourceModel(binding, ctx);
         break;
       case "body": {
         const contentType = ctx.header("content-type") ?? "";
