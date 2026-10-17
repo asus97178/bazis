@@ -185,6 +185,8 @@ export class ReportWriter {
 | `"Y" depends on "X", which module "A" exports, but "B" does not list "A" in its imports` | Модуль `A` не импортирован | Добавить `A` в `imports` модуля `B` |
 | `BAZIS_DI_DEPENDENCY_UNKNOWN` (при кодогенерации) | Тип параметра конструктора — интерфейс без токена или неизвестный тип | Сделать контракт абстрактным классом или объявить токен `createToken` с тем же именем |
 
+Все ошибки DI с полными текстами — в [справочнике](../reference/errors/di.md).
+
 ## Дальше
 
 - [Модули](modules.md)
