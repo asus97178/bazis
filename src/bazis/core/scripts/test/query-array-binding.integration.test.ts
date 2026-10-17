@@ -56,7 +56,7 @@ await app.stop();
   const result = JSON.parse(probe.last);
   expect(result.many).toEqual([200, { tag: ["a", "b"], status: [1, 2], flag: [true, false], ids: [7] }]);
   expect(result.none).toEqual([200, { tag: [], status: null, flag: [], ids: [] }]);
-  expect(result.bad).toEqual([400, { error: 'Parameter "status" must be of type number, got: "abc"' }]);
+  expect(result.bad).toEqual([400, { error: "Validation failed", details: [{ property: "status", message: 'Field "status" must be of type number, got: string', code: "type" }] }]);
   expect(result.params).toEqual([
     ["flag", false, { type: "array", items: { type: "boolean" } }],
     ["ids", false, { type: "array", items: { type: "number" } }],
