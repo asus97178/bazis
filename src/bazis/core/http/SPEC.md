@@ -943,7 +943,7 @@ The guard class is registered in DI as a regular `scoped`/`singleton` provider.
 | `rateLimit` is in-memory | not shared between processes |
 | Preflight without the global `cors` | a per-route `cors()` registers no OPTIONS handler |
 | Several `@Controller` on a class | not supported: one controller class |
-| Parameter decorators | codegen infers argument sources from the signature |
+| Parameter decorators | not in TC39: codegen infers the source from the signature or from the type markers `FromQuery`/`FromHeader`/`FromBody`/`FromRoute` |
 | Middleware on abstract/private methods | route decorators apply only to public instance methods |
 
 ---

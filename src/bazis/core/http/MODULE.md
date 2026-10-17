@@ -216,6 +216,7 @@ bindings only from the generated target by the concrete controller class.
 Methods without parameters get an empty descriptor; looking up foreign bindings by
 class name is removed, and the package compatibility map is generated empty.
 Automatic handling of route, query, DTO body, ListRequest, Request,
-ResponseBuilder and HttpContext is kept. Headers and raw bodies are available
-through HttpContext, DI through the constructor. RequestModel and the HttpContext
+ResponseBuilder and HttpContext is kept. Explicit sources come from the type markers
+`FromQuery`/`FromHeader`/`FromBody`/`FromRoute` (query and header models since
+0.101.0); raw bodies are available through HttpContext, DI through the constructor. RequestModel and the HttpContext
 fallback for routes without a registration are kept. Migration: [RELEASE](../../../../docs/RELEASE.md).

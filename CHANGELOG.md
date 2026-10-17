@@ -4,6 +4,45 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.101.0 — 2026-10-17
+
+### Added
+
+- Explicit argument sources: `FromQuery`, `FromHeader`, `FromBody`,
+  `FromRoute` from `bazis/core/http`. Standard decorators have no parameter
+  decorators, so the source is the parameter type, read by codegen through the
+  type checker (an aliased import works; an application type of the same name
+  is not a marker). The names were the aliases of the `@Bind` descriptors
+  removed in 0.95; they come back as types and field decorators, `@Bind`
+  stays removed:
+
+  ```ts
+  @Get(":id")
+  item(id: FromRoute<number>, size: FromQuery<number, "page_size"> = 10, requestId?: FromHeader<string, "x-request-id">) {}
+  ```
+
+- Query and header models, validated in the controller like a body:
+  `search(query: FromQuery<SearchQuery>, headers: FromHeader<TenantHeaders>)`.
+  Every declared field is read by its wire name (`@FromQuery("page_size")`,
+  `@FromHeader("x-tenant-id")` on the field), converted to its type and
+  checked by its `@Validator` rules before the action runs; all problems come
+  in one 400 under the names the client sent. Undeclared parameters are
+  ignored, a field that is absent keeps its initializer. A repeated single
+  parameter is refused (`duplicate`) instead of taking one of the values, an
+  array field takes at most 100 values (`tooManyValues`), header names match
+  case-insensitively. A model needs no `@RequestModel()` in the application
+  sources.
+- OpenAPI lists the fields of query and header models as parameters under
+  their wire names, with the schema, rules and JSDoc of the model; primitive
+  `FromHeader` parameters are listed too.
+- Setup errors instead of silent `undefined`: a nested object in a query or
+  header model, an array in a header model or two fields on one wire name stop
+  the start with `HttpSetupError`; `FromHeader<string[]>`, a name on a model,
+  `FromRoute` outside the route template and `FromBody<string>` stop codegen
+  with `BAZIS_HTTP_BINDING_UNRESOLVED` and the reason.
+- Message keys `duplicate` and `tooManyValues` in the English and Russian
+  catalogs.
+
 ## 0.100.8 — 2026-10-17
 
 ### Fixed

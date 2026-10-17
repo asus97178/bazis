@@ -41,6 +41,65 @@ export const GENERATED_OPENAPI_METADATA: GeneratedOpenApiMetadata = {
         "product",
         "quantity"
       ]
+    },
+    "CreateItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "title"
+      ]
+    },
+    "SearchQuery": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "pageSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Page size, 1–100."
+        },
+        "sort": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxLength": 3
+        },
+        "onlyNew": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "q"
+      ]
+    },
+    "TenantHeaders": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "trace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
     }
   },
   operations: {
@@ -82,6 +141,99 @@ export const GENERATED_OPENAPI_METADATA: GeneratedOpenApiMetadata = {
           "required": [
             "limit",
             "q"
+          ]
+        }
+      }
+    },
+    "CatalogController": {
+      "create": {
+        "response": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "requestId",
+            "title"
+          ]
+        }
+      },
+      "item": {
+        "response": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number"
+            },
+            "size": {
+              "type": "number"
+            },
+            "requestId": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          "required": [
+            "id",
+            "requestId",
+            "size"
+          ]
+        }
+      },
+      "search": {
+        "response": {
+          "type": "object",
+          "properties": {
+            "isSearchQuery": {
+              "type": "boolean"
+            },
+            "q": {
+              "type": "string"
+            },
+            "pageSize": {
+              "type": "number"
+            },
+            "sort": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "onlyNew": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "isSearchQuery",
+            "onlyNew",
+            "pageSize",
+            "q",
+            "sort",
+            "tags"
+          ]
+        }
+      },
+      "tenant": {
+        "response": {
+          "type": "object",
+          "properties": {
+            "tenantId": {
+              "type": "string"
+            },
+            "trace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tenantId"
           ]
         }
       }

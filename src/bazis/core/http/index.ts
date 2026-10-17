@@ -59,6 +59,7 @@ export {
 
 // Binding
 export type { BindingSource, ParameterBinding } from "./Binding/bindings";
+export { FromHeader, FromQuery, type FromBody, type FromRoute } from "./Binding/sources";
 export type { ValueType } from "./Binding/convert";
 export { RequestModel } from "./Binding/RequestModel";
 
