@@ -1,0 +1,119 @@
+# Обновление между версиями
+
+Что поменять в коде при переходе на новую версию. Здесь — только
+ломающие изменения, от новых к старым; исправления и новое — в
+[CHANGELOG](https://github.com/asus97178/bazis/blob/main/CHANGELOG.md).
+
+Переходите через несколько версий — пройдите по всем разделам между
+вашей версией и новой.
+
+## 0.100.7
+
+- **Свой валидатор моделей.** У порта `ModelValidator` вместо
+  `typeMismatchMessage` и `failureTitle` — один необязательный метод
+  `message(code, params)`. Касается только своего валидатора в
+  `runApp({ validator })`.
+- **Русские тексты проверки** изменились: `Поле "title": минимальная длина —
+  2` вместо `должно содержать не менее 2 символов`. Тесты, которые сравнивают
+  русский текст, нужно обновить. `MessageRegistry.setDefaults(RU_VALIDATION_MESSAGES)`
+  в `index.ts` можно заменить на `runApp({ language: "ru" })`
+  ([Русская локализация](../recipes/russian.md)).
+
+## 0.100.4
+
+- **Адаптер WebSocket — функция от сервисов:**
+
+  ```ts
+  // было
+  websocket: { adapter: new RedisWebSocketAdapter(redis) }
+  // стало
+  websocket: { adapter: (services) => new RedisWebSocketAdapter(services.resolve(IRedis)) }
+  ```
+
+  Готовый экземпляр адаптера отклоняется при запуске с подсказкой
+  ([Несколько экземпляров](../recipes/multiple-instances.md)).
+
+## 0.100.0
+
+- **Вывод CLI** — экраны вместо строк `[bazis] …`. Скрипты, которые
+  разбирали вывод, должны смотреть на код выхода.
+- **Подключения `@Infra` стартуют параллельно**, несколько сбоев сразу —
+  `StartupFailuresError`. Код, который ловил первый сбой, получит общий.
+- **Ошибки нескольких настроек** — одна `ConfigValidationError` с `issues`,
+  а не `AggregateError`.
+- **LLM-коннектор проверяет провайдера при запуске.** Если провайдер
+  недоступен при старте по природе — `checkOnStart: false`
+  ([Проверка при старте](../ai/llm-connectors.md#проверка-при-старте)).
+- **Файл, который не импортирует ни одна цель**, — предупреждение
+  кодогенерации, а не ошибка.
+
+## 0.99.6
+
+- **Клиенты инфраструктуры — по типу.** `IPostgres`, `IRedis`,
+  `IOpenSearch` вместо токенов `POSTGRES`, `REDIS`, `OPENSEARCH`:
+
+  ```ts
+  constructor(private readonly sql: IPostgres, private readonly redis: IRedis) {}
+  ```
+
+## 0.99.0
+
+Агенты стали данными.
+
+- Убраны `@Agent`, `@Task`, `@Prompt`, `agentOutput()`, поля `agents` и
+  `prompts` у `@Module`, классы входа и выхода агента, вызов агента по
+  имени (`invoke`, `invokeTask`).
+- Агент — `AgentDataDefinition`: `name`, `instructions`, `toolNames`. Его
+  можно хранить в базе ([Агенты в базе](../ai/agents.md#агенты-в-базе)).
+  Инструменты остаются кодом.
+- `AgentRuntime` создаёт DI: сервис получает его по типу. Настройки
+  рантайма — токен `AGENT_RUNTIME_OPTIONS`.
+- `instructions` — системное сообщение как есть.
+- Код ошибки кодогенерации — `BAZIS_TOOL_SCHEMA_MODEL_UNIMPORTABLE`
+  (был `BAZIS_AGENT_SCHEMA_MODEL_UNIMPORTABLE`).
+
+## 0.98.34
+
+- **Кэш-методы `scoped`-сервиса** требуют явный `key`, а `transient`-сервис
+  кэш-декораторы не принимает: иначе — `CacheDeclarationError` при
+  запуске.
+- Убраны `cachedScoped` и `cachedSingleton`: регистрируйте обычными
+  `scoped` и `singleton`.
+
+## 0.98.33
+
+- Убран `backgroundModule({ services })`: фоновые службы объявляет их
+  модуль — `@Module({ background: [Worker] })`.
+
+## 0.98.32
+
+- Проверки `@Authorize` получают `AuthorizeContext` (`header`,
+  `services`, `state`), а не `HttpContext`. Обычные проверки работают
+  как раньше. Вспомогательные функции, которым проверка передаёт свой
+  контекст, типизируйте как `AuthorizeContext`.
+- Убрана опция `controllers` у `httpModule` и `grpcModule`: контроллеры
+  объявляет модуль (`controllers`, `grpcControllers`).
+
+## 0.98.31
+
+- Шлюз WebSocket объявляет его модуль, как контроллер:
+  `@Module({ gateways: [ChatGateway] })`. Опция `gateways` у
+  `websocketModule` убрана; `runApp({ websocket })` — только общие
+  настройки.
+
+## 0.97.0
+
+- **`@Authorize` на методе добавляет проверки** к проверкам контроллера, а
+  не заменяет их. Метод с другими правами, чем у контроллера, вынесите в
+  отдельный контроллер. `@AllowAnonymous()` по-прежнему снимает все
+  проверки.
+
+## Раньше
+
+Изменения до 0.97 — в
+[CHANGELOG](https://github.com/asus97178/bazis/blob/main/CHANGELOG.md).
+
+## Дальше
+
+- [Версии и выпуски](versions.md)
+- [Справочник ошибок](errors/README.md)
