@@ -45,7 +45,7 @@
 | `[HttpGet("{id:int}")]` | `@Get(":id(int)")` | [Контроллеры](../overview/controllers.md#маршруты) |
 | `[FromRoute]`, `[FromQuery]`, `[FromBody]` | Имя и тип параметра метода | [Контроллеры](../overview/controllers.md#аргументы-методов) |
 | `HttpContext`, `[FromHeader]` | `ctx: HttpContext`, `ctx.header(…)` | [Контроллеры](../overview/controllers.md#httpcontext) |
-| DataAnnotations, автоматический `400` | `@RequestModel()` + `@Validator`, тоже `400` | [Проверка данных](../overview/validation.md) |
+| DataAnnotations, автоматический `400` | `@Validator` на полях класса, тоже `400`; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
 | `Ok()`, `CreatedAtAction()`, `NoContent()` | `Ok`, `Created`, `NoContent` | [Ответы](../overview/responses.md#помощники) |
 | `IOptions<T>` + `ValidateOnStart` | `defineConfig` + `ConfigView<T>`, проверка всегда при запуске | [Конфигурация](../fundamentals/configuration.md) |
 | `appsettings.{Environment}.json` | Разделы `default`, `development`, `test`, `production` в `defineConfig` | [Конфигурация](../fundamentals/configuration.md#окружения) |
@@ -262,7 +262,7 @@ export class BooksController {
 | --- | --- |
 | `id` | Есть в маршруте `:id(int)` — из пути, уже числом |
 | `q`, `limit` | Простые типы, которых нет в маршруте, — из строки запроса; `limit = 10` — необязательный |
-| `body: AddBookRequest` | Класс модели запроса — из JSON-тела, с проверкой |
+| `body: AddBookRequest` | Класс из исходников приложения — из JSON-тела, с проверкой |
 | `ctx: HttpContext` | Контекст запроса |
 
 Ограничение `:id(int)` работает как `{id:int}`: `/books/abc` не совпадает
@@ -290,7 +290,9 @@ export class AddBookRequest {
 ```
 
 Как `[ApiController]`, bazis отвечает `400` до вызова метода. Поля,
-которых нет в классе, отбрасываются.
+которых нет в классе, отбрасываются. `@RequestModel()` не обязателен —
+как и `[FromBody]`, источник понятен по типу; нужен он лишь классу из
+другого пакета.
 
 ### Фильтр авторизации
 
