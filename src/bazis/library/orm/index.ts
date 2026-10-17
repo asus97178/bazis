@@ -45,7 +45,7 @@ export {
   type ScalarLogicalFieldType,
 } from "./Metadata/DynamicModelBuilder";
 export { pluralize } from "./Metadata/conventions";
-export { ValueConverters, type ValueConverter } from "./Metadata/ValueConverter";
+export { DecryptionError, ValueConverters, type ValueConverter } from "./Metadata/ValueConverter";
 export type {
   ColumnOptionsType,
   ColumnType,

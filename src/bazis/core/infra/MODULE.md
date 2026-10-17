@@ -225,7 +225,7 @@ Stream checks: [source, binary and browser](https://github.com/asus97178/osnova/
 
 [codexAppServerConnect(config)](connectors/codex.ts) is an extra connector of the
 existing Infra, without a separate module or a parallel lifecycle. It returns an
-InfraConnector<CodexClient>, the token CODEX_APP_SERVER, phase=0. The client is created
+InfraConnector<CodexClient>, injected by type as `ICodex` (since 0.103.0; the CODEX_APP_SERVER token is removed), phase=0. The client is created
 without effects from the ConfigRegistry of its kernel. connect starts the stdio process,
 initialize/initialized and the effective policy check; dispose closes the process and
 ends all waits. health checks that the process is available, separately from the

@@ -11,6 +11,7 @@ export { IRepository, repositoryFor } from "./repository";
 export { registerRepositories } from "./registerRepositories";
 export { paginate, type PageResult } from "./listQuery";
 export { databaseErrorStatus } from "./databaseErrorStatus";
+export { encryptedWith } from "./encryptedWith";
 
 import { registerModuleMetadataExpander, type BazisModuleRef } from "../di";
 import { registerModuleDescriber } from "../kernel/report/moduleTree";
