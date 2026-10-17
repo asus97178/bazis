@@ -2,7 +2,7 @@ import { OrmError } from "../errors";
 import { renderPostgresOnConflictDoNothing, renderPostgresSkipLocked } from "../Providers/PostgresDialect";
 import type { EntityModel, PropertyModel } from "../Metadata/types";
 import type { SqlDialect, SqlParam } from "../Providers/types";
-import { encodeProperty } from "../Providers/propertyConversion";
+import { assertComparable, encodeProperty } from "../Providers/propertyConversion";
 import type { Condition } from "./conditions";
 import type { QueryPlan } from "./QueryPlan";
 
@@ -121,7 +121,9 @@ export class SqlTranslator {
       return "";
     }
     const parts = plan.orders.map((order) => {
-      const column = this.requireProperty(order.property).columnName;
+      const property = this.requireProperty(order.property);
+      assertComparable(property, this.model.name);
+      const column = property.columnName;
       return `${this.dialect.quoteId(column)}${order.descending ? " DESC" : " ASC"}`;
     });
     return ` ORDER BY ${parts.join(", ")}`;
@@ -144,6 +146,7 @@ export class SqlTranslator {
     switch (condition.kind) {
       case "compare": {
         const property = this.requireProperty(condition.property);
+        assertComparable(property, this.model.name);
         const placeholder = this.dialect.parameter(params.length);
         params.push(encode(property, condition.value));
         // startsWith/endsWith/contains escape wildcards with `\`; this works
@@ -153,6 +156,7 @@ export class SqlTranslator {
       }
       case "in": {
         const property = this.requireProperty(condition.property);
+        assertComparable(property, this.model.name);
         if (condition.values.length === 0) {
           return "0 = 1"; // an empty IN is always false
         }
@@ -167,7 +171,7 @@ export class SqlTranslator {
         if (condition.properties.length === 0 || condition.values.length === 0) return "0 = 1";
         return `(${condition.values.map((tuple) => {
           if (tuple.length !== condition.properties.length) throw new OrmError("Tuple predicate component count mismatch.");
-          return `(${tuple.map((value, index) => { const property = this.requireProperty(condition.properties[index]!); const placeholder = this.dialect.parameter(params.length); params.push(encode(property, value)); return `${this.dialect.quoteId(property.columnName)} = ${placeholder}`; }).join(" AND ")})`;
+          return `(${tuple.map((value, index) => { const property = this.requireProperty(condition.properties[index]!); assertComparable(property, this.model.name); const placeholder = this.dialect.parameter(params.length); params.push(encode(property, value)); return `${this.dialect.quoteId(property.columnName)} = ${placeholder}`; }).join(" AND ")})`;
         }).join(" OR ")})`;
       }
       case "null": {

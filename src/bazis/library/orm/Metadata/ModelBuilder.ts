@@ -184,6 +184,15 @@ export class ModelBuilder {
       if (indexNames.has(index.name)) throw new ModelBuildError(`Entity "${ctor.name}": duplicate index name "${index.name}".`);
       indexNames.add(index.name);
     }
+    // Encryption with a random nonce stores equal values differently: such a
+    // column cannot identify a row or be unique.
+    for (const property of properties) {
+      if (property.converter?.comparable !== false) continue;
+      if (property.isKey) throw new ModelBuildError(`Entity "${ctor.name}": key "${property.propertyName}" cannot be encrypted: equal values are stored differently.`);
+      if (indexes.some((index) => index.unique && index.columns.includes(property.columnName))) {
+        throw new ModelBuildError(`Entity "${ctor.name}": a unique index on encrypted "${property.propertyName}" cannot work: equal values are stored differently. Put it on a keyed hash (HMAC) column.`);
+      }
+    }
     return model;
   }
 

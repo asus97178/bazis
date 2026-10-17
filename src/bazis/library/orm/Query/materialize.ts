@@ -11,7 +11,7 @@ export function materialize<T extends object>(model: EntityModel, row: Row, dial
   const entity = new model.ctor() as Record<string, unknown>;
   for (const property of model.properties) {
     if (property.columnName in row) {
-      entity[property.propertyName] = decodeProperty(property, row[property.columnName], dialect);
+      entity[property.propertyName] = decodeProperty(property, row[property.columnName], dialect, model.name);
     }
   }
   return entity as T;
@@ -32,7 +32,7 @@ export function materializeProjection(
     }
     const column = alias in row ? alias : property.columnName;
     if (column in row) {
-      result[alias] = decodeProperty(property, row[column], dialect);
+      result[alias] = decodeProperty(property, row[column], dialect, model.name);
     }
   }
   return result;

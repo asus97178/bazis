@@ -1,8 +1,9 @@
 import { DI, HOSTED_SERVICE, type InjectionToken, type ModuleOwnedContributionSnapshot, type ProviderDefinition, type ProviderDependencyList, type ServiceResolver } from "../di";
 import { getGeneratedClassDeps } from "../di/module/autoDeps";
 import { resolveDependencyList } from "../di/internal/resolveDependencyList";
-import { HEALTH_CHECK, StartupReport } from "../kernel";
+import { ConfigRegistry, HEALTH_CHECK, StartupReport } from "../kernel";
 import { DbContextOptions, OrmError, type DatabaseProvider, type DbContext } from "../../library/orm";
+import { bindEncryptedColumns } from "./encryptedWith";
 import { OrmLifecycle } from "./OrmLifecycle";
 import { ownedStoreLifecycleFor, ownedStoreLifecycleHealthFor } from "./OrmOwnedStoreLifecycle";
 import { effectiveOrmModuleConfig, ownedStoreRegistrations } from "./ownedStoreContributions";
@@ -22,13 +23,22 @@ type OrmBuildConfig<TContext extends DbContext> = OrmModuleConfig<TContext> & {
 function createContextOptions<TContext extends DbContext>(
   config: OrmBuildConfig<TContext>,
   provider: DatabaseProvider,
+  serviceProvider: unknown,
 ): DbContextOptions {
-  return new DbContextOptions({
+  return bindKeys(new DbContextOptions({
     provider,
     entities: config.entities ?? [],
     validateOnSave: config.validateOnSave,
     executionStrategy: config.executionStrategy,
-  });
+  }), serviceProvider);
+}
+
+/** Binds the keys of `encryptedWith` columns from the application configuration. */
+function bindKeys(options: DbContextOptions, serviceProvider: unknown): DbContextOptions {
+  const services = serviceProvider as { has?(token: unknown): boolean; resolve?(token: unknown): unknown };
+  const registry = services.has?.(ConfigRegistry) ? services.resolve?.(ConfigRegistry) as ConfigRegistry : undefined;
+  bindEncryptedColumns(options, registry);
+  return options;
 }
 
 const contextDependencies = new WeakMap<object, ProviderDependencyList>();
@@ -103,7 +113,7 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
       DI.scoped(
         DI.factoryProviderWithResolver(config.context, [token, SERVICE_PROVIDER] as const, (resolver, provider: DatabaseProvider, serviceProvider) => {
           const current = effectiveConfigFor(serviceProvider, registrationIdentity, config);
-          return constructContext(current.context, createContextOptions(current, provider), resolver);
+          return constructContext(current.context, createContextOptions(current, provider, serviceProvider), resolver);
         }),
       ),
       DI.singleton(
@@ -119,7 +129,7 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
             });
             return ownedStoreLifecycleFor(container, provider, records);
           }
-          return createOrmLifecycle(current, createContextOptions(current, provider), false, serviceProvider);
+          return createOrmLifecycle(current, createContextOptions(current, provider, serviceProvider), false, serviceProvider);
         }),
       ),
     ];
@@ -137,12 +147,12 @@ export function buildOrmModuleProviders<TContext extends DbContext>(
     DI.scoped(DI.factoryProviderWithResolver(config.context, [SERVICE_PROVIDER], (resolver, serviceProvider) => {
       const current = effectiveConfigFor(serviceProvider, registrationIdentity, config);
       const context = current === config ? config.context : current.context;
-      return constructContext(context, current === config && optionsAtModuleCall !== undefined ? optionsAtModuleCall : createContextOptions(current, provider), resolver);
+      return constructContext(context, current === config && optionsAtModuleCall !== undefined ? bindKeys(optionsAtModuleCall, serviceProvider) : createContextOptions(current, provider, serviceProvider), resolver);
     })),
     // Standalone mode: the context owns its provider and closes it.
     DI.singleton(DI.factoryProvider(HOSTED_SERVICE, [SERVICE_PROVIDER], (serviceProvider) => {
       const current = effectiveConfigFor(serviceProvider, registrationIdentity, config);
-      return createOrmLifecycle(current, current === config && optionsAtModuleCall !== undefined ? optionsAtModuleCall : createContextOptions(current, provider), true, serviceProvider);
+      return createOrmLifecycle(current, current === config && optionsAtModuleCall !== undefined ? bindKeys(optionsAtModuleCall, serviceProvider) : createContextOptions(current, provider, serviceProvider), true, serviceProvider);
     })),
   ];
   return providers;
