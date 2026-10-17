@@ -43,8 +43,6 @@ export type HttpMessageKey =
   | "bodyTooDeep"
   | "bodyTooComplex"
   | "bodyCyclic"
-  | "missingParameter"
-  | "invalidParameter"
   | "invalidListQuery";
 
 export const EN_HTTP_MESSAGES: Readonly<Record<HttpMessageKey, string>> = Object.freeze({
@@ -75,8 +73,6 @@ export const EN_HTTP_MESSAGES: Readonly<Record<HttpMessageKey, string>> = Object
   bodyTooDeep: "Request body is too deeply nested",
   bodyTooComplex: "Request body is too complex",
   bodyCyclic: "Request body must be acyclic JSON",
-  missingParameter: 'Missing required {kind} parameter "{name}"',
-  invalidParameter: 'Parameter "{name}" must be of type {type}, got: "{value}"',
   invalidListQuery: "Invalid list query",
 });
 
@@ -108,8 +104,6 @@ export const RU_HTTP_MESSAGES: Readonly<Record<HttpMessageKey, string>> = Object
   bodyTooDeep: "Слишком глубокая вложенность в теле запроса",
   bodyTooComplex: "Тело запроса слишком сложное",
   bodyCyclic: "Тело запроса не должно содержать циклов",
-  missingParameter: 'Не передан обязательный параметр "{name}"',
-  invalidParameter: 'Параметр "{name}": ожидается {type}, получено: "{value}"',
   invalidListQuery: "Некорректные параметры списка",
 });
 

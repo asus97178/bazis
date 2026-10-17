@@ -100,14 +100,50 @@ describe("FromHeader", () => {
     expect((await get("/catalog/items/7")).body).toEqual({ id: 7, size: 10, requestId: null });
   });
 
-  test("FromBody with a required header: a missing header is a 400 before the body is used", async () => {
+  test("FromBody with a required header: a missing header is an item of the same 400", async () => {
     const post = (headers: Record<string, string>, body: unknown) =>
       app.fetch("/catalog/items", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
     const missing = await post({}, { title: "Dune" });
     expect(missing.status).toBe(400);
-    expect(await missing.json()).toEqual({ error: 'Missing required header parameter "x-request-id"' });
+    expect(await missing.json()).toEqual({ error: "Validation failed", details: [{ property: "x-request-id", message: 'Field "x-request-id" is required', code: "required" }] });
     expect(await (await post({ "x-request-id": "r2" }, { title: "Dune" })).json()).toEqual({ title: "Dune", requestId: "r2" });
     expect(((await (await post({ "x-request-id": "r2" }, { title: "" })).json()) as { details: { code: string }[] }).details[0]!.code).toBe("minLength");
+  });
+});
+
+describe("one 400 for every binding problem (0.102.0)", () => {
+  // 0.101.0 stopped at the first failing argument: a broken query model hid a
+  // missing header, an invalid body hid a missing required header.
+  test("a query model and a header model fail together", async () => {
+    expect((await get("/catalog/scoped?q=d&page_size=1&page_size=2")).body).toEqual({
+      error: "Validation failed",
+      details: [
+        { property: "page_size", message: 'Parameter "page_size" must be given once', code: "duplicate" },
+        { property: "q", message: 'Field "q" must be at least 2 characters long', code: "minLength" },
+        { property: "x-tenant-id", message: 'Field "x-tenant-id" is required', code: "required" },
+      ],
+    });
+    expect(CatalogController.calls).toBe(0);
+  });
+
+  test("a body model, a header and a route parameter fail together", async () => {
+    const response = await app.fetch("/catalog/items", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "" }) });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Validation failed",
+      details: [
+        { property: "title", message: 'Field "title" must be at least 1 characters long', code: "minLength" },
+        { property: "x-request-id", message: 'Field "x-request-id" is required', code: "required" },
+      ],
+    });
+    expect((await get("/catalog/items/abc?page_size=x")).body).toEqual({
+      error: "Validation failed",
+      details: [
+        { property: "id", message: 'Field "id" must be of type number, got: string', code: "type" },
+        { property: "page_size", message: 'Field "page_size" must be of type number, got: string', code: "type" },
+      ],
+    });
+    expect(CatalogController.calls).toBe(0);
   });
 });
 

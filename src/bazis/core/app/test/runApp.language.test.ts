@@ -35,8 +35,8 @@ describe("language: ru", () => {
     await withApp({ language: "ru" }, async (app) => {
       expect(await body(app, "/nope")).toEqual({ status: 404, json: { error: "Не найдено" } });
       expect(await body(app, "/books", { method: "DELETE" })).toEqual({ status: 405, json: { error: "Метод не поддерживается" } });
-      expect(await body(app, "/books")).toEqual({ status: 400, json: { error: 'Не передан обязательный параметр "q"' } });
-      expect(await body(app, "/books?q=a&limit=x")).toEqual({ status: 400, json: { error: 'Параметр "limit": ожидается число, получено: "x"' } });
+      expect(await body(app, "/books")).toEqual({ status: 400, json: { error: "Проверка данных не пройдена", details: [{ property: "q", message: 'Поле "q" обязательно для заполнения', code: "required" }] } });
+      expect(await body(app, "/books?q=a&limit=x")).toEqual({ status: 400, json: { error: "Проверка данных не пройдена", details: [{ property: "limit", message: 'Поле "limit": ожидается число, получено: строка', code: "type" }] } });
       expect(await body(app, "/books/3")).toEqual({ status: 404, json: { error: "Не найдено" } });
       expect(await body(app, "/books/2")).toEqual({ status: 404, json: { error: "Книга 2 не найдена" } });
       expect(await body(app, "/books/admin")).toEqual({ status: 403, json: { error: "Доступ запрещён" } });
@@ -88,8 +88,8 @@ test("Validator.setDefaultMessages still wins over the language catalog", async 
 test("without language the texts are English, as before", async () => {
   await withApp({}, async (app) => {
     expect(await body(app, "/nope")).toEqual({ status: 404, json: { error: "Not Found" } });
-    expect(await body(app, "/books")).toEqual({ status: 400, json: { error: 'Missing required query parameter "q"' } });
-    expect(await body(app, "/books?q=a&limit=x")).toEqual({ status: 400, json: { error: 'Parameter "limit" must be of type number, got: "x"' } });
+    expect(await body(app, "/books")).toEqual({ status: 400, json: { error: "Validation failed", details: [{ property: "q", message: 'Field "q" is required', code: "required" }] } });
+    expect(await body(app, "/books?q=a&limit=x")).toEqual({ status: 400, json: { error: "Validation failed", details: [{ property: "limit", message: 'Field "limit" must be of type number, got: string', code: "type" }] } });
     expect(await body(app, "/books/admin")).toEqual({ status: 403, json: { error: "Forbidden" } });
     expect(await body(app, "/books", post('{"title":"a","year":"x"}'))).toEqual({
       status: 400,

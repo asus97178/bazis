@@ -4,6 +4,39 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.102.0 — 2026-10-17
+
+### Changed (breaking)
+
+- Every binding problem of a request comes in one 400, like ASP.NET model
+  state. 0.101.0 stopped at the first failing argument: a broken query model
+  hid a missing header, an invalid body hid a missing required header. Now
+  every argument is bound, and missing or invalid route, query and header
+  values join the validation errors of body, query and header models:
+
+  ```json
+  {"error":"Validation failed","details":[
+    {"property":"title","message":"Field \"title\" must be at least 1 characters long","code":"minLength"},
+    {"property":"x-request-id","message":"Field \"x-request-id\" is required","code":"required"}]}
+  ```
+
+  A missing or invalid single parameter is no longer its own response:
+
+  ```text
+  GET /books            before: {"error":"Missing required query parameter \"q\""}
+                        now:    {"error":"Validation failed","details":[{"property":"q","message":"Field \"q\" is required","code":"required"}]}
+  GET /books?limit=x    before: {"error":"Parameter \"limit\" must be of type number, got: \"x\""}
+                        now:    details [{"property":"limit","message":"Field \"limit\" must be of type number, got: string","code":"type"}]
+  ```
+
+  Clients that read `error` for these cases read `details` (`property`,
+  `code`) instead. Errors of the request itself — malformed JSON, a wrong media
+  type, a body that is too large, an invalid list query — still stop at once
+  with their own text.
+- The message keys `missingParameter` and `invalidParameter` are removed from
+  `EN_HTTP_MESSAGES`/`RU_HTTP_MESSAGES`; the texts are the validation keys
+  `required` and `type` (`runApp({ messages: { required: "…" } })`).
+
 ## 0.101.0 — 2026-10-17
 
 ### Added
