@@ -4,7 +4,7 @@ import { HOSTED_SERVICE, HOSTED_SERVICE_HEALTH, type HostedService } from "../ex
 import { SERVICE_PROVIDER, SERVICE_PROVIDER_BY_TYPE } from "../extensions/service-provider-token";
 import { isClassProvider, ProviderDefinition, type Provider } from "../provider";
 import { getClassDeps } from "../internal/classDeps";
-import { DiError, ModuleEncapsulationError } from "../errors";
+import { DiError, InvalidProviderError, ModuleEncapsulationError } from "../errors";
 import { OpenGenericRegistration } from "../internal/OpenGenericRegistration";
 import { tokenToDebugName, type Class } from "../token";
 import type { BuildServiceProviderOptions } from "../types";
@@ -133,6 +133,7 @@ export function createContainer(rootModule: BazisModuleRef, options?: CreateCont
     const providers = moduleRef.providers;
     if (providers) {
       for (let index = 0; index < providers.length; index += 1) {
+        assertProviderDefinition(providers[index], record.name, index);
         collection.add(providers[index] as ProviderDefinition);
       }
     }
@@ -310,4 +311,20 @@ function normalizeLateGeneratedClassDeps(definition: ProviderDefinition): Provid
   }
   const normalizedProvider = { ...provider, deps: generatedDeps } as Provider<unknown>;
   return new ProviderDefinition(normalizedProvider, definition.lifetime, definition.key);
+}
+
+/**
+ * A module lists registrations made by singleton/scoped/transient/…; a raw
+ * `{ provide: X }` object used to crash later with a bare TypeError.
+ */
+function assertProviderDefinition(value: unknown, moduleName: string, index: number): void {
+  const provider = (value as { provider?: unknown } | null | undefined)?.provider;
+  if (typeof provider === "object" && provider !== null && "provide" in provider) return;
+  const provide = (value as { provide?: unknown } | null | undefined)?.provide;
+  const name = typeof provide === "function" ? provide.name : typeof provide === "string" ? provide : String(provide ?? value);
+  throw new InvalidProviderError(
+    name,
+    `Module "${moduleName}": providers[${index}] is not a provider registration${provide === undefined ? "" : ` ({ provide: ${name} })`}. `
+      + `Register it with singleton(${name}), scoped(${name}), transient(${name}), singletonValue(TOKEN, value) or singletonFactory(TOKEN, [deps], factory).`,
+  );
 }

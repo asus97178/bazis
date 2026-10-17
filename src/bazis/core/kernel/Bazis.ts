@@ -69,9 +69,17 @@ export class Bazis {
     } catch (error) {
       stopWaiting?.();
       if (error instanceof ShutdownTimeoutError) {
+        // A failed start whose cleanup is stuck: report why the start failed
+        // first, otherwise only the cleanup timeout would be visible.
+        const startFailure = error.cause;
+        if (startFailure !== undefined) {
+          if (screen !== undefined) screen.failed(startFailure, kernel);
+          else console.error(`[bazis] application failed: ${formatStartupFailure(startFailure)}`);
+        }
         // Graceful shutdown is stuck: hanging handles would keep the process
         // alive forever, so this is the one place a hard exit is correct.
-        console.error(`[bazis] ${redactSensitiveText(error.message)} Forcing exit.`);
+        const text = startFailure === undefined ? error.message : `Cleanup after the failed start did not finish within ${error.timeoutMs}ms.`;
+        console.error(`[bazis] ${redactSensitiveText(text)} Forcing exit.`);
         process.exit(1);
       }
       // Configuration problems surfacing at start (e.g. options fail-fast)

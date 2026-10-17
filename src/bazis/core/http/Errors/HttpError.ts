@@ -1,3 +1,4 @@
+import { KernelError } from "../../kernel";
 import type { ModelValidationIssue } from "../Binding/modelValidator";
 import { englishHttpMessage, type HttpMessageKey, type LocalizedMessage, type MessageParams } from "./messages";
 
@@ -111,11 +112,7 @@ export function frameworkBadRequest(key: HttpMessageKey, params?: MessageParams,
 
 /**
  * Misconfigured routes/controllers (duplicate route, bad template, missing
- * @Controller). Thrown at startup, never at request time — fail fast.
+ * @Controller). Thrown at startup, never at request time — fail fast. A
+ * KernelError: the start reports it as a configuration error of the code.
  */
-export class HttpSetupError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "HttpSetupError";
-  }
-}
+export class HttpSetupError extends KernelError {}

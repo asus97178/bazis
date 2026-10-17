@@ -64,8 +64,12 @@ export class GraphValidator {
     issues: Set<string>,
   ): void {
     if (registrationPath.has(registration.id)) {
-      const cyclePath = [...tokenPath, registration.token].map((token) => tokenToDebugName(token)).join(" -> ");
-      issues.add(`Cycle detected: ${cyclePath}`);
+      // One cycle is reached from each of its members: report it once, as the cycle itself.
+      const start = tokenPath.indexOf(registration.token);
+      const members = (start >= 0 ? tokenPath.slice(start) : tokenPath).map((token) => tokenToDebugName(token));
+      const first = members.indexOf([...members].sort()[0] as string);
+      const canonical = [...members.slice(first), ...members.slice(0, first)];
+      issues.add(`Cycle detected: ${[...canonical, canonical[0]].join(" -> ")}`);
       return;
     }
 

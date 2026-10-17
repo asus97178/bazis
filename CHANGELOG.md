@@ -4,6 +4,38 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.100.8 — 2026-10-17
+
+### Fixed
+
+- A start that fails while an `onInit` hook hangs says why. With
+  `startupTimeoutMs`, or a SIGTERM during the start, the rollback waits for
+  the hook, and 0.100.7 then printed only `Graceful shutdown did not finish
+  within 10000ms. Forcing exit.` Now the reason comes first and names the
+  hook: `[bazis] application failed: StartupTimeoutError: Application startup
+  did not finish within 1000ms; still starting: hook WarmUp.onInit.`, then
+  `Cleanup after the failed start did not finish within 10000ms. Forcing
+  exit.` The timeout no longer prints an extra `{ timeoutMs, pending }`
+  line.
+- `HttpClient` refuses an option it does not know instead of dropping it:
+  `Unknown HttpClient option "baseURL" in the client defaults; did you mean
+  "baseUrl"?` (also `timeout` → `timeoutMs`, `maxContentLength` →
+  `maxResponseBytes`). Before, the axios spelling `baseURL` was ignored and
+  every call failed with `ERR_NETWORK` "fetch() URL is invalid".
+- A raw `{ provide: Clock }` object in module `providers` is an
+  `InvalidProviderError` that names the module, the position and how to
+  register the class, instead of `TypeError: undefined is not an object`.
+- A dependency cycle is reported once (`Cycle detected: InvoiceService ->
+  OrderService -> InvoiceService`), not once per member.
+- `ScopedServiceFromRootError` says how to get a scope:
+  `provider.createScope()`, resolve, dispose.
+- `conflicting environment aliases` names the variables (`BAZIS_MAIL__HOST
+  and BAZIS_SMTP_HOST are set to different values; set only one`), never their
+  values.
+- `HttpSetupError` (duplicate route, unknown constraint, a class without
+  `@Controller`) is a `KernelError` and prints as `[bazis] configuration
+  error:`, not `application failed`.
+
 ## 0.100.7 — 2026-10-17
 
 ### Added
