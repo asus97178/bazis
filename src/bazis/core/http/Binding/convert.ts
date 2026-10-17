@@ -1,4 +1,3 @@
-import { frameworkBadRequest } from "../Errors/HttpError";
 
 /** Primitive conversion targets for query/header/route values. */
 export type ValueType = "string" | "int" | "number" | "bool";
@@ -36,13 +35,4 @@ export function tryConvert(raw: string, type: ValueType): string | number | bool
       }
       return INVALID;
   }
-}
-
-/** Converts or throws 400 with the parameter name in the message. */
-export function convertOr400(raw: string, type: ValueType, parameterName: string): string | number | boolean {
-  const value = tryConvert(raw, type);
-  if (value === INVALID) {
-    throw frameworkBadRequest("invalidParameter", { name: parameterName, type, value: raw });
-  }
-  return value;
 }

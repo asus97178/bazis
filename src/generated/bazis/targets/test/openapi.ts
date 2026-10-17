@@ -185,6 +185,23 @@ export const GENERATED_OPENAPI_METADATA: GeneratedOpenApiMetadata = {
           ]
         }
       },
+      "scoped": {
+        "response": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string"
+            },
+            "tenantId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "q",
+            "tenantId"
+          ]
+        }
+      },
       "search": {
         "response": {
           "type": "object",

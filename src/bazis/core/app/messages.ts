@@ -7,7 +7,7 @@ export type AppLanguage = "en" | "ru";
 
 /**
  * Own texts for framework messages, by key: HTTP texts (`notFound`,
- * `missingParameter`, …), validation codes (`required`, `minLength`, …),
+ * `malformedJson`, …), validation codes (`required`, `minLength`, …),
  * `validationFailed`, `unknownField` and type names (`typeName.number`).
  * Placeholders: `{property}`, `{min}`, `{name}`, … as in the built-in texts.
  */

@@ -99,6 +99,12 @@ export class TenantHeaders {
 - Misuse (`FromHeader<string[]>`, a name on a model, `FromRoute` outside the
   template, `FromBody<string>`) is `BAZIS_HTTP_BINDING_UNRESOLVED`.
 
+Every argument is bound even when another one fails: missing or invalid
+route, query and header values and the validation errors of all models come
+in one `400 Validation failed` with `details` (`code` `required`, `type`,
+`duplicate`, rule codes), like ASP.NET model state. Errors of the request
+itself (malformed JSON, media type, size) stop at once with their own text.
+
 Checking allowed values belongs to the Validator or the service.
 
 A `ctx: HttpContext` parameter stays a regular supported input. For older manual

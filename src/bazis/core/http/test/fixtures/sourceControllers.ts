@@ -63,6 +63,12 @@ export class CatalogController {
     return { ...headers };
   }
 
+  @Get("scoped")
+  scoped(query: FromQuery<SearchQuery>, headers: FromHeader<TenantHeaders>) {
+    CatalogController.calls += 1;
+    return { q: query.q, tenantId: headers.tenantId };
+  }
+
   @Get("items/:id")
   item(id: FromRoute<number>, size: FromQuery<number, "page_size"> = 10, requestId?: FromHeader<string, "x-request-id">) {
     CatalogController.calls += 1;
