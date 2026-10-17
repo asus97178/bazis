@@ -57,7 +57,7 @@ Bun в один файл. На сервер достаточно скопиро�
 | `@Module({ providers, controllers, imports, exports })` | `@Module({ providers, controllers, imports, exports })` |
 | `@Injectable()` + провайдер | `scoped(Service)` / `singleton(Service)` в `providers`, без декоратора |
 | `@Inject(TOKEN)` | Тип параметра конструктора; контракт — абстрактный класс, как и в NestJS, или интерфейс с токеном `createToken<T>()` |
-| DTO + `class-validator` | `@RequestModel()` + `@Validator({...})` |
+| DTO + `class-validator` | Класс с `@Validator({...})`; `@RequestModel()` — по желанию |
 | Guards | `@Authorize(...)` |
 | Interceptors / Pipes | Маршрутный middleware и фильтры действий |
 | TypeORM / Prisma | Встроенный ORM: `DbContext`, `DbSet` |

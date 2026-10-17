@@ -13,7 +13,7 @@
 В терминале вместо строки печатается
 [экран запуска](../../cli/commands.md#экран-запуска).
 
-Тексты получены на bazis 0.100.7, кроме отмеченных.
+Тексты получены на bazis 0.100.8, кроме отмеченных.
 
 ## Настройки
 
@@ -36,7 +36,7 @@
 | `validator` | `must be a TCP port (1-65535)` — текст вашей проверки из `validate` | Поправить значение |
 | `missing-secret` | `required non-empty secret is not set (BAZIS_MAIL__APIKEY)` | Задать секрет переменной или [файлом секрета](../../security/secrets.md#файлы-секретов) |
 | `development-secret` | `production would use the development default secret from the code; set BAZIS_MAIL__WEBHOOKTOKEN, or declare webhookToken in the production section` | Задать секрет для production; значение из кода в production не годится |
-| `conflict` | `conflicting environment aliases` | Две переменные одного ключа (основная и из `env`) заданы по-разному — оставить одну |
+| `conflict` | `conflicting environment aliases: BAZIS_MAIL__HOST and BAZIS_SMTP_HOST are set to different values; set only one` | Основная переменная и имя из `env` заданы по-разному — оставить одну. Значения в тексте не показываются |
 | `string` | `expected a string` | Текст из исходников: значение из своего источника настроек — не строка |
 
 - Значения секретов в тексте не показываются: вместо них — `the value` или
@@ -108,18 +108,21 @@ InfraError: Infra connector "llm": https://api.openai.com/v1 is not available �
 ### `StartupTimeoutError`
 
 ```text
-Application startup did not finish within 30000ms; still starting: infra:search.
+[bazis] application failed: StartupTimeoutError: Application startup did not finish within 1000ms; still starting: hook SlowWarmUp.onInit.
+[bazis] Cleanup after the failed start did not finish within 10000ms. Forcing exit.
 ```
 
-Текст из исходников. Запуск не уложился в `kernel.startupTimeoutMs`
-(по умолчанию 30 секунд); в конце — что ещё запускалось.
+Запуск не уложился в `kernel.startupTimeoutMs` (по умолчанию 30 секунд).
+В конце — что ещё запускалось: служба (`infra:search`) или хук
+(`hook SlowWarmUp.onInit`).
 
-> [!WARNING]
-> В 0.100.7 эта ошибка не видна, если зависла не служба, а хук `onInit`.
-> Приложение ждёт его ещё `shutdownTimeoutMs` и печатает только
-> `[bazis] Graceful shutdown did not finish within 10000ms. Forcing exit.`
-> Если запуск оборвался этой строкой и ничего не сказал о причине —
-> ищите `onInit`, который не завершается.
+Вторая строка — если зависшая работа не закончилась и за срок остановки
+(`shutdownTimeoutMs`): приложение ждёт её, чтобы не закрыть подключения
+из-под неё, и выходит принудительно.
+
+> [!NOTE]
+> До 0.100.8 при зависшем `onInit` печаталась только вторая строка, и
+> причину было не узнать.
 
 ### `ShutdownTimeoutError`
 
@@ -138,10 +141,10 @@ Application startup did not finish within 30000ms; still starting: infra:search.
 ### `StartupAbortedError`
 
 ```text
-Application startup was aborted by a shutdown request.
+[bazis] application failed: StartupAbortedError: Application startup was aborted by a shutdown request.
 ```
 
-Текст из исходников. Пришёл `SIGTERM` или `SIGINT`, пока приложение
+Пришёл `SIGTERM` или `SIGINT`, пока приложение
 запускалось. Обычно это нормально: оркестратор передумал. Про зависший
 `onInit` — предупреждение у [`StartupTimeoutError`](#startuptimeouterror).
 

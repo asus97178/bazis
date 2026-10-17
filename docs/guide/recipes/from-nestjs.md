@@ -36,7 +36,7 @@ NestJS — переносится большая часть привычек. Н
 | `@Injectable()` | Не нужен | |
 | `@Param()`, `@Query()`, `@Body()` | Имя и тип параметра метода | [Контроллеры](../overview/controllers.md#аргументы-методов) |
 | `ParseIntPipe`, `ParseUUIDPipe` | Ограничение в маршруте: `:id(int)`, `:id(uuid)` | [Контроллеры](../overview/controllers.md#маршруты) |
-| `class-validator` + `ValidationPipe` | `@RequestModel()` + `@Validator` | [Проверка данных](../overview/validation.md) |
+| `class-validator` + `ValidationPipe` | `@Validator` на полях класса; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
 | `Scope.DEFAULT` / `REQUEST` / `TRANSIENT` | `singleton` / `scoped` / `transient` | [Провайдеры](../overview/providers.md#время-жизни) |
 | `@Inject(TOKEN)` + `{ provide, useClass }` | Абстрактный класс как токен: `singleton(IBookStore, MemoryBookStore)` | [Провайдеры](../overview/providers.md#регистрация-по-контракту) |
 | `@nestjs/config` + `ConfigService` | `defineConfig` + `ConfigView<T>` | [Конфигурация](../fundamentals/configuration.md) |
@@ -209,7 +209,7 @@ export class BooksController {
 | --- | --- |
 | `id` | Есть в маршруте `:id(int)` — из пути, уже числом |
 | `q`, `limit` | Простые типы, которых нет в маршруте, — из строки запроса; `limit = 10` — необязательный |
-| `body: AddBookRequest` | Класс модели запроса — из JSON-тела, с проверкой |
+| `body: AddBookRequest` | Класс из исходников приложения — из JSON-тела, с проверкой |
 | `ctx: HttpContext` | Контекст запроса |
 
 ### Проверка тела
@@ -235,7 +235,9 @@ export class AddBookRequest {
 ```
 
 Поля, которых нет в классе, отбрасываются — как `whitelist: true` в
-`ValidationPipe`, только по умолчанию.
+`ValidationPipe`, только по умолчанию. `@RequestModel()` не обязателен:
+без него класс работает так же, декоратор только показывает, что класс —
+входной контракт. Нужен он лишь классу из другого пакета.
 
 ### Guard → `@Authorize`
 

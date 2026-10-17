@@ -1,6 +1,6 @@
 # Ошибки WebSocket и gRPC
 
-Тексты — из исходников 0.100.7; проверенные примеры — в главах
+Тексты — из исходников 0.100.8; проверенные примеры — в главах
 [WebSocket](../../realtime/websocket.md) и [gRPC](../../realtime/grpc.md).
 
 ## WebSocket

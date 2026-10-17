@@ -12,7 +12,7 @@
 | `[bazis] configuration error: Invalid configuration (environment "…")` | [Запуск и конфигурация](startup.md#configvalidationerror) |
 | `[bazis] application failed: InfraError: Infra connector "…"` | [Запуск и конфигурация](startup.md#infraerror) |
 | `[bazis] Graceful shutdown did not finish within …` | [Запуск и конфигурация](startup.md#shutdowntimeouterror) |
-| `[bazis] application failed: HttpSetupError:` | [HTTP](http.md#httpsetuperror) |
+| `[bazis] configuration error: Duplicate route…`, `Unknown route constraint…` | [HTTP](http.md#httpsetuperror) |
 | Ответ `{"error": "…"}` со статусом 4xx/5xx | [HTTP](http.md#ответы-клиенту) |
 | `HttpClientError` с `code` `ETIMEDOUT`, `ERR_BAD_STATUS`… | [HTTP](http.md#http-клиент) |
 | `UniqueViolationError`, `SchemaAdmissionError [ORM_SCHEMA_…]`, `ORM_OWNED_STORE_…` | [ORM](orm.md) |
@@ -29,8 +29,7 @@
   - `[bazis] configuration error:` — ошибка настроек или графа сервисов,
     её исправляют в коде или в переменных окружения;
   - `[bazis] application failed:` — не поднялось то, что от кода не
-    зависит: база, Redis, внешний сервис. Сюда же пока попадают
-    ошибки маршрутов.
+    зависит: база, Redis, внешний сервис, срок запуска.
 
   В терминале вместо строки — [экран запуска](../../cli/commands.md#экран-запуска)
   со всеми ошибками сразу.
