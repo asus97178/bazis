@@ -107,7 +107,7 @@ describe("FromHeader", () => {
     expect(missing.status).toBe(400);
     expect(await missing.json()).toEqual({ error: 'Missing required header parameter "x-request-id"' });
     expect(await (await post({ "x-request-id": "r2" }, { title: "Dune" })).json()).toEqual({ title: "Dune", requestId: "r2" });
-    expect((await (await post({ "x-request-id": "r2" }, { title: "" })).json()).details[0].code).toBe("minLength");
+    expect(((await (await post({ "x-request-id": "r2" }, { title: "" })).json()) as { details: { code: string }[] }).details[0]!.code).toBe("minLength");
   });
 });
 
