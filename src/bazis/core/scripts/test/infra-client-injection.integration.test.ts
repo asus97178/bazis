@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 // Infra clients are injected by type, like the rest of the application:
-// constructor(sql: IPostgres, redis: IRedis, search: IOpenSearch).
+// constructor(sql: IPostgres, redis: IRedis, search: IOpenSearch, codex: ICodex).
 const repository = process.cwd();
 const roots: string[] = [];
 afterAll(async () => { for (const root of roots) await rm(root, { recursive: true, force: true }); });
 
-test("IPostgres, IRedis and IOpenSearch bind by type without an explicit deps list", async () => {
+test("IPostgres, IRedis, IOpenSearch and ICodex bind by type without an explicit deps list", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "bazis-infra-clients-"));
   roots.push(root);
   await mkdir(path.join(root, "node_modules"));
@@ -17,9 +17,9 @@ test("IPostgres, IRedis and IOpenSearch bind by type without an explicit deps li
   await Bun.write(path.join(root, "bazis.config.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
   await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, types: ["bun"] }, include: ["src/**/*.ts"] }));
   await Bun.write(path.join(root, "src/index.ts"), `import { Module, scoped } from "bazis/core/di";
-import type { IOpenSearch, IPostgres, IRedis } from "bazis/core/infra";
+import type { ICodex, IOpenSearch, IPostgres, IRedis } from "bazis/core/infra";
 export class ReportsService {
-  constructor(private readonly sql: IPostgres, private readonly redis: IRedis, private readonly search: IOpenSearch) {}
+  constructor(private readonly sql: IPostgres, private readonly redis: IRedis, private readonly search: IOpenSearch, private readonly codex: ICodex) {}
 }
 @Module({ providers: [scoped(ReportsService)], exports: [] })
 export class AppModule {}
@@ -28,5 +28,5 @@ export class AppModule {}
   const [exit, out, err] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
   expect(exit, out + err).toBe(0);
   const deps = await Bun.file(path.join(root, "src/generated/bazis/deps.ts")).text();
-  for (const token of ["IPostgres", "IRedis", "IOpenSearch"]) expect(deps).toContain(token);
+  for (const token of ["IPostgres", "IRedis", "IOpenSearch", "ICodex"]) expect(deps).toContain(token);
 }, 60_000);
