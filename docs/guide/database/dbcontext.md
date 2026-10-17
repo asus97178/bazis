@@ -93,6 +93,18 @@ export class CatalogStats extends PeriodicBackgroundService {
 Каждый тик получает новый контекст. Подробнее — в главе
 [Жизненный цикл](../fundamentals/lifecycle.md#scoped-сервисы-в-фоновой-службе).
 
+Несколько областей — несколько независимых контекстов: так работу можно
+вести параллельно, у каждого контекста своё отслеживание изменений и своя
+транзакция.
+
+> [!NOTE]
+> `DbContextFactory` из EF Core в приложении не нужен: его роль играет
+> `createScope()`. Контекст из области получает подключение, настройки
+> модуля и ключи шифрования. `DbContextFactory` нужен ORM без
+> приложения, когда `DbContextOptions` собираете сами:
+> `new DbContextFactory(CatalogDbContext, new DbContextOptions({ provider, entities })).create()`.
+> В DI приложения `DbContextOptions` нет — внедрить фабрику не выйдет.
+
 ## Несколько модулей
 
 У каждого модуля с данными свой контекст со своими сущностями; все они

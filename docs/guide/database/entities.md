@@ -4,7 +4,7 @@
 таблицу, столбцы и ключ. Схему по ним создаёт `ensureCreated` (см.
 [Подключение PostgreSQL](postgresql.md)).
 
-Все примеры проверены на bazis 0.98.14 и PostgreSQL 17.
+Все примеры проверены на bazis 0.98.14 и PostgreSQL 17, шифрование — на 0.104.0.
 
 ```ts
 import { Column, CreatedAt, Entity, Index, Required, UpdatedAt, UUID } from "bazis/core/orm";
@@ -225,6 +225,130 @@ export class OrderLine { ... }
 `isNull()`, `isNotNull()`; условия объединяются через `.and()`, `.or()`,
 `.not()`. Сравнивать можно и два столбца:
 `(row) => row.endsAt.gt(row.startsAt)`.
+
+## Шифрование столбца
+
+`encryptedWith` шифрует строковый столбец (AES-256-GCM). Ключ берётся из
+[настроек](../fundamentals/configuration.md) модуля:
+
+```ts
+// config/crypto.config.ts
+import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+
+export interface CryptoConfig { phoneKey: Secret; phoneHashKey: Secret }
+
+export const cryptoConfig = defineConfig<CryptoConfig>("crypto", {
+  default: { phoneKey: secret("dev-phone-key-not-for-production"), phoneHashKey: secret("dev-phone-hash-key") },
+  production: { phoneKey: secret(), phoneHashKey: secret() },
+});
+```
+
+```ts
+// customers/model/Customer.model.ts
+import { Column, encryptedWith, Entity, HasConversion, Required, UUID } from "bazis/core/orm";
+
+@Entity({ table: "customers" })
+export class Customer {
+  @UUID() id = "";
+
+  @Required() @Column({ type: "text" }) name = "";
+
+  @Required()
+  @HasConversion(encryptedWith(cryptoConfig, "phoneKey"))
+  @Column({ type: "text" })
+  phone = "";
+}
+
+// customers/Customers.module.ts
+@Module({ config: cryptoConfig, ormBazis: { context: Customers, entities: [Customer] }, exports: [] })
+export class CustomersModule {}
+```
+
+В коде поле обычное, в базе лежит шифротекст:
+
+```text
+GET /customers/b40c…               → {"name":"Анна","phone":"+7 900 123-45-67"}
+SELECT phone FROM customers        → rJfNG/P39GOy4F+RVyPQ/9fv6+5K6vnF6DTLqPU0GR+ncdE+70tstZwMMQ8=
+```
+
+Ключ читается при запуске, когда загружены все источники настроек, в том
+числе [файлы секретов](../security/secrets.md#файлы-секретов). Если конфиг
+не подключён к модулю, приложение не стартует:
+
+```text
+OrmError: Customer.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application;
+add it to `config` of the module that owns Customer or to runApp({ config }).
+```
+
+- **Ключ — случайные 32 байта**, а не пароль: `openssl rand -base64 32`.
+  Строка ключа превращается в ключ AES через SHA-256, без растяжения, как у
+  паролей.
+- **Ключ нельзя сменить.** Строки, записанные другим ключом, не читаются:
+
+  ```text
+  OrmError: Cannot read Customer.phone: cannot decrypt the value: it was encrypted with another key,
+  or the stored value was changed
+  ```
+
+  Смены ключа с перешифровкой старых строк в bazis нет.
+- **Одинаковые значения в базе разные**: каждое шифруется со случайным
+  числом (nonce). Поэтому по столбцу нельзя искать и сортировать — запрос
+  падает, а не возвращает пустой список:
+
+  ```text
+  OrmError: Customer.phone is encrypted with a random nonce: it cannot be compared or sorted in SQL.
+  To find rows by it, store a separate column with a keyed hash of the value (HMAC) and compare that.
+  ```
+
+  По той же причине зашифрованный ключ и уникальный индекс не дают собрать
+  модель (`ModelBuildError`). `isNull()` работает.
+- **Пустая строка тоже шифруется**. А вот `null` в версии 0.104.0 не
+  поддерживается: сохранение падает с `TypeError`. Храните пустое значение
+  как `""`.
+
+> [!NOTE]
+> `encryptedWith` — с версии 0.104.0. Раньше ключ передавали строкой в
+> `ValueConverters.encrypted(…)` при объявлении класса, и ключ из файла
+> секретов к этому моменту ещё не был загружен. `ValueConverters.encrypted`
+> остался для ORM без приложения, когда ключ уже есть в коде.
+
+### Поиск по зашифрованному столбцу
+
+Чтобы находить клиента по телефону, храните рядом HMAC телефона — хеш с
+отдельным ключом. Одинаковые телефоны дают одинаковый хеш, по нему работают
+`eq` и индекс:
+
+```ts
+// customers/PhoneHash.service.ts
+import { createHmac } from "node:crypto";
+import type { ConfigView } from "bazis/core/kernel";
+
+export class PhoneHash {
+  constructor(private readonly config: ConfigView<CryptoConfig>) {}
+
+  of(phone: string): string {
+    const normalized = phone.replace(/[^\d+]/g, "");
+    return createHmac("sha256", this.config.get("phoneHashKey").reveal()).update(normalized).digest("base64url");
+  }
+}
+
+// Customer.model.ts
+@Required() @Index() @Column({ type: "text" }) phoneHash = "";
+
+// контроллер
+customer.phoneHash = this.hash.of(body.phone);                         // при записи
+this.db.customers.where((c) => c.phoneHash.eq(this.hash.of(phone)));    // при поиске
+```
+
+```text
+GET /customers/by-phone/+7%20(900)%20123-45-67 → [{"name":"Анна","phone":"+7 900 123-45-67",…}]
+```
+
+- Номер приводится к одному виду до хеширования: `+7 (900) 123-45-67` и
+  `+7 900 123-45-67` должны давать один хеш.
+- Ключ HMAC — отдельный от ключа шифрования.
+- Хеш показывает, у каких строк значения совпадают. Самих значений по нему
+  не узнать, если не знать ключ.
 
 ## Дальше
 
