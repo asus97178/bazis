@@ -12,7 +12,7 @@
 Missing dependency "Mailer" for "SignupService"
 ```
 
-Тексты ниже получены на bazis 0.100.7, кроме отмеченных «текст из
+Тексты ниже получены на bazis 0.100.8, кроме отмеченных «текст из
 исходников».
 
 ## Ошибки графа при запуске
@@ -50,12 +50,12 @@ Singleton "PriceCache" depends on scoped "OrdersRepository". A scoped service li
 #### Cycle detected
 
 ```text
-Cycle detected: OrderService -> InvoiceService -> OrderService
 Cycle detected: InvoiceService -> OrderService -> InvoiceService
 ```
 
-- **Причина.** Сервисы зависят друг от друга по кругу. Один и тот же цикл
-  сейчас печатается дважды — с каждого его участника.
+- **Причина.** Сервисы зависят друг от друга по кругу. Цикл печатается
+  один раз, начиная с участника, первого по алфавиту (до 0.100.8 — по разу
+  с каждого участника).
 - **Что сделать.** Вынесите общую часть в третий сервис или разорвите цикл
   ленивой зависимостью
   ([Ленивые зависимости](../../fundamentals/dependency-injection.md#ленивые-зависимости)).
@@ -119,7 +119,7 @@ Module imports cycle: module#4 -> module#5 -> module#4
 ### `ScopedServiceFromRootError`
 
 ```text
-[bazis] configuration error: Cannot resolve scoped service "CartRepository" from root provider.
+[bazis] configuration error: Cannot resolve scoped service "CartRepository" from root provider. A scoped service lives in a request or a scope: create one with provider.createScope(), resolve "CartRepository" from it and dispose the scope when done.
 ```
 
 - **Причина.** Scoped-сервис запросили у корневого контейнера, вне области
@@ -177,17 +177,16 @@ ScopeDisposedError: Cannot use a disposed scope or container.
 ### `InvalidProviderError`
 
 ```text
-Provider for "Clock" has unknown shape: expected one of useClass/useFactory/useValue.
+[bazis] configuration error: Module "InvalidProviderModule": providers[0] is not a provider registration ({ provide: Clock }). Register it with singleton(Clock), scoped(Clock), transient(Clock), singletonValue(TOKEN, value) or singletonFactory(TOKEN, [deps], factory).
 ```
 
-Текст из исходников. Регистрация не похожа ни на класс, ни на фабрику, ни
-на значение. Регистрируйте через `singleton`, `scoped`, `transient`,
-`singletonValue`, `singletonFactory`.
+В `providers` модуля — объект вместо регистрации. Регистрируйте через
+`singleton`, `scoped`, `transient`, `singletonValue`, `singletonFactory`.
+До 0.100.8 здесь был `TypeError: undefined is not an object`.
 
-> [!NOTE]
-> В 0.100.7 объект `{ provide: Clock }` в `providers` модуля вместо этой
-> ошибки падает с `TypeError: undefined is not an object (evaluating
-> 'definition.provider.provide')`.
+Другой вариант той же ошибки — при регистрации вручную, текст из
+исходников: `Provider for "Clock" has unknown shape: expected one of
+useClass/useFactory/useValue.`
 
 ### `CircularDependencyError`
 

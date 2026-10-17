@@ -7,7 +7,7 @@
 - [ошибки HTTP-клиента](#http-клиент) — когда приложение само ходит во
   внешний сервис.
 
-Тексты получены на bazis 0.100.7.
+Тексты получены на bazis 0.100.8.
 
 ## Ответы клиенту
 
@@ -92,7 +92,7 @@
 Маршруты не собрались — сервер не стартует:
 
 ```text
-[bazis] application failed: HttpSetupError: Duplicate route: GET /orders/:orderId is mapped to both OrdersController.byId (/orders/:id) and OrdersController.byOrderId. Routes that differ only in parameter names are the same route; change one of the paths.
+[bazis] configuration error: Duplicate route: GET /orders/:orderId is mapped to both OrdersController.byId (/orders/:id) and OrdersController.byOrderId. Routes that differ only in parameter names are the same route; change one of the paths.
 ```
 
 | Текст | Что сделать |
@@ -105,9 +105,8 @@
 | `Wildcard "*" must be the last segment in template "…"` | Текст из исходников: `*` только в конце пути |
 | `HTTP route maxBodySize must match '<positive integer><b\|kb\|mb\|gb>' (e.g. '4mb').` | Текст из исходников: размер в виде `"4mb"` |
 
-> [!NOTE]
-> Ошибки маршрутов — ошибки кода, но печатаются как `application failed`,
-> а не `configuration error`.
+`HttpSetupError` наследует `KernelError` и печатается как ошибка
+настройки. До 0.100.8 — как `application failed: HttpSetupError:`.
 
 ## HTTP-клиент
 
@@ -144,10 +143,15 @@ try {
 HttpClientError: baseUrl "x" is relative: outside a browser page it must be absolute, for example "http://localhost:3000/x"
 ```
 
-> [!WARNING]
-> Опция называется `baseUrl`, а не `baseURL`, как в axios. С `baseURL` она
-> молча не применяется, и каждый запрос падает с `ERR_NETWORK` и текстом
-> `fetch() URL is invalid`.
+Неизвестная опция — тоже ошибка, с подсказкой для написания axios:
+
+```text
+HttpClientError: Unknown HttpClient option "baseURL" in the client defaults; did you mean "baseUrl"?
+HttpClientError: Unknown HttpClient option "timeout" in the client defaults; did you mean "timeoutMs"?
+```
+
+До 0.100.8 `baseURL` молча не применялась, и каждый запрос падал с
+`ERR_NETWORK` и текстом `fetch() URL is invalid`.
 
 ### `HttpClientConfigError`
 
