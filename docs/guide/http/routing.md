@@ -90,7 +90,7 @@ search(q: string, limit = 10, done = false, tag?: string) { ... }
 | --- | --- |
 | `/tasks/search?q=bun` | `q = "bun"`, `limit = 10`, `done = false`, `tag = undefined` |
 | `/tasks/search?q=bun&limit=5&done=true&tag=x` | `limit = 5`, `done = true`, `tag = "x"` |
-| `/tasks/search` | **400** `Missing required query parameter "q"` |
+| `/tasks/search` | **400** `Validation failed`, в `details` — `{"property":"q","code":"required"}` |
 
 Тип берётся из аннотации или из значения по умолчанию (`limit = 10` —
 число). Параметр с `?` или значением по умолчанию необязателен.

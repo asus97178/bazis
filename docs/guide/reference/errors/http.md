@@ -40,11 +40,12 @@
 | Маршрута нет | 404 | `Not Found` |
 | Маршрут есть, метода нет | 405 | `Method Not Allowed` |
 | Параметр маршрута не прошёл ограничение (`/books/abc` для `:id(int)`) | 404 | `Not Found` |
-| Нет обязательного параметра строки запроса | 400 | `Missing required query parameter "q"` |
-| Параметр не того типа | 400 | `Parameter "limit" must be of type number, got: "x"` |
+| Нет обязательного параметра пути, строки запроса или заголовка | 400 | `Validation failed`, в `details` — `{"property":"q","code":"required"}` |
+| Параметр не того типа | 400 | `Validation failed`, в `details` — `{"property":"limit","code":"type"}` |
+| Одиночный параметр повторён (`?page_size=1&page_size=2`) | 400 | `Validation failed`, `code` `duplicate` |
 | Тело — не JSON | 400 | `Malformed JSON in request body` |
 | Тело — JSON, но не объект | 400 | `Request body must be a JSON object` |
-| Тело не прошло проверку | 400 | `Validation failed` и список в `details` |
+| Тело, модель строки запроса или заголовков не прошли проверку | 400 | `Validation failed` и список в `details` |
 | Тело больше `maxBodyBytes` | 413 | `Payload Too Large`, в `details` — `maxBytes` |
 | Нет входа (`@Authorize`) | 401 | `Unauthorized` |
 | Нет прав (`@Authorize`) | 403 | `Forbidden` |
@@ -52,6 +53,10 @@
 | Неподдерживаемая версия API | 400 | `Unsupported API version`, в `details` — `supported` |
 
 ### `ModelValidationError`
+
+Все ошибки привязки запроса — одним ответом: тело, модели строки запроса и
+заголовков, одиночные параметры. Ошибки самого запроса (не JSON, не тот
+`Content-Type`, слишком большое тело) приходят сразу и отдельно.
 
 ```json
 {

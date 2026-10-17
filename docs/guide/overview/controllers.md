@@ -59,8 +59,9 @@ export class TaskController {
 
 ## Аргументы методов
 
-Декораторов на параметрах нет: источник значения bazis определяет по имени и
-типу параметра.
+Источник значения bazis определяет по имени и типу параметра. Когда этого
+мало — другое имя в запросе, заголовок, модель строки запроса, — источник
+указывают явно, см. [ниже](#явный-источник-fromquery-fromheader-frombody-fromroute).
 
 | Параметр метода | Откуда значение |
 | --- | --- |
@@ -79,8 +80,8 @@ search(q: string, limit = 10) { ... }
 ```text
 GET /tasks/search?q=bun&limit=5   → q = "bun", limit = 5
 GET /tasks/search?q=bun           → q = "bun", limit = 10
-GET /tasks/search                 → 400 Missing required query parameter "q"
-GET /tasks/search?q=bun&limit=abc → 400
+GET /tasks/search                 → 400 {"error":"Validation failed","details":[{"property":"q","message":"Field \"q\" is required","code":"required"}]}
+GET /tasks/search?q=bun&limit=abc → 400 … {"property":"limit","message":"Field \"limit\" must be of type number, got: string","code":"type"}
 ```
 
 Если по сигнатуре нельзя понять, откуда брать параметр — например, у него нет
@@ -89,6 +90,126 @@ GET /tasks/search?q=bun&limit=abc → 400
 
 > [!NOTE]
 > Параметры из префикса контроллера и `*path` привязываются с версии 0.96.4.
+
+## Явный источник: `FromQuery`, `FromHeader`, `FromBody`, `FromRoute`
+
+В стандартных декораторах TypeScript нет декораторов на параметрах, поэтому
+`@Query() q: string`, как в NestJS, не скомпилируется. Источник указывают
+типом параметра — так же, как в ASP.NET `[FromQuery]`, только на типе:
+
+```ts
+import { Controller, Get, Post, type FromBody, type FromHeader, type FromQuery, type FromRoute } from "bazis/core/http";
+
+@Get("books/:id")
+book(id: FromRoute<number>, requestId?: FromHeader<string, "x-request-id">) { … }
+
+@Get("books")
+list(size: FromQuery<number, "page_size"> = 10) { … }
+
+@Post("books")
+add(body: FromBody<AddBookRequest>) { … }
+```
+
+| Тип параметра | Откуда значение |
+| --- | --- |
+| `FromRoute<number>`, `FromRoute<string, "slug">` | Параметр пути; второй аргумент — имя в шаблоне |
+| `FromQuery<number, "page_size">`, `FromQuery<string[]>` | Строка запроса под этим именем; массив — все значения ключа |
+| `FromQuery<BookSearchQuery>` | Модель строки запроса — см. ниже |
+| `FromHeader<string, "x-request-id">` | Заголовок, без учёта регистра; без имени — имя параметра |
+| `FromHeader<LibraryHeaders>` | Модель заголовков |
+| `FromBody<AddBookRequest>` | JSON-тело, как класс без маркера |
+
+Во время выполнения это просто тип значения: `FromQuery<number>` — это
+`number`. Кодогенерация читает маркер через проверку типов, поэтому работает
+и `import { FromQuery as Q }`, а свой тип приложения с именем `FromQuery`
+маркером не считается.
+
+### Модели строки запроса и заголовков
+
+Параметры поиска удобно описать классом — с правилами `@Validator`, как
+модель тела. Проверка выполняется в контроллере, до вызова метода, — в
+сервис приходит уже проверенный объект:
+
+```ts
+import { FromHeader, FromQuery } from "bazis/core/http";
+import { Validator } from "bazis/library/validation";
+
+export class BookSearchQuery {
+  /** Part of the title. */
+  @Validator({ required: true, minLength: 2, maxLength: 100 })
+  q!: string;
+
+  /** Books per page, 1–50. */
+  @FromQuery("page_size") @Validator({ integer: true, range: [1, 50] })
+  pageSize = 10;
+
+  @Validator({ enumType: BookSort })
+  sort: string = BookSort.Title;
+
+  @Validator({ maxLength: 5 })
+  authors: string[] = [];
+}
+
+export class LibraryHeaders {
+  @FromHeader("x-library-id") @Validator({ required: true, uuid: true })
+  libraryId!: string;
+}
+```
+
+```ts
+@Get("search")
+search(query: FromQuery<BookSearchQuery>, library: FromHeader<LibraryHeaders>) {
+  return this.books.search(query);
+}
+```
+
+На полях `@FromQuery("…")` и `@FromHeader("…")` — уже декораторы: они
+задают имя в запросе. Без них имя — имя свойства (для заголовка — без
+учёта регистра).
+
+```text
+GET /catalog/search?q=du&page_size=5&authors=Herbert&authors=Lem   x-library-id: 0f8f…
+→ query = {"q":"du","pageSize":5,"sort":"title","authors":["Herbert","Lem"]}
+
+GET /catalog/search?q=du   X-Library-Id: 0f8f…
+→ query = {"q":"du","pageSize":10,"sort":"title","authors":[]}
+
+GET /catalog/search?q=d&page_size=abc&sort=price      (без заголовка)
+→ 400 {"error":"Validation failed","details":[
+    {"property":"page_size","message":"Field \"page_size\" must be of type number, got: string","code":"type"},
+    {"property":"q","message":"Field \"q\" must be at least 2 characters long","code":"minLength"},
+    {"property":"sort","message":"Field \"sort\" must be one of: title, year","code":"enum"},
+    {"property":"x-library-id","message":"Field \"x-library-id\" is required","code":"required"}]}
+
+GET /catalog/search?q=dune&page_size=5&page_size=50
+→ 400 … {"property":"page_size","message":"Parameter \"page_size\" must be given once","code":"duplicate"}
+```
+
+- **Все ошибки — одним ответом:** модели строки запроса, модели заголовков,
+  тела и одиночных параметров вместе. `property` — имя, как его прислал
+  клиент.
+- **Только объявленное.** Лишние параметры (`admin`, `__proto__`)
+  игнорируются. Поле без значения сохраняет значение по умолчанию.
+- **Повтор одиночного параметра — `400 duplicate`**, а не «взять первый»:
+  прокси и приложение могли бы прочитать разные значения. В массиве — до
+  100 значений (`tooManyValues`).
+- **Типы полей:** `string`, `number`, `boolean` и массивы из них; у модели
+  заголовков — одно значение на поле. Вложенный объект — ошибка при запуске:
+  вложенные фильтры — задача [списков](../http/lists.md).
+- **OpenAPI** показывает поля моделей параметрами `query` и `header` под
+  их именами, с правилами и описаниями из JSDoc.
+- `@RequestModel()` моделям не нужен — как и модели тела.
+
+Ошибки использования ловит кодогенерация — `BAZIS_HTTP_BINDING_UNRESOLVED` с
+причиной: `FromHeader<string[]>` (заголовок — одно значение), имя у модели
+(`FromQuery<BookSearchQuery, "q">`), `FromRoute` с именем, которого нет в
+шаблоне, `FromBody<string>`.
+
+> [!NOTE]
+> Явные источники и модели строки запроса и заголовков — с версии 0.101.0,
+> все ошибки привязки одним ответом — с 0.102.0. Раньше `FromQuery` и другие
+> были описателями убранного в 0.95 декоратора `@Bind`; теперь это типы и
+> декораторы полей.
 
 ### `HttpContext`
 
@@ -99,7 +220,7 @@ GET /tasks/search?q=bun&limit=abc → 400
 | `ctx.method`, `ctx.path`, `ctx.url` | Метод, путь, полный URL |
 | `ctx.params` | Все параметры маршрута |
 | `ctx.query(name)` | Значение из строки запроса |
-| `ctx.header(name)` | Заголовок запроса |
+| `ctx.header(name)` | Заголовок запроса; для проверяемого значения — `FromHeader` |
 | `ctx.text()`, `ctx.formData()` | Тело как текст или форма |
 | `ctx.request` | Исходный `Request` |
 | `ctx.state` | Данные, которые middleware передают дальше по запросу |

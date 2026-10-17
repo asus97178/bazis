@@ -95,7 +95,7 @@ DI class "Hidden" must be exported (an export alias is sufficient) so constructo
 ### `BAZIS_HTTP_BINDING_UNRESOLVED`
 
 ```text
-controller "TagsController.list" (/…/src/app/tags/Tags.controller.ts): cannot infer bindings (parameter "filter" has no type annotation usable for conventions). Use supported parameter types; read headers or raw bodies through HttpContext, and inject services in the constructor.
+controller "TagsController.list" (/…/src/app/tags/Tags.controller.ts): cannot infer bindings (parameter "filter" has no type annotation usable for conventions). Use supported parameter types or mark the source with FromQuery/FromHeader/FromBody/FromRoute; read raw bodies through HttpContext, and inject services in the constructor.
 ```
 
 - **Причина.** По типу параметра метода не понять, откуда брать
@@ -104,6 +104,16 @@ controller "TagsController.list" (/…/src/app/tags/Tags.controller.ts): cannot 
   исходников приложения — тело, `HttpContext` — всё остальное. Сервисы —
   в конструктор
   ([Контроллеры](../../overview/controllers.md#аргументы-методов)).
+
+Явные источники дают свои причины:
+
+| Причина | Что поправить |
+| --- | --- |
+| `FromHeader<string[]>: a header takes one value` | Заголовок — одно значение |
+| `FromQuery<SearchQuery, "…">: a query model takes no name; name its fields with @FromQuery("…")` | Имя — на полях модели |
+| `FromRoute parameter "size" is not in the route template` | Имя из шаблона маршрута |
+| `FromBody<string> takes a request-model class; read a raw body through HttpContext` | Тело — класс; сырое тело — `ctx.text()` |
+| `the name in FromQuery<…, "name"> must be a non-empty string literal` | Имя — строковый литерал |
 
 > [!NOTE]
 > Путь в сообщении — абсолютный. Класс не из исходников приложения в

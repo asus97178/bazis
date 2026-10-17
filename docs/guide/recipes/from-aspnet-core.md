@@ -20,8 +20,11 @@
 - **Модули вместо одного `Program.cs`.** Сервисы регистрируются не в общем
   `builder.Services`, а в модуле, которому принадлежат. Что модуль
   `exports`, видно остальным; остальное — только ему.
-- **Атрибутов привязки нет.** Ни `[FromRoute]`, ни `[FromQuery]`, ни
-  `[FromBody]`: источник значения bazis выбирает по имени и типу параметра.
+- **Атрибуты привязки — типы.** Источник bazis выбирает по имени и типу
+  параметра, как `[ApiController]`. Явно — тип-маркер с тем же именем:
+  `FromQuery<number, "page_size">`, `FromHeader<string, "x-request-id">`,
+  `FromRoute<number>`, `FromBody<T>`; на свойствах модели —
+  `@FromQuery("page_size")`, как `[FromQuery(Name = …)]`.
 - **Зависимости записывает кодогенерация.** В TypeScript нет рефлексии
   типов во время выполнения, поэтому `bazis codegen` (его запускают `dev`,
   `test` и `build`) сохраняет зависимости конструкторов в `src/generated`.
@@ -43,8 +46,11 @@
 | `ValidateScopes`, `ValidateOnBuild` | Всегда, в любом окружении | [Провайдеры](../overview/providers.md#ошибки-которые-ловятся-при-старте) |
 | `[ApiController]`, `ControllerBase` | `@Controller` | [Контроллеры](../overview/controllers.md) |
 | `[HttpGet("{id:int}")]` | `@Get(":id(int)")` | [Контроллеры](../overview/controllers.md#маршруты) |
-| `[FromRoute]`, `[FromQuery]`, `[FromBody]` | Имя и тип параметра метода | [Контроллеры](../overview/controllers.md#аргументы-методов) |
-| `HttpContext`, `[FromHeader]` | `ctx: HttpContext`, `ctx.header(…)` | [Контроллеры](../overview/controllers.md#httpcontext) |
+| `[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]` | Имя и тип параметра или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>`, `FromHeader<T>` | [Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `[FromQuery] SearchQuery query` с DataAnnotations | `query: FromQuery<SearchQuery>` с `@Validator` на полях | [Модели строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
+| `[FromQuery(Name = "page_size")]` на свойстве | `@FromQuery("page_size")` на поле | [Модели строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
+| Model state: все ошибки привязки и проверки в одном `400` | Так же: `Validation failed` и все нарушения в `details` | [Контроллеры](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
+| `HttpContext` | `ctx: HttpContext` | [Контроллеры](../overview/controllers.md#httpcontext) |
 | DataAnnotations, автоматический `400` | `@Validator` на полях класса, тоже `400`; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
 | `Ok()`, `CreatedAtAction()`, `NoContent()` | `Ok`, `Created`, `NoContent` | [Ответы](../overview/responses.md#помощники) |
 | `IOptions<T>` + `ValidateOnStart` | `defineConfig` + `ConfigView<T>`, проверка всегда при запуске | [Конфигурация](../fundamentals/configuration.md) |
@@ -406,7 +412,7 @@ Singleton "BazisLifecycleHook" depends on scoped "BooksService". A scoped servic
 
 ```text
 GET  /books?q=du&limit=5          → {"items":[{"id":1,"title":"Dune","author":"Herbert"}],"servedAt":"now"}
-GET  /books                       → 400 {"error":"Missing required query parameter \"q\""}
+GET  /books                       → 400 {"error":"Validation failed","details":[{"property":"q","message":"Field \"q\" is required","code":"required"}]}
 GET  /books/1                     → {"id":1,"title":"Dune","author":"Herbert"}
 GET  /books/99                    → 404 {"error":"book 99 not found","details":{"id":99}}
 GET  /books/abc                   → 404 {"error":"Not Found"}            ← :id(int) не совпал
