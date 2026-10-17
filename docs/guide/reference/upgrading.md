@@ -7,6 +7,32 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.104.0
+
+- **Условие или сортировка по зашифрованному столбцу — ошибка.** Раньше
+  `where((c) => c.phone.eq(phone))` по столбцу с
+  `ValueConverters.encrypted` молча возвращал `[]`, теперь бросает
+  `OrmError`. Ищите по отдельному столбцу с HMAC значения
+  ([Шифрование столбца](../database/entities.md#шифрование-столбца)).
+- **Ключ и уникальный индекс** на зашифрованном столбце не дают собрать
+  модель (`ModelBuildError`): одинаковые значения хранятся по-разному,
+  такие ограничения не работали.
+- Ключ шифрования в приложении берите из настроек:
+  `encryptedWith(cryptoConfig, "phoneKey")` вместо
+  `ValueConverters.encrypted(cryptoConfig.get("phoneKey").reveal())` —
+  так работают ключи из файлов секретов.
+
+## 0.103.0
+
+- **Клиент Codex — по типу `ICodex`.** Токен `CODEX_APP_SERVER` удалён:
+
+  ```ts
+  // было
+  singletonFactory(Assistant, [CODEX_APP_SERVER] as const, (codex) => new Assistant(codex))
+  // стало
+  export class Assistant { constructor(private readonly codex: ICodex) {} }
+  ```
+
 ## 0.102.0
 
 - **Все ошибки привязки — одним `400`.** Нет обязательного параметра или

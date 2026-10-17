@@ -66,6 +66,27 @@ CHECK references unknown property "prise".
 свойство, неподдерживаемая форма. Ошибка при запуске; текст называет
 место.
 
+## Зашифрованные столбцы
+
+Тексты — из 0.104.0; подробно — в разделе
+[Шифрование столбца](../../database/entities.md#шифрование-столбца).
+
+| Текст | Когда |
+| --- | --- |
+| `Customer.phone is encrypted with a random nonce: it cannot be compared or sorted in SQL. …` | `where` или `orderBy` по зашифрованному столбцу. Ищите по столбцу с HMAC |
+| `Cannot read Customer.phone: cannot decrypt the value: it was encrypted with another key, or the stored value was changed` | Строка записана другим ключом или изменена в базе. Исходная `DecryptionError` — в `error.cause` |
+| `Customer.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application; …` | При запуске: конфиг ключа не подключён к модулю |
+| `… the key is empty; set a random secret (openssl rand -base64 32).` | При запуске: ключ пустой |
+| `… the column is already bound to another key in this process.` | Два приложения в одном процессе (обычно в тестах) с разными ключами для одного столбца |
+| `encryptedWith(crypto.phoneKey): the key is not bound yet; …` | Столбец используется до запуска приложения или без него |
+
+`ModelBuildError` при запуске:
+
+```text
+Entity "Lead": a unique index on encrypted "phone" cannot work: equal values are stored differently. Put it on a keyed hash (HMAC) column.
+Entity "Lead": key "id" cannot be encrypted: equal values are stored differently.
+```
+
 ## Транзакции
 
 | Класс | Текст | Что сделать |

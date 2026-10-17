@@ -3,7 +3,7 @@
 ORM: сущности, контекст, запросы, сохранение, транзакции, схема, ошибки
 базы. Всё, что есть в `bazis/library/orm`, плюс подключение к приложению:
 модуль, коннектор `@Infra`, репозитории, страницы списков. Список — по
-пакету 0.102.0.
+пакету 0.104.0.
 
 ## Подключение
 
@@ -28,7 +28,9 @@ ORM: сущности, контекст, запросы, сохранение, �
 | `Schema(name)` | Схема PostgreSQL таблицы | — |
 | `SoftDelete()` | Мягкое удаление: `remove()` ставит время вместо `DELETE` | [Мягкое удаление](../../database/immediate.md#мягкое-удаление-и-фильтры) |
 | `QueryFilter(predicate)` | Условие, которое добавляется ко всем запросам сущности; с контекстом — для арендаторов | [Арендаторы](../../security/authorization-patterns.md#арендаторы) |
-| `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.encrypted(secret)` — шифрование AES-256-GCM | — |
+| `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.json()`, `ValueConverters.encrypted(secret)` — ключ в коде, для ORM без приложения | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
+| `encryptedWith(config, field)` | Шифрование столбца AES-256-GCM ключом из настроек; ключ читается при запуске | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
+| `DecryptionError` | Значение не расшифровать: другой ключ или изменённые данные | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
 | `buildDynamicModel(definition)` | Модель таблицы из описания, без классов | [Динамические модели](../../database/dynamic-models.md) |
 | `pluralize(name)` | Множественное число для имени таблицы по умолчанию | — |
 
@@ -38,7 +40,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | --- | --- | --- |
 | `DbContext` | Базовый класс контекста: наборы, `saveChanges`, `database` | [DbContext](../../database/dbcontext.md) |
 | `DbSet` | Таблица в контексте: запросы, `add`, `update`, `remove`, `find` | [`DbSet`](../../database/dbcontext.md#dbset) |
-| `DbContextOptions`, `DbContextFactory` | Опции контекста; контекст вне DI-области — в скриптах и параллельной работе | [Вне запроса](../../database/dbcontext.md#вне-запроса) |
+| `DbContextOptions`, `DbContextFactory` | Опции контекста; фабрика контекстов для ORM без приложения — в приложении вместо неё `createScope()` | [Вне запроса](../../database/dbcontext.md#вне-запроса) |
 | `DatabaseFacade` | `db.database`: схема, сырой SQL, транзакции, проверка связи | [Сырой SQL](../../database/dbcontext.md#сырой-sql) |
 | `EntityQuery`, `IncludableQuery`, `ProjectedQuery` | Запросы: `where`, `orderBy`, `include`, `select`, `toList`, `first` | [Запросы](../../database/queries.md) |
 | `Operand`, `Predicate` | Условия: `t.done.eq(false).and(…)` | [Условия](../../database/queries.md#условия) |
@@ -59,7 +61,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | --- | --- | --- |
 | `OrmTransaction` | Транзакция из `db.database.transaction(...)` | [Транзакции](../../database/transactions.md) |
 | `isCommittedOutcome`, `isUnknownTransactionOutcome` | Проверка исхода транзакции | [Тайм-ауты](../../database/errors.md#тайм-ауты-и-недоступная-база) |
-| `ExecutionStrategy`, `withRetry(provider, options)` | Повторы запросов при временных сбоях (как `EnableRetryOnFailure` в EF Core) | — |
+| `ExecutionStrategy`, `withRetry(provider, options)` | Повторы при временных сбоях (как `EnableRetryOnFailure` в EF Core); в приложении — `executionStrategy` модуля | [Повтор при временном сбое](../../database/saving.md#повтор-при-временном-сбое) |
 | `withoutExecutionStrategyRetries` | Отключить вложенные повторы для подсистемы со своими | — |
 
 ## Схема
@@ -82,7 +84,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 Классы: `OrmError`, `DbUpdateError`, `UniqueViolationError`,
 `ForeignKeyViolationError`, `CheckViolationError`, `NotNullViolationError`,
 `LockTimeoutError`, `OrmValidationError`, `EntityNotFoundError`,
-`EntityNotMappedError`, `ModelBuildError`, `TransactionOutcomeUnknownError`,
+`EntityNotMappedError`, `ModelBuildError`, `DecryptionError`, `TransactionOutcomeUnknownError`,
 `OrmTransactionScopeError`, `ConcurrentTransactionScopeError`,
 `OrmProviderIdentityMismatchError`, `PostCommitError`, `OrmDatabaseTimeError`,
 `OrmTrackedMutationConflictError`, `OrmUndeclaredConflictTargetError`,

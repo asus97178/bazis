@@ -14,7 +14,7 @@ OpenSearch 2.17. Codex проверен только без установлен
 | `redisConnect` | `IRedis` — Redis-клиент Bun | Здесь и [Кэширование](../realtime/caching.md) |
 | `openSearchConnect` | `IOpenSearch` | Здесь |
 | `llmConnect`, `llmRouter` | `AgentRuntime` | [LLM-коннекторы](../ai/llm-connectors.md) |
-| `codexAppServerConnect` | `CodexClient` | Здесь |
+| `codexAppServerConnect` | `ICodex` | Здесь |
 
 ## PostgreSQL: `postgres`
 
@@ -187,7 +187,26 @@ export class AppInfra {}
 | `binary` | Путь к CLI `codex` |
 | `stateDirectory` | Каталог состояния Codex: вход в аккаунт хранится там |
 
-Клиент берётся токеном `CODEX_APP_SERVER`:
+Клиент внедряется по типу `ICodex`, как и остальные:
+
+```ts
+import { ICodex } from "bazis/core/infra";
+
+export class Assistant {
+  constructor(private readonly codex: ICodex) {}
+
+  status() {
+    return this.codex.status();
+  }
+}
+```
+
+> [!NOTE]
+> `ICodex` — с версии 0.103.0. Раньше клиент брали токеном
+> `CODEX_APP_SERVER` и перечисляли зависимости вручную; см.
+> [Обновление](../reference/upgrading.md).
+
+Методы:
 
 | Метод | Что делает |
 | --- | --- |

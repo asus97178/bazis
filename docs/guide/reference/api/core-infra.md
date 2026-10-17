@@ -1,7 +1,7 @@
 # `bazis/core/infra`
 
 Инфраструктура: манифест `@Infra` и коннекторы — PostgreSQL, Redis,
-OpenSearch, LLM, Codex. Список — по пакету 0.102.0.
+OpenSearch, LLM, Codex. Список — по пакету 0.104.0.
 
 ## Манифест
 
@@ -22,7 +22,7 @@ OpenSearch, LLM, Codex. Список — по пакету 0.102.0.
 | `llmConnect(config, options)` | Одна модель OpenAI-совместимого API; регистрирует `AgentRuntime` | [`llmConnect`](../../ai/llm-connectors.md#одна-модель-llmconnect) |
 | `llmRouter(profiles, options)`, `llmProfile`, `LlmModelRouter` | Несколько моделей по профилям, с запасной | [`llmRouter`](../../ai/llm-connectors.md#несколько-моделей-llmrouter) |
 | `openAiCompatibleAdapter`, `OpenAiCompatibleModelProvider` | Адаптер OpenAI-совместимого API | [Свой адаптер](../../ai/llm-connectors.md#свой-адаптер) |
-| `codexAppServerConnect(config)`, `CODEX_APP_SERVER`, `CODEX_MODEL_ID`, `CODEX_REASONING_EFFORT` | ChatGPT через Codex App Server | [Codex](../../infra/connectors.md#codex) |
+| `codexAppServerConnect(config)`, `ICodex`, `CODEX_MODEL_ID`, `CODEX_REASONING_EFFORT` | ChatGPT через Codex App Server; клиент внедряется по типу `ICodex` | [Codex](../../infra/connectors.md#codex) |
 | `CodexError`, `RU_CODEX_MESSAGES` | Ошибки Codex с текстом для пользователя | [Ошибки агентов](../errors/agents.md#модели-и-codex) |
 | `LlmModelRouterError`, `OpenAiCompatibleProviderError` | Ошибки LLM-коннекторов | [Ошибки](../../ai/llm-connectors.md#ошибки) |
 | `DEFAULT_LLM_REQUEST_TIMEOUT_MS` | Срок запроса к провайдеру по умолчанию | — |

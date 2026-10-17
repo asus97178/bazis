@@ -146,6 +146,55 @@ await db.saveChanges();            // 2 — сохранены обе
 DbUpdateError: Primary key for tracked entity "Article" cannot be changed.
 ```
 
+## Повтор при временном сбое
+
+Взаимная блокировка (deadlock) или обрыв соединения проходят сами, если
+повторить сохранение. `executionStrategy` модуля включает такие повторы:
+
+```ts
+@Module({
+  ormBazis: {
+    context: Customers,
+    entities: [Customer],
+    executionStrategy: { maxRetries: 3, baseDelayMs: 50 },
+  },
+  exports: [],
+})
+export class CustomersModule {}
+```
+
+Два запроса сохраняют одни и те же строки в обратном порядке, и PostgreSQL
+прерывает один из них:
+
+```text
+без executionStrategy  {"first":"deadlock detected","second":"ok in 1621 ms"}
+с executionStrategy    {"first":"ok in 2233 ms","second":"ok in 1622 ms"}
+```
+
+| Настройка | По умолчанию | Что задаёт |
+| --- | --- | --- |
+| `maxRetries` | `3` | Сколько раз повторить после первой попытки |
+| `baseDelayMs` | `50` | Пауза перед первым повтором; дальше вдвое больше: 50, 100, 200 мс |
+| `isTransient(error)` | см. ниже | Какую ошибку повторять |
+
+Без `executionStrategy` повторов нет.
+
+Повторяются ошибки: `deadlock detected`, `could not serialize` (`40001`),
+обрыв соединения (`ECONNRESET`, `ETIMEDOUT`, `connection terminated`,
+`08006`, `57P01`, `ERR_POSTGRES_CONNECTION_CLOSED`).
+
+- **Повторяется только `saveChanges()` вне транзакции**, целиком, в
+  новой транзакции. Внутри [`transactionScope`](transactions.md) повторов
+  нет: повтор одного шага мог бы записать часть транзакции дважды. Запросы
+  (`find`, `toList`) и сырой SQL тоже не повторяются.
+- **Обрыв во время `COMMIT` не повторяется**: неизвестно, записались ли
+  данные (`TransactionOutcomeUnknownError`).
+- **Повтор отправляет те же значения**, строку он не перечитывает. В
+  примере выше оба запроса дописали `!` к имени, а в базе `Анна!`, не
+  `Анна!!`: второе сохранение затёрло первое. Если важно, кто записал
+  последним, читайте строку с блокировкой (`findForUpdate`) в
+  `transactionScope`.
+
 ## Дальше
 
 - [Запросы](queries.md)
