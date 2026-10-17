@@ -4,6 +4,42 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.104.0 — 2026-10-18
+
+### Added
+
+- `encryptedWith(config, field)` from `bazis/core/orm`: AES-256-GCM column
+  encryption with the key from the application configuration. The key is read
+  when the ORM starts, after every source (secret files included) is loaded,
+  so `secret()` keys from files work and a missing key or an undeclared config
+  stops the start with the entity, the property and the config named:
+
+  ```ts
+  export const cryptoConfig = defineConfig("crypto", { default: { phoneKey: secret("dev-…") }, production: { phoneKey: secret() } });
+
+  @HasConversion(encryptedWith(cryptoConfig, "phoneKey"))
+  @Column({ type: "text" })
+  phone = "";
+  ```
+
+  Binding the same column to another key in the same process is refused.
+- `ValueConverter.comparable`: `false` marks a converter whose equal values
+  are stored differently. Both encrypted converters set it.
+- `DecryptionError`, thrown when an encrypted value cannot be decrypted.
+
+### Changed
+
+- A condition (`eq`, `in`, comparisons, tuples) or an ordering on an encrypted
+  column now throws an `OrmError` naming the column and suggesting a keyed-hash
+  (HMAC) column. Before, it silently matched nothing. `isNull()` still works.
+- An encrypted key or a unique index on an encrypted column is refused when
+  the model is built.
+- A value that cannot be decrypted (another key, changed data) throws
+  `OrmError` "Cannot read Customer.phone: cannot decrypt the value: …"
+  instead of a bare crypto error.
+- Empty strings are encrypted too. Empty values stored by earlier versions
+  still read as empty.
+
 ## 0.103.0 — 2026-10-17
 
 ### Changed (breaking)
