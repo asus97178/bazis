@@ -97,7 +97,16 @@ export class LifecycleCoordinator {
 
     try {
       for (let index = 0; index < this.hooks.length; index += 1) {
-        await this.invokeHook(() => (this.hooks[index] as LifecycleHook).onInit?.(), signal);
+        const hook = this.hooks[index] as LifecycleHook;
+        if (hook.onInit === undefined) continue;
+        // A hung onInit is named by the startup timeout, like a hosted service.
+        const name = `hook ${hook.constructor?.name ?? "LifecycleHook"}.onInit`;
+        this.pending.add(name);
+        try {
+          await this.invokeHook(() => hook.onInit?.(), signal);
+        } finally {
+          this.pending.delete(name);
+        }
       }
 
       const phases = groupByPhase(hosted);

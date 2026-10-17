@@ -1,4 +1,5 @@
 import { HttpClientError, HttpErrorCode } from "./errors";
+import { assertKnownOptions } from "./configKeys";
 import { InspectableRedirectProtocol as redirectProtocol } from "./redirectProtocol";
 import { InterceptorManager } from "./interceptors";
 import { trackDownload } from "./progress";
@@ -85,6 +86,7 @@ export class HttpClient {
   };
 
   public constructor(defaults: RequestConfig = {}) {
+    assertKnownOptions(defaults, "the client defaults");
     this.defaults = defaults;
     this.interceptors = {
       request: new InterceptorManager<ResolvedRequestConfig>(),
@@ -106,6 +108,11 @@ export class HttpClient {
   public request<T = unknown>(configOrUrl: RequestConfig | string, maybeConfig: RequestConfig = {}): Promise<HttpResponse<T>> {
     const config: RequestConfig =
       typeof configOrUrl === "string" ? { ...maybeConfig, url: configOrUrl } : configOrUrl;
+    try {
+      assertKnownOptions(config, "the request config");
+    } catch (error) {
+      return Promise.reject(error);
+    }
     const merged = this.mergeConfig(this.defaults, config);
 
     // axios ordering: request interceptors run last-registered-first.

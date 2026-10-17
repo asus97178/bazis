@@ -1,6 +1,6 @@
 import { inspect } from "node:util";
 import { redactSensitive, redactSensitiveText } from "../../library/redaction";
-import { StartupFailuresError } from "./errors";
+import { ShutdownTimeoutError, StartupFailuresError, StartupTimeoutError } from "./errors";
 
 const MAX_CAUSES = 5;
 /** Properties already printed in the header, the frames or the cause chain. */
@@ -32,7 +32,9 @@ export function formatStartupFailure(error: unknown): string {
     // Services that failed together: the list above is the report; the
     // aggregate's own frames are the kernel's, not the application's.
     if (!(current instanceof StartupFailuresError)) lines.push(...(current.stack ?? "").split("\n").filter((line) => /^\s+at /.test(line)));
-    const details = Object.fromEntries(Object.entries(current).filter(([name]) => !SHOWN.has(name)));
+    // Timeouts already say their limit and what was pending in the message.
+    const restated = current instanceof StartupTimeoutError || current instanceof ShutdownTimeoutError;
+    const details = restated ? {} : Object.fromEntries(Object.entries(current).filter(([name]) => !SHOWN.has(name)));
     if (Object.keys(details).length > 0) lines.push(inspect(redactSensitive(details), INSPECT));
     current = current.cause;
   }

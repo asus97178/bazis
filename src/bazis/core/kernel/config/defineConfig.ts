@@ -184,7 +184,11 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       const priority = Math.max(...candidates.map(candidate => candidate.priority));
       const winners = candidates.filter(candidate => candidate.priority === priority);
       const selected = winners[0];
-      if (winners.some(candidate => candidate.raw !== selected?.raw)) issue(key, "conflict", "conflicting environment aliases");
+      if (winners.some(candidate => candidate.raw !== selected?.raw)) {
+        // Names only: the values may be secrets.
+        const variables = [...new Set(winners.map(candidate => candidate.name))];
+        issue(key, "conflict", `conflicting environment aliases: ${variables.join(" and ")} are set to different values; set only one`);
+      }
       const raw = selected?.raw ?? (isSecret(cell) || isEnum(cell) ? cell.default : cell);
       let value: ConfigValueType | undefined;
       if (type === "secret") {
