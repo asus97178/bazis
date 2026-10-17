@@ -4,6 +4,22 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.104.1 — 2026-10-18
+
+### Fixed
+
+- `null` in a column with a value converter stays SQL NULL and the converter
+  is not called for it, as in EF Core. Before, an encrypted nullable column
+  failed to save with `TypeError: The "data" argument must be of type
+  string…`, and `ValueConverters.json()` stored the string `"null"`
+  instead of SQL NULL. Stored `"null"` strings still read as `null`.
+
+### Added
+
+- `ValueConverter.convertsNulls`: `true` makes the converter receive
+  `null` both ways, for example to store `null` as `""`. A custom
+  converter that relied on getting `null` needs it.
+
 ## 0.104.0 — 2026-10-18
 
 ### Added

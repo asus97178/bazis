@@ -1,6 +1,7 @@
 import { types } from "node:util";
 import { OrmError, OrmTrackedMutationConflictError, OrmUndeclaredConflictTargetError, OrmUnsafeImmediateMutationError } from "../errors";
 import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
+import { convertsValue } from "../Providers/propertyConversion";
 import type { DbContextRuntime } from "../runtime";
 import { hasTrackedEntriesForModel } from "../Tracking/ChangeTracker";
 import { isPostgresJsonScalarParameter } from "../Providers/PostgresDialect";
@@ -136,11 +137,11 @@ function admitInsertValues<T extends object>(model: EntityModel, entity: T): rea
 }
 function unsetKey(value: unknown): boolean { return value === undefined || value === null || value === "" || value === 0; }
 function encodeAssignments(runtime: DbContextRuntime, assignments: readonly AdmittedAssignment[]): readonly { readonly property: PropertyModel; readonly value: SqlParam }[] {
-  return Object.freeze(assignments.map(({ property, value }) => Object.freeze({ property, value: value === null ? null : encode(runtime, property, value) })));
+  return Object.freeze(assignments.map(({ property, value }) => Object.freeze({ property, value: value === null && !convertsValue(property, null) ? null : encode(runtime, property, value) })));
 }
 function encode(runtime: DbContextRuntime, property: PropertyModel, input: unknown, allowNull = false): SqlParam {
   try {
-    const providerValue = property.converter ? property.converter.toProvider(input) : input;
+    const providerValue = convertsValue(property, input) ? property.converter!.toProvider(input) : input;
     const safeProvider = storageValue(providerValue, property.type, allowNull);
     return snapshotEncodedSqlParam(runtime.provider.dialect.encode(safeProvider, property.type));
   } catch {
