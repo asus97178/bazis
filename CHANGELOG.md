@@ -4,6 +4,22 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.103.0 — 2026-10-17
+
+### Changed (breaking)
+
+- The Codex client is injected by type, like the other infra clients:
+  `constructor(private readonly codex: ICodex)`, with no explicit deps list.
+  `ICodex` from `bazis/core/infra` replaces the `CODEX_APP_SERVER` token,
+  which is removed:
+
+  ```ts
+  // before
+  singletonFactory(Assistant, [CODEX_APP_SERVER] as const, (codex) => new Assistant(codex))
+  // now
+  export class Assistant { constructor(private readonly codex: ICodex) {} }
+  ```
+
 ## 0.102.0 — 2026-10-17
 
 ### Changed (breaking)

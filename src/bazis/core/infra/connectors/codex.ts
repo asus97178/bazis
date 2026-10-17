@@ -5,12 +5,18 @@ import { reader, requireValue } from "../connectorConfig";
 import { CodexAppServerClient } from "./codex/CodexAppServerClient";
 import type { CodexClient, CodexConfigShape } from "./codex/contracts";
 
-export const CODEX_APP_SERVER: InjectionToken<CodexClient> = createToken<CodexClient>("CodexClient");
+/**
+ * Codex App Server client of the `codexAppServerConnect()` connector,
+ * injected by type like the other infra clients:
+ * `constructor(private readonly codex: ICodex)`.
+ */
+export interface ICodex extends CodexClient {}
+export const ICodex = createToken<ICodex>("ICodex") as InjectionToken<CodexClient>;
 
 /** App Server is a full executor; it does not implement the raw AgentModelProvider port. */
 export function codexAppServerConnect(config: AppConfig<CodexConfigShape>): InfraConnector<CodexClient> {
   return {
-    token: CODEX_APP_SERVER, config, phase: 0,
+    token: ICodex, config, phase: 0,
     create(configs) {
       const view = reader(config, configs);
       return new CodexAppServerClient({
