@@ -278,7 +278,14 @@ describe("public bazis DX smoke", () => {
 });
 
 test("HTTP manual binding API is removed", () => {
-  for (const name of ["Bind", "Param", "Query", "Body", "Header", "Req", "Res", "Ctx", "FromServices", "List", "FromRoute", "FromQuery", "FromBody", "FromHeader"]) {
+  for (const name of ["Bind", "Param", "Query", "Body", "Header", "Req", "Res", "Ctx", "FromServices", "List", "FromRoute", "FromBody"]) {
     expect(name in http).toBe(false);
+  }
+  // Since 0.101.0 FromQuery and FromHeader are field decorators of query and
+  // header models (the parameter markers are types read by codegen), not the
+  // removed @Bind descriptors.
+  for (const decorator of [http.FromQuery, http.FromHeader]) {
+    expect(typeof decorator("name")).toBe("function");
+    expect(decorator("name").length).toBe(2);
   }
 });

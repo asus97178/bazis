@@ -12,7 +12,9 @@ contain breaking changes, a patch version does not.
   `FromRoute` from `bazis/core/http`. Standard decorators have no parameter
   decorators, so the source is the parameter type, read by codegen through the
   type checker (an aliased import works; an application type of the same name
-  is not a marker):
+  is not a marker). The names were the aliases of the `@Bind` descriptors
+  removed in 0.95; they come back as types and field decorators, `@Bind`
+  stays removed:
 
   ```ts
   @Get(":id")
