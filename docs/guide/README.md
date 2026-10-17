@@ -122,7 +122,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 ## 13. Справочник
 
-- ⏳ API по точкам входа `bazis/...`
+- ✅ [API по точкам входа `bazis/...`](reference/api/README.md)
 - ✅ [Команды CLI](cli/commands.md)
 - ✅ [Параметры конфигурации](reference/configuration.md)
 - ✅ [Справочник ошибок](reference/errors/README.md)
