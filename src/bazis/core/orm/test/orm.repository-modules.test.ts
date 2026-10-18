@@ -71,7 +71,7 @@ describe("repositories across modules", () => {
     class OrdersModule {}
     @Module({ imports: [ConnectionModule, OrdersModule], exports: [] })
     class AppModule {}
-    expect(failure(() => createContainer(AppModule, { validateOnBuild: true }).createScope().resolve(OrdersService))).toContain(`No provider token found for named dependency "IRepository<Product>". Repositories are registered by ormBazis for the entities of its context: add Product to the entities of an ormBazis module and keep registerRepositories on (the default), or inject that module's DbContext instead.`);
+    expect(failure(() => createContainer(AppModule, { validateOnBuild: true }).createScope().resolve(OrdersService))).toContain(`Missing dependency "IRepository<Product>" for "OrdersService". Repositories are registered by ormBazis for the entities of its context: add Product to the entities of an ormBazis module and keep registerRepositories on (the default), or inject that module's DbContext instead.`);
   });
 });
 
