@@ -10,9 +10,18 @@ export function registerNamedDependencyHint(hint: NamedDependencyHint): void {
   hints.push(hint);
 }
 
+function hintFor(name: string): string {
+  const hint = hints.map((item) => item(name)).find((text) => text !== undefined);
+  return hint ? ` ${hint}` : "";
+}
+
+/** The graph-validation issue for a named dependency nobody registers, naming the service that needs it. */
+export function missingNamedDependencyIssue(name: string, requester: string): string {
+  return `Missing dependency "${name}" for "${requester}".${hintFor(name)}`;
+}
+
 export class NamedDependencyNotFoundError extends DiError {
   public constructor(name: string) {
-    const hint = hints.map((item) => item(name)).find((text) => text !== undefined);
-    super(`No provider token found for named dependency "${name}".${hint ? ` ${hint}` : ""}`);
+    super(`No provider token found for named dependency "${name}".${hintFor(name)}`);
   }
 }

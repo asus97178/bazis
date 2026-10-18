@@ -4,6 +4,25 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.105.1 — 2026-10-18
+
+### Fixed
+
+- A service that injects `ConfigView<T>` of a config no module declares now
+  fails the start with the service and the fix named:
+
+  ```text
+  Missing dependency "Config:crypto" for "PhoneHash". The config defineConfig("crypto", …) is not declared
+  in the application: add it to `config` of the module that uses it, or to runApp({ config }).
+  ```
+
+  Before: `No provider token found for named dependency "Config:crypto".`
+- Every dependency injected by name (an interface, `IRepository<T>`,
+  `ConfigView<T>`) that nothing registers is reported in the graph
+  validation list as `Missing dependency "…" for "<service>"`, together with
+  the other problems, instead of stopping at the first one without the
+  service.
+
 ## 0.105.0 — 2026-10-18
 
 ### Added

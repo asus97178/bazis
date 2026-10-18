@@ -7,6 +7,16 @@ import { ENV_PREFIX } from "./sources";
 import { isSensitiveKey, redactSensitiveText } from "../../../library/redaction";
 import { ConfigValidationError, type ConfigIssue, type ConfigIssueKind } from "./ConfigValidationError";
 import { callerFile } from "./callerFile";
+import { registerNamedDependencyHint } from "../../di/errors/NamedDependencyNotFoundError";
+
+// `ConfigView<T>` is injected by the name of its config; a config that no
+// module declares has no provider, and the start says where to declare it.
+registerNamedDependencyHint((name) => {
+  const match = /^Config:(.+)$/.exec(name);
+  if (!match) return undefined;
+  const declaration = match[1] === "default" ? "defineConfig({ … })" : `defineConfig("${match[1]}", …)`;
+  return `The config ${declaration} is not declared in the application: add it to \`config\` of the module that uses it, or to runApp({ config }).`;
+});
 
 type Stand = "development" | "test" | "production";
 type Primitive = string | number | boolean;
