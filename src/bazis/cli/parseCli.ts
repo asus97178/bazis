@@ -20,6 +20,7 @@ export interface ParsedGenerateArgs {
 
 export type ParseCliResult =
   | { readonly kind: "help"; readonly help: boolean }
+  | { readonly kind: "version" }
   | { readonly kind: "new"; readonly name: string; readonly outputPath?: string; readonly frameworkPath?: string; readonly linkFramework: boolean; readonly vendor: boolean; readonly dryRun: boolean }
   | { readonly kind: "generate"; readonly args: ParsedGenerateArgs }
   | { readonly kind: "codegen"; readonly target?: string }
@@ -38,6 +39,7 @@ const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterpris
 /** Parsing is pure: help and invalid input can never start generation. */
 export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   if (argv.some((arg) => arg === "--help" || arg === "-h")) return { kind: "help", help: true };
+  if (argv.length === 1 && (argv[0] === "--version" || argv[0] === "-v")) return { kind: "version" };
   if (argv.length === 0) return { kind: "help", help: false };
   // Everything after `test` (or `test --`) belongs to `bun test`.
   if (argv[0] === "test") return { kind: "test", args: argv[1] === "--" ? argv.slice(2) : argv.slice(1) };

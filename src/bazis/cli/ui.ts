@@ -37,16 +37,26 @@ export function projectInfo(cwd: string): { name?: string; version?: string } {
   }
 }
 
-/** Version of the bazis package this CLI belongs to. */
-export function bazisVersion(): string {
+function bazisPackage(): { version?: unknown; engines?: { bun?: unknown } } | undefined {
   try {
     const file = fileURLToPath(new URL("../package.json", import.meta.url));
-    if (!existsSync(file)) return "?";
-    const version = (JSON.parse(readFileSync(file, "utf8")) as { version?: unknown }).version;
-    return typeof version === "string" ? version : "?";
+    if (!existsSync(file)) return undefined;
+    return JSON.parse(readFileSync(file, "utf8")) as { version?: unknown; engines?: { bun?: unknown } };
   } catch {
-    return "?";
+    return undefined;
   }
+}
+
+/** Version of the bazis package this CLI belongs to. */
+export function bazisVersion(): string {
+  const version = bazisPackage()?.version;
+  return typeof version === "string" ? version : "?";
+}
+
+/** The Bun range the package declares in `engines` (`>=1.4.0`). */
+export function requiredBun(): string | undefined {
+  const range = bazisPackage()?.engines?.bun;
+  return typeof range === "string" ? range : undefined;
 }
 
 /** The logo with the command badge: project, versions, and the command's own facts. */

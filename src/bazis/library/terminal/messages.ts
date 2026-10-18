@@ -238,6 +238,9 @@ const en = {
   },
   errors: {
     unknown: "Use bazis --help to list commands and options.",
+    bunTooOld: (required: string, actual: string) => `bazis needs Bun ${required.startsWith(">=") ? `${required.slice(2).trim()} or newer` : required}; this is Bun ${actual}.`,
+    bunWhich: (file: string) => `This Bun is ${file}. bunx bazis and bun run scripts start bazis with the first bun in PATH, not with the Bun that called them.`,
+    bunUpgrade: "Update that Bun: bun upgrade. Or put the newer Bun first in PATH.",
   },
 };
 
@@ -397,6 +400,9 @@ const ru: Messages = {
   },
   errors: {
     unknown: "Список команд и опций: bazis --help.",
+    bunTooOld: (required, actual) => `bazis нужен Bun ${required.startsWith(">=") ? `${required.slice(2).trim()} или новее` : required}, а запущен Bun ${actual}.`,
+    bunWhich: (file) => `Запущен ${file}. bunx bazis и скрипты bun run запускают bazis первым bun из PATH, а не тем Bun, который их вызвал.`,
+    bunUpgrade: "Обновите этот Bun: bun upgrade. Или поставьте новый Bun первым в PATH.",
   },
 };
 
