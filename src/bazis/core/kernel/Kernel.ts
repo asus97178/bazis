@@ -261,18 +261,32 @@ export class Kernel {
       if (this.startupCleanupFailure !== undefined) return Promise.reject(this.startupCleanupFailure);
       return Promise.resolve();
     }
+    // Only an application that started announces its stop.
+    const wasStarted = this.state === "started";
     this.state = "stopping";
-    this.shutdownPromise = this.stopCore(request);
+    this.shutdownPromise = this.stopCore(request, wasStarted);
     return this.shutdownPromise;
   }
 
-  private async stopCore(request: StopRequest): Promise<void> {
+  private async stopCore(request: StopRequest, wasStarted: boolean): Promise<void> {
     // The whole graceful-stop sequence — lifetime notifications, the STOPPING
     // event, hosted services/hooks and disposal — is bounded by one budget. A
     // single hanging callback or handler must not wedge shutdown forever.
+    const announce = wasStarted && this.options.startupReport && this.options.schemaOnly !== true;
+    const logger = announce ? this.container.tryResolve(LOGGER) : undefined;
+    const startedAt = performance.now();
     const work = this.runShutdownSequence(request);
     try {
       await awaitShutdown(work, this.options.shutdownTimeoutMs);
+      if (announce) {
+        const fields = {
+          ...(request.signal === undefined ? {} : { signal: request.signal }),
+          exitCode: request.exitCode,
+          shutdownMs: Number((performance.now() - startedAt).toFixed(1)),
+        };
+        if (logger) logger.info("bazis stopped", fields);
+        else console.log(`[bazis] stopped ${JSON.stringify(fields)}`);
+      }
     } finally {
       this.state = "stopped";
     }
@@ -441,6 +455,12 @@ export class Kernel {
     console.error("[bazis] Unhandled error, shutting down:", redacted);
   }
 
+  /** Where the servers listen: `{ listening: ["http://localhost:3000"] }`. */
+  private listening(): { listening?: readonly string[] } {
+    const urls = (this.container.tryResolve(StartupReport)?.listeners ?? []).map((listener) => listener.url);
+    return urls.length > 0 ? { listening: urls } : {};
+  }
+
   private printStartupReport(): void {
     if (this.options.onStarted !== undefined) {
       try {
@@ -460,6 +480,7 @@ export class Kernel {
       hostedServices: this.coordinator.startedHostedCount,
       hooks: this.coordinator.hookCount,
       startupMs: Number(this.startupMs.toFixed(1)),
+      ...this.listening(),
     };
     if (logger) {
       logger.info("bazis started", fields);

@@ -20,6 +20,8 @@ export const USAGE = `Usage:
   bazis build                                 Codegen and typecheck
   bazis build --bin [--outfile <path>]        Also compile a standalone executable (default bin/<name>)
   bazis build --bin --dotenv                  The executable also reads .env files from its working directory
+  bazis build --bin --platform <os-arch>      For another platform, e.g. linux-x64, linux-arm64-musl
+                                             (default output bin/<name>-<os-arch>)
   bazis --help
   bazis --version                             Print the bazis version (also -v)
   g can also be written as generate.
@@ -130,7 +132,7 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
     if (parsed.kind === "codegen") return await runCodegenCommand(cwd, parsed.target, codegen, ui);
     if (parsed.kind === "dev") return await runDev(cwd, codegen, ui, { watch: parsed.watch });
     if (parsed.kind === "test") return await runTest(cwd, parsed.args, codegen, ui);
-    if (parsed.kind === "build") return await runBuild(cwd, { bin: parsed.bin, outfile: parsed.outfile, dotenv: parsed.dotenv }, codegen, ui);
+    if (parsed.kind === "build") return await runBuild(cwd, { bin: parsed.bin, outfile: parsed.outfile, dotenv: parsed.dotenv, platform: parsed.platform }, codegen, ui);
     if (parsed.kind === "new") return await runNew(parsed, ui);
     // Module registration parses the host module with the TypeScript API: load it
     // only after switching TypeScript 7 to @typescript/typescript6.

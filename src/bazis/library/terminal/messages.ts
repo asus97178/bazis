@@ -98,7 +98,7 @@ const en = {
     codegen: "codegen", typecheck: "typecheck", config: "config", connections: "connections", schema: "schema",
     modules: "modules", services: "services", tests: "bun test", compile: "compile", files: "files", register: "register",
   },
-  meta: { env: "env", watch: "watch", on: "on", off: "off", src: "src", pid: "pid", target: "target", out: "output", path: "path" },
+  meta: { env: "env", watch: "watch", on: "on", off: "off", src: "src", pid: "pid", target: "target", out: "output", path: "path", platform: "platform" },
   common: {
     of: "of", in: "in", and: "and", none: "none", ok: "ok", empty: "empty", plus: "plus", memory: "memory",
     declaredIn: "declared in", code: "code", where: "where", try: "try", logs: "logs", inProcess: "in process",
@@ -260,7 +260,7 @@ const ru: Messages = {
     codegen: "кодогенерация", typecheck: "типы", config: "конфигурация", connections: "подключения", schema: "схема",
     modules: "модули", services: "сервисы", tests: "bun test", compile: "компиляция", files: "файлы", register: "подключение",
   },
-  meta: { env: "среда", watch: "слежение", on: "вкл", off: "выкл", src: "вход", pid: "pid", target: "цель", out: "файл", path: "путь" },
+  meta: { env: "среда", watch: "слежение", on: "вкл", off: "выкл", src: "вход", pid: "pid", target: "цель", out: "файл", path: "путь", platform: "платформа" },
   common: {
     of: "из", in: "в", and: "и", none: "нет", ok: "в порядке", empty: "пусто", plus: "ещё", memory: "память",
     declaredIn: "объявлено в", code: "код", where: "где", try: "попробуйте", logs: "журнал", inProcess: "в процессе",
