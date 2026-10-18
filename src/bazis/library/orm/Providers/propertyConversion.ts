@@ -2,16 +2,24 @@ import { OrmError } from "../errors";
 import type { PropertyModel } from "../Metadata/types";
 import type { SqlDialect, SqlParam } from "./types";
 
+/**
+ * Whether the converter of the property applies to the value: `null` and
+ * `undefined` stay SQL NULL unless the converter declares `convertsNulls`.
+ */
+export function convertsValue(property: PropertyModel, value: unknown): boolean {
+  return property.converter !== undefined && (property.converter.convertsNulls === true || (value !== null && value !== undefined));
+}
+
 /** Encodes a property value: converter -> dialect. */
 export function encodeProperty(property: PropertyModel, value: unknown, dialect: SqlDialect): SqlParam {
-  const modelValue = property.converter ? property.converter.toProvider(value) : value;
+  const modelValue = convertsValue(property, value) ? property.converter!.toProvider(value) : value;
   return dialect.encode(modelValue, property.type);
 }
 
 /** Decodes a column value: dialect -> converter. A converter failure names the entity and the property. */
 export function decodeProperty(property: PropertyModel, value: unknown, dialect: SqlDialect, owner?: string): unknown {
   const providerValue = dialect.decode(value, property.type);
-  if (!property.converter) return providerValue;
+  if (!property.converter || !convertsValue(property, providerValue)) return providerValue;
   try {
     return property.converter.fromProvider(providerValue);
   } catch (error) {

@@ -13,6 +13,12 @@ export interface ValueConverter<TModel = unknown, TProvider = unknown> {
    * the query fails instead of silently matching nothing.
    */
   readonly comparable?: boolean;
+  /**
+   * `true`: the converter also gets `null` (both ways), for example to store
+   * `null` as `""`. By default `null` stays SQL NULL and the converter is
+   * not called, as in EF Core.
+   */
+  readonly convertsNulls?: boolean;
 }
 
 /** Thrown by an encrypted column that cannot be read: another key, or the stored value was changed. */

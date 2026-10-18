@@ -162,11 +162,11 @@ test("hostile late AST node is rejected before converters and SQL", async () => 
   const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; query.plan = { conditions: [{ kind: "compare", property: "id", op: "=", value: 1 }, bad], orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] };
   await expect(query.executeDelete()).rejects.toBeInstanceOf(OrmUnsafeImmediateMutationError); expect(reads).toBe(0); expect(converterCalls).toBe(0); expect(log).toEqual([]);
 });
-test("predicate null invokes converter once and binds SQL NULL", async () => {
+test("predicate null binds SQL NULL without the converter", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); converterCalls = 0;
   const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; query.plan = { conditions: [{ kind: "compare", property: "value", op: "=", value: null }], orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] };
   await query.executeDelete();
-  expect(converterCalls).toBe(1); expect(log[0]).toEqual({ sql: 'DELETE FROM "ConvertedRows" WHERE "value" = $1', params: [null] });
+  expect(converterCalls).toBe(0); expect(log[0]).toEqual({ sql: 'DELETE FROM "ConvertedRows" WHERE "value" = $1', params: [null] });
 });
 test("predicate converter reentrancy is stopped by final tracker guard", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log));
@@ -443,18 +443,18 @@ test("ValueConverters.json accepts a dense top-level array clone without touchin
   await db.jsonText.asNoTracking().where(x => x.id.eq(3)).executeUpdate({ payload: input as never }); input.push("later");
   expect(log[0]!.params).toEqual(['["one",{"nested":["two"]}]', 3]);
 });
-test("nullable insert and update null bypass the converter while predicate null counts occurrences", async () => {
+test("insert, update and predicate null bypass the converter", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); nullableConverterCalls = 0;
   await db.nullable.insertIfAbsent(Object.assign(new NullableConvertedRow(), { id: 2, value: null }), { conflictBy: x => [x.id] }); expect(nullableConverterCalls).toBe(0); expect(log[0]!.params).toEqual([2, null]);
-  const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; converterCalls = 0; query.plan = { conditions: [{ kind: "tuples", properties: ["value"], values: [[null], [null]] }], orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] }; await query.executeDelete(); expect(converterCalls).toBe(2); expect(log[1]!.params).toEqual([null, null]);
+  const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; converterCalls = 0; query.plan = { conditions: [{ kind: "tuples", properties: ["value"], values: [[null], [null]] }], orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] }; await query.executeDelete(); expect(converterCalls).toBe(0); expect(log[1]!.params).toEqual([null, null]);
   // Like insert, an update to NULL binds SQL NULL without the converter.
   await db.nullable.asNoTracking().where(x => x.id.eq(1)).executeUpdate({ value: null }); expect(nullableConverterCalls).toBe(0); expect(log[2]!.params).toEqual([null, 1]);
 });
-test("admitted predicate null AST uses zero calls while compare and IN bind each null occurrence", async () => {
+test("admitted predicate null AST, compare and IN bind null without the converter", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log)); const query = db.converted.asNoTracking() as unknown as { plan: unknown; executeDelete(): Promise<unknown> }; const base = { orders: [], noTracking: true, includes: [], ignoreQueryFilters: true, projections: [] };
   converterCalls = 0; query.plan = { ...base, conditions: [{ kind: "null", property: "value", negated: false }] }; await query.executeDelete(); expect(converterCalls).toBe(0); expect(log[0]!.params).toEqual([]);
-  converterCalls = 0; query.plan = { ...base, conditions: [{ kind: "compare", property: "value", op: "=", value: null }] }; await query.executeDelete(); expect(converterCalls).toBe(1); expect(log[1]!.params).toEqual([null]);
-  converterCalls = 0; query.plan = { ...base, conditions: [{ kind: "in", property: "value", values: [null, null] }] }; await query.executeDelete(); expect(converterCalls).toBe(2); expect(log[2]!.params).toEqual([null, null]);
+  converterCalls = 0; query.plan = { ...base, conditions: [{ kind: "compare", property: "value", op: "=", value: null }] }; await query.executeDelete(); expect(converterCalls).toBe(0); expect(log[1]!.params).toEqual([null]);
+  converterCalls = 0; query.plan = { ...base, conditions: [{ kind: "in", property: "value", values: [null, null] }] }; await query.executeDelete(); expect(converterCalls).toBe(0); expect(log[2]!.params).toEqual([null, null]);
 });
 test("requires public asNoTracking for update and delete before any dispatch", async () => {
   const log: { sql: string; params: readonly unknown[] }[] = []; const db = new Context(provider(log));

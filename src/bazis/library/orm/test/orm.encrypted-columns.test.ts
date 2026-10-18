@@ -65,3 +65,23 @@ test("an encrypted key or unique index is refused when the model is built", () =
   expect(() => ModelBuilder.build(EncryptedKey)).toThrow('Entity "EncryptedKey": key "id" cannot be encrypted: equal values are stored differently.');
   expect(() => ModelBuilder.build(UniquePhone)).toThrow('Entity "UniquePhone": a unique index on encrypted "phone" cannot work: equal values are stored differently. Put it on a keyed hash (HMAC) column.');
 });
+
+@Entity()
+class Note {
+  @Key({ generated: false }) id = 1;
+  @HasConversion(phone) @Column({ type: "text", nullable: true }) secret: string | null = null;
+  @HasConversion(ValueConverters.json<{ tags: string[] }>()) @Column({ type: "text", nullable: true }) meta: { tags: string[] } | null = null;
+  @HasConversion({ convertsNulls: true, toProvider: (value: string | null) => value ?? "", fromProvider: (value: string | null) => (value === "" || value === null ? null : value) })
+  @Column({ type: "text" }) nickname: string | null = null;
+}
+
+test("null stays SQL NULL: converters are not called for it unless they declare convertsNulls", async () => {
+  const { provider, statements } = recording(() => [{ id: 1, secret: null, meta: null, nickname: "" }]);
+  const context = new Context(new DbContextOptions({ provider, entities: [Note], validateOnSave: false }));
+  context.add(new Note());
+  await context.saveChanges();
+  const insert = statements.find((statement) => statement.sql.startsWith("INSERT"))!;
+  expect(insert.params).toEqual([1, null, null, ""]);
+  const [loaded] = await context.setOf(Note).asNoTracking().toList();
+  expect(loaded).toMatchObject({ secret: null, meta: null, nickname: null });
+});
