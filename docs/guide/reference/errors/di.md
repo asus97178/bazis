@@ -33,6 +33,31 @@ Missing dependency "Mailer" for "SignupService"
 - **Что сделать.** Добавьте `Mailer` в `providers` модуля или импортируйте
   модуль, который его экспортирует.
 
+Зависимости, которые внедряются по имени, — `ConfigView<T>`,
+`IRepository<T>`, токен `createToken("…")` — приходят в том же списке, с
+подсказкой:
+
+```text
+[bazis] configuration error: Service graph validation failed:
+Missing dependency "Config:report" for "ReportService". The config defineConfig("report", …) is not declared
+in the application: add it to `config` of the module that uses it, or to runApp({ config }).
+Missing dependency "IRepository<Lead>" for "LeadsService". Repositories are registered by ormBazis for the
+entities of its context: add Lead to the entities of an ormBazis module and keep registerRepositories on
+(the default), or inject that module's DbContext instead.
+Missing dependency "IClock" for "Scheduler".
+```
+
+| Имя | Что сделать |
+| --- | --- |
+| `Config:report` | Подключить конфиг: `config: reportConfig` в модуле или `runApp({ config })` ([Конфигурация](../../fundamentals/configuration.md)) |
+| `IRepository<Lead>` | Добавить `Lead` в `entities` модуля с `ormBazis` ([Репозитории](../../database/repositories.md)) |
+| `IClock` | Зарегистрировать токен: `scoped(IClock, SystemClock)` ([Провайдеры](../../overview/providers.md#интерфейс-и-токен)) |
+
+> [!NOTE]
+> С версии 0.105.1. Раньше запуск останавливался на первой такой
+> зависимости, без имени сервиса:
+> `No provider token found for named dependency "Config:report".`
+
 #### Singleton depends on scoped
 
 ```text
@@ -201,13 +226,16 @@ Circular dependency detected: A -> B -> A
 ### `NamedDependencyNotFoundError`
 
 ```text
-[bazis] configuration error: No provider token found for named dependency "IClock".
+No provider token found for named dependency "IClock".
 ```
 
-Зависимость объявлена по имени — `namedDependency("IClock")` в списке
-зависимостей фабрики, — но токена с таким именем никто не регистрирует.
-Зарегистрируйте токен `createToken("IClock")` или сделайте контракт
-абстрактным классом ([Провайдеры](../../overview/providers.md#интерфейс-и-токен)).
+Текст из исходников. Зависимость по имени, которую никто не регистрирует,
+при запуске приложения приходит в списке
+[`ServiceValidationError`](#missing-dependency) с именем сервиса. Этот
+класс — когда граф не проверялся: `createContainer(…)` без
+`validateOnBuild` и сразу `resolve`. Что сделать — то же: зарегистрировать
+токен или сделать контракт абстрактным классом
+([Провайдеры](../../overview/providers.md#интерфейс-и-токен)).
 
 ### `AmbiguousNamedDependencyError`
 
