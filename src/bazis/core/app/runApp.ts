@@ -21,7 +21,7 @@ import {
   type UiProfileV1,
 } from "../../library/ui";
 import { modelValidatorAdapter } from "../../library/validation";
-import { createLocalize, type AppLanguage, type AppMessages } from "./messages";
+import { createLanguages, type AppLanguage, type AppLanguageOptions, type AppMessages } from "./messages";
 import { useCodexLanguage } from "../infra/connectors/codex/contracts";
 import {
   type RunAppUiOptions,
@@ -66,8 +66,16 @@ export interface RunAppOptions {
    * ```ts
    * await runApp(AppModule, { language: "ru", http: { port: 3000 } });
    * ```
+   *
+   * Several languages — each request gets the best match of its
+   * `Accept-Language`, or `default`; such responses carry `Content-Language`
+   * and `Vary: Accept-Language`, and `ctx.language` names the choice:
+   *
+   * ```ts
+   * await runApp(AppModule, { language: { default: "ru", supported: ["ru", "en"] } });
+   * ```
    */
-  readonly language?: AppLanguage;
+  readonly language?: AppLanguage | AppLanguageOptions;
   /**
    * Own texts for single framework messages, on top of `language`:
    * `{ notFound: "Нет такой страницы", required: "Заполните {property}" }`.
@@ -292,8 +300,8 @@ export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}):
  */
 export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): BazisModuleRef {
   // Checked even without HTTP: an unknown language is a startup error.
-  const localize = createLocalize(options.language, options.messages);
-  useCodexLanguage(options.language ?? "en");
+  const languages = createLanguages(options.language, options.messages);
+  useCodexLanguage(typeof options.language === "object" ? options.language.default : options.language ?? "en");
   // Infrastructure and cache are global modules; add them to the graph next to the feature root.
   const globals: BazisModuleRef[] = [];
   if (options.infra !== undefined) {
@@ -331,7 +339,7 @@ export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): B
       options.http,
     );
     const httpRoot = httpModule({
-      localize,
+      languages,
       ...options.http,
       validator,
       imports: [httpAppRoot],

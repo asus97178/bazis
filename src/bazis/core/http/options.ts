@@ -2,7 +2,7 @@ import type { Class } from "../di";
 import type { AccessLogOptions } from "./Middleware/accessLog";
 import type { CorsOptions } from "./Middleware/cors";
 import type { ErrorHandlerOptions } from "./Middleware/errorHandler";
-import type { Localize } from "./Errors/messages";
+import type { LanguageSelection } from "./Errors/messages";
 import type { SecurityHeadersOptions } from "./Middleware/securityHeaders";
 import type { HttpMiddleware } from "./Middleware/types";
 import type { ActionMeta, ControllerMeta } from "./Decorators/metadata";
@@ -61,11 +61,11 @@ export interface HttpModuleOptions {
   /** Request-model validator captured by this HTTP server instance. */
   readonly validator?: ModelValidator;
   /**
-   * Renders framework response texts in the application language. `runApp`
+   * Response language of each request and its framework texts. `runApp`
    * sets it from its `language` and `messages` options; without it the
    * texts are English.
    */
-  readonly localize?: Localize;
+  readonly languages?: LanguageSelection;
   /**
    * Modules providing the controllers' dependencies. Controllers live inside
    * the returned HttpModule, so their dependencies must be visible to it:

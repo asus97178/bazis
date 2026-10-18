@@ -4,6 +4,29 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.108.0 — 2026-10-19
+
+### Added
+
+- Closed by default: `runApp({ http: { authorize: signedIn } })` runs these
+  checks on every route that is not `@AllowAnonymous`, before the route's own
+  `@Authorize` checks (each function once), like ASP.NET Core's fallback
+  policy. `/health` and the docs stay open; OpenAPI marks such routes secured
+  and the startup screen no longer lists them as open.
+- A response language per request:
+  `runApp({ language: { default: "ru", supported: ["ru", "en"] } })` picks the
+  best match of `Accept-Language` (`q` values, `ru-RU` → `ru`), or the
+  default. Framework texts (errors, validation, 404, …) are rendered in it and
+  carry `Content-Language` and `Vary: Accept-Language`; `ctx.language` names
+  the choice for the application's own texts. `language: "ru"` works as before
+  and adds no headers. `CodexError` texts follow the default language.
+
+### Changed (breaking)
+
+- `HttpModuleOptions.localize` and `errorHandler({ localize })` are replaced
+  by `languages` (a `LanguageSelection`); `runApp` sets it from `language`
+  and `messages`, so applications that use `runApp` change nothing.
+
 ## 0.107.0 — 2026-10-19
 
 ### Added

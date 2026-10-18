@@ -8,6 +8,27 @@ export type MessageParams = Readonly<Record<string, unknown>>;
  */
 export type Localize = (key: string, params: MessageParams) => string | undefined;
 
+/** The response language of one request and its texts. */
+export interface SelectedLanguage {
+  readonly language: string;
+  readonly localize: Localize;
+}
+
+/**
+ * Picks the response language of a request. `negotiated`: several languages,
+ * chosen by `Accept-Language`; responses whose text the framework wrote then
+ * carry `Content-Language` and `Vary: Accept-Language`.
+ */
+export interface LanguageSelection {
+  readonly negotiated: boolean;
+  select(acceptLanguage: string | null | undefined): SelectedLanguage;
+}
+
+/** Headers of a framework-written response in a negotiated language. */
+export function languageHeaders(selection: LanguageSelection | undefined, selected: SelectedLanguage | undefined): [string, string][] {
+  return selection?.negotiated === true && selected !== undefined ? [["content-language", selected.language], ["vary", "Accept-Language"]] : [];
+}
+
 /** A message key and parameters carried by an error, rendered at the response. */
 export interface LocalizedMessage {
   readonly key: string;
