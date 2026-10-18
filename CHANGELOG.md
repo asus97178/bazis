@@ -4,6 +4,37 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.105.0 — 2026-10-18
+
+### Added
+
+- `transactionScope(work, { retry: true })` runs the whole scope again after
+  a transient failure (deadlock, serialization failure, lost connection), like
+  EF Core's `strategy.ExecuteAsync`. `true` takes the context's
+  `executionStrategy` (or 3 retries from 50 ms); an object sets its own
+  `maxRetries`, `baseDelayMs`, `isTransient`:
+
+  ```ts
+  await db.transactionScope(async () => {
+    const from = await db.accounts.findForUpdate(fromId);
+    const to = await db.accounts.findForUpdate(toId);
+    from!.balance -= amount;
+    to!.balance += amount;
+    await db.saveChanges();
+  }, { retry: true });
+  ```
+
+  - Every attempt starts from a clean context: what the failed attempt
+    loaded or changed (in this context and in contexts joined with
+    `tx.use`) is detached, so the callback reads its rows again and applies
+    its changes once.
+  - Refused with `OrmTransactionScopeError` for a context that already
+    tracks entities (their changes would be lost) and for a nested scope.
+  - A COMMIT without acknowledgement, an abort and a timeout are not retried;
+    `timeoutMs` applies to each attempt.
+- `ExecutionStrategy.execute(operation, beforeRetry?)`: a callback before
+  each new attempt.
+
 ## 0.104.1 — 2026-10-18
 
 ### Fixed
