@@ -3,7 +3,7 @@
 ORM: сущности, контекст, запросы, сохранение, транзакции, схема, ошибки
 базы. Всё, что есть в `bazis/library/orm`, плюс подключение к приложению:
 модуль, коннектор `@Infra`, репозитории, страницы списков. Список — по
-пакету 0.104.0.
+пакету 0.104.1.
 
 ## Подключение
 
@@ -28,7 +28,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | `Schema(name)` | Схема PostgreSQL таблицы | — |
 | `SoftDelete()` | Мягкое удаление: `remove()` ставит время вместо `DELETE` | [Мягкое удаление](../../database/immediate.md#мягкое-удаление-и-фильтры) |
 | `QueryFilter(predicate)` | Условие, которое добавляется ко всем запросам сущности; с контекстом — для арендаторов | [Арендаторы](../../security/authorization-patterns.md#арендаторы) |
-| `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.json()`, `ValueConverters.encrypted(secret)` — ключ в коде, для ORM без приложения | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
+| `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.json()`, `ValueConverters.encrypted(secret)` — ключ в коде, для ORM без приложения. `null` конвертер не получает, если не объявил `convertsNulls` | [Преобразование значения](../../database/entities.md#преобразование-значения) |
 | `encryptedWith(config, field)` | Шифрование столбца AES-256-GCM ключом из настроек; ключ читается при запуске | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
 | `DecryptionError` | Значение не расшифровать: другой ключ или изменённые данные | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
 | `buildDynamicModel(definition)` | Модель таблицы из описания, без классов | [Динамические модели](../../database/dynamic-models.md) |

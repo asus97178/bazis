@@ -4,7 +4,7 @@
 (списки, формы, страницы, навигация), из которого будет отрисовываться
 интерфейс. Глава о них появится вместе с отрисовкой; до тех пор это
 экспериментальная часть API, её форма может меняться. Список — по пакету
-0.104.0.
+0.104.1.
 
 Значения: `UiProfile`, `defineUiProfile`, `uiOperation`, `uiEndpoint`,
 `compileUiSurfaceV1`, `indexOpenApiV1`, `uiProfileAuthoringMetadataOf`,

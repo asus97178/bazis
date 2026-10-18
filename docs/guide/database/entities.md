@@ -4,7 +4,7 @@
 таблицу, столбцы и ключ. Схему по ним создаёт `ensureCreated` (см.
 [Подключение PostgreSQL](postgresql.md)).
 
-Все примеры проверены на bazis 0.98.14 и PostgreSQL 17, шифрование — на 0.104.0.
+Все примеры проверены на bazis 0.98.14 и PostgreSQL 17, преобразование значений и шифрование — на 0.104.1.
 
 ```ts
 import { Column, CreatedAt, Entity, Index, Required, UpdatedAt, UUID } from "bazis/core/orm";
@@ -226,6 +226,81 @@ export class OrderLine { ... }
 `.not()`. Сравнивать можно и два столбца:
 `(row) => row.endsAt.gt(row.startsAt)`.
 
+## Преобразование значения
+
+`@HasConversion` задаёт, как значение поля хранится в столбце: функция
+`toProvider` — перед записью, `fromProvider` — после чтения.
+
+```ts
+import { Column, Entity, HasConversion, Key, ValueConverters, type ValueConverter } from "bazis/core/orm";
+
+/** В коде — копейки, в базе — рубли строкой. */
+const rubles: ValueConverter<number, string> = {
+  toProvider: (kopecks) => (kopecks / 100).toFixed(2),
+  fromProvider: (stored) => Math.round(Number(stored) * 100),
+};
+
+@Entity({ table: "profiles" })
+export class Profile {
+  @Key({ generated: false }) id = 0;
+
+  @HasConversion(rubles) @Column({ type: "text" }) balance = 0;
+
+  @HasConversion(ValueConverters.json<{ tags: string[] }>())
+  @Column({ type: "text", nullable: true })
+  settings: { tags: string[] } | null = null;
+}
+```
+
+```text
+в коде    {"id":1,"balance":12345,"settings":{"tags":["vip"]}}
+в базе    balance = '123.45', settings = '{"tags":["vip"]}'
+```
+
+| Конвертер | Что делает |
+| --- | --- |
+| `ValueConverters.json<T>()` | Объект ↔ JSON-строка в столбце `text`. Для `jsonb` конвертер не нужен: `type: "json"` |
+| `encryptedWith(config, field)` | Шифрование ключом из настроек — [ниже](#шифрование-столбца) |
+| `ValueConverters.encrypted(key)` | То же с ключом в коде — для ORM без приложения |
+
+Тип столбца по-прежнему задаёт `type`: конвертер возвращает значение
+этого типа.
+
+### `null` и конвертеры
+
+`null` в поле с конвертером остаётся NULL в столбце: конвертер для него не
+вызывается ни при записи, ни при чтении. Так `json()` и шифрование
+работают в столбцах с `nullable: true` (проверено и для зашифрованного):
+
+```text
+в коде    {"id":2,"settings":null}
+в базе    settings IS NULL
+```
+
+Если `null` нужно хранить иначе — например, пустой строкой в столбце
+`NOT NULL`, — объявите `convertsNulls: true`, и конвертер будет получать
+`null` в обе стороны:
+
+```ts
+const emptyAsNull: ValueConverter<string | null, string | null> = {
+  convertsNulls: true,
+  toProvider: (value) => value ?? "",
+  fromProvider: (stored) => (stored === "" || stored === null ? null : stored),
+};
+
+@HasConversion(emptyAsNull) @Column({ type: "text" }) nickname: string | null = null;
+```
+
+```text
+в коде    {"id":2,"nickname":null}
+в базе    nickname = ''
+```
+
+> [!NOTE]
+> Правило — с версии 0.104.1, как в EF Core. Раньше конвертер получал
+> `null`: зашифрованный столбец не сохранялся (`TypeError`), а `json()`
+> записывал строку `"null"`. Такие строки и сейчас читаются как `null`.
+
 ## Шифрование столбца
 
 `encryptedWith` шифрует строковый столбец (AES-256-GCM). Ключ берётся из
@@ -302,9 +377,8 @@ add it to `config` of the module that owns Customer or to runApp({ config }).
 
   По той же причине зашифрованный ключ и уникальный индекс не дают собрать
   модель (`ModelBuildError`). `isNull()` работает.
-- **Пустая строка тоже шифруется**. А вот `null` в версии 0.104.0 не
-  поддерживается: сохранение падает с `TypeError`. Храните пустое значение
-  как `""`.
+- **Пустая строка тоже шифруется**, а `null` остаётся NULL — см.
+  [`null` и конвертеры](#null-и-конвертеры).
 
 > [!NOTE]
 > `encryptedWith` — с версии 0.104.0. Раньше ключ передавали строкой в
