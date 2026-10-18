@@ -6,7 +6,7 @@
 сообщается событием. Так модули зависят друг от друга только в одну
 сторону: задачи знают о проектах, проекты о задачах — нет.
 
-Проверено на bazis 0.105.3 и PostgreSQL 17.
+Проверено на bazis 0.106.0 и PostgreSQL 17.
 
 ## 1. Модуль проектов
 
@@ -93,6 +93,7 @@ export const PROJECT_DELETED = createEventToken<ProjectDeleted>("projects.delete
 
 ```ts
 // src/app/modules/projects/services/Projects.service.ts
+import { ServiceProvider } from "bazis/core/di";
 import { EventBus } from "bazis/core/kernel";
 import { CurrentUser } from "../../auth/CurrentUser";
 import { Project } from "../model/Project.model";
@@ -107,6 +108,7 @@ export class ProjectsService implements IProjectsService {
     private readonly db: ProjectsDbContext,
     private readonly current: CurrentUser,
     private readonly events: EventBus,
+    private readonly services: ServiceProvider,
   ) {}
 
   async list(): Promise<ProjectResponse[]> {
@@ -128,7 +130,7 @@ export class ProjectsService implements IProjectsService {
     if (!project) return false;
     this.db.projects.remove(project);
     await this.db.saveChanges();
-    await this.events.publish(PROJECT_DELETED, { id });
+    await this.events.publishScoped(this.services, PROJECT_DELETED, { id });
     return true;
   }
 
@@ -143,8 +145,10 @@ export class ProjectsService implements IProjectsService {
 }
 ```
 
-`publish` без области — подписчик будет singleton (ниже, в шаге 5). Так
-сервис проектов не зависит ни от HTTP, ни от того, кто подписан.
+`ServiceProvider` scoped-сервиса — область текущего запроса, поэтому
+`publishScoped` передаёт её подписчикам: они получат сервисы того же
+запроса ([Контейнер вручную](../fundamentals/dependency-injection.md#контейнер-вручную)).
+Сервис проектов не знает, кто подписан, и не зависит от HTTP.
 
 ## 3. Контроллер и модуль
 
@@ -276,7 +280,12 @@ export class TasksService implements ITasksService {
 ```ts
 // tasks/Tasks.module.ts
 @Module({
-  imports: [AuthModule, ProjectsModule, eventsModule({ subscribers: [ProjectCleanup] })],
+  imports: [AuthModule, ProjectsModule],
+  providers: [
+    scoped(ITasksService, TasksService),
+    scoped(ProjectCleanup),
+    ...withEventSubscribers(ProjectCleanup),
+  ],
   …
 })
 ```
@@ -295,36 +304,30 @@ provides but does not export. Add it to the exports of "ProjectsModule".
 
 ```ts
 // src/app/modules/tasks/ProjectCleanup.ts
-import { ServiceProvider } from "bazis/core/di";
 import { OnEvent } from "bazis/core/kernel";
 import { PROJECT_DELETED, type ProjectDeleted } from "../projects/projectEvents";
 import { TasksDbContext } from "./model/Tasks.dbContext";
 
 /** A deleted project leaves its tasks without a project. */
 export class ProjectCleanup {
-  constructor(private readonly services: ServiceProvider) {}
+  constructor(private readonly db: TasksDbContext) {}
 
   @OnEvent(PROJECT_DELETED)
   async onProjectDeleted(event: ProjectDeleted): Promise<void> {
-    const scope = this.services.createScope();
-    try {
-      const db = scope.resolve(TasksDbContext);
-      await db.tasks.asNoTracking().where((t) => t.projectId.eq(event.id)).executeUpdate({ projectId: null });
-    } finally {
-      await scope.dispose();
-    }
+    await this.db.tasks.asNoTracking().where((t) => t.projectId.eq(event.id)).executeUpdate({ projectId: null });
   }
 }
 ```
 
-- `eventsModule({ subscribers: [ProjectCleanup] })` регистрирует подписчика
-  как singleton ([События](../fundamentals/events.md#методом-класса)).
-  Контекст базы — scoped, поэтому подписчик создаёт свою область, как
-  [фоновая служба](../fundamentals/lifecycle.md#scoped-сервисы-в-фоновой-службе).
-- `ServiceProvider` в конструкторе — корневой контейнер, даже у
-  scoped-сервиса. Поэтому `publishScoped(this.services, …)` из
-  `ProjectsService` не нашёл бы scoped-подписчика:
-  `ScopedServiceFromRootError: Cannot resolve scoped service "ProjectCleanup" from root provider`.
+- `scoped(ProjectCleanup)` и `withEventSubscribers(ProjectCleanup)` —
+  подписчик живёт в запросе и получает контекст базы этого запроса
+  ([События](../fundamentals/events.md#методом-класса)).
+
+> [!NOTE]
+> До 0.106.0 `ServiceProvider` в scoped-сервисе был корневым контейнером, и
+> `publishScoped(this.services, …)` падал с
+> `ScopedServiceFromRootError: Cannot resolve scoped service "ProjectCleanup" from root provider`.
+> Тогда подписчика делали singleton со своей областью.
 - `executeUpdate` меняет строки одним `UPDATE`, без загрузки задач. Перед
   ним нужен `asNoTracking()`, иначе
   `OrmUnsafeImmediateMutationError: … call .asNoTracking() before executeUpdate()`

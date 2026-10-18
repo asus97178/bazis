@@ -44,6 +44,21 @@ export class OrderService {
 | `publishScoped(scope, EVENT, payload)` | В запросе или в своей области (`ctx.services`, `provider.createScope()`): подписчики могут быть `scoped` |
 | `publish(EVENT, payload)` | Вне запроса, когда все подписчики — функции или `singleton` |
 
+Сервис, которому `HttpContext` не передают, публикует в свою область —
+`ServiceProvider` из конструктора scoped-сервиса и есть область запроса
+([Контейнер вручную](dependency-injection.md#контейнер-вручную)):
+
+```ts
+export class ProjectsService {
+  constructor(private readonly events: EventBus, private readonly services: ServiceProvider) {}
+
+  async delete(id: string) {
+    // … удаление
+    await this.events.publishScoped(this.services, PROJECT_DELETED, { id });
+  }
+}
+```
+
 `publish` разрешает подписчиков из корня контейнера, поэтому
 `scoped`-подписчик там не сработает:
 
