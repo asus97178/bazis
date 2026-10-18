@@ -1,7 +1,7 @@
 # `bazis/core/di`
 
 Внедрение зависимостей: модули, регистрации, токены, контейнер, ошибки
-графа. Список — по пакету 0.105.3.
+графа. Список — по пакету 0.106.0.
 
 ## Модули
 
@@ -30,7 +30,7 @@
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `createContainer(root, options)` | Контейнер из дерева модулей; `overrides` — замены для тестов | [Контейнер вручную](../../fundamentals/dependency-injection.md#контейнер-вручную) |
-| `DiContainer`, `ServiceProvider`, `ServiceScope`, `ServiceCollection` | Контейнер, провайдер сервисов, область, набор регистраций | там же |
+| `DiContainer`, `ServiceProvider`, `ServiceScope`, `ServiceCollection` | Контейнер, провайдер сервисов (в scoped-сервисе — область запроса), область, набор регистраций | там же |
 | `createInstance(resolver, Class, deps?)` | Создать класс с зависимостями из контейнера, без регистрации (как `ActivatorUtilities` в .NET) | — |
 
 ## Службы хоста
