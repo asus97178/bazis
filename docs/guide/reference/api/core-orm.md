@@ -3,7 +3,7 @@
 ORM: сущности, контекст, запросы, сохранение, транзакции, схема, ошибки
 базы. Всё, что есть в `bazis/library/orm`, плюс подключение к приложению:
 модуль, коннектор `@Infra`, репозитории, страницы списков. Список — по
-пакету 0.104.1.
+пакету 0.105.0.
 
 ## Подключение
 
@@ -61,7 +61,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | --- | --- | --- |
 | `OrmTransaction` | Транзакция из `db.database.transaction(...)` | [Транзакции](../../database/transactions.md) |
 | `isCommittedOutcome`, `isUnknownTransactionOutcome` | Проверка исхода транзакции | [Тайм-ауты](../../database/errors.md#тайм-ауты-и-недоступная-база) |
-| `ExecutionStrategy`, `withRetry(provider, options)` | Повторы при временных сбоях (как `EnableRetryOnFailure` в EF Core); в приложении — `executionStrategy` модуля | [Повтор при временном сбое](../../database/saving.md#повтор-при-временном-сбое) |
+| `ExecutionStrategy`, `withRetry(provider, options)` | Повторы при временных сбоях (как `EnableRetryOnFailure` в EF Core); в приложении — `executionStrategy` модуля и `transactionScope(work, { retry: true })` | [Повтор при временном сбое](../../database/saving.md#повтор-при-временном-сбое), [повтор транзакции](../../database/transactions.md#повтор-при-взаимной-блокировке) |
 | `withoutExecutionStrategyRetries` | Отключить вложенные повторы для подсистемы со своими | — |
 
 ## Схема
