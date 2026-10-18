@@ -151,7 +151,7 @@ bunx bazis codegen
 
 | Задача | Команда |
 | --- | --- |
-| Какая версия установлена | `bun pm ls \| grep bazis` |
+| Какая версия установлена | `bunx bazis --version` |
 | Обновиться в пределах диапазона из `package.json` | `bun update bazis` |
 | Перейти на последнюю версию | `bun add bazis@latest` |
 | Поставить конкретную версию | `bun add bazis@0.96.2` |
