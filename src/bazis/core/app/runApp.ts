@@ -21,6 +21,7 @@ import {
 } from "../../library/ui";
 import { modelValidatorAdapter } from "../../library/validation";
 import { createLocalize, type AppLanguage, type AppMessages } from "./messages";
+import { useCodexLanguage } from "../infra/connectors/codex/contracts";
 import {
   type RunAppUiOptions,
   type RunAppUiSurfaceOptions,
@@ -290,6 +291,7 @@ export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}):
 export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): BazisModuleRef {
   // Checked even without HTTP: an unknown language is a startup error.
   const localize = createLocalize(options.language, options.messages);
+  useCodexLanguage(options.language ?? "en");
   // Infrastructure and cache are global modules; add them to the graph next to the feature root.
   const globals: BazisModuleRef[] = [];
   if (options.infra !== undefined) {

@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.105.3 — 2026-10-18
+
+### Fixed
+
+- `runApp({ language: "ru" })` also switches the `CodexError` texts; before,
+  they needed `CodexError.useMessages(RU_CODEX_MESSAGES)`. Own texts from
+  `CodexError.useMessages(...)` stay on top of the language, whichever is
+  called first. The texts are process-wide: with two applications in one
+  process the last started one sets the language.
+- A graph issue about a class registered under a token names the class:
+  `Singleton "WarmUp (as BazisLifecycleHook)" depends on scoped "BooksService".
+  … make "WarmUp" scoped too` instead of `Singleton "BazisLifecycleHook"`;
+  `Missing dependency "IMailer" for "Signup (as ISignup)"` likewise.
+
 ## 0.105.2 — 2026-10-18
 
 ### Added

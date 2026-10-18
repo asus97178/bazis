@@ -52,7 +52,7 @@ const EN_CODEX_MESSAGES: Readonly<Record<CodexErrorCode, string>> = Object.freez
   LOGIN_EXPIRED: "The sign-in window expired. Start signing in again.",
 });
 
-/** Russian texts for every code: `CodexError.useMessages(RU_CODEX_MESSAGES)` at startup. */
+/** Russian texts for every code; `runApp({ language: "ru" })` turns them on. */
 export const RU_CODEX_MESSAGES: Readonly<Record<CodexErrorCode, string>> = Object.freeze({
   NOT_CONFIGURED: "Подключение ChatGPT не настроено на сервере.",
   UNAVAILABLE: "Codex App Server недоступен. Проверьте его установку и настройки.",
@@ -67,15 +67,31 @@ export const RU_CODEX_MESSAGES: Readonly<Record<CodexErrorCode, string>> = Objec
   LOGIN_EXPIRED: "Время для входа истекло. Начните вход заново.",
 });
 
+const CODEX_LANGUAGES = { en: EN_CODEX_MESSAGES, ru: RU_CODEX_MESSAGES } as const;
+let language: Readonly<Record<CodexErrorCode, string>> = EN_CODEX_MESSAGES;
+let own: Partial<Record<CodexErrorCode, string>> = {};
 let messages: Readonly<Record<CodexErrorCode, string>> = EN_CODEX_MESSAGES;
 
-/** `message` is user-facing text for `code`; switch its language with `useMessages`. */
+/**
+ * @internal `runApp({ language })` sets the language of the texts. It is
+ * process-wide, like the texts themselves: the last started application wins.
+ */
+export function useCodexLanguage(name: keyof typeof CODEX_LANGUAGES): void {
+  language = CODEX_LANGUAGES[name];
+  messages = Object.freeze({ ...language, ...own });
+}
+
+/** `message` is user-facing text for `code`, in the language of `runApp({ language })`. */
 export class CodexError extends Error {
   constructor(readonly code: CodexErrorCode) { super(messages[code]); this.name = "CodexError"; }
 
-  /** Replace texts for some or all codes (process-wide); missing codes keep English. */
+  /**
+   * Own texts for some or all codes (process-wide), on top of the application
+   * language; missing codes keep it. `useMessages({})` drops own texts.
+   */
   static useMessages(overrides: Partial<Record<CodexErrorCode, string>>): void {
-    messages = Object.freeze({ ...EN_CODEX_MESSAGES, ...overrides });
+    own = { ...overrides };
+    messages = Object.freeze({ ...language, ...own });
   }
 }
 export const CODEX_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;

@@ -1,6 +1,6 @@
 import { ServiceValidationError } from "../errors";
 import { missingNamedDependencyIssue } from "../errors/NamedDependencyNotFoundError";
-import { isLazyDependency, isNamedDependency, isOptionalDependency } from "../provider";
+import { isClassProvider, isLazyDependency, isNamedDependency, isOptionalDependency } from "../provider";
 import type {
   KeyedDependency,
   NamedDependency,
@@ -99,7 +99,7 @@ export class GraphValidator {
         const inner = isLazy || isOptional ? dependency.inner : dependency;
         // An optional dependency on a name nothing registered is simply absent.
         if (isNamedDependency(inner) && !this.context.hasName(inner.name)) {
-          if (!isOptional) issues.add(missingNamedDependencyIssue(inner.name, tokenToDebugName(registration.token)));
+          if (!isOptional) issues.add(missingNamedDependencyIssue(inner.name, serviceName(registration)));
           continue;
         }
         const descriptor = this.context.describeDependency(inner);
@@ -109,15 +109,15 @@ export class GraphValidator {
         }
         if (!depRegistration) {
           issues.add(
-            `Missing dependency "${tokenToDebugName(descriptor.token)}" for "${tokenToDebugName(registration.token)}"`,
+            `Missing dependency "${tokenToDebugName(descriptor.token)}" for "${serviceName(registration)}"`,
           );
           continue;
         }
 
         if (this.context.validateScopes && rootLifetime === "singleton" && depRegistration.lifetime === "scoped") {
           issues.add(
-            `Singleton "${tokenToDebugName(registration.token)}" depends on scoped "${tokenToDebugName(descriptor.token)}". `
-              + `A scoped service lives for one request or scope: make "${tokenToDebugName(registration.token)}" scoped too, `
+            `Singleton "${serviceName(registration)}" depends on scoped "${tokenToDebugName(descriptor.token)}". `
+              + `A scoped service lives for one request or scope: make "${className(registration) ?? tokenToDebugName(registration.token)}" scoped too, `
               + `or inject ServiceProvider and resolve "${tokenToDebugName(descriptor.token)}" in a scope you create (provider.createScope()).`,
           );
         }
@@ -135,4 +135,18 @@ export class GraphValidator {
       registrationPath.delete(registration.id);
     }
   }
+}
+
+/** The class behind a token registration, when it is not the token itself: `singleton(LIFECYCLE_HOOK, WarmUp)`. */
+function className(registration: ServiceRegistration): string | undefined {
+  if (!isClassProvider(registration.provider)) return undefined;
+  const name = registration.provider.useClass.name;
+  return name && name !== tokenToDebugName(registration.token) ? name : undefined;
+}
+
+/** `WarmUp (as BazisLifecycleHook)` for a class under a token, else the token. */
+function serviceName(registration: ServiceRegistration): string {
+  const token = tokenToDebugName(registration.token);
+  const name = className(registration);
+  return name ? `${name} (as ${token})` : token;
 }
