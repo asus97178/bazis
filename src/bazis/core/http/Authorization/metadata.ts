@@ -177,3 +177,20 @@ export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol):
     ? { allowAnonymous: false }
     : { allowAnonymous: false, authorize: { checks } };
 }
+
+/**
+ * The checks a route runs: the server's default checks (`runApp({ http:
+ * { authorize } })`) first, then the route's own `@Authorize`; each function
+ * once. `undefined` — the route is open: `@AllowAnonymous`, or no checks at all.
+ */
+export function routeAuthorizeChecks(ctor: object, methodName: string | symbol, defaults: readonly AuthorizeCheck[] = []): readonly AuthorizeCheck[] | undefined {
+  const meta = resolveAuthorizeMeta(ctor, methodName);
+  if (meta.allowAnonymous) return undefined;
+  const checks = [...new Set([...defaults, ...(meta.authorize?.checks ?? [])])];
+  return checks.length === 0 ? undefined : checks;
+}
+
+/** `authorize` of the HTTP options as a list. */
+export function defaultAuthorizeChecks(option: AuthorizeCheck | readonly AuthorizeCheck[] | undefined): readonly AuthorizeCheck[] {
+  return option === undefined ? [] : typeof option === "function" ? [option] : option;
+}

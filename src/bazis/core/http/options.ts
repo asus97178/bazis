@@ -8,6 +8,7 @@ import type { HttpMiddleware } from "./Middleware/types";
 import type { ActionMeta, ControllerMeta } from "./Decorators/metadata";
 import type { OpenApiDocsOptions } from "../../library/openapi";
 import type { ModelValidator } from "./Binding/modelValidator";
+import type { AuthorizeCheck } from "./Authorization/metadata";
 
 /** Built-in health endpoint (liveness/readiness probe). */
 export interface HealthEndpointOptions {
@@ -129,6 +130,16 @@ export interface HttpModuleOptions {
    * title/version.
    */
   readonly docs?: OpenApiDocsOptions | boolean;
+  /**
+   * Closed by default: these checks run on every route that is not
+   * `@AllowAnonymous`, before the route's own `@Authorize` checks
+   * (like ASP.NET Core's fallback policy). `/health` and the docs stay open.
+   *
+   * ```ts
+   * runApp(AppModule, { http: { authorize: signedIn } });
+   * ```
+   */
+  readonly authorize?: AuthorizeCheck | readonly AuthorizeCheck[];
   /**
    * Access log for every request (method, path, status, duration, correlation
    * id). `true` enables the default single-line sink; pass an object to plug a

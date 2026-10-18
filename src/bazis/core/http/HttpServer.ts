@@ -15,6 +15,7 @@ import type { HttpMiddleware } from "./Middleware/types";
 import { prepareOpenApiDocs, serveOpenApiDocs } from "./OpenApi/openApiDocs";
 import type { PreparedOpenApiDocs } from "../../library/openapi";
 import { RouterBuilder } from "./Routing/RouterBuilder";
+import { defaultAuthorizeChecks } from "./Authorization/metadata";
 import type { Router } from "./Routing/Router";
 import { parseRequestPath } from "./Routing/template";
 import { assertVersioningOptions, createVersionReader, type VersionReader } from "./Versioning/VersionReader";
@@ -177,11 +178,13 @@ export class HttpServer implements HostedService {
     this.globalCors = this.options.cors || serverMiddleware.map(corsOptionsOf).find((options) => options !== undefined);
     serverChain.push(...serverMiddleware.filter((middleware) => !isCorrelationIdMiddleware(middleware)));
 
+    const defaultChecks = defaultAuthorizeChecks(this.options.authorize);
     const builder = new RouterBuilder(
       serverChain,
       this.options.prefix,
       this.options.versioning,
       this.collectRouteComposer(),
+      defaultChecks,
     );
     this.router = builder.build(this.options.controllers);
     const routes = builder.routes;
@@ -192,6 +195,7 @@ export class HttpServer implements HostedService {
       globalPrefix: this.options.prefix,
       versioning: this.options.versioning,
       environment: this.resolver.tryResolve(Environment),
+      authorize: defaultChecks,
     });
 
     this.webSocket = this.resolver.tryResolve(WEBSOCKET_UPGRADE);

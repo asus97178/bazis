@@ -13,6 +13,7 @@ import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
 import { httpModule, useModelValidator, type HttpModuleOptions, type ModelValidator } from "../http";
 import { grpcModule, type GrpcModuleOptions } from "../grpc";
 import { buildHttpOpenApiDocument } from "../http/OpenApi/openApiDocument";
+import { defaultAuthorizeChecks } from "../http/Authorization/metadata";
 import { KernelBuilder, Bazis, KernelError, type KernelOptions, type ValidatableConfig } from "../kernel";
 import { websocketModule, type WebSocketOptions } from "../websocket";
 import {
@@ -204,6 +205,7 @@ function buildUiOpenApiDocument(
     controllers: collectModuleControllers([root]),
     globalPrefix: http.prefix,
     versioning: http.versioning,
+    authorize: defaultAuthorizeChecks(http.authorize),
     title: docs?.title ?? "Bazis UI profiles",
     version: docs?.version ?? "1.0.0",
   });

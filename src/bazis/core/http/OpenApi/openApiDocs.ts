@@ -1,3 +1,4 @@
+import type { AuthorizeCheck } from "../Authorization/metadata";
 import type { Class } from "../../di";
 import { Environment } from "../../kernel";
 import {
@@ -15,6 +16,7 @@ interface PrepareOpenApiDocsInput {
   readonly globalPrefix?: string;
   readonly versioning?: ApiVersioningOptions;
   readonly environment?: Environment;
+  readonly authorize?: readonly AuthorizeCheck[];
 }
 
 const DEFAULT_UI_PATH = "/docs";
@@ -38,6 +40,7 @@ export function prepareOpenApiDocs(input: PrepareOpenApiDocsInput): PreparedOpen
     versioning: input.versioning,
     title,
     version,
+    ...(input.authorize === undefined ? {} : { authorize: input.authorize }),
   });
   const json = JSON.stringify(document, null, 2);
   return {
