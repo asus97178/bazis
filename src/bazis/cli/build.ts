@@ -14,9 +14,13 @@ export interface BuildOptions {
   readonly outfile?: string;
   /** Let the executable read `.env` files from its working directory (off by default). */
   readonly dotenv?: boolean;
+  /** Another platform, `linux-x64`: `bun build --target=bun-linux-x64`. */
+  readonly platform?: string;
 }
 
 export interface CompileOptions {
+  /** Cross-compile for `bun-<platform>`; Bun downloads that runtime once. */
+  readonly platform?: string;
   /** Let the executable read `.env`, `.env.local`, `.env.<NODE_ENV>` from its working directory. */
   readonly dotenv?: boolean;
 }
@@ -149,10 +153,11 @@ export async function runBuild(cwd: string, options: BuildOptions, codegen: Code
   const s = ui.out;
   const t = s.t;
   const startedAt = performance.now();
-  const outfile = options.bin ? path.resolve(cwd, options.outfile ?? path.join("bin", await binaryName(cwd))) : undefined;
+  const outfile = options.bin ? path.resolve(cwd, options.outfile ?? path.join("bin", await defaultBinaryName(cwd, options.platform))) : undefined;
   commandHeader(s, "build", cwd, [
     s.kv(t.meta.target, s.text(options.bin ? "executable" : "typecheck")),
     ...(outfile === undefined ? [] : [s.kv(t.meta.out, s.text(path.relative(cwd, outfile)))]),
+    ...(options.platform === undefined ? [] : [s.kv(t.meta.platform, s.text(options.platform))]),
   ]);
   s.section(t.section.build);
   const generated = await codegen(cwd, "all", { ui });
@@ -182,7 +187,7 @@ export async function runBuild(cwd: string, options: BuildOptions, codegen: Code
   s.section(t.section.binary);
   const stopCompile = s.progress(t.step.compile);
   const compileStarted = performance.now();
-  const compiled = await compileBinaryAsync(bun, await projectEntry(cwd), outfile, { dotenv: options.dotenv });
+  const compiled = await compileBinaryAsync(bun, await projectEntry(cwd), outfile, { dotenv: options.dotenv, platform: options.platform });
   stopCompile();
   const compileMs = formatDuration(performance.now() - compileStarted);
   const relative = path.relative(cwd, outfile);
@@ -263,9 +268,10 @@ export async function compileBinaryAsync(bun: string, entry: string, outfile: st
   }
 }
 
-function compileArgs(bun: string, entry: string, outfile: string, options: CompileOptions): string[] {
+export function compileArgs(bun: string, entry: string, outfile: string, options: CompileOptions): string[] {
   const autoload = ["--no-compile-autoload-bunfig", options.dotenv === true ? "--compile-autoload-dotenv" : "--no-compile-autoload-dotenv"];
-  return [bun, "build", "--compile", ...autoload, path.resolve(entry), "--outfile", path.resolve(outfile)];
+  const target = options.platform === undefined ? [] : [`--target=bun-${options.platform}`];
+  return [bun, "build", "--compile", ...target, ...autoload, path.resolve(entry), "--outfile", path.resolve(outfile)];
 }
 
 function removeWorkDir(workDir: string): void {
@@ -285,6 +291,12 @@ async function projectEntry(cwd: string): Promise<string> {
   const entry = (config.targets?.[config.defaultTarget ?? ""]?.entrypoints as unknown[] | undefined)?.[0];
   if (typeof entry !== "string" || !entry) throw new Error("bazis.config.json has no entrypoint for its default target.");
   return path.resolve(cwd, entry);
+}
+
+/** `bin/<name>`, or `bin/<name>-<platform>` for another platform, so the local build is kept. */
+async function defaultBinaryName(cwd: string, platform: string | undefined): Promise<string> {
+  const name = await binaryName(cwd);
+  return platform === undefined ? name : `${name}-${platform}`;
 }
 
 async function binaryName(cwd: string): Promise<string> {

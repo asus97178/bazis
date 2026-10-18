@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.107.0 — 2026-10-19
+
+### Added
+
+- `bazis build --bin --platform <os>-<arch>` compiles the executable for
+  another platform (`bun build --target=bun-<platform>`): `linux-x64`,
+  `linux-arm64`, `linux-x64-musl`, `linux-arm64-musl`, `darwin-arm64`,
+  `darwin-x64`, `windows-x64`, with optional `-baseline`/`-modern`. The
+  default output is `bin/<name>-<platform>`, so the local build is kept. Bun
+  downloads the runtime of that platform on first use.
+
+### Changed
+
+- The `bazis started` line is printed in every environment, production
+  included, and names where the servers listen:
+  `bazis started {"environment":"production",…,"listening":["http://127.0.0.1:3000"]}`.
+  Before, production printed nothing on a successful start. The startup
+  screen still shows only outside production.
+- A started application prints `bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":…}`
+  when it stops. `useStartupReport(false)` (`runApp({ configure: (k) => k.useStartupReport(false) })`)
+  turns both lines off.
+
 ## 0.106.0 — 2026-10-18
 
 ### Changed (breaking)

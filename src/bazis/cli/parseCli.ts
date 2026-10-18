@@ -26,14 +26,16 @@ export type ParseCliResult =
   | { readonly kind: "codegen"; readonly target?: string }
   | { readonly kind: "dev"; readonly watch: boolean }
   | { readonly kind: "test"; readonly args: readonly string[] }
-  | { readonly kind: "build"; readonly bin: boolean; readonly outfile?: string; readonly dotenv: boolean }
+  | { readonly kind: "build"; readonly bin: boolean; readonly outfile?: string; readonly dotenv: boolean; readonly platform?: string }
   | { readonly kind: "error"; readonly message: string };
 
 const GENERATOR_ALIASES = new Map<string, "module" | "pack">([
   ["module", "module"], ["m", "module"],
   ["pack", "pack"], ["p", "pack"], ["module-pack", "pack"],
 ]);
-const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--pack", "--parts", "--target", "--path", "--framework", "--outfile"]);
+const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--pack", "--parts", "--target", "--path", "--framework", "--outfile", "--platform"]);
+/** Platforms of `bun build --compile --target=bun-<platform>`. */
+export const BINARY_PLATFORM = /^(linux|darwin|windows)-(x64|arm64)(-musl)?(-baseline|-modern)?$/;
 const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--vendor", "--bin", "--watch", "--dotenv"]);
 
 /** Parsing is pure: help and invalid input can never start generation. */
@@ -91,15 +93,20 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
   }
   if (options.has("--watch")) return error("--watch is only supported by dev.");
   if (command === "build") {
-    if (positional.length !== 1) return error("Use: bazis build [--bin [--outfile <path>] [--dotenv]]");
+    if (positional.length !== 1) return error("Use: bazis build [--bin [--outfile <path>] [--platform <os-arch>] [--dotenv]]");
     for (const option of options.keys()) {
-      if (option !== "--bin" && option !== "--outfile" && option !== "--dotenv") return error(`Option ${option} is not supported by build.`);
+      if (option !== "--bin" && option !== "--outfile" && option !== "--dotenv" && option !== "--platform") return error(`Option ${option} is not supported by build.`);
     }
     if (options.has("--outfile") && !options.has("--bin")) return error("--outfile requires --bin.");
     if (options.has("--dotenv") && !options.has("--bin")) return error("--dotenv requires --bin.");
-    return { kind: "build", bin: options.has("--bin"), outfile: options.get("--outfile"), dotenv: options.has("--dotenv") };
+    if (options.has("--platform") && !options.has("--bin")) return error("--platform requires --bin.");
+    const platform = options.get("--platform");
+    if (platform !== undefined && !BINARY_PLATFORM.test(platform)) {
+      return error(`Unknown platform: ${platform}. Use <os>-<arch>[-musl]: linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, darwin-arm64, darwin-x64, windows-x64.`);
+    }
+    return { kind: "build", bin: options.has("--bin"), outfile: options.get("--outfile"), dotenv: options.has("--dotenv"), ...(platform === undefined ? {} : { platform }) };
   }
-  if (options.has("--bin") || options.has("--outfile") || options.has("--dotenv")) return error("--bin, --outfile and --dotenv are only supported by build.");
+  if (options.has("--bin") || options.has("--outfile") || options.has("--dotenv") || options.has("--platform")) return error("--bin, --outfile, --platform and --dotenv are only supported by build.");
   if (command === "codegen") {
     if (positional.length !== 1) return error("Use: bazis codegen [--target <name|all>]");
     for (const option of options.keys()) {

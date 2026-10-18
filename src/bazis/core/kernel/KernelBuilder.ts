@@ -166,9 +166,11 @@ export class KernelBuilder {
     const userRoot = resolveUserRoot(this.rootModule, environment);
     const configs = collectModuleConfigs([userRoot]);
     const configRegistry = new ConfigRegistry(configs, environment.name, configuration);
-    const startupReport = this.startupReport ?? !environment.isProduction;
-    // The screen replaces the report line, so it follows the same switch.
-    const screen = this.startupScreen !== undefined && startupReport;
+    // The `bazis started` / `bazis stopped` lines are printed in every
+    // environment: in production they are the only sign that the process is up.
+    const startupReport = this.startupReport ?? true;
+    // The screen replaces the started line outside production.
+    const screen = this.startupScreen !== undefined && (this.startupReport ?? !environment.isProduction);
     const report = new StartupReport(screen);
     report.configuration(configRegistry.inspect());
     this.builtReport = report;
