@@ -121,10 +121,13 @@ ormBazis: { context: CatalogDbContext, entities: [Category, Product], registerRe
 Тогда внедрить репозиторий нельзя:
 
 ```text
-No provider token found for named dependency "IRepository<Product>". Repositories are registered by ormBazis
+Missing dependency "IRepository<Product>" for "OrdersService". Repositories are registered by ormBazis
 for the entities of its context: add Product to the entities of an ormBazis module and keep
 registerRepositories on (the default), or inject that module's DbContext instead.
 ```
+
+До 0.105.1 сообщение начиналось с `No provider token found for named
+dependency` и не называло сервис.
 
 Та же ошибка будет для сущности, которой нет ни в одном `ormBazis`.
 

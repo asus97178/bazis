@@ -79,6 +79,15 @@ export class MailService {
 Настройки, которые не принадлежат ни одному модулю, передают в
 `runApp(AppModule, { config: [appConfig] })`.
 
+Если конфиг не подключён ни к модулю, ни к `runApp`, приложение не
+стартует:
+
+```text
+[bazis] configuration error: Service graph validation failed:
+Missing dependency "Config:report" for "ReportService". The config defineConfig("report", …) is not declared
+in the application: add it to `config` of the module that uses it, or to runApp({ config }).
+```
+
 ## Откуда берутся значения
 
 От слабого к сильному:
