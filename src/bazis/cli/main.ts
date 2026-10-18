@@ -6,7 +6,7 @@ import { parseCliArgs, type ParsedGenerateArgs } from "./parseCli";
 import { runCodegen, type CodegenOptions } from "./codegen";
 import { generateProject } from "./generateProject";
 import { runBuild, runDev, runTest } from "./build";
-import { commandFailed, commandHeader, createScreens, lineOutput, type CliOutput } from "./ui";
+import { bazisVersion, commandFailed, commandHeader, createScreens, lineOutput, requiredBun, type CliOutput } from "./ui";
 
 export const USAGE = `Usage:
   bazis new <Name> [options]                  Create a new application project
@@ -21,6 +21,7 @@ export const USAGE = `Usage:
   bazis build --bin [--outfile <path>]        Also compile a standalone executable (default bin/<name>)
   bazis build --bin --dotenv                  The executable also reads .env files from its working directory
   bazis --help
+  bazis --version                             Print the bazis version (also -v)
   g can also be written as generate.
   --lang <en|ru> sets the output language (also BAZIS_LANG, "language" in bazis.config.json).
 
@@ -72,6 +73,8 @@ export interface CliRuntime {
   readonly stderr?: ScreenOutput;
   /** Output language when `--lang` is not given; detected from the environment otherwise. */
   readonly language?: Language;
+  /** The running Bun: version and executable (default: this process). */
+  readonly bun?: { readonly version: string; readonly path: string };
 }
 
 const defaultRuntime: CliRuntime = {
@@ -106,6 +109,18 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
   if (parsed.kind === "help") {
     runtime.log(USAGE.trim());
     return parsed.help ? 0 : 1;
+  }
+  if (parsed.kind === "version") {
+    runtime.log(bazisVersion());
+    return 0;
+  }
+  // `#!/usr/bin/env bun` runs the CLI on the first bun in PATH, which may be
+  // older than the one the user called; stop before it fails somewhere later.
+  const bun = runtime.bun ?? { version: Bun.version, path: process.execPath };
+  const required = requiredBun();
+  if (required !== undefined && !Bun.semver.satisfies(bun.version, required)) {
+    const t = ui.err.t.errors;
+    return commandFailed(ui.err, ui.err.t.failure.command, [{ tag: "BUN", where: bun.path, cause: t.bunTooOld(required, bun.version), fixes: [t.bunWhich(bun.path), t.bunUpgrade] }], 1);
   }
   if (parsed.kind === "error") {
     return commandFailed(ui.err, ui.err.t.failure.command, [{ tag: "CLI", where: "bazis", cause: parsed.message, fixes: [ui.err.t.errors.unknown] }], 1);

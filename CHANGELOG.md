@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.105.2 — 2026-10-18
+
+### Added
+
+- `bazis --version` (also `-v`) prints the package version.
+
+### Fixed
+
+- The CLI checks the running Bun against `engines.bun` (`>=1.4.0`) before
+  any command and stops with the version, the executable and the fix.
+  `bunx bazis` and `bun run` scripts start the CLI through
+  `#!/usr/bin/env bun`, that is with the first `bun` in PATH, which can be
+  older than the Bun that called them; before, the command silently ran on it.
+
+  ```text
+  [BUN] /Users/ann/.bun/bin/bun
+  ✖  bazis needs Bun 1.4.0 or newer; this is Bun 1.3.13.
+  ➜  This Bun is /Users/ann/.bun/bin/bun. bunx bazis and bun run scripts start bazis with the first bun in PATH, …
+  ➜  Update that Bun: bun upgrade. Or put the newer Bun first in PATH.
+  ```
+
 ## 0.105.1 — 2026-10-18
 
 ### Fixed
