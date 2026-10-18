@@ -1,4 +1,5 @@
 import type { DbContext } from "../DbContext";
+import type { ExecutionStrategyOptions } from "../Saving/ExecutionStrategy";
 
 /** A database wall-clock value obtained from the active database session. */
 export interface OrmDatabaseTimeV1 {
@@ -15,6 +16,16 @@ export interface OrmTransactionScopeOptions {
   readonly signal?: AbortSignal;
   /** Total work budget in milliseconds, including admission and COMMIT; positive integer. */
   readonly timeoutMs?: number;
+  /**
+   * Runs the whole scope again after a transient failure (deadlock,
+   * serialization failure, lost connection): `true` takes the context's
+   * `executionStrategy` (or 3 retries from 50 ms), an object sets its own.
+   * Every attempt starts from a clean context: what the failed attempt
+   * loaded or changed is detached, so the callback must read what it
+   * changes. Allowed only for the outermost scope of a context that tracks
+   * nothing yet; a COMMIT without acknowledgement is never retried.
+   */
+  readonly retry?: boolean | ExecutionStrategyOptions;
 }
 
 /** Opaque transaction capability. It deliberately exposes no executor or completion authority. */

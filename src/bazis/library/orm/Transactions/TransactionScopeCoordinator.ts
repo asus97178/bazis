@@ -7,6 +7,8 @@ import { OrmTransaction, type OrmDatabaseTimeV1, type OrmTransactionScopeOptions
 
 import { isUnknownTransactionOutcome, TransactionOutcomeUnknownError } from "../Providers/transactionOutcome";
 import { OperationDeadline, positiveTimeout } from "../Providers/operationDeadline";
+import { ExecutionStrategy, type ExecutionStrategyOptions } from "../Saving/ExecutionStrategy";
+import { trackedEntryCount } from "../Tracking/ChangeTracker";
 
 interface Frame {
   readonly allEnrolled: Set<object>;
@@ -20,6 +22,8 @@ interface Frame {
   activeChildFrame?: Frame;
   rollbackOnly?: unknown;
   cancellationRequested?: boolean;
+  /** Outermost frame of a retried scope: every context of the attempt, cleared before the next one. */
+  readonly retryContexts?: Set<DbContext>;
   readonly pending: Set<PendingTask>;
   readonly abortPromise: Promise<never>;
   abort(error: OrmTransactionScopeError): void;
@@ -173,7 +177,31 @@ function releaseTask(task: PendingTask): void {
   if (task.settled && task.dispatches.size === 0 && task.attached.size === 0) task.frame.pending.delete(task);
 }
 
-export async function transactionScope<TResult>(context: DbContext, provider: DatabaseProvider, work: (transaction: OrmTransaction) => Promise<TResult>, options?: OrmTransactionScopeOptions): Promise<TResult> {
+export async function transactionScope<TResult>(context: DbContext, provider: DatabaseProvider, work: (transaction: OrmTransaction) => Promise<TResult>, options?: OrmTransactionScopeOptions, contextStrategy?: ExecutionStrategyOptions): Promise<TResult> {
+  const retry = options?.retry;
+  if (retry === undefined || retry === false) return runScope(context, provider, work, options);
+  if (views.getStore() !== undefined || provider.isTransactionActive?.() === true) {
+    throw new OrmTransactionScopeError("transactionScope({ retry }) must be the outermost scope: a nested scope is part of the outer transaction, so retry the outer one.");
+  }
+  assertRetryable(context);
+  const contexts = new Set<DbContext>([context]);
+  const strategy = new ExecutionStrategy(retry === true ? contextStrategy ?? {} : retry);
+  return strategy.execute(() => runScope(context, provider, work, options, contexts), () => {
+    // The rolled-back attempt left its loaded and changed entities behind;
+    // the next attempt reads them again instead of applying its changes twice.
+    for (const each of contexts) each.changeTracker.clear();
+    contexts.clear();
+    contexts.add(context);
+  });
+}
+
+function assertRetryable(context: DbContext): void {
+  const tracked = trackedEntryCount(context.changeTracker);
+  if (tracked === 0) return;
+  throw new OrmTransactionScopeError(`transactionScope({ retry }) needs ${contextName(context)} without tracked entities: every attempt starts from a clean context, and the ${tracked} entities tracked before the scope would lose their changes. Start the scope before loading anything, or create a new scope for it.`);
+}
+
+async function runScope<TResult>(context: DbContext, provider: DatabaseProvider, work: (transaction: OrmTransaction) => Promise<TResult>, options: OrmTransactionScopeOptions | undefined, retryContexts?: Set<DbContext>): Promise<TResult> {
   let signal = options?.signal;
   if (options?.timeoutMs !== undefined) positiveTimeout(options.timeoutMs, 30_000, "timeoutMs");
   if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError("ORM transaction signal must be an AbortSignal.");
@@ -230,7 +258,7 @@ export async function transactionScope<TResult>(context: DbContext, provider: Da
       void abortPromise.catch(() => {});
       let cancelDrain!: () => void;
       const cancellationPromise = new Promise<"cancelled">((resolve) => { cancelDrain = () => resolve("cancelled"); });
-      const frame: Frame = { allEnrolled: new Set([token]), id: Symbol("orm transaction"), authority, provider: base, parent, enrolled: parent ? current!.enrolled : new Set([token]), state: "active", pending: new Set(), abortPromise, abort, cancellationPromise, cancelDrain }; childFrame = frame;
+      const frame: Frame = { allEnrolled: new Set([token]), id: Symbol("orm transaction"), authority, provider: base, parent, enrolled: parent ? current!.enrolled : new Set([token]), state: "active", pending: new Set(), abortPromise, abort, cancellationPromise, cancelDrain, retryContexts: parent ? undefined : retryContexts }; childFrame = frame;
       if (parent) parent.activeChildFrame = frame;
       const view: View = { frame, enrolled: frame.enrolled };
       return withProviderDispatchObserver((dispatch) => registerDispatch(frame, dispatch), () => views.run(view, async () => {
@@ -374,6 +402,12 @@ class ScopedOrmTransaction extends OrmTransaction {
     const parent = views.getStore();
     if (!parent || parent.frame !== frame) throw foreignTransaction();
     if (uncertainContexts.has(token)) throw new TransactionOutcomeUnknownError();
+    let root = frame;
+    while (root.parent) root = root.parent;
+    if (root.retryContexts && !root.retryContexts.has(context)) {
+      assertRetryable(context);
+      root.retryContexts.add(context);
+    }
     for (let target: Frame | undefined = frame; target; target = target.parent) target.allEnrolled.add(token);
     const enrolled = new Set(parent.enrolled); enrolled.add(token);
     return views.run({ frame, enrolled }, () => trackTask(frame, () => work(context)));

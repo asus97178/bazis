@@ -56,7 +56,8 @@ export class ExecutionStrategy {
     return false;
   }
 
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
+  /** Runs `operation`, again after a transient failure; `beforeRetry` runs before each new attempt. */
+  async execute<T>(operation: () => Promise<T>, beforeRetry?: (error: unknown) => void): Promise<T> {
     let attempt = 0;
     for (;;) {
       try {
@@ -67,6 +68,7 @@ export class ExecutionStrategy {
         }
         const delay = this.baseDelayMs * 2 ** attempt;
         await new Promise((resolve) => setTimeout(resolve, delay));
+        beforeRetry?.(error);
         attempt += 1;
       }
     }

@@ -347,6 +347,11 @@ export function trackedEntriesOf(tracker: ChangeTracker): ReadonlyMap<object, Tr
   return trackerEntries.get(tracker) ?? new Map();
 }
 
+/** Non-barrel helper: how many entities the tracker holds. */
+export function trackedEntryCount(tracker: ChangeTracker): number {
+  return trackerEntries.get(tracker)?.size ?? 0;
+}
+
 /** Non-barrel helper used only by immediate DML admission. */
 export function hasTrackedEntriesForModel(tracker: ChangeTracker, model: EntityModel): boolean {
   return [...(trackerEntries.get(tracker)?.values() ?? [])].some((entry) => entry.model === model);

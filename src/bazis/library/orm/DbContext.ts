@@ -102,6 +102,6 @@ export abstract class DbContext {
 
   /** Executes a composable ORM transaction scope for this provider identity. */
   transactionScope<TResult>(work: (transaction: OrmTransaction) => Promise<TResult>, options?: OrmTransactionScopeOptions): Promise<TResult> {
-    return transactionScope(this, this.#options.provider, work, options);
+    return transactionScope(this, this.#options.provider, work, options, this.#options.executionStrategy);
   }
 }
