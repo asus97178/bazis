@@ -4,6 +4,32 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.106.0 — 2026-10-18
+
+### Changed (breaking)
+
+- `ServiceProvider` injected into a service that lives in a scope (scoped,
+  or transient used by a scoped one) is now that scope, like .NET's
+  `IServiceProvider`: `resolve` returns the services of the same request, so
+  `events.publishScoped(this.services, …)` from a scoped service reaches the
+  scoped subscribers of that request. Before, it was the root container and
+  such a call failed with `ScopedServiceFromRootError`.
+
+  ```ts
+  export class ProjectsService {
+    constructor(private readonly events: EventBus, private readonly services: ServiceProvider) {}
+    delete(id: string) { return this.events.publishScoped(this.services, PROJECT_DELETED, { id }); }
+  }
+  ```
+
+  - `createScope()` on it opens a new independent scope, as before.
+  - `dispose()` on it is refused: the scope is disposed by whoever created it.
+  - Singletons, background services and the root still get the root
+    container. `scope.resolve(ServiceProvider)` returns the scope.
+  - Code that took `ServiceProvider` in a scoped service to reach the root
+    (for example to resolve a scoped service in another request) should
+    call `createScope()` instead.
+
 ## 0.105.3 — 2026-10-18
 
 ### Fixed
