@@ -5,7 +5,7 @@
 прочитать, проверить, записать, записать ещё. Для этого есть
 `db.transactionScope(...)`.
 
-Все примеры проверены на bazis 0.98.18 и PostgreSQL 17.
+Все примеры проверены на bazis 0.98.18 и PostgreSQL 17, повтор транзакции — на 0.105.0.
 
 ## Перевод денег
 
@@ -174,6 +174,63 @@ SELECT "id", "status" FROM "jobs" WHERE "status" = $1 ORDER BY "id" ASC LIMIT $2
 ```text
 Error: FOR UPDATE SKIP LOCKED requires an explicit complete primary-key order.
 ```
+
+## Повтор при взаимной блокировке
+
+Два перевода навстречу друг другу блокируют строки в обратном порядке:
+первый держит счёт 1 и ждёт счёт 2, второй — наоборот. PostgreSQL
+прерывает одну из транзакций с `deadlock detected`. Такую транзакцию
+достаточно выполнить ещё раз — это делает `retry`:
+
+```ts
+await this.db.transactionScope(async () => {
+  const from = await this.db.accounts.findForUpdate(fromId);
+  const to = await this.db.accounts.findForUpdate(toId);
+  from!.balance -= amount;
+  to!.balance += amount;
+  await this.db.saveChanges();
+}, { retry: true });
+```
+
+```text
+без retry  {"first":"deadlock detected","second":"ok","attempts":{"first":1,"second":1}}
+с retry    {"first":"ok","second":"ok","attempts":{"first":1,"second":2}}
+```
+
+| Значение | Что повторяет |
+| --- | --- |
+| `retry: true` | По [`executionStrategy`](saving.md#повтор-при-временном-сбое) модуля; без неё — 3 раза, паузы 50, 100, 200 мс |
+| `retry: { maxRetries, baseDelayMs, isTransient }` | По своим настройкам |
+
+Повторяются те же ошибки, что и у `saveChanges()`: взаимная блокировка,
+`could not serialize`, обрыв соединения.
+
+- **Функция выполняется заново целиком.** Всё, что она делает помимо
+  базы — письма, HTTP-вызовы, — тоже повторится. Такое выносите в
+  [`afterCommit`](#после-коммита-aftercommit): он вызывается один раз,
+  после успешной попытки.
+- **Каждая попытка начинается с чистого контекста.** Что неудачная
+  попытка загрузила и изменила, отсоединяется, в том числе в контекстах из
+  [`tx.use`](#второй-контекст-в-той-же-транзакции). Повтор читает строки
+  заново, поэтому `balance -= amount` не применится дважды.
+- **Контекст до начала не должен ничего отслеживать**, иначе вызов
+  отклоняется:
+
+  ```text
+  OrmTransactionScopeError: transactionScope({ retry }) needs Customers without tracked entities: every attempt
+  starts from a clean context, and the 1 entities tracked before the scope would lose their changes.
+  Start the scope before loading anything, or create a new scope for it.
+  ```
+
+  Читайте внутри функции или берите контекст из новой области.
+- **Только внешний scope.** Вложенный — часть внешней транзакции, повторять
+  нужно внешний; `retry` во вложенном — `OrmTransactionScopeError`.
+- **Не повторяются** обрыв во время `COMMIT` (исход неизвестен), отмена
+  через `signal` и тайм-аут. `timeoutMs` действует на каждую попытку.
+
+> [!NOTE]
+> `retry` — с версии 0.105.0. Раньше `executionStrategy` повторял только
+> `saveChanges()` вне транзакции.
 
 ## Вложенные транзакции
 
@@ -378,6 +435,7 @@ const rows = await this.db.database.transaction(async (t) => {
 | `OrmTransactionScopeError` | Ошибку поймали внутри; тайм-аут или отмена; второй контекст без `tx.use`; забытый `await` |
 | `OrmProviderIdentityMismatchError` | У второго контекста другой провайдер |
 | `ConcurrentTransactionScopeError` | Два вложенных scope одновременно |
+| `OrmTransactionScopeError` с `retry` | Контекст уже отслеживает сущности или scope вложенный — [Повтор](#повтор-при-взаимной-блокировке) |
 | `PostCommitError` | Данные записаны, но упал колбэк `afterCommit` |
 | `TransactionOutcomeUnknownError` | Соединение оборвалось во время `COMMIT`: неизвестно, записались ли данные. Контекст после этого не принимает новых операций |
 
