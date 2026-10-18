@@ -72,7 +72,9 @@ describe("architecture: injectable ServiceProvider identity", () => {
       expect(container.resolve(SERVICE_PROVIDER)).toBe(container);
       expect(container.resolve(ServiceProvider)).toBe(container);
       expect(scope.resolve(SERVICE_PROVIDER)).toBe(container);
-      expect(scope.resolve(ServiceProvider)).toBe(container);
+      // Inside a scope ServiceProvider is that scope (0.106.0); SERVICE_PROVIDER stays the root.
+      expect(scope.resolve(ServiceProvider)).not.toBe(container);
+      expect(scope.resolve(ServiceProvider).resolve(Consumer)).toBe(consumer);
     } finally {
       await scope.dispose();
       await container.dispose();

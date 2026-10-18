@@ -1,6 +1,7 @@
 import {
   AsyncResolutionRequiredError,
   ClassDependenciesMismatchError,
+  DiError,
   InvalidProviderError,
   NamedDependencyNotFoundError,
   ProviderNotFoundError,
@@ -44,7 +45,27 @@ import {
 import type { Token } from "./token";
 import { tokenToDebugName } from "./token";
 
+/**
+ * `ServiceProvider` as a service in a scope sees that scope, as .NET's
+ * IServiceProvider does: `resolve` returns the scope's services and
+ * `createScope()` opens a new one. The scope is disposed by whoever created it.
+ */
+class ScopeServiceProvider extends ServiceScope {
+  public constructor(provider: ConstructorParameters<typeof ServiceScope>[0], state: ResolutionScopeState, private readonly root: ServiceProvider) {
+    super(provider, state);
+  }
+
+  public createScope(): ServiceScope {
+    return this.root.createScope();
+  }
+
+  public override dispose(): Promise<void> {
+    return Promise.reject(new DiError("This ServiceProvider is the scope that resolved the service; whoever created the scope disposes it. To own a scope, call createScope() and dispose that one."));
+  }
+}
+
 export class ServiceProvider implements ServiceResolver {
+  private readonly scopeProviders = new WeakMap<ResolutionScopeState, ScopeServiceProvider>();
   private readonly registry: ServiceRegistry;
   private readonly activations = new ResolutionTracker();
   private readonly lifetime: ScopeLifecycle;
@@ -185,6 +206,17 @@ export class ServiceProvider implements ServiceResolver {
     return this.lifetime.disposeScope(scopeState);
   }
 
+  /** `ServiceProvider` asked for inside a scope: the scope itself, not the root. */
+  private providerForScope<T>(token: Token<T>, key: ServiceKey | undefined, scopeState: ResolutionScopeState): T | undefined {
+    if (token !== (ServiceProvider as unknown) || key !== undefined || scopeState.isRoot) return undefined;
+    let view = this.scopeProviders.get(scopeState);
+    if (view === undefined) {
+      view = new ScopeServiceProvider(this, scopeState, this);
+      this.scopeProviders.set(scopeState, view);
+    }
+    return view as unknown as T;
+  }
+
   private resolveSingle<T>(
     token: Token<T>,
     key: ServiceKey | undefined,
@@ -192,6 +224,8 @@ export class ServiceProvider implements ServiceResolver {
     stack: ResolutionActivation[],
     ownerLifetime: ProviderLifetime | undefined,
   ): T {
+    const scopeProvider = this.providerForScope(token, key, scopeState);
+    if (scopeProvider !== undefined) return scopeProvider;
     const registration = this.registry.find(token, key);
     if (!registration) {
       throw new ProviderNotFoundError(token, this.describeResolutionPath(stack, token));
@@ -278,6 +312,8 @@ export class ServiceProvider implements ServiceResolver {
     stack: ResolutionActivation[],
     ownerLifetime?: ProviderLifetime,
   ): Promise<T> {
+    const scopeProvider = this.providerForScope(token, key, scopeState);
+    if (scopeProvider !== undefined) return scopeProvider;
     const registration = this.registry.find(token, key);
     if (!registration) {
       throw new ProviderNotFoundError(token, this.describeResolutionPath(stack, token));
@@ -733,6 +769,8 @@ export class ServiceProvider implements ServiceResolver {
     ownerLifetime: ProviderLifetime | undefined,
   ): T | undefined {
     this.lifetime.assertLive(scopeState);
+    const scopeProvider = this.providerForScope(token, key, scopeState);
+    if (scopeProvider !== undefined) return scopeProvider;
     const registration = this.registry.find(token, key);
     if (!registration) {
       return undefined;
