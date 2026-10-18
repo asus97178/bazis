@@ -232,8 +232,31 @@ enabled: false
 Ошибки — `CodexError` с кодом: `NOT_CONFIGURED`, `UNAVAILABLE`,
 `SIGN_IN_REQUIRED`, `BUSY`, `MODEL_UNAVAILABLE`, `REASONING_UNAVAILABLE`,
 `PROTOCOL_ERROR`, `RESPONSE_FAILED`, `TIMEOUT`, `LOGIN_FAILED`,
-`LOGIN_EXPIRED`. Тексты по умолчанию английские; русские включает
-`CodexError.useMessages(RU_CODEX_MESSAGES)` при старте.
+`LOGIN_EXPIRED`. Текст `message` рассчитан на показ пользователю, его язык
+задаёт `runApp({ language })`:
+
+```ts
+try {
+  return { answer: await this.assistant.ask("Привет") };
+} catch (error) {
+  if (error instanceof CodexError) return { code: error.code, message: error.message };
+  throw error;
+}
+```
+
+```text
+language: "en"  {"code":"NOT_CONFIGURED","message":"The ChatGPT connection is not configured on the server."}
+language: "ru"  {"code":"NOT_CONFIGURED","message":"Подключение ChatGPT не настроено на сервере."}
+```
+
+Свои тексты — `CodexError.useMessages({ BUSY: "…" })`: они ложатся поверх
+языка приложения, остальные коды остаются на нём. Тексты общие на процесс:
+если в одном процессе два приложения с разными языками, действует язык
+последнего запущенного.
+
+> [!NOTE]
+> С версии 0.105.3. Раньше `language` тексты Codex не переключал, нужен был
+> `CodexError.useMessages(RU_CODEX_MESSAGES)`.
 
 ## Дальше
 

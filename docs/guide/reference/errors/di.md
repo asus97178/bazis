@@ -69,8 +69,14 @@ Singleton "PriceCache" depends on scoped "OrdersRepository". A scoped service li
 - **Что сделать.** Сделайте `PriceCache` `scoped`. Если это фоновая служба или
   хук — внедрите `ServiceProvider` и создавайте область на каждую единицу
   работы ([Жизненный цикл](../../fundamentals/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
-- Если сервис зарегистрирован под токеном, в сообщении будет имя токена:
-  `singleton(LIFECYCLE_HOOK, WarmUp)` даст `Singleton "BazisLifecycleHook"`.
+- Если класс зарегистрирован под токеном, в сообщении и класс, и токен:
+  `singleton(LIFECYCLE_HOOK, WarmUp)` даст
+
+  ```text
+  Singleton "WarmUp (as BazisLifecycleHook)" depends on scoped "BooksService". A scoped service lives for one request or scope: make "WarmUp" scoped too, or inject ServiceProvider and resolve "BooksService" in a scope you create (provider.createScope()).
+  ```
+
+  До 0.105.3 здесь было только имя токена: `Singleton "BazisLifecycleHook"`.
 
 #### Cycle detected
 

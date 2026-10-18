@@ -401,7 +401,7 @@ export class WarmUp implements LifecycleHook {
 
 ```text
 [bazis] configuration error: Service graph validation failed:
-Singleton "BazisLifecycleHook" depends on scoped "BooksService". A scoped service lives for one request or scope: make "BazisLifecycleHook" scoped too, or inject ServiceProvider and resolve "BooksService" in a scope you create (provider.createScope()).
+Singleton "WarmUp (as BazisLifecycleHook)" depends on scoped "BooksService". A scoped service lives for one request or scope: make "WarmUp" scoped too, or inject ServiceProvider and resolve "BooksService" in a scope you create (provider.createScope()).
 ```
 
 `BazisLifecycleHook` — имя токена `LIFECYCLE_HOOK`, под которым
