@@ -9,7 +9,7 @@
 `bazis g module <Имя> --full` сам ставит `@Authorize` на маршруты нового
 модуля.
 
-Проверено на bazis 0.100.3 и PostgreSQL 17.
+Проверено на bazis 0.105.3 и PostgreSQL 17.
 
 ## 1. Модуль
 
@@ -179,6 +179,9 @@ export class User {
 
 ```ts
 // model/Auth.dbContext.ts
+import { DbContext } from "bazis/core/orm";
+import { User } from "./User.model";
+
 export class AuthDbContext extends DbContext {
   readonly users = this.set(User);
 }
@@ -590,9 +593,17 @@ test("a taken email is 409, a wrong password 401, a refresh token is not an acce
 ```
 
 Тест задач из рецепта CRUD теперь тоже входит — администратором — и
-передаёт токен в каждом запросе:
+передаёт токен в каждом запросе. В `tasks.http.test.ts` замените запуск
+приложения и добавьте токен в помощники:
 
 ```ts
+// src/app/modules/tasks/test/tasks.http.test.ts — что изменилось
+import type { TestApp } from "bazis/core/testing";
+import { startPlanner } from "../../../test/testApp";
+
+let app: TestApp;
+let token = "";
+
 beforeAll(async () => {
   app = await startPlanner();
   const login = await app.fetch("/auth/login", {
@@ -602,7 +613,17 @@ beforeAll(async () => {
   });
   token = ((await login.json()) as { accessToken: string }).accessToken;
 });
+
+function post(path: string, body: unknown) {
+  return app.fetch(path, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+}
+
+function get(path: string) {
+  return app.fetch(path, { headers: { authorization: `Bearer ${token}` } });
+}
 ```
+
+Чтения `app.fetch("/tasks…")` в тестах замените на `get("/tasks…")`.
 
 ```text
 $ bunx bazis test
@@ -629,6 +650,7 @@ $ bunx bazis test
 
 ## Дальше
 
+- [Второй модуль и связь между модулями](projects-module.md) — следующий шаг [учебного проекта](../introduction/tutorial.md)
 - [JWT](../security/jwt.md) — ключи RS256, ротация, одноразовый refresh
 - [Шаблоны авторизации](../security/authorization-patterns.md) — роли, `anyOf`, арендаторы, ключи API
 - [Чек-лист перед продакшеном](../security/production-checklist.md#авторизация)

@@ -15,7 +15,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Установка](introduction/installation.md)
 - ✅ [Первые шаги](introduction/first-steps.md)
 - ✅ [Основные понятия](introduction/essentials.md) — модуль, DI, контроллер, кодогенерация, конфигурация
-- ⏳ Учебный проект: Todo API — по шагам на основе `examples/todo`
+- ✅ [Учебный проект: планировщик задач](introduction/tutorial.md) — от `bazis new` до исполняемого файла: CRUD, вход по JWT, второй модуль, сборка
 
 ## 2. Обзор: строительные блоки
 
@@ -113,6 +113,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 - ✅ [CRUD-модуль целиком](recipes/crud-module.md)
 - ✅ [JWT и защита маршрутов](recipes/jwt-auth.md)
+- ✅ [Второй модуль и связь между модулями](recipes/projects-module.md)
 - ✅ [Несколько экземпляров приложения с Redis](recipes/multiple-instances.md)
 - ✅ [Фоновая задача с базой данных](recipes/background-job.md)
 - ✅ [Инструмент агента, вызывающий сервис](recipes/agent-tool.md)
