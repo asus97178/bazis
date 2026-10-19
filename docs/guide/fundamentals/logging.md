@@ -4,7 +4,7 @@
 запросов, ошибки HTTP и фоновых служб пишутся одним логгером и в одном
 формате. Correlation id связывает их с запросом, к которому они относятся.
 
-Все примеры проверены на bazis 0.97.11.
+Все примеры проверены на bazis 0.108.0.
 
 ## Логгер в сервисе
 
@@ -32,6 +32,9 @@ debug: checking limits {"amount":50,"requestId":"req-7"}
 info: payment accepted {"amount":50,"requestId":"req-7"}
 ```
 
+`requestId` появляется, когда подключён [correlation id](#correlation-id);
+без него поля только ваши.
+
 Пишите подробности полями, а не внутри сообщения: так строки удобно
 фильтровать в системе сбора журналов.
 
@@ -57,7 +60,7 @@ await runApp(AppModule, {
 ```
 
 ```text
-[shop] info: payment accepted {"amount":5,"requestId":"7353…"}
+[shop] info: payment accepted {"amount":5}
 ```
 
 | Опция | По умолчанию | Что задаёт |
@@ -65,7 +68,7 @@ await runApp(AppModule, {
 | `minLevel` | Зависит от окружения | Самый низкий выводимый уровень |
 | `name` | — | Префикс `[name]` в каждой строке |
 | `redaction` | Включена | Маскировка секретов; `false` — только для отладки на своей машине |
-| `requestContext` | `true` | Добавлять `requestId` внутри запроса |
+| `requestContext` | `true` | Добавлять `requestId` внутри запроса, если его задал [correlation id](#correlation-id) |
 
 ## Маскировка секретов
 
@@ -139,7 +142,7 @@ info: GET /pay/50 200 6.9ms {...,"requestId":"req-7"}
 > журнале запросов и строках ошибок.
 
 Сам идентификатор в коде — `getRequestId()` из `bazis/core/kernel`; вне
-запроса он `undefined`.
+запроса и без `createCorrelationIdMiddleware()` он `undefined`.
 
 ## Что пишется само
 

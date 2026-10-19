@@ -5,7 +5,7 @@
 в SQL с параметрами. Параметры строки запроса — в стиле
 [JSON:API](https://jsonapi.org/format/#fetching).
 
-Все примеры проверены на bazis 0.98.2 с PostgreSQL.
+Все примеры проверены на bazis 0.108.0 с PostgreSQL.
 
 ## Модель списка
 

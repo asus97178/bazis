@@ -4,7 +4,7 @@
 знает, кто на это реагирует — статистика, аудит, уведомления. Шина событий
 в bazis работает внутри процесса и строится на DI.
 
-Все примеры проверены на bazis 0.97.10.
+Все примеры проверены на bazis 0.108.0.
 
 ## Событие
 
@@ -63,7 +63,9 @@ export class ProjectsService {
 `scoped`-подписчик там не сработает:
 
 ```text
-ScopedServiceFromRootError: Cannot resolve scoped service "AuditTrail" from root provider.
+ScopedServiceFromRootError: Cannot resolve scoped service "AuditTrail" from root provider. A scoped service
+lives in a request or a scope: create one with provider.createScope(), resolve "AuditTrail" from it and
+dispose the scope when done.
 ```
 
 `await` ждёт, пока отработают **все** обработчики, — они выполняются по

@@ -5,7 +5,7 @@ bazis сам описывает API в формате [OpenAPI 3.1](https://spec
 кода при кодогенерации — Swagger-декораторов нет. Что написано в
 сигнатуре метода и модели запроса, то и попадёт в документ.
 
-Все примеры проверены на bazis 0.98.6.
+Все примеры проверены на bazis 0.108.0.
 
 ## Где смотреть
 
@@ -103,6 +103,9 @@ POST /tasks       201 400 401 403  summary: "POST /tasks"
 | `limit = 10`, `tag?: string` | `query`, необязательный, тип по значению по умолчанию |
 | `tag: string[]` | `query`, `array` |
 | Модель списка (`ListRequest`) | `sort` со списком допустимых полей, `page[number]`, `page[size]` с `maximum`, `filter[поле][оператор]` |
+| `requestId?: FromHeader<string, "x-request-id">` | `header`, необязательный |
+| `query: FromQuery<SearchQuery>` | Поля модели — параметры `query` под своими именами (`page_size`), правила `@Validator` — ограничения (`maximum: 50`) |
+| `library: FromHeader<LibraryHeaders>` | Поля модели — параметры `header`; `required: true` — обязательный, `uuid: true` — `format: uuid` |
 
 ### Тело запроса
 
