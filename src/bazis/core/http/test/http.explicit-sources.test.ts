@@ -171,3 +171,9 @@ test("OpenAPI lists model fields as parameters under their wire names", async ()
     ["id", "path"], ["page_size", "query"], ["x-request-id", "header"],
   ]);
 });
+
+test("OpenAPI lists 400 for query and header models, which are validated", async () => {
+  const document = await (await app.fetch("/docs/openapi.json")).json() as { paths: Record<string, Record<string, { responses: Record<string, unknown> }>> };
+  expect(Object.keys(document.paths["/catalog/search"]!.get!.responses)).toContain("400");
+  expect(Object.keys(document.paths["/catalog/tenant"]!.get!.responses)).toContain("400");
+});

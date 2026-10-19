@@ -55,6 +55,18 @@ test("an import sees the token through its own imports but does not export it (0
   );
 });
 
+test("a chain of imports offers to import the owner directly or to re-export", () => {
+  @Module({ providers: [singletonValue(CLOCK, "now")], exports: [CLOCK] })
+  class ClockModule {}
+  @Module({ imports: [ClockModule], exports: [] })
+  class ReportModule {}
+  @Module({ imports: [ReportModule], providers: [DI.singleton(DI.factoryProvider(REPORT, [CLOCK], (clock) => clock))], exports: [] })
+  class AppModule {}
+  expect(messageOf(() => createContainer(AppModule))).toContain(
+    `Module "AppModule": "Report" depends on "Clock", which its import "ReportModule" receives from "ClockModule" but does not export. Add "ClockModule" to the imports of "AppModule", or add it to the exports of "ReportModule".`,
+  );
+});
+
 // One implementation per token for the whole application: a second registration
 // in the importer becomes the selected one, which the imported module cannot see.
 abstract class IClock { abstract now(): string; }

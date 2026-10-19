@@ -4,6 +4,34 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.109.0 — 2026-10-19
+
+### Changed (breaking)
+
+- The `HTTP_CLIENT` and `HTTP_CLIENT_FACTORY` tokens are removed: take the
+  clients by type, `constructor(private readonly http: HttpClient)` and
+  `constructor(clients: HttpClientFactory)`.
+- `createTestContainer(root, options)` builds the container through the kernel,
+  like `startTestApp`, without starting anything: `Logger`, `EventBus`,
+  `ConfigView` of declared configs and `Environment` (`test`) are there, so a
+  module that uses them can be tested. Options are `overrides` and
+  `configure(builder)`; the low-level `createContainer` options are gone.
+
+### Fixed
+
+- OpenAPI lists `400` for an action with a header parameter or a query or
+  header model (`FromQuery<Model>`, `FromHeader<Model>`): they are validated.
+- A missing `ICache` says how to provide it: `Missing dependency "ICache" for
+  "Catalog". The cache is provided by a cache module: add cache: memory() to
+  the runApp options …`; a missing `IDistributedCache` names
+  `redisConnect(…, { cache: "distributed" })`.
+- A dependency that a module sees only through a chain of imports offers both
+  fixes: `… which its import "ReportModule" receives from "ClockModule" but does
+  not export. Add "ClockModule" to the imports of "AppModule", or add it to the
+  exports of "ReportModule".`
+- `Missing dependency "…" for "…"` ends with a period only before a hint, for
+  named and class dependencies alike.
+
 ## 0.108.0 — 2026-10-19
 
 ### Added

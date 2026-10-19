@@ -18,8 +18,8 @@ Checks: `test/http-client.bodyless.test.ts`, a real logout of the Vue client.
 Addendum 2026-10-09 (0.98.11): `HttpClientFactory` is an abstract class instead of an
 interface, so a service takes it by type; `HttpClientFactoryBuilder.build()` returns an
 instance of it and the call shape (`createClient(name?)`) does not change. The core
-integration registers the factory and the default client under their classes and under
-`HTTP_CLIENT_FACTORY` / `HTTP_CLIENT`. A relative `baseUrl` (`"/api"`) is resolved
+integration registers the factory and the default client under their classes (since
+0.109.0 only there: the `HTTP_CLIENT_FACTORY` / `HTTP_CLIENT` tokens are removed). A relative `baseUrl` (`"/api"`) is resolved
 against the page address once per dispatch (`withAbsoluteBaseUrl`), so URL building and
 all origin checks see an absolute base; without a page it is an `HttpClientError` without
 a code. Regression: `test/http-client.relative-base.test.ts`.

@@ -379,9 +379,9 @@ function successStatus(method: string, action: ActionMeta, generated: number | u
 
 /**
  * Errors the operation can answer with: 400 when the request carries values
- * that are converted or validated (body, list query, query, typed route
- * parameters), 401/403 under @Authorize, and the errors the method body
- * returns or throws itself.
+ * that are converted or validated (body, list query, query and header values
+ * and models, typed route parameters), 401/403 under @Authorize, and the
+ * errors the method body returns or throws itself.
  */
 function errorStatuses(
   bindings: readonly ParameterBinding[],
@@ -390,7 +390,8 @@ function errorStatuses(
 ): number[] {
   const statuses = new Set(generated ?? []);
   const validated = bindings.some((binding) =>
-    binding.source === "body" || binding.source === "list" || binding.source === "query"
+    binding.source === "body" || binding.source === "list" || binding.source === "query" || binding.source === "header"
+    || binding.source === "queryModel" || binding.source === "headerModel"
     || (binding.source === "route" && binding.type !== undefined && binding.type !== "string"));
   if (validated) statuses.add(400);
   if (authorized) {
