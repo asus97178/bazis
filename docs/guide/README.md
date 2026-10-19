@@ -107,7 +107,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Настройка продакшена](deployment/production.md) — точка входа для production, переменные окружения, журнал, сроки, порядок выкладки
 - ✅ [Docker](deployment/docker.md) — двухэтапный образ, healthcheck без curl, секреты, Compose с шагом схемы
 - ✅ [Плавная остановка и health](deployment/graceful-shutdown.md) — `SIGTERM`, срок остановки и коды выхода, `/health`, проверки Kubernetes
-- ✅ [Платформы](deployment/platforms.md) — glibc и musl, Linux-файл с Mac, systemd
+- ✅ [Платформы](deployment/platforms.md) — glibc и musl, Linux-файл с Mac (`--platform`), systemd
 
 ## 12. Рецепты
 

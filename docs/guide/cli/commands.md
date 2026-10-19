@@ -500,6 +500,7 @@ bunx bazis build
 bunx bazis build --bin                    # bin/<имя из package.json>
 bunx bazis build --bin --outfile dist/shop
 bunx bazis build --bin --dotenv           # файл будет читать .env
+bunx bazis build --bin --platform linux-x64  # для другой платформы: bin/<имя>-linux-x64
 ```
 
 ```text

@@ -161,7 +161,7 @@ error: Unhandled error, shutting down {"error":{"name":"Error","message":"forgot
 | `startupTimeoutMs` | `30000` | Время на весь запуск; `0` — без предела |
 | `signals` | `["SIGINT", "SIGTERM"]` | Сигналы остановки |
 | `unhandledErrorPolicy` | `"shutdown"` | Что делать с необработанной ошибкой |
-| `startupReport` | Вне production | Строка `bazis started` в журнале |
+| `startupReport` | `true` | Строки `bazis started` (с адресом в `listening`) и `bazis stopped` в журнале, в любом окружении |
 
 Если окружение не задано, приложение считает себя production: забытая
 переменная окружения на сервере не включит режим разработки с подробными

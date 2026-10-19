@@ -84,7 +84,7 @@ await runApp(AppModule, {
 Kubernetes. С точкой входа выше:
 
 ```text
-info: bazis started {"environment":"production","debug":false,"configKeys":2,"configMs":3.5,"containerMs":23.6,"hostedServices":3,"hooks":0,"startupMs":214.9}
+info: bazis started {"environment":"production","debug":false,"configKeys":2,"configMs":3.5,"containerMs":23.6,"hostedServices":3,"hooks":0,"startupMs":214.9,"listening":["http://localhost:8080"]}
 info: POST /orders 201 9.3ms {"method":"POST","path":"/orders","status":201,"durationMs":9.34}
 info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"durationMs":4.95}
 ```
@@ -92,7 +92,10 @@ info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"dur
 - В production пишутся уровни `info` и выше; `debug` — только вне
   production.
 - Пароли, токены и учётные данные в адресах маскируются.
-- Без `startupReport: true` успешный старт в production не пишет ничего.
+- Запуск и остановка пишутся всегда: `bazis started` с адресом в
+  `listening` и `bazis stopped` с сигналом и кодом выхода (с 0.107.0).
+  При `HOST=0.0.0.0` адрес показан как `http://localhost:<порт>`.
+  Отключает их `kernel: { startupReport: false }`.
 
 Свой формат или отправка в систему сбора — через свой логгер
 ([Свой логгер](../fundamentals/logging.md#свой-логгер)).

@@ -29,8 +29,38 @@ ELF 64-bit LSB executable, ARM aarch64, dynamically linked,
 
 ## Linux-файл с Mac
 
-Собирать на сервере не обязательно: сборочный этап из главы
-[Docker](docker.md) даёт Linux-файл, его можно забрать из образа:
+`--platform` собирает файл для другой платформы прямо на Mac:
+
+```sh
+bunx bazis build --bin --platform linux-x64
+```
+
+```text
+  [OK  ]  compile         bin/planner-linux-x64 · 80.5 MB                                 10.5 s
+    ✔  SUCCESS   executable is ready · bin/planner-linux-x64
+
+$ file bin/planner-linux-x64
+bin/planner-linux-x64: ELF 64-bit LSB executable, x86-64, … for GNU/Linux 3.2.0
+```
+
+| `--platform` | Для чего |
+| --- | --- |
+| `linux-x64`, `linux-arm64` | Linux с glibc: Debian, Ubuntu, RHEL |
+| `linux-x64-musl`, `linux-arm64-musl` | Alpine |
+| `darwin-arm64`, `darwin-x64` | macOS |
+| `windows-x64` | Windows (bazis на нём не проверялся) |
+
+К имени можно добавить `-baseline` (старые процессоры x64 без AVX2) или
+`-modern`. Файл по умолчанию — `bin/<имя>-<платформа>`, локальная сборка
+`bin/<имя>` остаётся. При первой сборке под платформу Bun скачивает её
+рантайм (около 40 МБ) и кладёт в свой кэш.
+
+> [!NOTE]
+> `--platform` — с версии 0.107.0. Раньше Linux-файл с Mac получали только
+> через Docker, как ниже.
+
+Ещё способ — сборочный этап из главы [Docker](docker.md): он даёт
+Linux-файл, его можно забрать из образа:
 
 ```sh
 docker build --target build -t shop-build .

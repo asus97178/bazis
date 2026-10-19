@@ -255,6 +255,49 @@ export class AuthController {
 Проверки выполняются по порядку и останавливаются на первой неудаче: если
 `signedIn` бросил 401, `hasRole` уже не вызывается.
 
+## Закрыто по умолчанию
+
+Чтобы маршрут без `@Authorize` не оказался открытым по забывчивости,
+задайте общую проверку в `runApp`:
+
+```ts
+await runApp(AppModule, {
+  infra: AppInfra,
+  http: { authorize: requireTokenKind(TokenKind.Admin, TokenKind.Client), /* … */ },
+});
+```
+
+| Маршрут | Что выполняется |
+| --- | --- |
+| Без декораторов | Общая проверка |
+| `@Authorize(check)` | Сначала общая проверка, потом `check` |
+| `@AllowAnonymous()` | Ничего — маршрут открыт |
+| `/health`, документация OpenAPI | Ничего — они открыты всегда |
+
+Проверено на планировщике из [учебного проекта](../introduction/tutorial.md),
+у контроллера проектов убран `@Authorize`:
+
+```text
+GET  /projects                    без токена         → 401
+GET  /projects                    с токеном клиента  → 200
+GET  /auth/users                  с токеном клиента  → 403   (@Authorize(requireTokenKind(Admin)) после общей)
+POST /auth/login                  @AllowAnonymous    → 200
+GET  /health                                         → 200
+```
+
+- Одна и та же функция выполняется один раз, даже если она стоит и в
+  `authorize`, и в `@Authorize` маршрута.
+- OpenAPI отмечает такие маршруты полем `security`, а
+  [экран запуска](../cli/commands.md#экран-запуска) больше не показывает их
+  открытыми.
+- Действует для HTTP. Методы gRPC и шлюзы WebSocket защищаются своими
+  `@Authorize`.
+
+> [!NOTE]
+> `http.authorize` — с версии 0.108.0, как fallback policy в ASP.NET Core.
+> Раньше маршрут без `@Authorize` был открыт, и открытые маршруты
+> оставалось только перечислять в тесте.
+
 ## Чем авторизация отличается от middleware
 
 Проверку доступа можно написать и как middleware, но у `@Authorize` два

@@ -145,7 +145,8 @@ info: GET /pay/50 200 6.9ms {...,"requestId":"req-7"}
 
 | Событие | Строка |
 | --- | --- |
-| Запуск приложения (вне production) | `info: bazis started {...}` |
+| Запуск приложения | `info: bazis started {...,"listening":["http://…"]}` |
+| Остановка | `info: bazis stopped {"signal":"SIGTERM","exitCode":0,…}` |
 | Каждый запрос, если включён `accessLog` | `info: GET /pay/50 200 6.9ms {...}` |
 | Неожиданная ошибка в запросе | `error: GET /pay/50 failed {...}` — см. [Обработку ошибок](../overview/errors.md#журнал-ошибок) |
 | Падение фоновой службы | `error: background Worker crashed {...}` — см. [Жизненный цикл](lifecycle.md#падения-и-перезапуск) |

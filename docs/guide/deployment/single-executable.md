@@ -83,20 +83,22 @@ $ echo $?
 1
 ```
 
-**В production старт молчит.** Без терминала приложение ничего не пишет
-при успешном запуске и при остановке. Проверяйте готовность по
-`/health`, а строку о старте включает опция `startupReport`:
-
-```ts
-await runApp(AppModule, { infra: AppInfra, kernel: { startupReport: true }, http: { … } });
-```
+**Запуск и остановка — по строке в журнале**, в том числе в production.
+В `listening` — адрес, на котором слушает сервер:
 
 ```text
-info: bazis started {"environment":"production","debug":false,"configKeys":3,…,"startupMs":94.5}
+info: bazis started {"environment":"production","debug":false,"configKeys":6,"configMs":0.2,"containerMs":2.2,"hostedServices":6,"hooks":0,"startupMs":127.8,"listening":["http://127.0.0.1:3096"]}
+info: bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":1.1}
 ```
 
-В терминале вместо строки печатается [экран запуска](../cli/commands.md#экран-запуска)
-— если `startupReport` включён.
+Обе строки отключает `runApp({ kernel: { startupReport: false } })`.
+[Экран запуска](../cli/commands.md#экран-запуска) печатается только вне
+production и только в терминале. Готовность для балансировщика
+по-прежнему проверяйте по `/health`.
+
+> [!NOTE]
+> С версии 0.107.0. Раньше в production успешный запуск и остановка не
+> писали ничего, а в строке запуска не было адреса.
 
 Приложение из примера готово отвечать через 0.1 секунды после запуска.
 
