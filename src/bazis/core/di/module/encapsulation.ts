@@ -184,10 +184,15 @@ export function validateModuleEncapsulation(
     // module, say) registered the token.
     const blocking = consumer.imports.find((imported) => !imported.providedTokens.has(token)
       && !exportedTokens(imported).has(token) && visibleTokens(imported).has(token));
-    if (blocking !== undefined) {
-      return `which its import "${blocking.name}" receives from its own imports but does not export. Add it to the exports of "${blocking.name}".`;
-    }
     const owner = records.find((record) => record !== consumer && record.providedTokens.has(token));
+    if (blocking !== undefined) {
+      // The module that registers and exports the token can be imported
+      // directly; an unnamed inner module (`ormBazis`) cannot.
+      const direct = owner !== undefined && owner !== blocking && exportedTokens(owner).has(token) && !/^module#\d+$/.test(owner.name);
+      return direct
+        ? `which its import "${blocking.name}" receives from "${owner.name}" but does not export. Add "${owner.name}" to the imports of "${consumer.name}", or add it to the exports of "${blocking.name}".`
+        : `which its import "${blocking.name}" receives from its own imports but does not export. Add it to the exports of "${blocking.name}".`;
+    }
     if (owner === undefined) return "which is provided by another module but not exported.";
     return exportedTokens(owner).has(token)
       ? `which module "${owner.name}" exports, but "${consumer.name}" does not list "${owner.name}" in its imports. Add "${owner.name}" to the imports of "${consumer.name}".`

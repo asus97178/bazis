@@ -1,4 +1,5 @@
 import { createToken, type InjectionToken } from "../di";
+import { registerNamedDependencyHint } from "../di/errors/NamedDependencyNotFoundError";
 import type { CacheEntry } from "./types/CacheEntry";
 import type { CacheSetOptions } from "./types/CacheOptions";
 
@@ -64,6 +65,10 @@ export interface ICache<TValue = unknown> {
 
 /** Default cache DI token. */
 export const ICache = createToken<ICache>("ICache") as InjectionToken<ICache<unknown>>;
+
+registerNamedDependencyHint((name) => name === "ICache" || name.startsWith("ICache<")
+  ? "The cache is provided by a cache module: add cache: memory() to the runApp options (startTestApp takes the same options)."
+  : undefined);
 
 /** Typed token for a specific value type. */
 export function cacheToken<TValue>(name: string): InjectionToken<ICache<TValue>> {

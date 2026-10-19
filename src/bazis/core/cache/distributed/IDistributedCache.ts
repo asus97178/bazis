@@ -1,4 +1,5 @@
 import { createToken, type InjectionToken } from "../../di";
+import { registerNamedDependencyHint } from "../../di/errors/NamedDependencyNotFoundError";
 import type { CacheSetOptions } from "../types/CacheOptions";
 
 /** Default named connection used when a decorator omits `connection`. */
@@ -47,3 +48,7 @@ export interface IDistributedCache<TValue = unknown> {
  * `DISTRIBUTED_SERVICE_CACHE.resolve(name)`.
  */
 export const IDistributedCache = createToken<IDistributedCache>("IDistributedCache") as InjectionToken<IDistributedCache<unknown>>;
+
+registerNamedDependencyHint((name) => name === "IDistributedCache"
+  ? "The distributed cache is provided by Redis: add redisConnect(redisConfig, { cache: \"distributed\" }) to the @Infra manifest."
+  : undefined);

@@ -1,5 +1,5 @@
 import { ServiceValidationError } from "../errors";
-import { missingNamedDependencyIssue } from "../errors/NamedDependencyNotFoundError";
+import { missingDependencyIssue } from "../errors/NamedDependencyNotFoundError";
 import { isClassProvider, isLazyDependency, isNamedDependency, isOptionalDependency } from "../provider";
 import type {
   KeyedDependency,
@@ -99,7 +99,7 @@ export class GraphValidator {
         const inner = isLazy || isOptional ? dependency.inner : dependency;
         // An optional dependency on a name nothing registered is simply absent.
         if (isNamedDependency(inner) && !this.context.hasName(inner.name)) {
-          if (!isOptional) issues.add(missingNamedDependencyIssue(inner.name, serviceName(registration)));
+          if (!isOptional) issues.add(missingDependencyIssue(inner.name, serviceName(registration)));
           continue;
         }
         const descriptor = this.context.describeDependency(inner);
@@ -109,7 +109,7 @@ export class GraphValidator {
         }
         if (!depRegistration) {
           issues.add(
-            `Missing dependency "${tokenToDebugName(descriptor.token)}" for "${serviceName(registration)}"`,
+            missingDependencyIssue(tokenToDebugName(descriptor.token), serviceName(registration)),
           );
           continue;
         }

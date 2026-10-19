@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { Module, createContainer } from "@/core/di";
 import {
-  HTTP_CLIENT,
-  HTTP_CLIENT_FACTORY,
   HttpClient,
   httpClientModule,
-  type HttpClientFactory,
+  HttpClientFactory,
 } from "@/core/http-client";
 import { runWithRequestContextAsync } from "@/core/kernel";
 
@@ -22,19 +20,19 @@ function buildClient(extra: Record<string, unknown>): { client: HttpClient; cont
   @Module({ imports: [httpClientModule({ default: extra })] })
   class AppModule {}
   const container = createContainer(AppModule, { validateOnBuild: true });
-  return { client: container.resolve(HTTP_CLIENT), container };
+  return { client: container.resolve(HttpClient), container };
 }
 
 describe("httpClientModule: DI wiring", () => {
-  test("provides HTTP_CLIENT and HTTP_CLIENT_FACTORY", () => {
+  test("provides HttpClient and HttpClientFactory by type", () => {
     @Module({
       imports: [httpClientModule({ clients: { api: { baseUrl: "https://api.test" } } })],
     })
     class AppModule {}
     const container = createContainer(AppModule, { validateOnBuild: true });
 
-    expect(container.resolve(HTTP_CLIENT)).toBeInstanceOf(HttpClient);
-    const factory = container.resolve(HTTP_CLIENT_FACTORY) as HttpClientFactory;
+    expect(container.resolve(HttpClient)).toBeInstanceOf(HttpClient);
+    const factory = container.resolve(HttpClientFactory) as HttpClientFactory;
     expect(factory.createClient("api")).toBeInstanceOf(HttpClient);
     expect(() => factory.createClient("nope")).toThrow();
   });
@@ -51,9 +49,9 @@ describe("httpClientModule: DI wiring", () => {
     class AppModule {}
     const container = createContainer(AppModule, { validateOnBuild: true });
 
-    expect(container.resolve(HTTP_CLIENT).defaults.timeoutMs).toBe(12_345);
-    expect(container.resolve(HTTP_CLIENT).defaults.maxResponseBytes).toBe(1_234);
-    const named = container.resolve(HTTP_CLIENT_FACTORY).createClient("api");
+    expect(container.resolve(HttpClient).defaults.timeoutMs).toBe(12_345);
+    expect(container.resolve(HttpClient).defaults.maxResponseBytes).toBe(1_234);
+    const named = container.resolve(HttpClientFactory).createClient("api");
     expect(named.defaults.timeoutMs).toBe(12_345);
     expect(named.defaults.maxResponseBytes).toBe(1_234);
   });
@@ -62,7 +60,7 @@ describe("httpClientModule: DI wiring", () => {
     @Module({ imports: [httpClientModule({ timeoutMs: 0, maxResponseBytes: 0 })] })
     class AppModule {}
     const container = createContainer(AppModule, { validateOnBuild: true });
-    const client = container.resolve(HTTP_CLIENT);
+    const client = container.resolve(HttpClient);
 
     expect(client.defaults.timeoutMs).toBe(0);
     expect(client.defaults.maxResponseBytes).toBe(0);

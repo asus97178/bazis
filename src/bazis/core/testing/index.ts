@@ -1,23 +1,36 @@
-import { HOSTED_SERVICE, createContainer, type BazisModuleRef, type CreateContainerOptions, type DiContainer, type ProviderDefinition } from "../di";
+import { HOSTED_SERVICE, type BazisModuleRef, type DiContainer, type ProviderDefinition } from "../di";
 import { loadBazisGeneratedRuntime } from "../generatedRuntime";
 import { HttpServer, type HttpModuleOptions } from "../http";
 import { KernelBuilder, type Kernel } from "../kernel";
 import { composeApp } from "../app/runApp";
 import type { RunAppOptions } from "../app";
 
+export interface TestContainerOptions {
+  /** Replacements for registered providers: `singleton(ITaskStore, FakeStore)`. */
+  readonly overrides?: readonly ProviderDefinition[];
+  /** Adjust the kernel before it is built: config sources, a logger. */
+  readonly configure?: (builder: KernelBuilder) => void;
+}
+
 /**
- * A container for module tests. Loads the project's generated code first
- * (without it constructor dependencies are missing and a test passes for the
- * wrong reason), then builds the graph with the replacements.
+ * A container for module tests: the module graph with the kernel services an
+ * application has — `Logger`, `EventBus`, `ConfigView` of declared configs,
+ * `Environment` (`test`) — but nothing started: no hosted services, no HTTP.
+ * Loads the project's generated code first (without it constructor
+ * dependencies are missing and a test passes for the wrong reason).
  *
  * ```ts
  * const container = await createTestContainer(TaskModule, { overrides: [singleton(ITaskStore, FakeStore)] });
  * const tasks = container.createScope().resolve(TaskService);
  * ```
  */
-export async function createTestContainer(root: BazisModuleRef, options: CreateContainerOptions = {}): Promise<DiContainer> {
+export async function createTestContainer(root: BazisModuleRef, options: TestContainerOptions = {}): Promise<DiContainer> {
   await loadBazisGeneratedRuntime();
-  return createContainer(root, { validateOnBuild: true, ...options });
+  const builder = new KernelBuilder(root).useOptions({ startupReport: false, environment: "test", signals: [] });
+  options.configure?.(builder);
+  if (options.overrides !== undefined) builder.useOverrides(options.overrides);
+  const kernel: Kernel = await builder.build();
+  return kernel.container;
 }
 
 export interface TestAppOptions extends Omit<RunAppOptions, "http"> {

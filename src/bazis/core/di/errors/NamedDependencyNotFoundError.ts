@@ -1,11 +1,11 @@
 import { DiError } from "./DiError";
 
-/** Returns a hint for a named dependency nobody registers, or `undefined`. */
+/** Returns a hint for a dependency nobody registers (by its name), or `undefined`. */
 export type NamedDependencyHint = (name: string) => string | undefined;
 
 const hints: NamedDependencyHint[] = [];
 
-/** Infrastructure extensions (ORM repositories, …) explain their own named dependencies here. */
+/** Infrastructure extensions (ORM repositories, the cache, …) explain their own dependencies here. */
 export function registerNamedDependencyHint(hint: NamedDependencyHint): void {
   hints.push(hint);
 }
@@ -15,9 +15,10 @@ function hintFor(name: string): string {
   return hint ? ` ${hint}` : "";
 }
 
-/** The graph-validation issue for a named dependency nobody registers, naming the service that needs it. */
-export function missingNamedDependencyIssue(name: string, requester: string): string {
-  return `Missing dependency "${name}" for "${requester}".${hintFor(name)}`;
+/** The graph-validation issue for a dependency nobody registers, naming the service that needs it and the fix when one is known. */
+export function missingDependencyIssue(name: string, requester: string): string {
+  const hint = hintFor(name);
+  return hint === "" ? `Missing dependency "${name}" for "${requester}"` : `Missing dependency "${name}" for "${requester}".${hint}`;
 }
 
 export class NamedDependencyNotFoundError extends DiError {
