@@ -5,7 +5,7 @@
 выбирает метод и как именно аргументы получают значения, со всеми
 пограничными случаями.
 
-Все примеры проверены на bazis 0.98.1.
+Все примеры проверены на bazis 0.108.0.
 
 ## Какой маршрут совпадёт
 
@@ -65,7 +65,7 @@ TasksController.again. Routes that differ only in parameter names are the same r
 | Шаблон и тип | `/tasks/42` | `/tasks/abc` |
 | --- | --- | --- |
 | `:n` и `n: string` | `"42"` | `"abc"` |
-| `:n` и `n: number` | `42` | **400** `Parameter "n" must be of type number, got: "abc"` |
+| `:n` и `n: number` | `42` | **400** `Validation failed`, в `details` — `{"property":"n","code":"type"}` |
 | `:n(int)` и `n: number` | `42` | **404** — маршрут просто не совпал |
 
 Разница важна: ограничение в шаблоне (`(int)`, `(uuid)`…) участвует в
@@ -101,9 +101,14 @@ search(q: string, limit = 10, done = false, tag?: string) { ... }
 | `number` | Любое число, в том числе `1.5`; `abc` — 400 |
 | `boolean` | `true`, `false`, `1`, `0`; `yes` — 400 |
 
-Целые числа в строке запроса отдельно не проверяются: если нужен целый
-`limit`, проверьте его в методе или используйте модель списка — о ней в
-главе [Списки и JSON:API](lists.md).
+Целые числа в простом параметре отдельно не проверяются: `limit=1.5` даст
+`1.5`. Если нужен целый `limit` в диапазоне, возьмите
+[модель строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков)
+с `@Validator({ integer: true, range: [1, 50] })` или модель списка из главы
+[Списки и JSON:API](lists.md).
+
+Ошибки всех параметров собираются в один ответ `400 Validation failed` с
+`details` — как ошибки модели тела (с версии 0.102.0).
 
 ### Массивы
 
@@ -118,7 +123,7 @@ list(tag: string[] = [], status?: number[]) { ... }
 | --- | --- |
 | `?tag=a&tag=b&status=1&status=2` | `tag = ["a", "b"]`, `status = [1, 2]` |
 | без параметров | `tag = []` (значение по умолчанию), `status = undefined` |
-| `?status=abc` | **400** `Parameter "status" must be of type number, got: "abc"` |
+| `?status=abc` | **400** `Validation failed`: `Field "status" must be of type number, got: string` |
 
 Подходят `string[]`, `number[]`, `boolean[]`, а также `Array<T>` и
 `readonly T[]`. Без значения по умолчанию и без `?` отсутствующий массив
@@ -135,15 +140,18 @@ list(tag: string[] = [], status?: number[]) { ... }
 | Что нужно | Как получить |
 | --- | --- |
 | JSON-тело | Параметр-класс — [модель запроса](../overview/validation.md) |
-| Заголовок | `ctx.header("x-api-key")` |
+| Заголовок | `apiKey: FromHeader<string, "x-api-key">` или `ctx.header("x-api-key")` |
+| Несколько параметров строки запроса или заголовков с проверкой | `FromQuery<SearchQuery>`, `FromHeader<Headers>` — [модели](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
 | Тело как текст или форма | `await ctx.text()`, `await ctx.formData()` |
 | Все параметры маршрута | `ctx.params` |
 | Исходный запрос | Параметр типа `Request` |
 
-Заголовков-параметров нет намеренно: они почти всегда относятся к
-инфраструктуре (ключи, трассировка, авторизация), и место им — в
-[middleware](../overview/middleware.md) или проверке доступа, а не в
-сигнатуре метода.
+Явный источник — `FromQuery`, `FromHeader`, `FromBody`, `FromRoute` — задаётся
+типом параметра; подробно — в главе
+[Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute).
+Заголовки, которые относятся к инфраструктуре (ключи, трассировка,
+авторизация), по-прежнему лучше читать в [middleware](../overview/middleware.md)
+или проверке доступа.
 
 ## Что codegen не примет
 
@@ -153,7 +161,7 @@ list(tag: string[] = [], status?: number[]) { ... }
 | Сигнатура | Почему |
 | --- | --- |
 | `find(filter)` — параметр без типа | Неизвестно, откуда брать значение |
-| `create(a: CreateA, b: CreateB)` — два класса | Тело у запроса одно |
+| `create(a: CreateA, b: CreateB)` — две модели тела | Тело у запроса одно; модель строки запроса или заголовков помечайте `FromQuery<…>` / `FromHeader<…>` |
 | `list(ids: Date[])` — массив не простого типа | Из строки запроса приходят только строки, числа и логические значения |
 | `find({ id })` — деструктуризация | Не поддерживается: используйте имя параметра |
 
