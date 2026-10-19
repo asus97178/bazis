@@ -3,7 +3,7 @@
 Тесты в bazis — обычные тесты `bun:test`. Фреймворк добавляет к ним две
 вещи: подмену зависимостей и запуск приложения прямо в процессе теста.
 
-Все примеры проверены на bazis 0.98.0.
+Все примеры проверены на bazis 0.108.0.
 
 ## Запуск
 
@@ -95,7 +95,7 @@ test("TaskService with a fake store", async () => {
 подменять нечего — опечатка в токене, — тест упадёт сразу:
 
 ```text
-Override of "ITaskStore" replaces nothing: no module registers it.
+Override of "ITaskStore" replaces nothing: no module registers it. Check the token, or register it in a module first.
 ```
 
 > [!WARNING]
