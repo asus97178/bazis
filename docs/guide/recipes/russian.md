@@ -9,7 +9,7 @@ API на русском:
 Пример — каталог книг из рецепта
 [Если вы пришли с NestJS](from-nestjs.md).
 
-Все примеры проверены на bazis 0.100.7 и Bun 1.4.0.
+Все примеры проверены на bazis 0.100.7 и Bun 1.4.0, выбор по `Accept-Language` — на 0.108.0.
 
 ## Язык ответов
 
@@ -60,6 +60,38 @@ POST /books {"title":"","year":"abc"}
 Язык задаётся для каждого приложения отдельно, а не для всего процесса.
 Два приложения в одном процессе — например, в тестах — отвечают каждое на
 своём языке.
+
+### Язык по `Accept-Language`
+
+Если клиентам нужны разные языки, перечислите их:
+
+```ts
+await runApp(AppModule, { language: { default: "ru", supported: ["ru", "en"] }, http: { /* … */ } });
+```
+
+Каждый запрос получает лучший язык из `Accept-Language` (с учётом `q`,
+`ru-RU` → `ru`), а без заголовка или с неподдерживаемым языком — `default`:
+
+```text
+GET /projects                                        → 401 Content-Language: ru  {"error":"Требуется аутентификация"}
+GET /projects   accept-language: en-US,en;q=0.9      → 401 Content-Language: en  {"error":"Unauthorized"}
+
+POST /auth/register {"email":"bad","password":"x"}
+  без заголовка → {"error":"Проверка данных не пройдена","details":[{"property":"email","message":"Поле \"email\" должно быть корректным email-адресом",…
+  en            → {"error":"Validation failed","details":[{"property":"email","message":"Field \"email\" must be a valid email address",…
+```
+
+- Ответы с текстом фреймворка получают `Content-Language` и
+  `Vary: Accept-Language`: кэши не отдадут английский ответ русскому
+  клиенту.
+- Успешные ответы контроллеров эти заголовки не получают и по-прежнему
+  попадают в [кэш ответов](../http/output-cache.md). Если ответ зависит от
+  языка, используйте `ctx.language` — выбранный язык — и сами добавьте
+  `Vary: Accept-Language`.
+- Тексты `CodexError` — на языке `default`: они общие на процесс.
+
+> [!NOTE]
+> Выбор по `Accept-Language` — с версии 0.108.0.
 
 > [!NOTE]
 > Опция `language` — с версии 0.100.7. Раньше переводились только
@@ -216,8 +248,6 @@ expect((await (await app.fetch("/books")).json()).details).toEqual([{ property: 
 
 ## Чего пока нет
 
-- **Языка на запрос.** Язык один на всё приложение; выбора по
-  `Accept-Language` нет.
 - **Перевода внутри сервиса.** `Validator.validate()`, вызванный в коде
   сервиса, а не при привязке запроса, берёт тексты из глобального реестра
   и по умолчанию отвечает по-английски. Для русского вызовите один раз при

@@ -84,8 +84,14 @@ $ curl localhost:3000/health
 {"healthy":true,"checks":[{"name":"infra:db","healthy":true,…},{"name":"background:AdminSeed","healthy":true,…}]}
 ```
 
-В production приложение по умолчанию ничего не пишет при старте; что
-включить и как выкладывать — в разделе «Развёртывание»:
+В журнал пишутся строки запуска и остановки:
+
+```text
+info: bazis started {"environment":"production","debug":false,"configKeys":6,"configMs":0.2,"containerMs":2.2,"hostedServices":6,"hooks":0,"startupMs":127.8,"listening":["http://127.0.0.1:3096"]}
+info: bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":1.1}
+```
+
+Как выкладывать — в разделе «Развёртывание»:
 
 - [Один исполняемый файл](../deployment/single-executable.md)
 - [Настройка продакшена](../deployment/production.md) и [Docker](../deployment/docker.md)

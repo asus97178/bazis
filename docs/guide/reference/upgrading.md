@@ -7,6 +7,25 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.108.0
+
+- `HttpModuleOptions.localize` и `errorHandler({ localize })` заменены на
+  `languages`. Их ставит `runApp` из `language` и `messages`: приложения на
+  `runApp` ничего не меняют.
+- Новое: `runApp({ http: { authorize } })` — [закрыто по
+  умолчанию](../overview/authorization.md#закрыто-по-умолчанию);
+  `language: { default, supported }` — [язык по
+  Accept-Language](../recipes/russian.md#язык-по-accept-language).
+
+## 0.107.0
+
+- **Запуск и остановка пишутся в журнал и в production**: `bazis started` с
+  адресом в `listening` и `bazis stopped`. Если журнал разбирает скрипт,
+  проверьте, что новые строки ему не мешают; отключить —
+  `kernel: { startupReport: false }`.
+- Новое: `bazis build --bin --platform linux-x64` —
+  [Linux-файл с Mac](../deployment/platforms.md#linux-файл-с-mac).
+
 ## 0.106.0
 
 - **`ServiceProvider` в scoped-сервисе — область запроса.** `resolve`

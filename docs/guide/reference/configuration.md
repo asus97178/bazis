@@ -48,7 +48,7 @@ await runApp(AppModule, { language: "ru", infra: AppInfra, kernel: { shutdownTim
 | `signals` | `["SIGINT", "SIGTERM"]` | Сигналы плавной остановки |
 | `unhandledErrorPolicy` | `"shutdown"` | Необработанная ошибка: `"shutdown"` — остановка с кодом 1, `"none"` — ничего |
 | `validateOnBuild` | `true` | Проверка графа сервисов при запуске |
-| `startupReport` | вне `production` | Строка `bazis started` или [экран запуска](../cli/commands.md#экран-запуска) |
+| `startupReport` | `true` | Строки `bazis started` и `bazis stopped`; вне `production` в терминале — [экран запуска](../cli/commands.md#экран-запуска) |
 | `schemaOnly` | `BAZIS_SCHEMA_ONLY` | Только инфраструктура и схема, затем выход с кодом 0 ([Шаг схемы](../deployment/single-executable.md#шаг-схемы)) |
 
 ## `http`
@@ -74,7 +74,7 @@ await runApp(AppModule, { language: "ru", infra: AppInfra, kernel: { shutdownTim
 | `phase` | `10` | Фаза запуска HTTP-сервера: после инфраструктуры |
 | `imports` | — | Модули с зависимостями контроллеров, если они не видны иначе |
 
-Опции, которые обычно не задают руками: `validator` и `localize` ставит
+Опции, которые обычно не задают руками: `validator` и `languages` ставит
 `runApp`, `routeMiddlewareComposer` — пакеты фреймворка.
 
 ## Переменные окружения
