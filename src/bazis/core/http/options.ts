@@ -2,12 +2,13 @@ import type { Class } from "../di";
 import type { AccessLogOptions } from "./Middleware/accessLog";
 import type { CorsOptions } from "./Middleware/cors";
 import type { ErrorHandlerOptions } from "./Middleware/errorHandler";
-import type { Localize } from "./Errors/messages";
+import type { LanguageSelection } from "./Errors/messages";
 import type { SecurityHeadersOptions } from "./Middleware/securityHeaders";
 import type { HttpMiddleware } from "./Middleware/types";
 import type { ActionMeta, ControllerMeta } from "./Decorators/metadata";
 import type { OpenApiDocsOptions } from "../../library/openapi";
 import type { ModelValidator } from "./Binding/modelValidator";
+import type { AuthorizeCheck } from "./Authorization/metadata";
 
 /** Built-in health endpoint (liveness/readiness probe). */
 export interface HealthEndpointOptions {
@@ -60,11 +61,11 @@ export interface HttpModuleOptions {
   /** Request-model validator captured by this HTTP server instance. */
   readonly validator?: ModelValidator;
   /**
-   * Renders framework response texts in the application language. `runApp`
+   * Response language of each request and its framework texts. `runApp`
    * sets it from its `language` and `messages` options; without it the
    * texts are English.
    */
-  readonly localize?: Localize;
+  readonly languages?: LanguageSelection;
   /**
    * Modules providing the controllers' dependencies. Controllers live inside
    * the returned HttpModule, so their dependencies must be visible to it:
@@ -129,6 +130,16 @@ export interface HttpModuleOptions {
    * title/version.
    */
   readonly docs?: OpenApiDocsOptions | boolean;
+  /**
+   * Closed by default: these checks run on every route that is not
+   * `@AllowAnonymous`, before the route's own `@Authorize` checks
+   * (like ASP.NET Core's fallback policy). `/health` and the docs stay open.
+   *
+   * ```ts
+   * runApp(AppModule, { http: { authorize: signedIn } });
+   * ```
+   */
+  readonly authorize?: AuthorizeCheck | readonly AuthorizeCheck[];
   /**
    * Access log for every request (method, path, status, duration, correlation
    * id). `true` enables the default single-line sink; pass an object to plug a

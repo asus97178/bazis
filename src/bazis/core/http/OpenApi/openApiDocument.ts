@@ -8,7 +8,7 @@ import {
   type OpenApiSchema,
 } from "../../../library/openapi";
 import { optionsFromSchema } from "../../../library/jsonapi";
-import { resolveAuthorizeMeta } from "../Authorization/metadata";
+import { resolveAuthorizeMeta, routeAuthorizeChecks, type AuthorizeCheck } from "../Authorization/metadata";
 import type { ParameterBinding } from "../Binding/bindings";
 import { resolveGeneratedBindings } from "../Binding/autoBindings";
 import { controllerMetaOf, type ActionMeta, type ControllerMeta } from "../Decorators/metadata";
@@ -23,6 +23,8 @@ export interface HttpOpenApiDocumentBuildInput {
   readonly versioning?: ApiVersioningOptions;
   readonly title: string;
   readonly version: string;
+  /** Default checks of `runApp({ http: { authorize } })`: such routes are secured too. */
+  readonly authorize?: readonly AuthorizeCheck[];
 }
 
 /** Body of every error response: `{ "error": "...", "details": ... }` (see Middleware/errorHandler). */
@@ -80,6 +82,7 @@ function collectOpenApiOperations(
           routeTemplate: joinPaths(meta.prefix, route.template),
           versioning: input.versioning,
           generated,
+          defaultChecks: input.authorize ?? [],
         }));
       }
     }
@@ -98,6 +101,7 @@ interface CreateOperationInput {
   readonly routeTemplate: string;
   readonly versioning?: ApiVersioningOptions;
   readonly generated: GeneratedOpenApiMetadata;
+  readonly defaultChecks: readonly AuthorizeCheck[];
 }
 
 function createOperation(input: CreateOperationInput): OpenApiCatalogOperation {
@@ -108,7 +112,7 @@ function createOperation(input: CreateOperationInput): OpenApiCatalogOperation {
   const status = String(successStatus(input.httpMethod, input.action, generatedOperation?.status));
   const responseSchema = generatedOperation?.response;
   const contentType = input.action.produces ?? "application/json";
-  const authorized = !auth.allowAnonymous && auth.authorize !== undefined;
+  const authorized = routeAuthorizeChecks(input.controllerClass, input.methodName, input.defaultChecks) !== undefined;
 
   return {
     path: input.path,

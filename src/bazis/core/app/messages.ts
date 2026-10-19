@@ -1,9 +1,18 @@
-import { EN_HTTP_MESSAGES, RU_HTTP_MESSAGES, formatMessage, type HttpMessageKey, type Localize } from "../http/Errors/messages";
+import { EN_HTTP_MESSAGES, RU_HTTP_MESSAGES, formatMessage, type HttpMessageKey, type LanguageSelection, type Localize, type SelectedLanguage } from "../http/Errors/messages";
 import { KernelError } from "../kernel";
 import { EN_VALIDATION_MESSAGES, MessageRegistry, RU_VALIDATION_MESSAGES, type ValidationCode } from "../../library/validation";
 
 /** Language of the texts the framework writes into responses. */
 export type AppLanguage = "en" | "ru";
+
+/**
+ * Several response languages: each request gets the best match of its
+ * `Accept-Language` among `supported`, or `default`.
+ */
+export interface AppLanguageOptions {
+  readonly default: AppLanguage;
+  readonly supported: readonly AppLanguage[];
+}
 
 /**
  * Own texts for framework messages, by key: HTTP texts (`notFound`,
@@ -41,4 +50,50 @@ export function createLocalize(language: AppLanguage = "en", messages: AppMessag
     const text = template(key);
     return text === undefined ? undefined : formatMessage(text, params, template);
   };
+}
+
+/**
+ * The response language of every request: one language, or the best match of
+ * `Accept-Language` (`ru-RU,ru;q=0.9,en;q=0.8`) among `supported`.
+ */
+export function createLanguages(option: AppLanguage | AppLanguageOptions = "en", messages: AppMessages = {}): LanguageSelection {
+  if (typeof option === "string") {
+    const single: SelectedLanguage = { language: option, localize: createLocalize(option, messages) };
+    return { negotiated: false, select: () => single };
+  }
+  const supported = [...new Set(option.supported)];
+  if (supported.length === 0) throw new KernelError("runApp: language.supported needs at least one language.");
+  if (!supported.includes(option.default)) {
+    throw new KernelError(`runApp: language.default "${String(option.default)}" must be one of language.supported (${supported.join(", ")}).`);
+  }
+  const selected = new Map<string, SelectedLanguage>(supported.map((language) => [language, { language, localize: createLocalize(language, messages) }]));
+  const fallback = selected.get(option.default)!;
+  return {
+    negotiated: supported.length > 1,
+    select(acceptLanguage) {
+      const language = negotiateLanguage(acceptLanguage, supported);
+      return language === undefined ? fallback : selected.get(language)!;
+    },
+  };
+}
+
+/** The supported language with the highest `q` in `Accept-Language`; ties keep the header order. */
+export function negotiateLanguage(header: string | null | undefined, supported: readonly string[]): string | undefined {
+  if (header === null || header === undefined || header.length > 1024) return undefined;
+  let best: { language: string; q: number } | undefined;
+  for (const part of header.split(",").slice(0, 32)) {
+    const [range = "", ...parameters] = part.trim().split(";");
+    const tag = range.trim().toLowerCase();
+    if (tag.length === 0) continue;
+    let q = 1;
+    for (const parameter of parameters) {
+      const [name, value] = parameter.trim().split("=");
+      if (name?.trim() === "q") q = Number(value);
+    }
+    if (!Number.isFinite(q) || q <= 0 || q > 1) continue;
+    const primary = tag === "*" ? undefined : tag.split("-")[0];
+    const language = primary === undefined ? undefined : supported.find((candidate) => candidate === primary);
+    if (language !== undefined && (best === undefined || q > best.q)) best = { language, q };
+  }
+  return best?.language;
 }

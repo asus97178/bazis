@@ -2,7 +2,7 @@ import { JwtError } from "../../../library/jwt/errors";
 import { ForbiddenError, UnauthorizedError } from "../Errors/HttpError";
 import type { HttpMiddleware } from "../Middleware/types";
 import type { RouteMiddlewareComposer } from "../options";
-import { resolveAuthorizeMeta } from "./metadata";
+import { routeAuthorizeChecks, type AuthorizeCheck } from "./metadata";
 
 /**
  * Built-in composer for `@Authorize`. The HTTP server puts it first among
@@ -12,14 +12,13 @@ import { resolveAuthorizeMeta } from "./metadata";
  * `UnauthorizedError` → `401`). A `JwtError` (missing, malformed, expired or
  * forged token) escaping a check is a 401 as well, not a server error.
  */
-export function createAuthorizeComposer(): RouteMiddlewareComposer {
+export function createAuthorizeComposer(defaults: readonly AuthorizeCheck[] = []): RouteMiddlewareComposer {
   return (controllerClass, methodName) => {
-    const meta = resolveAuthorizeMeta(controllerClass, methodName);
-    if (meta.allowAnonymous || meta.authorize === undefined) {
+    const checks = routeAuthorizeChecks(controllerClass, methodName, defaults);
+    if (checks === undefined) {
       return [];
     }
 
-    const { checks } = meta.authorize;
     const middleware: HttpMiddleware = async (ctx, next) => {
       for (const check of checks) {
         let allowed: boolean;

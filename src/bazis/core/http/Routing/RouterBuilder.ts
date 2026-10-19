@@ -10,7 +10,7 @@ import { corsOptionsOf } from "../Middleware/cors";
 import { normalizeResult } from "../Results/normalize";
 import type { ApiVersioningOptions, RouteMiddlewareComposer } from "../options";
 import { createAuthorizeComposer } from "../Authorization/authorizeComposer";
-import { resolveAuthorizeMeta } from "../Authorization/metadata";
+import { resolveAuthorizeMeta, routeAuthorizeChecks, type AuthorizeCheck } from "../Authorization/metadata";
 
 /** A registered route as the startup screen lists it. */
 export interface RegisteredRoute {
@@ -39,7 +39,7 @@ interface ActionPipeline {
  * precompiled per route — request dispatch performs no metadata work at all.
  */
 export class RouterBuilder {
-  private readonly authorizeComposer = createAuthorizeComposer();
+  private readonly authorizeComposer: RouteMiddlewareComposer;
   /** Every route of the last {@link build}, in registration order. */
   readonly routes: RegisteredRoute[] = [];
 
@@ -49,7 +49,11 @@ export class RouterBuilder {
     private readonly globalPrefix: string | undefined,
     private readonly versioning: ApiVersioningOptions | undefined,
     private readonly routeMiddlewareComposer?: RouteMiddlewareComposer,
-  ) {}
+    /** Checks for every route that is not `@AllowAnonymous`. */
+    private readonly defaultChecks: readonly AuthorizeCheck[] = [],
+  ) {
+    this.authorizeComposer = createAuthorizeComposer(defaultChecks);
+  }
 
   build(controllers: readonly Class<object>[]): Router {
     const router = new Router();
@@ -110,7 +114,7 @@ export class RouterBuilder {
           method: declaration.httpMethod,
           path: fullPath,
           handler: routeAction.name,
-          open: access.allowAnonymous === true || access.authorize === undefined,
+          open: routeAuthorizeChecks(controllerClass, methodName, this.defaultChecks) === undefined,
           anonymous: access.allowAnonymous === true,
         }));
       }

@@ -46,6 +46,12 @@ export class HttpContext {
     readonly clientIp?: string,
     /** Validator captured by the owning HTTP server. */
     readonly modelValidator?: ModelValidator,
+    /**
+     * Response language of this request: `runApp({ language })`, or the best
+     * match of `Accept-Language` when several languages are supported.
+     * `undefined` without `language`.
+     */
+    readonly language?: string,
   ) {}
 
   get method(): string {

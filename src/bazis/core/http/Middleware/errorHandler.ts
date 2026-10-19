@@ -3,7 +3,7 @@ import { redactSensitive, redactSensitiveText } from "../../../library/redaction
 import { HttpClientError, HttpErrorCode } from "../../../library/http-client/errors";
 import type { HttpContext } from "../HttpContext/HttpContext";
 import { HttpError, ModelValidationError } from "../Errors/HttpError";
-import { EN_HTTP_MESSAGES, STATUS_MESSAGE_KEYS, type HttpMessageKey, type Localize } from "../Errors/messages";
+import { EN_HTTP_MESSAGES, STATUS_MESSAGE_KEYS, type HttpMessageKey, languageHeaders, type LanguageSelection, type Localize } from "../Errors/messages";
 import { upstreamFailure } from "../Errors/upstreamFailure";
 import type { HttpMiddleware } from "./types";
 
@@ -36,11 +36,11 @@ export interface ErrorHandlerOptions {
   logger?: Logger;
   /**
    * Renders framework texts (`Not Found`, validation messages, …) in the
-   * application language; `runApp` builds it from `language` and `messages`.
-   * Without it the texts stay English. Messages an application passes to an
-   * error itself are never changed.
+   * response language of each request; `runApp` builds it from `language` and
+   * `messages`. Without it the texts stay English. Messages an application
+   * passes to an error itself are never changed.
    */
-  localize?: Localize;
+  languages?: LanguageSelection;
 }
 
 function jsonResponse(status: number, body: unknown, extraHeaders?: readonly [string, string][]): Response {
@@ -111,13 +111,15 @@ function safelyReportUnexpected(
  */
 export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware {
   const log = resolveErrorLog(options);
-  const text = textRenderer(options.localize);
   return async (ctx, next) => {
     try {
       await next();
     } catch (error) {
+      const selected = options.languages?.select(ctx.header("accept-language"));
+      const text = textRenderer(selected?.localize);
+      const language = languageHeaders(options.languages, selected);
       if (error instanceof HttpError) {
-        const extra: [string, string][] = [];
+        const extra: [string, string][] = [...language];
         const allow = (error as { allow?: readonly string[] }).allow;
         if (allow) {
           extra.push(["allow", allow.join(", ")]);
@@ -159,8 +161,8 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
             // message must not reach a browser or a shared screenshot.
             message: redactSensitiveText(error instanceof Error ? error.message : String(error)),
             stack: error instanceof Error && error.stack !== undefined ? redactSensitiveText(error.stack) : undefined,
-          })
-        : safeJsonResponse(status, { error: title });
+          }, language)
+        : safeJsonResponse(status, { error: title }, language);
     }
   };
 }
