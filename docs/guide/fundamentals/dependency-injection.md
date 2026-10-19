@@ -5,7 +5,7 @@
 и фабрики, несколько реализаций одного контракта, ключи, ленивые
 зависимости и освобождение ресурсов.
 
-Все примеры проверены на bazis 0.97.4.
+Все примеры проверены на bazis 0.108.0.
 
 ## Способы регистрации
 
@@ -43,11 +43,17 @@ DI не знает, какая нужна. Нужен именованный т�
 или явный список зависимостей:
 
 ```text
-[di:generate] ERROR: BAZIS_DI_DEPENDENCY_UNKNOWN: src/app/modules/Prim.ts:1: constructor parameter 1 "prefix"
-of "Greeter" has type "string", which cannot be injected: DI resolves dependencies by class, contract or token,
-and a plain type does not say which value to inject. Declare a token with the same name as a type alias
-(export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")) and register a value,
-or pass the deps explicitly: scoped(Greeter, Greeter, [TOKEN] as const).
+  ╭─ 1/1 [DI] src/app/modules/Prim.ts:3 ─────────────────────────────────────────────────────────╮
+  │ ✖  constructor parameter 1 "prefix" of "Greeter" has type "string", which cannot be injected:│
+  │    DI resolves dependencies by class, contract or token, and a plain type does not say which │
+  │    value to inject. Declare a token with the same name as a type alias (export type Prefix = │
+  │    string; export const Prefix = createToken<Prefix>("Prefix")) and register a value, or pass│
+  │    the deps explicitly: scoped(Greeter, Greeter, [TOKEN] as const).                          │
+  │                                                                                              │
+  │   3 │ export class Greeter { constructor(private readonly prefix: string) {} }               │
+  │     │                                                             ^^^^^^                     │
+  │    code BAZIS_DI_DEPENDENCY_UNKNOWN                                                          │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ## Фабрики

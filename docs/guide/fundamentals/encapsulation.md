@@ -5,7 +5,7 @@
 а `A` отдаёт этот сервис в `exports`. Здесь — правила подробнее и случаи,
 на которых обычно спотыкаются.
 
-Все примеры проверены на bazis 0.97.7.
+Все примеры проверены на bazis 0.108.0.
 
 ## Видимость не передаётся по цепочке
 
@@ -24,12 +24,19 @@ export class AppModule {}
 нет, хотя `AppModule` импортирует `ReportModule`, а тот — `ClockModule`:
 
 ```text
-Module "AppModule": "PageService" depends on "IClock", which module "ClockModule" exports,
-but "AppModule" does not list "ClockModule" in its imports. Add "ClockModule" to the imports of "AppModule".
+Module encapsulation violated:
+Module "AppModule": "PageService" depends on "IClock", which its import "ReportModule" receives from its
+own imports but does not export. Add it to the exports of "ReportModule".
 ```
 
-Каждый модуль перечисляет в `imports` всё, чем пользуется сам. Так по
-объявлению модуля видно, от чего он зависит на самом деле.
+Выхода два:
+
+- импортировать `ClockModule` в `AppModule` — модуль перечисляет в
+  `imports` всё, чем пользуется сам, и по объявлению видно, от чего он
+  зависит;
+- или [реэкспортировать](#реэкспорт) `IClock` из `ReportModule`, как
+  предлагает сообщение, — если `IClock` действительно часть того, что
+  `ReportModule` отдаёт наружу.
 
 ## Реэкспорт
 
@@ -46,6 +53,7 @@ export class ReportModule {}
 Отдать то, чего у модуля нет, тоже нельзя:
 
 ```text
+Module encapsulation violated:
 Module "Empty" exports "IClock" which it neither provides nor imports.
 ```
 
@@ -77,6 +85,7 @@ export class AppModule {}
 `ClockModule` не видит. Запуск останавливается:
 
 ```text
+Module encapsulation violated:
 Module "ClockModule": "ReportService" depends on "IClock", but "IClock" is registered in "ClockModule"
 and "AppModule", and the application uses one implementation per token, the last registered one, from
 "AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give the
