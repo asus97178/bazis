@@ -25,18 +25,22 @@ export class AppModule {}
 
 ```text
 Module encapsulation violated:
-Module "AppModule": "PageService" depends on "IClock", which its import "ReportModule" receives from its
-own imports but does not export. Add it to the exports of "ReportModule".
+Module "AppModule": "PageService" depends on "IClock", which its import "ReportModule" receives from
+"ClockModule" but does not export. Add "ClockModule" to the imports of "AppModule", or add it to the
+exports of "ReportModule".
 ```
 
-Выхода два:
+Выхода два, и сообщение называет оба:
 
 - импортировать `ClockModule` в `AppModule` — модуль перечисляет в
   `imports` всё, чем пользуется сам, и по объявлению видно, от чего он
   зависит;
-- или [реэкспортировать](#реэкспорт) `IClock` из `ReportModule`, как
-  предлагает сообщение, — если `IClock` действительно часть того, что
-  `ReportModule` отдаёт наружу.
+- или [реэкспортировать](#реэкспорт) `IClock` из `ReportModule` — если
+  `IClock` действительно часть того, что `ReportModule` отдаёт наружу.
+
+> [!NOTE]
+> Оба выхода в сообщении — с версии 0.109.0. Раньше оно предлагало только
+> реэкспорт.
 
 ## Реэкспорт
 

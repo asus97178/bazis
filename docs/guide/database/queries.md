@@ -5,7 +5,7 @@
 параметрами: значения из запроса пользователя никогда не попадают в текст
 SQL.
 
-Все примеры проверены на bazis 0.98.16 и PostgreSQL 17.
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
 ```ts
 const popular = await this.db.posts
@@ -60,8 +60,11 @@ db.posts.where((p) => p.views.gt(70) && p.authorId.eq(2))
 `bazis codegen` находит `&&`, `||` и `!` над условиями и останавливается:
 
 ```text
-BAZIS_ORM_PREDICATE_LOGIC: src/app/modules/blog/Posts.service.ts:4:46: ORM conditions cannot use JavaScript truthiness:
-JavaScript keeps only one side of && and ||. Use .and(), .or(), .not(): (p) => p.views.gt(70).and(p.authorId.eq(2)).
+  ╭─ 1/1 [CODEGEN] BAZIS_ORM_PREDICATE_LOGIC ────────────────────────────────────────────────────╮
+  │ ✖  src/app/modules/blog/Posts.service.ts:4:46: ORM conditions cannot use JavaScript          │
+  │    truthiness: JavaScript keeps only one side of && and ||. Use .and(), .or(), .not(): (p) =>│
+  │    p.views.gt(70).and(p.authorId.eq(2)).                                                     │
+  │    code BAZIS_ORM_PREDICATE_LOGIC                                                            │
 ```
 
 `p.views > 70` не пропустит TypeScript, а если обойти его приведением

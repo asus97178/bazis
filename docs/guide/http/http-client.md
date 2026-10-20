@@ -42,9 +42,8 @@ GET https://weather.example.com/forecast?city=Kazan&day=mon&day=tue
 
 > [!NOTE]
 > Внедрение `HttpClient` по типу — с версии 0.98.11. Раньше нужен был
-> токен: `scoped(WeatherService, WeatherService, [HTTP_CLIENT])`, иначе
-> `Missing dependency "HttpClient"`. Токен `HTTP_CLIENT` работает и
-> сейчас.
+> токен `HTTP_CLIENT`; с версии 0.109.0 токенов `HTTP_CLIENT` и
+> `HTTP_CLIENT_FACTORY` нет.
 
 ## Запросы
 
@@ -190,7 +189,7 @@ clients: payments, weather)`. Настройки клиента дополняю
 
 > [!NOTE]
 > `HttpClientFactory` внедряется по типу с версии 0.98.11. Раньше это был
-> интерфейс, и нужен был токен `HTTP_CLIENT_FACTORY`.
+> интерфейс, и нужен был токен `HTTP_CLIENT_FACTORY` (удалён в 0.109.0).
 
 ## Перехватчики
 

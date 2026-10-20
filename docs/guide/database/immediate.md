@@ -10,7 +10,7 @@
 | `query.executeDelete()` | `DELETE FROM … WHERE …` |
 | `dbSet.insertIfAbsent(entity, { conflictBy })` | `INSERT … ON CONFLICT (…) DO NOTHING` |
 
-Все примеры проверены на bazis 0.98.19 и PostgreSQL 17.
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
 ## Изменить по условию
 

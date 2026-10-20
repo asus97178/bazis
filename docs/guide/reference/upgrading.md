@@ -7,6 +7,19 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.109.0
+
+- **Токенов `HTTP_CLIENT` и `HTTP_CLIENT_FACTORY` нет.** Берите клиенты по
+  типу: `constructor(private readonly http: HttpClient)`,
+  `constructor(clients: HttpClientFactory)`.
+- **`createTestContainer` собирается через ядро.** Опции — `overrides` и
+  `configure(builder)`; низкоуровневые опции `createContainer` (например,
+  `validateScopes`) больше не принимаются. Тесты с одними `overrides`
+  ничего не меняют.
+- Тесты, которые сравнивали текст `Missing dependency "…" for "…".` с
+  точкой в конце, нужно обновить: точка теперь стоит только перед
+  подсказкой.
+
 ## 0.108.0
 
 - `HttpModuleOptions.localize` и `errorHandler({ localize })` заменены на

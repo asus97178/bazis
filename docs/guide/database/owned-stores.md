@@ -9,7 +9,7 @@ Owned store — это **набор таблиц, которыми модуль 
 испортило. Обычному приложению хватает
 [`ensureCreated`](schema.md).
 
-Все примеры проверены на bazis 0.98.23 и PostgreSQL 17.
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
 ## Объявление
 
@@ -108,8 +108,8 @@ bazis создаёт таблицы хранилища и записывает �
 
 ## Хранилище не меняется на месте
 
-Любое изменение модели — новый столбец, индекс, другое имя ключа, другая
-`formatVersion` — останавливает запуск:
+Любое изменение модели — новый столбец, индекс, другое имя ключа —
+останавливает запуск:
 
 ```text
 ORM_OWNED_STORE_IDENTITY_MISMATCH: Owned store "acme.notes" (schema "public", prefix "notes_"): its model changed
@@ -117,6 +117,9 @@ since the store was created (tables, columns, keys, indexes or their names). An 
 declare a new storeKey with a tablePrefix that does not overlap the old one, move the data, then drop the old tables
 and their row in __bazis_orm_owned_stores_v1 (rejectIfPresent can guard against leftovers).
 ```
+
+Другая `formatVersion` при той же модели даёт то же решение, но
+начало причины другое: `the registered identity does not match the code`.
 
 Миграций для хранилищ нет. Новая версия — **новое хранилище**.
 

@@ -2,13 +2,12 @@
 
 HTTP-клиент для вызовов внешних сервисов, в стиле axios, поверх `fetch`.
 Это `bazis/library/http-client` плюс подключение к DI с передачей
-`x-request-id`. Список — по пакету 0.108.0.
+`x-request-id`. Список — по пакету 0.109.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `httpClientModule(config)` | Регистрация клиента в DI: общие настройки, именованные клиенты | [Подключение](../../http/http-client.md#подключение) |
 | `HttpClient` | Клиент: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `request`, `create` | [Запросы](../../http/http-client.md#запросы) |
-| `HTTP_CLIENT`, `HTTP_CLIENT_FACTORY` | Токены клиента и фабрики именованных клиентов | [Несколько внешних сервисов](../../http/http-client.md#несколько-внешних-сервисов) |
 | `HttpClientFactory`, `HttpClientFactoryBuilder` | Именованные клиенты, как `IHttpClientFactory` в .NET | там же |
 | `HttpClientError`, `HttpErrorCode` | Ошибка с кодом `ETIMEDOUT`, `ERR_BAD_STATUS`…, статусом и ответом | [Ошибки](../../http/http-client.md#ошибки) |
 | `HttpClientConfigError` | Запрошен незарегистрированный именованный клиент | [Ошибки HTTP-клиента](../errors/http.md#httpclientconfigerror) |
