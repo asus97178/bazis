@@ -4,7 +4,7 @@
 таблицу, столбцы и ключ. Схему по ним создаёт `ensureCreated` (см.
 [Подключение PostgreSQL](postgresql.md)).
 
-Все примеры проверены на bazis 0.98.14 и PostgreSQL 17, преобразование значений и шифрование — на 0.104.1.
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17, преобразование значений и шифрование — на 0.104.1.
 
 ```ts
 import { Column, CreatedAt, Entity, Index, Required, UpdatedAt, UUID } from "bazis/core/orm";
