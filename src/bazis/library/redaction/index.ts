@@ -84,10 +84,25 @@ function redactValue(
   if (depth >= options.maxDepth) {
     return options.replacement;
   }
+  // `seen` holds the objects on the current path only: an object reached
+  // again through another branch is a shared reference, not a cycle.
   if (seen.has(value)) {
     return CIRCULAR;
   }
   seen.add(value);
+  try {
+    return redactObject(value, options, seen, depth);
+  } finally {
+    seen.delete(value);
+  }
+}
+
+function redactObject(
+  value: object,
+  options: NormalizedRedactionOptions,
+  seen: WeakSet<object>,
+  depth: number,
+): unknown {
   if (value instanceof Error) {
     return redactError(value, options, seen, depth);
   }

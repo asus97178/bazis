@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.109.1 — 2026-10-21
+
+### Fixed
+
+- Redacted values (logs, startup error details) print an object reached twice
+  without a cycle in full. Before, the second occurrence read `"[Circular]"`:
+  the `SchemaMigrationRequiredError` details showed `expected: '[Circular]'`.
+- The encapsulation error for a repository (`IRepository<Product>`) names the
+  module to import, not the application root: with an `AppModule` without
+  `exports` it said `Add "BazisKernelModule" to the imports of "OrdersModule"`.
+
 ## 0.109.0 — 2026-10-19
 
 ### Changed (breaking)
