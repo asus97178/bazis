@@ -3,7 +3,7 @@
 Таблицы в базе должны совпадать с сущностями. bazis умеет создавать и
 обновлять их сам при запуске. Режим задаётся в `ormBazis` модуля.
 
-Все примеры проверены на bazis 0.98.21 и PostgreSQL 17.
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
 | Режим | Что делает при запуске | Когда брать |
 | --- | --- | --- |
@@ -73,6 +73,7 @@ could not create unique index "ix_products_sku". Fix the data, then start again.
 [bazis] application failed: SchemaMigrationRequiredError [ORM_SCHEMA_MIGRATION_REQUIRED]: PostgreSQL schema change requires an explicit migration.
 - Table "public"."products", object "price": column type differs (column.type); expected (ORM): "real"; actual (database): "integer".
 - Table "public"."products", object "sku": column exists in the database but is absent from the ORM model (column.unexpected); expected (ORM): absent; actual (database): present.
+- Table "public"."products", object "ix_products_sku": index is not declared in the ORM model (index.unexpected); expected (ORM): absent; actual (database): present.
 Check the application version and target database. Align the ORM model and database schema; apply an explicit migration if a database change is intended (with ensureCreated: add it to the module's migrations with runMigrationsOnStart: true).
 ```
 
