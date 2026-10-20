@@ -111,6 +111,10 @@ imports of "OrdersModule".
 > Точечный экспорт `repositoryFor(Product)` и эти сообщения — с версии
 > 0.98.22. Раньше работал только `exports: [IRepository]`, а ошибка
 > указывала на внутренний модуль `module#10`, который создаёт `ormBazis`.
+>
+> До 0.109.1 второе сообщение в приложении с `AppModule` без `exports`
+> называло корень приложения: `Add "BazisKernelModule" to the imports of
+> "OrdersModule"`.
 
 ## Выключить
 
