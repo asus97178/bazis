@@ -49,6 +49,22 @@ describe("repositories across modules", () => {
     expect(failure(() => createContainer(AppModule))).toContain(`Module "OrdersModule": "OrdersService" depends on "IRepository<Product>", which module "CatalogModule" exports, but "OrdersModule" does not list "CatalogModule" in its imports. Add "CatalogModule" to the imports of "OrdersModule".`);
   });
 
+  test("an open root module (no exports, like AppModule under the kernel) is not offered as the exporter", () => {
+    // A module without exports passes on everything it imports, so the
+    // application root "exported" the repositories too and was named first.
+    const CatalogModule = catalog([repositoryFor(Product)]);
+    @Module({ providers: [orders], exports: [] })
+    class OrdersModule {}
+    @Module({ imports: [ConnectionModule, OrdersModule, CatalogModule] })
+    class AppModule {}
+    @Module({ imports: [AppModule] })
+    class KernelRootModule {}
+    const message = failure(() => createContainer(KernelRootModule));
+    expect(message).toContain(`which module "CatalogModule" exports, but "OrdersModule" does not list "CatalogModule" in its imports. Add "CatalogModule" to the imports of "OrdersModule".`);
+    expect(message).not.toContain("KernelRootModule");
+    expect(message).not.toContain(`"AppModule"`);
+  });
+
   test("a module can export the repository of one entity only", () => {
     const CatalogModule = catalog([repositoryFor(Product)]);
     @Module({ imports: [CatalogModule], providers: [orders], exports: [] })

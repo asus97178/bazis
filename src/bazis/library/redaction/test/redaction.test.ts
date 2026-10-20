@@ -52,4 +52,18 @@ describe("sensitive redaction", () => {
 
     expect(redactSensitive(value)).toEqual({ token: "***", self: "[Circular]" });
   });
+
+  test("an object reached twice without a cycle is printed both times", () => {
+    // ORM schema differences share one { kind: "absent" } descriptor; the
+    // startup error printed the second one as "[Circular]".
+    const absent = { kind: "absent" };
+    const shared = [{ expected: absent, actual: { kind: "present" } }, { expected: absent, actual: absent }];
+    const error = Object.assign(new Error("schema"), { differences: shared });
+
+    expect(redactSensitive(shared)).toEqual([
+      { expected: { kind: "absent" }, actual: { kind: "present" } },
+      { expected: { kind: "absent" }, actual: { kind: "absent" } },
+    ]);
+    expect((redactSensitive(error) as unknown as { differences: unknown }).differences).toEqual(redactSensitive(shared));
+  });
 });

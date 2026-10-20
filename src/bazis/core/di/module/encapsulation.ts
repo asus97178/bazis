@@ -199,6 +199,15 @@ export function validateModuleEncapsulation(
       : `which module "${owner.name}" provides but does not export. Add it to the exports of "${owner.name}".`;
   };
 
+  // Whether `record` imports `target`, directly or through other modules. Such a
+  // module cannot be the fix: importing it into `target` would be a cycle, and a
+  // root without exports (AppModule, the kernel root) passes on everything.
+  const importsModule = (record: ModuleGraphRecord, target: ModuleGraphRecord, path = new Set<ModuleGraphRecord>()): boolean => {
+    if (path.has(record)) return false;
+    path.add(record);
+    return record.imports.some((imported) => imported === target || importsModule(imported as ModuleGraphRecord, target, path));
+  };
+
   // A closed token (`IRepository<Product>`) travels with its family export, so
   // the fix is named in family terms and skips unnamed inner modules such as
   // the one `ormBazis` creates.
@@ -208,7 +217,7 @@ export function validateModuleEncapsulation(
     const exportFix = `${family} (or only ${closed})`;
     const sees = (record: ModuleGraphRecord) => visibleFamilies(record).has(familyId) || visibleTokens(record).has(token);
     const passes = (record: ModuleGraphRecord) => exportedFamilies(record).has(familyId) || exportedTokens(record).has(token);
-    const named = (record: ModuleGraphRecord) => !/^module#\d+$/.test(record.name);
+    const named = (record: ModuleGraphRecord) => !/^module#\d+$/.test(record.name) && !importsModule(record, consumer);
     const blocking = consumer.imports.find((imported) => named(imported) && sees(imported) && !passes(imported));
     if (blocking !== undefined) {
       return `which its import "${blocking.name}" receives from its own imports but does not export. Add ${exportFix} to the exports of "${blocking.name}".`;
