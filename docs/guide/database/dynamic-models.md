@@ -6,7 +6,7 @@
 строит по такому описанию модель, создаёт таблицу и работает с её строками
 как с обычными сущностями.
 
-Все примеры проверены на bazis 0.98.24 и PostgreSQL 17.
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
 ## Описание таблицы
 
@@ -207,6 +207,7 @@ export class DynamicModule {}
 | `has no primary key. Mark one field with isKey, or set primaryKey` | Нет ключа |
 | `declares several isKey fields ("a", "b") … use primaryKey: { properties: ["a", "b"] }` | Два `isKey` — для составного ключа нужен `primaryKey` |
 | `unknown field type "integer"` | Неверный `type` (верно — `int`) |
+| `foreign key field "companyId" has no navigationName` | У `foreignKey` нет имени навигации |
 | `foreign key field "companyId" has no targetKeyType` | У `foreignKey` нет типа ключа цели |
 | `references target "Companies" but no target resolver was provided` | Связь без резолвера |
 | `duplicate field "name"` | Два поля с одним именем |
