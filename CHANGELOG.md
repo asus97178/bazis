@@ -4,6 +4,18 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.110.0 — 2026-10-21
+
+### Changed (breaking)
+
+- `@AllowAnonymous()` and `@Authorize(...)` on the same method or class stop the
+  start with a configuration error naming it:
+  `ReportsController.bug has both @AllowAnonymous() and @Authorize(...)`. Before,
+  each silently undid the other and the decorator order decided:
+  `@AllowAnonymous() @Authorize(check)` left the route open and `check` never ran.
+  A class declaration with the opposite one on a method, and a subclass
+  replacing its base, stay valid.
+
 ## 0.109.1 — 2026-10-21
 
 ### Fixed

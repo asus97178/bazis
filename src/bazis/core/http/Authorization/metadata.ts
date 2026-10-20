@@ -1,4 +1,5 @@
 import type { ServiceScope } from "../../di";
+import { HttpSetupError } from "../Errors/HttpError";
 
 // Same one-line polyfill as the rest of the HTTP module: Bun executes TC39
 // decorators natively, but Symbol.metadata may be missing in the runtime.
@@ -46,6 +47,8 @@ interface AuthActionMeta {
   allowAnonymous?: boolean;
   /** Declaration made on this exact class/method metadata object. */
   declaration?: "authorize" | "anonymous";
+  /** Both `@Authorize` and `@AllowAnonymous` were declared here. */
+  conflict?: true;
 }
 
 interface AuthControllerMeta {
@@ -53,6 +56,8 @@ interface AuthControllerMeta {
   allowAnonymous?: boolean;
   /** Declaration made on this exact class metadata object. */
   declaration?: "authorize" | "anonymous";
+  /** Both `@Authorize` and `@AllowAnonymous` were declared on the class. */
+  conflict?: true;
   actions: Map<string | symbol, AuthActionMeta>;
 }
 
@@ -105,8 +110,15 @@ function ownActionMeta(metadata: object, methodName: string | symbol): AuthActio
   return action;
 }
 
+// The other declaration on the same class or method: each would silently undo
+// the other and the decorator order would decide. Reported when routes are built.
+function markConflict(target: { declaration?: "authorize" | "anonymous"; conflict?: true }, declaration: "authorize" | "anonymous"): void {
+  if (target.declaration !== undefined && target.declaration !== declaration) target.conflict = true;
+}
+
 export function setControllerAuthorize(metadata: object, options: AuthorizeOptions): void {
   const meta = ownMeta(metadata);
+  markConflict(meta, "authorize");
   meta.authorize = meta.declaration === "authorize" && meta.authorize
     ? { checks: [...options.checks, ...meta.authorize.checks] }
     : options;
@@ -116,6 +128,7 @@ export function setControllerAuthorize(metadata: object, options: AuthorizeOptio
 
 export function setControllerAllowAnonymous(metadata: object): void {
   const meta = ownMeta(metadata);
+  markConflict(meta, "anonymous");
   meta.allowAnonymous = true;
   meta.declaration = "anonymous";
   delete meta.authorize;
@@ -123,6 +136,7 @@ export function setControllerAllowAnonymous(metadata: object): void {
 
 export function setActionAuthorize(metadata: object, methodName: string | symbol, options: AuthorizeOptions): void {
   const action = ownActionMeta(metadata, methodName);
+  markConflict(action, "authorize");
   action.authorize = action.declaration === "authorize" && action.authorize
     ? { checks: [...options.checks, ...action.authorize.checks] }
     : options;
@@ -132,6 +146,7 @@ export function setActionAuthorize(metadata: object, methodName: string | symbol
 
 export function setActionAllowAnonymous(metadata: object, methodName: string | symbol): void {
   const action = ownActionMeta(metadata, methodName);
+  markConflict(action, "anonymous");
   action.allowAnonymous = true;
   action.declaration = "anonymous";
   delete action.authorize;
@@ -153,6 +168,7 @@ export interface ResolvedAuthorizeMeta {
  *
  * Inheritance is different: a subclass's own class-level declaration replaces
  * the base class's, and an overriding method's declaration replaces the base method's.
+ * Both decorators on the same class or method throw `HttpSetupError`.
  */
 export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol): ResolvedAuthorizeMeta {
   const metadata = (ctor as { [key: symbol]: unknown })[Symbol.metadata as unknown as symbol] as
@@ -163,7 +179,20 @@ export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol):
     return { allowAnonymous: false };
   }
 
+  const owner = (ctor as { readonly name?: string }).name || "Controller";
+  if (meta.conflict) {
+    throw new HttpSetupError(
+      `${owner} has both @AllowAnonymous() and @Authorize(...) on the class: the result would depend on the decorator order. `
+        + "Keep one; to open single methods of a protected class, put @AllowAnonymous() on them.",
+    );
+  }
   const action = meta.actions.get(methodName);
+  if (action?.conflict) {
+    throw new HttpSetupError(
+      `${owner}.${String(methodName)} has both @AllowAnonymous() and @Authorize(...): the result would depend on the decorator order. `
+        + "Keep @Authorize(...) to protect the route, or @AllowAnonymous() to open it.",
+    );
+  }
   if (action?.allowAnonymous) {
     return { allowAnonymous: true };
   }
