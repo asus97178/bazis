@@ -4,6 +4,14 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.111.2 — 2026-10-22
+
+### Fixed
+
+- The startup timeout names only the services still starting. Connectors start
+  together, and before one hanging connector was reported with every connector
+  of its batch: `still starting: infra:db, infra:cache, infra:search, infra:probe`.
+
 ## 0.111.1 — 2026-10-21
 
 ### Fixed

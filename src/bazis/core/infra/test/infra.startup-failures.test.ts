@@ -58,3 +58,18 @@ test("the startup timeout names the hosted service that is still starting and is
   expect((failure as StartupTimeoutError).pending).toBe("infra:slow");
   expect((failure as Error).message).toBe("Application startup did not finish within 50ms; still starting: infra:slow.");
 });
+
+// 0.111.2: connectors start together, and the timeout used to name all of them
+// ("infra:fast, infra:slow") although only one was still connecting.
+test("the startup timeout names only the connector that is still connecting, not the ones started with it", async () => {
+  const connector = (name: string, connect: () => Promise<void>): InfraConnector<object> => ({
+    token: createToken<object>(name), create: () => ({}), connect, dispose: () => undefined,
+  });
+  @Infra({ fast: connector("Fast", async () => undefined), slow: connector("Slow", () => new Promise<void>(() => undefined)) })
+  class AppInfra {}
+  const kernel = await Bazis.createBuilder(AppInfra).useEnvironment("test").useStartupReport(false)
+    .useStartupTimeout(50).useShutdownTimeout(50).build();
+  const failure = await kernel.start().then(() => undefined, (error: unknown) => error);
+  expect(failure).toBeInstanceOf(StartupTimeoutError);
+  expect((failure as Error).message).toBe("Application startup did not finish within 50ms; still starting: infra:slow.");
+});

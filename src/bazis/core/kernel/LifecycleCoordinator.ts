@@ -174,8 +174,10 @@ export class LifecycleCoordinator {
     const names = batch.map(serviceName);
     for (const name of names) this.pending.add(name);
     const startedAt = performance.now();
-    const results = await Promise.allSettled(batch.map((service) => this.startService(service, signal)));
-    for (const name of names) this.pending.delete(name);
+    // Each service leaves the pending list as soon as it has started, so a
+    // startup timeout names only the ones still starting.
+    const results = await Promise.allSettled(batch.map((service, index) =>
+      this.startService(service, signal).finally(() => this.pending.delete(names[index] as string))));
     this.timings.push(Object.freeze({ names: Object.freeze(names), phase: batch[0]?.phase ?? 0, ms: performance.now() - startedAt }));
     const failures: StartupFailure[] = [];
     results.forEach((result, index) => {
