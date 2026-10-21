@@ -5,7 +5,7 @@
 ответ. Кэш целых HTTP-ответов — отдельная глава,
 [Кэширование ответов](../http/output-cache.md).
 
-Все примеры проверены на bazis 0.98.34 и Valkey 7.2.
+Все примеры проверены на bazis 0.111.0 и Valkey 7.2.
 
 ## Два уровня
 
@@ -20,6 +20,19 @@
 
 Один экземпляр приложения — хватит `@Cacheable`. Несколько экземпляров и
 нужен общий результат или общий сброс — `@CacheableRedis`.
+
+`cache: memory()` нужен обоим: Redis — второй уровень, а не замена. Без
+модуля кэша приложение с этими декораторами не запустится:
+
+```text
+[bazis] configuration error: Service graph validation failed:
+Missing dependency "ICache" for "StockService". The cache is provided by a cache module:
+add cache: memory() to the runApp options (startTestApp takes the same options).
+```
+
+> [!NOTE]
+> Проверка — с версии 0.111.0. Раньше без `memory()` декораторы молча не
+> работали: каждый вызов выполнял метод, даже с Redis в `@Infra`.
 
 ## Кэш в памяти: `@Cacheable`
 
