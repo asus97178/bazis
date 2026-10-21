@@ -3,7 +3,7 @@
 Готовые коннекторы bazis. Как они подключаются к приложению, стартуют и
 сообщают о здоровье — в [обзоре `@Infra`](overview.md).
 
-Примеры проверены на bazis 0.99.6, PostgreSQL 17, Valkey 7.2 и
+Примеры проверены на bazis 0.111.1, PostgreSQL 17, Valkey 7.2 и
 OpenSearch 2.17. Codex проверен только без установленного CLI — см.
 [ниже](#codex).
 
@@ -214,7 +214,7 @@ export class Assistant {
 | `login("browser" \| "device")` | Начинает вход: ссылка, для `device` — ещё код |
 | `cancelLogin()`, `logout()` | Отменяет вход, отключает аккаунт |
 | `models()` | Модели аккаунта и уровни рассуждения |
-| `run(input)` | Ответ: `instructions`, `messages`, `onTextDelta`, необязательно `tools` и `onToolCall` |
+| `run(input)` | Ответ: `instructions`, `messages` (`{ role, text }`), `signal`, `onTextDelta`, необязательно `model`, `reasoningEffort`, `tools` и `onToolCall` |
 
 Проверено без установленного CLI:
 

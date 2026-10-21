@@ -192,7 +192,7 @@ GET /health → … {"name":"infra:cache",…}, {"name":"infra:queue",…} …
 Без `token` два экземпляра конфликтуют, и приложение не загрузится:
 
 ```text
-InfraError: Infra manifest: instances "sessions" and "queue" share the same connector token;
+InfraError: Infra manifest: instances "cache" and "queue" share the same connector token;
   each instance needs a distinct token.
 ```
 
