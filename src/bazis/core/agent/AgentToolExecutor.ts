@@ -853,21 +853,6 @@ export class AgentToolExecutor {
       return this.finish(call, result, startedAt, metadata, options, audit, undefined, undefined, undefined, executionState);
     }
 
-    if (
-      (tool.metadata.sideEffect === "write" || tool.metadata.sideEffect === "external")
-      && audit.sink === undefined
-      && !(options.allowUnauditedSideEffects ?? this.allowUnauditedSideEffects)
-    ) {
-      const result = this.errorResult(
-        call,
-        "TOOL_AUDIT_REQUIRED",
-        `Tool "${tool.metadata.name}" has side effects and requires an audit sink.`,
-        metadata,
-        startedAt,
-      );
-      return this.finish(call, result, startedAt, metadata, options, audit, tool, options.agentName, undefined, executionState);
-    }
-
     const visibility = this.authorizeAgent(tool, options);
     if (!visibility.allowed) {
       const code = visibility.code ?? "TOOL_NOT_VISIBLE_TO_AGENT";
@@ -884,6 +869,22 @@ export class AgentToolExecutor {
         return this.finish(call, result, startedAt, metadata, options, audit, tool, options.agentName, undefined, executionState);
       }
       const result = this.errorResult(call, code, message, metadata, startedAt);
+      return this.finish(call, result, startedAt, metadata, options, audit, tool, options.agentName, undefined, executionState);
+    }
+
+    // After visibility: a tool the agent cannot see is refused for that reason.
+    if (
+      (tool.metadata.sideEffect === "write" || tool.metadata.sideEffect === "external")
+      && audit.sink === undefined
+      && !(options.allowUnauditedSideEffects ?? this.allowUnauditedSideEffects)
+    ) {
+      const result = this.errorResult(
+        call,
+        "TOOL_AUDIT_REQUIRED",
+        `Tool "${tool.metadata.name}" has side effects and requires an audit sink.`,
+        metadata,
+        startedAt,
+      );
       return this.finish(call, result, startedAt, metadata, options, audit, tool, options.agentName, undefined, executionState);
     }
 

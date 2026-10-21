@@ -4,6 +4,20 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.111.1 — 2026-10-21
+
+### Fixed
+
+- An application with `llmRouter` and an `ormBazis` module with `ensureCreated`
+  starts. Before, schema admission refused the router: `infra:llm (phase -100)
+  is not a framework connector`; `llmConnect` was not affected.
+- A model call to a tool its agent does not have (or to a made-up name) no
+  longer fails the run. The model gets the denial and continues; before, the
+  next request threw `Assistant transcript references tool … absent from the
+  request contract` and the run ended with `AGENT_PROVIDER_FAILED`.
+- A write tool the agent cannot see is refused with `TOOL_NOT_VISIBLE_TO_AGENT`
+  also without an audit sink; before, `TOOL_AUDIT_REQUIRED` hid the reason.
+
 ## 0.111.0 — 2026-10-21
 
 ### Changed (breaking)

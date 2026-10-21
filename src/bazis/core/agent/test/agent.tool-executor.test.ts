@@ -894,6 +894,23 @@ describe("agent tool executor", () => {
     }
   });
 
+  // 0.111.1: a write tool the agent cannot see was refused for the missing audit
+  // sink (TOOL_AUDIT_REQUIRED), which hid the real reason.
+  test("a side-effecting tool the agent cannot see is refused as not visible, before the audit check", async () => {
+    reindexCalls = 0;
+    const container = createContainer(ToolExecutorTestModule);
+    const SearchOnlyAgent = agentDefinition({ name: "search-only", tools: [SearchCatalogTool] });
+    const executor = new AgentToolExecutor(container, agentRegistry(container, SearchOnlyAgent), { approvalPolicy: () => true });
+    try {
+      const result = await executor.execute(agentToolCall({ id: "call-1", name: "catalog.reindex" }), { agentName: "search-only" });
+      expect(result.status).toBe("denied");
+      expect(result.error?.code).toBe("TOOL_NOT_VISIBLE_TO_AGENT");
+      expect(reindexCalls).toBe(0);
+    } finally {
+      await container.dispose();
+    }
+  });
+
   test("requires an agent and denies tools that are not visible to that agent", async () => {
     hiddenToolCalls = 0;
     const { executor, container } = createExecutor();
