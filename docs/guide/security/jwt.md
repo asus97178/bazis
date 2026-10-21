@@ -6,7 +6,7 @@ access и refresh, ключи HS256 и RS256, ротацию ключей. Ка�
 [Авторизация](../overview/authorization.md). Здесь — сами токены: обновление,
 отзыв, ключи и тонкости проверки.
 
-Все примеры проверены на bazis 0.98.26.
+Все примеры проверены на bazis 0.109.1.
 
 ## Пара токенов
 
@@ -202,7 +202,7 @@ const { payload } = await verifier.validate(token);
 export interface AuthConfig { privateKeyPem: Secret; publicKeyPem: string; }
 
 export const authConfig = defineConfig<AuthConfig>("auth", {
-  default: { privateKeyPem: secret(""), publicKeyPem: "" },
+  default: { privateKeyPem: secret(), publicKeyPem: "" },
 });
 // BAZIS_AUTH__PRIVATEKEYPEM, BAZIS_AUTH__PUBLICKEYPEM
 ```
@@ -238,7 +238,8 @@ export class AuthModule {}
 | `privateKeyPem contains a PUBLIC KEY` | Ключи перепутаны |
 | `publicKeyPem contains a private key` | `openssl pkey -in key.pem -pubout -out public.pem` |
 | `publicKeyPem is a PKCS#1 public key (BEGIN RSA PUBLIC KEY)` | `openssl rsa -RSAPublicKey_in -in public.pem -pubout -out public-spki.pem` |
-| `is not a PEM: expected "-----BEGIN PRIVATE KEY-----"` | Не тот файл или пустая переменная |
+| `is not a PEM: expected "-----BEGIN PRIVATE KEY-----"` | Не тот файл |
+| `must be a non-empty string` | Пустая переменная |
 
 > [!NOTE]
 > Проверка PEM при создании и поддержка `\n` — с версии 0.98.26. Раньше
@@ -303,7 +304,8 @@ ring.revoke("2026-09");
 - При утечке ключа — сразу `revoke`, не дожидаясь шага 2.
 - Токен без `kid` (выпущенный до перехода на `JwtKeyRing`) связка не примет.
   Для такого перехода есть `legacy: { keyId, acceptUntil }` — он принимает
-  токены без `kid` одним ключом до указанного момента.
+  токены без `kid` одним ключом до указанного момента. `acceptUntil` — в
+  секундах, как `exp`: `Math.floor(Date.now() / 1000) + 14 * 86_400`.
 - Состояние связки живёт в процессе. Если экземпляров приложения несколько,
   меняйте ключи на всех: через конфигурацию и перезапуск или своим
   механизмом рассылки.
