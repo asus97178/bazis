@@ -47,17 +47,7 @@ export class Bazis {
     try {
       kernel = await builder.build();
     } catch (error) {
-      if (screen !== undefined && !(error instanceof ShutdownTimeoutError)) {
-        screen.failed(error, undefined, builder.report);
-        process.exitCode = 1;
-        return 1;
-      }
-      if (error instanceof DiError || error instanceof KernelError) {
-        console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
-        process.exitCode = 1;
-        return 1;
-      }
-      throw error;
+      return reportBuildFailure(error, screen, builder.report);
     }
 
     try {
@@ -95,4 +85,28 @@ export class Bazis {
       return 1;
     }
   }
+}
+
+/**
+ * @internal How a start that failed before the kernel was built is reported:
+ * the startup screen on a terminal, otherwise one `[bazis] configuration error`
+ * line for DI and kernel errors. Returns exit code 1; anything else is rethrown.
+ * `runApp` uses it for errors found while it composes the application.
+ */
+export function reportBuildFailure(
+  error: unknown,
+  screen: StartupScreen | undefined = startupScreenEnabled() ? new StartupScreen() : undefined,
+  report?: KernelBuilder["report"],
+): number {
+  if (screen !== undefined && !(error instanceof ShutdownTimeoutError)) {
+    screen.failed(error, undefined, report);
+    process.exitCode = 1;
+    return 1;
+  }
+  if (error instanceof DiError || error instanceof KernelError) {
+    console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
+    process.exitCode = 1;
+    return 1;
+  }
+  throw error;
 }

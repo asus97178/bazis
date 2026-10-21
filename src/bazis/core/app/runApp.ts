@@ -15,6 +15,7 @@ import { grpcModule, type GrpcModuleOptions } from "../grpc";
 import { buildHttpOpenApiDocument } from "../http/OpenApi/openApiDocument";
 import { defaultAuthorizeChecks } from "../http/Authorization/metadata";
 import { KernelBuilder, Bazis, KernelError, type KernelOptions, type ValidatableConfig } from "../kernel";
+import { reportBuildFailure } from "../kernel/Bazis";
 import { websocketModule, type WebSocketOptions } from "../websocket";
 import {
   isUiProfileAuthoringClass,
@@ -287,7 +288,14 @@ function normalizeAbsolutePath(path: string): string {
  */
 export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}): Promise<number> {
   await loadBazisGeneratedRuntime();
-  return Bazis.run(composeApp(root, options), options.kernel, (builder) => {
+  let app: BazisModuleRef;
+  try {
+    app = composeApp(root, options);
+  } catch (error) {
+    // Composing already reads routes and options: report its errors like the kernel build does.
+    return reportBuildFailure(error);
+  }
+  return Bazis.run(app, options.kernel, (builder) => {
     builder.useApplicationRoot(root);
     options.configure?.(builder);
   });

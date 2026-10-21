@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.110.1 — 2026-10-21
+
+### Fixed
+
+- A configuration error that `runApp` finds while it composes the application
+  is reported like one from the kernel build: one `[bazis] configuration error`
+  line (or the startup screen) and exit code 1. Before, it escaped with a source
+  frame and a Bun banner — for example the 0.110.0 `@AllowAnonymous()` and
+  `@Authorize(...)` conflict (found while the OpenAPI document is built), an
+  unknown `language`, or `websocket` options without gateways.
+
 ## 0.110.0 — 2026-10-21
 
 ### Changed (breaking)
