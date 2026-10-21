@@ -5,7 +5,7 @@
 его здоровье и регистрирует [`AgentRuntime`](agents.md) — его можно
 получать по типу в любом сервисе.
 
-Все примеры проверены на bazis 0.99.5. Вместо настоящего провайдера в
+Все примеры проверены на bazis 0.111.1. Вместо настоящего провайдера в
 проверках — локальный сервер с API в формате OpenAI: так результаты не
 зависят от сети и ключей.
 
@@ -138,6 +138,10 @@ import { Infra, llmProfile, llmRouter, openAiCompatibleAdapter } from "bazis/cor
 })
 export class AppInfra {}
 ```
+
+> [!NOTE]
+> До 0.111.1 приложение с `llmRouter` и модулем `ormBazis` с `ensureCreated`
+> не запускалось: `infra:llm (phase -100) is not a framework connector`.
 
 Агент выбирает профиль полем `modelProfile`; без него — `defaultProfile`:
 
