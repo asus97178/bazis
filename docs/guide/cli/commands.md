@@ -10,7 +10,7 @@ bunx bazis <команда> [опции]
 В `package.json` нового проекта уже есть скрипты: `bun run dev`,
 `bun run test`, `bun run build`, `bun run build:bin`, `bun run codegen`.
 
-Все примеры проверены на bazis 0.100.2.
+Все примеры проверены на bazis 0.111.2.
 
 | Команда | Что делает |
 | --- | --- |
@@ -37,7 +37,7 @@ bunx bazis <команда> [опции]
 
 ```text
   █▀▀▄ ▄▀▀▄ ▀▀▀█ ▀█▀ █▀▀▀    [BUILD]  shop 0.1.0
-  █▀▀▄ █▀▀█ ▄▀▀  ░█░ ▀▀▀█    bazis 0.100.2 · bun 1.4.0
+  █▀▀▄ █▀▀█ ▄▀▀  ░█░ ▀▀▀█    bazis 0.111.2 · bun 1.4.3
   ▀▀▀  ▀  ▀ ▀▀▀▀ ▀▀▀ ▀▀▀▀    target typecheck
 
   ── BUILD ───────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ bunx bazis new Shop --dry-run   # показать файлы, ничего не
     …
     └─ + README.md
 
-  ◆  bazis ^0.100.2 from npm
+  ◆  bazis ^0.111.2 from npm
 
     ✔  SUCCESS   project Shop is created
 
@@ -155,6 +155,15 @@ bunx bazis g module Orders --full     # CRUD, список, кэш, доступ
 модулю для запуска: примерам `--minimal` и `--full` нужна база данных
 ([подключение](../database/postgresql.md)), примеру `--full` — ещё и кэш
 (`runApp(AppModule, { cache: memory() })`).
+
+Таблицу модуля шаблон не создаёт: как появится схема, решает
+приложение. Без этого первый запрос ответит
+`500 relation "orders" does not exist`. Проще всего — `ensureCreated: true`
+в `ormBazis` модуля ([Управление схемой](../database/schema.md)):
+
+```ts
+ormBazis: { context: OrdersDbContext, entities: [Order], ensureCreated: true },
+```
 
 | Опция | Что делает |
 | --- | --- |
@@ -350,7 +359,7 @@ PORT=3100 bunx bazis dev       # другой порт
 | --- | --- |
 | CONFIGURATION | Разделы настроек со значениями; секреты скрыты, рядом — откуда взялись |
 | INFRASTRUCTURE | Каждое подключение: продукт и версия, адрес без пароля, время |
-| DATABASE SCHEMA | Что `ensureCreated` или миграции изменили в базе |
+| DATABASE SCHEMA | Что `ensureCreated` или миграции изменили в базе; в примере выше у `OrdersModule` добавлен `ensureCreated: true` |
 | MODULES | Модули приложения: контроллеры, сервисы, таблицы, фоновые задачи, инструменты, экспорт |
 | ROUTES | Маршруты: метод, путь, обработчик; `○ open` — без `@Authorize`, `🔒` — защищён |
 | WARNINGS | Открытые маршруты, секреты из кода, предупреждения схемы |
