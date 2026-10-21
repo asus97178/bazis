@@ -6,10 +6,12 @@ import {
   Global,
   Module,
   singletonValue,
+  CLASS_PROVIDER_HOOK,
   type BazisModuleRef,
 } from "../di";
 import { loadBazisGeneratedRuntime } from "../generatedRuntime";
 import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
+import { cacheableClassProviderHook } from "../cache/di/classProviderHook";
 import { httpModule, useModelValidator, type HttpModuleOptions, type ModelValidator } from "../http";
 import { grpcModule, type GrpcModuleOptions } from "../grpc";
 import { buildHttpOpenApiDocument } from "../http/OpenApi/openApiDocument";
@@ -322,6 +324,11 @@ export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): B
     // Warns about @OutputCache routes when no cache module is installed.
     globals.push({ global: true, providers: [missingCacheModuleCheck()] });
   }
+  // The cache wrapper of @Cacheable / @CacheableRedis classes, also without a cache
+  // module: it then needs ICache, and the graph check names the class and says to add
+  // cache: memory(). Without it the decorators would silently do nothing. The cache
+  // module registers the same hook, and DI keeps one.
+  globals.push({ global: true, providers: [singletonValue(CLASS_PROVIDER_HOOK, cacheableClassProviderHook)] });
   const appRoot: BazisModuleRef =
     globals.length > 0 || options.config !== undefined
       ? {
