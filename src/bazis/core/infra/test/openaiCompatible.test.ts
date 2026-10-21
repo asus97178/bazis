@@ -428,3 +428,31 @@ describe("OpenAI-compatible LLM adapter", () => {
     expect(await settlesAfterCancellation(pending)).toBe(true);
   });
 });
+
+// 0.111.1: a model may call a tool its agent does not have. The runtime answers
+// with a denial, and the next request replays that call: it used to throw
+// "Assistant transcript references tool … absent from the request contract",
+// so the run failed with AGENT_PROVIDER_FAILED and the model never saw the denial.
+test("a transcript call to a tool outside the request contract is replayed, not refused", async () => {
+  const captured: Record<string, unknown>[] = [];
+  const provider = openAiCompatibleAdapter({ fetch: async (_url, init) => {
+    captured.push(JSON.parse(String(init?.body)));
+    return response({ choices: [{ finish_reason: "stop", message: { role: "assistant", content: "Not allowed." } }] });
+  } }).create({ provider: "openai-compatible", model: "mock", baseUrl: "https://unused.invalid", apiKey: "synthetic" }) as OpenAiCompatibleModelProvider;
+  const visible = agentToolContract({ name: "orders.find", description: "Finds an order.", sideEffect: "read" });
+
+  await provider.complete(agentModelRequest({
+    invocationId: "inv-1",
+    messages: [
+      agentMessage("user", "Cancel order 7"),
+      agentMessage("assistant", agentToolCallPart(agentToolCall({ id: "call-1", name: "orders.cancel", input: { id: 7 } }))),
+      agentMessage("tool", agentToolResultPart(agentToolResult({ callId: "call-1", name: "orders.cancel", status: "denied", error: { code: "TOOL_NOT_VISIBLE_TO_AGENT", message: "Not visible." }, durationMs: 0 })), { toolCallId: "call-1" }),
+    ],
+    tools: [visible],
+  }), context());
+
+  const messages = captured[0]?.messages as readonly Record<string, unknown>[];
+  expect(messages[1]).toMatchObject({ role: "assistant", tool_calls: [{ id: "call-1", function: { name: "orders_cancel" } }] });
+  expect(messages[2]).toMatchObject({ role: "tool", tool_call_id: "call-1" });
+  expect(((captured[0]?.tools as readonly Record<string, unknown>[]).map((t) => (t.function as { name: string }).name))).toEqual(["orders_find"]);
+});
