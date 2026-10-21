@@ -467,12 +467,11 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
         const toolCalls = message.content
           .filter((part) => part.kind === "tool-call")
           .map((part) => {
-            const providerName = mapping.bazisToProvider.get(part.call.name);
-            if (providerName === undefined) {
-              throw new OpenAiCompatibleProviderError(
-                `Assistant transcript references tool "${part.call.name}" which is absent from the request contract.`,
-              );
-            }
+            // A call to a tool outside this request (one the agent may not use, or
+            // a made-up name) stays in the history next to its denial: the model must
+            // see both to recover. It gets a wire name that no request tool uses.
+            const providerName = mapping.bazisToProvider.get(part.call.name)
+              ?? providerToolName(part.call.name, new Set(mapping.providerToBazis.keys()));
             return Object.freeze({
               id: part.call.id,
               type: "function" as const,

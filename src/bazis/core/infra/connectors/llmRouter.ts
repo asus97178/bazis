@@ -12,6 +12,7 @@ import {
   type AgentModelResponse,
 } from "../../agent";
 import { InfraError, type InfraConnector } from "../InfraConnector";
+import { identifyConnector } from "../connectorIdentity";
 import { redactSensitiveText } from "../../../library/redaction";
 import { awaitAbortable } from "../../kernel/internal/awaitAbortable";
 import {
@@ -426,7 +427,9 @@ export function llmRouter(
   ensureFallbacksValid(entries);
   const configs = Object.freeze(Array.from(new Set(entries.map(([, profile]) => profile.config))));
 
-  return {
+  // The framework LLM connector, like llmConnect: it never touches the schema,
+  // so it may start before application services next to ormBazis ensureCreated.
+  return identifyConnector({
     token: AGENT_MODEL_PROVIDER,
     config: configs,
     providers: agentRuntimeProviders,
@@ -462,5 +465,5 @@ export function llmRouter(
     healthCheck(client, signal) {
       return client instanceof LlmModelRouter ? client.healthCheck(signal) : false;
     },
-  };
+  }, "llm");
 }
