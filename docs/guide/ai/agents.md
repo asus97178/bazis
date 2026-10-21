@@ -7,7 +7,7 @@
 `AgentRuntime`: отправляет его модели, выполняет вызовы инструментов и
 возвращает ответ.
 
-Все примеры проверены на bazis 0.99.1 и PostgreSQL 17. Модель в проверках —
+Все примеры проверены на bazis 0.111.1 и PostgreSQL 17. Модель в проверках —
 скрипт, отвечающий заранее заданными шагами: так результаты
 воспроизводимы и не зависят от сети. Подключение настоящей модели — в главе
 [LLM-коннекторы](llm-connectors.md).
@@ -131,9 +131,12 @@ const result = await this.agents.run(support, { input: "Где заказ 42?" }
 ```text
 POST /agents/support/ask {"question":"Где заказ 42?"}
 → {"status":"completed",
-   "answer":"Заказ: {\"id\":42,\"status\":\"paid\",\"total\":1500}",
+   "answer":"Заказ: {\"name\":\"orders.find\",\"status\":\"success\",\"output\":{\"id\":42,\"status\":\"paid\",\"total\":1500}}",
    "tools":[{"name":"orders.find","status":"success"}]}
 ```
+
+Модель-скрипт в проверке просто повторяет то, что получила от инструмента:
+имя, статус и результат вызова.
 
 | Поле результата | Что в нём |
 | --- | --- |
@@ -161,7 +164,7 @@ const answer = part?.kind === "text" ? part.text : null;
 | `maxSteps` | Предел вызовов модели (по умолчанию 8) |
 | `modelProfile` | Профиль модели вместо указанного в определении |
 | `signal` | Отмена запуска |
-| `onTextDelta` | Текст ответа по частям, пока модель его пишет |
+| `onTextDelta` | Текст ответа по частям, пока модель его пишет: `({ step, text }) => …` |
 
 ## Агенты в базе
 
@@ -241,7 +244,18 @@ PUT /agents/broken {"instructions":"x","toolNames":["orders.delete"]}
   `description` модели не отправляется.
 - **Только инструменты из `toolNames`.** Остальной каталог модель не видит.
   Если она всё же попросит чужой инструмент, вызов получит отказ
-  `TOOL_NOT_VISIBLE_TO_AGENT`, а `execute` не выполнится.
+  `TOOL_NOT_VISIBLE_TO_AGENT` (выдуманное имя — `TOOL_NOT_REGISTERED`),
+  `execute` не выполнится, а модель увидит отказ и продолжит:
+
+  ```text
+  POST /agents/support/ask {"question":"…"}     ← модель просит orders.cancel
+  → {"status":"completed","answer":"Инструмент ответил: TOOL_NOT_VISIBLE_TO_AGENT",
+     "tools":[{"name":"orders.cancel","status":"denied","error":"TOOL_NOT_VISIBLE_TO_AGENT"}]}
+  ```
+
+  > [!NOTE]
+  > С версии 0.111.1. Раньше такой вызов обрывал запуск с
+  > `AGENT_PROVIDER_FAILED`: модель не видела отказ.
 - **Ответы инструментов.** Ошибка проверки входа тоже уходит модели, чтобы
   она могла исправиться:
 
@@ -332,7 +346,7 @@ POST /agents/operator/ask             {"question":"отмени заказ 7"}
 → {"tools":[{"name":"orders.cancel","status":"denied","error":"TOOL_APPROVAL_DENIED"}]}
 
 POST /agents/operator/ask?role=admin  {"question":"отмени заказ 7"}
-→ {"answer":"Заказ: {\"id\":7,\"status\":\"cancelled\",\"total\":300}",
+→ {"answer":"Заказ: {\"name\":\"orders.cancel\",\"status\":\"success\",\"output\":{\"id\":7,\"status\":\"cancelled\",\"total\":300}}",
    "tools":[{"name":"orders.cancel","status":"success"}]}
 
 POST /agents/support/ask              {"question":"Где заказ 42?"}
