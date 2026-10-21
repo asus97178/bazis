@@ -241,6 +241,19 @@ export class AuthController {
 `@Authorize(signedIn, hasRole("admin"))` на методе класса с
 `@Authorize(signedIn)` проверит токен только однажды.
 
+`@AllowAnonymous()` и `@Authorize` на **одном** методе или классе
+противоречат друг другу. Приложение не запустится:
+
+```text
+[bazis] configuration error: ReportsController.bug has both @AllowAnonymous() and @Authorize(...):
+the result would depend on the decorator order. Keep @Authorize(...) to protect the route, or @AllowAnonymous() to open it.
+```
+
+> [!NOTE]
+> Проверка — с версии 0.110.0. Раньше один декоратор молча отменял
+> другой, и всё решал порядок: `@AllowAnonymous() @Authorize(check)`
+> оставлял маршрут открытым, а `check` не вызывался.
+
 > [!NOTE]
 > Проверки класса и метода складываются с версии 0.97.0. В более ранних
 > версиях `@Authorize` на методе заменял проверки класса: для `/auth/admin`
