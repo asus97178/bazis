@@ -4,6 +4,16 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.111.0 — 2026-10-21
+
+### Changed (breaking)
+
+- A service with `@Cacheable` or `@CacheableRedis` in an application without a
+  cache module stops the start: `Missing dependency "ICache" for "StockService".
+  The cache is provided by a cache module: add cache: memory() to the runApp
+  options`. Before, the decorators silently did nothing and every call ran the
+  method — also `@CacheableRedis` with Redis configured in `@Infra`.
+
 ## 0.110.1 — 2026-10-21
 
 ### Fixed
