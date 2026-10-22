@@ -60,6 +60,17 @@ bun add -d typescript@^6 @types/bun
 Подойдёт TypeScript 5.9, 6 или 7. Проект, созданный `bazis new`, получает
 `"typescript": "^6"`.
 
+> [!WARNING]
+> `bun init` записывает `typescript` в `peerDependencies` проекта. Тогда
+> `bun add -d typescript@^6` ничего не ставит, а Bun подтягивает самый новый
+> TypeScript — седьмой — как peer-зависимость `bazis`, и кодогенерация
+> остановится с `BAZIS_TYPESCRIPT_API_MISSING`. Сначала уберите запись:
+>
+> ```sh
+> bun remove typescript
+> bun add -d typescript@^6
+> ```
+
 ### TypeScript 7
 
 В TypeScript 7 нет программного API компилятора, через который
