@@ -5,8 +5,8 @@
 [Плавная остановка и health](graceful-shutdown.md#kubernetes), Docker — в
 главе [Docker](docker.md).
 
-Все примеры проверены на bazis 0.100.2, Debian 12 (systemd 252) и macOS на
-Apple Silicon.
+Все примеры проверены на bazis 0.111.2 и macOS на Apple Silicon, раздел
+systemd — на 0.100.2, Debian 12 (systemd 252).
 
 ## Где работает файл
 
@@ -36,11 +36,11 @@ bunx bazis build --bin --platform linux-x64
 ```
 
 ```text
-  [OK  ]  compile         bin/planner-linux-x64 · 80.5 MB                                 10.5 s
-    ✔  SUCCESS   executable is ready · bin/planner-linux-x64
+  [OK  ]  compile         bin/shop-linux-x64 · 80.4 MB                                    138 ms
+    ✔  SUCCESS   executable is ready · bin/shop-linux-x64
 
-$ file bin/planner-linux-x64
-bin/planner-linux-x64: ELF 64-bit LSB executable, x86-64, … for GNU/Linux 3.2.0
+$ file bin/shop-linux-x64
+bin/shop-linux-x64: ELF 64-bit LSB executable, x86-64, … for GNU/Linux 3.2.0
 ```
 
 | `--platform` | Для чего |
@@ -123,6 +123,7 @@ Started shop.service - Shop API.
 info: bazis started {"environment":"production","debug":false,"configKeys":3,…,"startupMs":136.4}
 info: GET /health 200 5.0ms {"method":"GET","path":"/health","status":200,"durationMs":4.95}
 Stopping shop.service - Shop API...
+info: bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":1.2}
 shop.service: Deactivated successfully.
 Stopped shop.service - Shop API.
 ```
