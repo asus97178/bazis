@@ -4,7 +4,7 @@ Planner из предыдущих рецептов запускается в д�
 балансировщиком. Что работает само, что живёт в памяти процесса и как
 через Redis сделать общими кэш ответов и уведомления по WebSocket.
 
-Проверено на bazis 0.100.4, PostgreSQL 17 и Valkey 7.2.
+Проверено на bazis 0.111.2, PostgreSQL 17 и Valkey 7.2.
 
 ## Что общее, а что нет
 
@@ -47,7 +47,9 @@ export class AppInfra {}
 ```
 
 `cache: "distributed"` публикует общий кэш поверх этого подключения.
-Модуль `memory()` для него не нужен.
+`@OutputRedisCache` и `IDistributedCache` в этом рецепте работают без
+`memory()`. Для `@Cacheable` и `@CacheableRedis` на методах сервисов он
+нужен ([Кэширование](../realtime/caching.md#два-уровня)).
 
 ## 2. Общий кэш списка задач
 
@@ -200,7 +202,8 @@ Redis не терял записи: журнал AOF с записью на ка
 вытеснения ключей. Иначе приложение не стартует:
 
 ```text
-[bazis] application failed: WebSocketDeliveryError [DURABILITY_CONFIGURATION]: WebSocket delivery rejected: DURABILITY_CONFIGURATION.
+[bazis] application failed: WebSocketDeliveryError [DURABILITY_CONFIGURATION]: WebSocket delivery needs a Redis that does not lose writes:
+  appendonly is no, needs yes; appendfsync is everysec, needs always. Set them in redis.conf or with CONFIG SET; …
 ```
 
 Настройки Redis или Valkey:
