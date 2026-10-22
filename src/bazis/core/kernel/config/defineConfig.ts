@@ -30,11 +30,14 @@ export interface ConfigEnum<T extends string | number = string | number> {
   readonly default: T;
 }
 export function configEnum<const V extends readonly [string | number, ...(string | number)[]]>(values: V, defaultValue: V[number]): ConfigEnum<V[number]> {
+  const declared: ConfigEnum<V[number]> = Object.freeze({ __enum: true, values: Object.freeze([...values]), default: defaultValue });
   if (!values.length || !values.includes(defaultValue) || values.some(value => typeof value !== typeof defaultValue || (typeof value === "number" && !Number.isFinite(value)))) {
-    throw new KernelError("configEnum requires non-empty homogeneous finite values and a declared default.");
+    // defineConfig reports it at start, with the other configuration errors.
+    invalidEnums.set(declared, new KernelError("configEnum requires non-empty homogeneous finite values and a declared default."));
   }
-  return Object.freeze({ __enum: true, values: Object.freeze([...values]), default: defaultValue });
+  return declared;
 }
+const invalidEnums = new WeakMap<object, KernelError>();
 type Cell = Primitive | SecretSpec | ConfigEnum;
 type Defaults = Record<string, Cell>;
 export type ConfigValueType = Primitive | Secret;
@@ -119,7 +122,11 @@ function isSecret(cell: Cell): cell is SecretSpec { return typeof cell === "obje
 function isEnum(cell: Cell): cell is ConfigEnum { return typeof cell === "object" && cell !== null && "__enum" in cell; }
 function copyCell(cell: Cell): Cell {
   if (isSecret(cell)) return secret(cell.default);
-  if (isEnum(cell)) return Object.freeze({ ...cell, values: Object.freeze([...cell.values]) });
+  if (isEnum(cell)) {
+    const problem = invalidEnums.get(cell);
+    if (problem !== undefined) throw problem;
+    return Object.freeze({ ...cell, values: Object.freeze([...cell.values]) });
+  }
   if (["string", "number", "boolean"].includes(typeof cell)) return cell;
   throw new KernelError("Configuration supports only primitive values, secret() and configEnum().");
 }
@@ -141,6 +148,26 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
   // The file that declared the config, for "declared in" of a startup failure.
   const declaredIn = callerFile(new Error().stack);
   const input = typeof prefixOrSchema === "string" ? maybeSchema! : prefixOrSchema;
+  let definition: ConfigDefinition<ConfigShape>;
+  try {
+    definition = createDefinition(prefix, input, declaredIn);
+  } catch (error) {
+    if (!(error instanceof KernelError)) throw error;
+    // A declaration problem is reported at start, with the other configuration
+    // errors, instead of crashing the import of the file that declares it.
+    const fail = (): never => { throw error; };
+    definition = Object.freeze({
+      token: Object.freeze(createToken<ConfigView<ConfigShape>>(`Config:${prefix || "default"}`)),
+      resolve: fail,
+      get: fail,
+      has: fail,
+      ensureValid: fail,
+    });
+  }
+  definitions.add(definition);
+  return definition;
+}
+function createDefinition(prefix: string, input: ConfigSchema<Defaults>, declaredIn: string | undefined): ConfigDefinition<ConfigShape> {
   const schema = Object.freeze({
     default: Object.freeze(Object.fromEntries(Object.entries(input.default).map(([key, value]) => [key, copyCell(value)]))),
     ...Object.fromEntries((["development", "test", "production"] as const).map(stand => [stand, Object.freeze(Object.fromEntries(Object.entries(input[stand] ?? {}).map(([key, value]) => [key, copyCell(value as Cell)])))])),
@@ -245,13 +272,11 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       inspect: () => rows,
     });
   };
-  const definition: ConfigDefinition<ConfigShape> = Object.freeze({
+  return Object.freeze({
     token: Object.freeze(createToken<ConfigView<ConfigShape>>(`Config:${prefix || "default"}`)),
     resolve,
     get: <K extends keyof ConfigShape>(key: K): ConfigShape[K] => resolve().get(key),
     has: <K extends keyof ConfigShape>(key: K) => resolve().has(key),
     ensureValid(environment?: Stand) { resolve(environment); },
   });
-  definitions.add(definition);
-  return definition;
 }

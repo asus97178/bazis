@@ -1,4 +1,4 @@
-import { DiError } from "../../di";
+import { DiError, isConfigurationError } from "../../di";
 import { ServiceValidationError } from "../../di/errors/ServiceValidationError";
 import { redactSensitiveText } from "../../../library/redaction";
 import type { Problem, Screen } from "../../../library/terminal";
@@ -68,7 +68,7 @@ export function diagnoseStartupFailure(error: unknown, screen: Screen, context: 
     };
   }
   const failed = context.failedServices?.[0];
-  const stage = error instanceof KernelError && failed === undefined ? "configuration" : stageOf(failed ?? "");
+  const stage = (error instanceof KernelError || isConfigurationError(error)) && failed === undefined ? "configuration" : stageOf(failed ?? "");
   return { stage, title: t.failure.app, problems: [genericProblem(error, failed)] };
 }
 

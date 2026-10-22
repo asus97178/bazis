@@ -1,4 +1,4 @@
-import { ModuleOwnedProviderConflictError } from "../errors";
+import { markConfigurationError, ModuleOwnedProviderConflictError } from "../errors";
 import type { ServiceCollection } from "../ServiceCollection";
 import {
   isClassProvider,
@@ -380,7 +380,11 @@ export function applyModuleOwnedProviderContributors(
   };
 
   for (let index = 0; index < contributors.length; index += 1) {
-    (contributors[index] as ModuleOwnedProviderContributor)(metadata, context);
+    try {
+      (contributors[index] as ModuleOwnedProviderContributor)(metadata, context);
+    } catch (error) {
+      throw markConfigurationError(error);
+    }
   }
 }
 
@@ -404,6 +408,12 @@ export function validateModuleOwnedContributions(
     ): readonly ModuleOwnedMetadataContribution<TPayload>[] => store.getMetadata(channel),
   });
   for (let index = 0; index < validators.length; index += 1) {
-    (validators[index] as ModuleOwnedContributionValidator)(snapshot);
+    try {
+      (validators[index] as ModuleOwnedContributionValidator)(snapshot);
+    } catch (error) {
+      // Conflicting owned stores or connector tokens across modules are
+      // declaration problems: report them as configuration errors.
+      throw markConfigurationError(error);
+    }
   }
 }

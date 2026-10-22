@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createContainer, Global, Module, singletonValue } from "@/core/di";
+import { createContainer, Global, isConfigurationError, Module, singletonValue } from "@/core/di";
 import {
   AGENT_MODEL_PROVIDER, AgentRuntime,
   agentMessage,
@@ -310,12 +310,12 @@ describe("LLM model router", () => {
 
   test("fails fast for ambiguous default profiles and unknown requested profiles", async () => {
     const providers: CapturingProvider[] = [];
-    expect(() =>
-      llmRouter({
-        fast: llmProfile(fastConfig, adapter("fast", providers)),
-        reasoning: llmProfile(sharedConfig, adapter("reasoning", providers)),
-      }),
-    ).toThrow(/defaultProfile/);
+    // The manifest file still imports; the application build reports it.
+    const ambiguous = llmRouter({
+      fast: llmProfile(fastConfig, adapter("fast", providers)),
+      reasoning: llmProfile(sharedConfig, adapter("reasoning", providers)),
+    });
+    expect(() => containerFor({ llm: ambiguous })).toThrow(/defaultProfile/);
 
     const container = containerFor({
       llm: llmRouter({
@@ -347,11 +347,19 @@ describe("LLM model router", () => {
 
   test("fails fast when the fallback graph contains an indirect cycle", () => {
     const providers: CapturingProvider[] = [];
-    expect(() => llmRouter({
+    const cyclic = llmRouter({
       fast: llmProfile(fastConfig, adapter("fast", providers), { fallback: "reasoning" }),
       reasoning: llmProfile(sharedConfig, adapter("reasoning", providers), { fallback: "archive" }),
       archive: llmProfile(sharedConfig, adapter("archive", providers), { fallback: "fast" }),
-    }, { defaultProfile: "fast" })).toThrow(/fallback cycle.*fast -> reasoning -> archive -> fast/);
+    }, { defaultProfile: "fast" });
+    let failure: unknown;
+    try {
+      containerFor({ llm: cyclic });
+    } catch (error) {
+      failure = error;
+    }
+    expect(String(failure)).toMatch(/fallback cycle.*fast -> reasoning -> archive -> fast/);
+    expect(isConfigurationError(failure)).toBe(true);
   });
 
   test("partial connect rolls back every created profile in reverse and aggregates cleanup errors", async () => {

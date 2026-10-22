@@ -4,6 +4,7 @@ import {
   Module,
   createToken,
   createModuleOwnedMetadataChannel,
+  deferModuleDeclarationError,
   registerModuleOwnedProviderContributor,
   registerModuleOwnedContributionValidator,
   type ModuleConfig,
@@ -14,6 +15,7 @@ import {
 import { ConfigRegistry, HEALTH_CHECK, StartupReport } from "../kernel";
 import { InfraError, type InfraConnector } from "./InfraConnector";
 import { InfraLifecycle } from "./InfraLifecycle";
+import { connectorDeclarationError } from "./connectorIdentity";
 
 /**
  * Infrastructure manifest: a readable "logical name → connector" map.
@@ -57,6 +59,8 @@ function buildInfraDefinitions(manifest: InfraManifest): {
   const seenTokens = new Map<InfraConnector["token"], string>();
 
   for (const [name, connector] of Object.entries(manifest)) {
+    const invalid = connectorDeclarationError(connector);
+    if (invalid !== undefined) throw invalid.error;
     if (!name.trim() || name !== name.trim()) throw new InfraError("Infra instance names must be non-empty and trimmed.");
     if (connector.phase !== undefined && !Number.isSafeInteger(connector.phase)) {
       throw new InfraError(`Infra instance "${name}": phase must be a finite safe integer.`);
@@ -135,8 +139,15 @@ function buildInfraDefinitions(manifest: InfraManifest): {
  * `@Infra`, but without a class. Handy for `imports` or `runApp({ infra })`.
  */
 export function infraModule(manifest: InfraManifest): BazisModuleRef {
-  const { providers, exports, config } = buildInfraDefinitions(manifest);
-  return { global: true, providers, exports, config };
+  try {
+    const { providers, exports, config } = buildInfraDefinitions(manifest);
+    return { global: true, providers, exports, config };
+  } catch (error) {
+    // Reported when the application is built, not while the file is imported.
+    const moduleRef: BazisModuleRef = { global: true };
+    deferModuleDeclarationError(moduleRef, error);
+    return moduleRef;
+  }
 }
 
 /**
@@ -157,8 +168,21 @@ export function infraModule(manifest: InfraManifest): BazisModuleRef {
  * ```
  */
 export function Infra(manifest: InfraManifest) {
-  const { providers, exports, config } = buildInfraDefinitions(manifest);
+  let definitions: ReturnType<typeof buildInfraDefinitions> | undefined;
+  let declarationError: unknown;
+  try {
+    definitions = buildInfraDefinitions(manifest);
+  } catch (error) {
+    declarationError = error;
+  }
   return (target: abstract new (...args: never) => unknown, _context: ClassDecoratorContext): void => {
+    if (definitions === undefined) {
+      // Reported when the application is built, not while the file is imported.
+      Module({ global: true })(target, _context);
+      deferModuleDeclarationError(target, declarationError);
+      return;
+    }
+    const { providers, exports, config } = definitions;
     Module({ global: true, providers, exports, config })(target, _context);
   };
 }

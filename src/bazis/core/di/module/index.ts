@@ -6,6 +6,7 @@ export { ModuleRegistrar } from "./ModuleRegistrar";
 export {
   registerModuleMetadataExpander,
   expandModuleMetadata,
+  deferModuleDeclarationError,
   type ModuleMetadataExpander,
 } from "./moduleExtensions";
 export {

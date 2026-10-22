@@ -4,6 +4,41 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.113.0 — 2026-10-22
+
+### Changed
+
+- Mistakes in declarations no longer crash the import of the file that holds
+  them. They are reported when the application starts, as one
+  `[bazis] configuration error` line (or on the startup screen) with exit
+  code 1. Before, they escaped with a source frame and a Bun banner. This
+  covers:
+  - `@Infra(...)` and `infraModule(...)` manifests (instance names, `phase`,
+    a token shared by two instances);
+  - `llmRouter(...)` profiles (no profiles, an unknown or ambiguous
+    `defaultProfile`, a fallback that is unknown, points to itself or forms a
+    cycle);
+  - `defineConfig(...)` environment names and unknown keys in a stand
+    section, and an invalid `configEnum(...)`;
+  - `@GrpcController(...)` / `@GrpcMethod(...)` (an invalid service
+    definition, a static or private method, an empty RPC name, a request model
+    that is not a class);
+  - `ormBazis` options (`ensureCreated` with `migrateOnStart`, an owned store
+    with `provider` or migrations) and owned stores or `@Infra` tokens that
+    conflict across modules.
+
+  Code that expected `llmRouter(...)` or `defineConfig(...)` to throw at the
+  call now gets the error from `createContainer(...)`, `ensureValid()` or
+  `resolve()`.
+
+### Added
+
+- `markConfigurationError(error)` and `isConfigurationError(error)` in
+  `bazis/core/di`: an extension that finds a declaration problem can mark its own
+  error so the start reports it as a configuration error.
+  `deferModuleDeclarationError(moduleRef, error)` keeps a problem found while
+  a module was declared and throws it when the application builds that module.
+
 ## 0.112.0 — 2026-10-22
 
 ### Changed (breaking)

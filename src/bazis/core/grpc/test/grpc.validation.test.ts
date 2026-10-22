@@ -197,6 +197,10 @@ test("validation trailers remain bounded; generated stream mismatch and invalid 
   expect(() => container.resolveAll(HOSTED_SERVICE)).toThrow("stream/DTO mismatch");
   const invalid = createContainer(grpcModule({ validator: null as never }));
   expect(() => invalid.resolveAll(HOSTED_SERVICE)).toThrow("ModelValidator");
-  expect(() => GrpcMethod("Echo", null as never)).toThrow("DTO class");
+  // A bad DTO does not break the import; registering the controller reports it.
+  @GrpcController({ Echo: echoService.Echo! })
+  class BadDtoController { @GrpcMethod("Echo", null as never) echo(input: EchoMessage) { return input; } }
+  expect(() => createContainer(grpcModule({ imports: [{ grpcControllers: [BadDtoController] }] })))
+    .toThrow("BadDtoController: echo: gRPC requestModel must be a DTO class.");
   await Promise.all([container.dispose(), invalid.dispose()]);
 });

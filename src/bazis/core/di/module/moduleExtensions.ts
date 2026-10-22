@@ -1,3 +1,4 @@
+import { markConfigurationError } from "../errors/configurationError";
 import type { BazisModuleMetadata, BazisModuleRef } from "./types";
 
 /**
@@ -21,15 +22,37 @@ export function registerModuleMetadataExpander(expander: ModuleMetadataExpander)
   }
 }
 
+const declarationErrors = new WeakMap<object, unknown>();
+
+/**
+ * Keeps a problem found while a module was declared (a bad `@Infra` manifest,
+ * …) instead of throwing it at import time. The application reports it as a
+ * configuration error when it builds this module.
+ */
+export function deferModuleDeclarationError(moduleRef: object, error: unknown): void {
+  if (!declarationErrors.has(moduleRef)) {
+    declarationErrors.set(moduleRef, markConfigurationError(error));
+  }
+}
+
 /** Collects extra module refs contributed by registered expanders for a module. */
 export function expandModuleMetadata(metadata: BazisModuleMetadata): readonly BazisModuleRef[] {
+  if (declarationErrors.has(metadata)) {
+    throw declarationErrors.get(metadata);
+  }
   if (expanders.length === 0) {
     return [];
   }
   const extra: BazisModuleRef[] = [];
   for (let index = 0; index < expanders.length; index += 1) {
     const expander = expanders[index] as ModuleMetadataExpander;
-    extra.push(...expander(metadata));
+    try {
+      extra.push(...expander(metadata));
+    } catch (error) {
+      // A bad declarative key (`ormBazis` options, …) is a configuration
+      // problem of the module, not an application crash.
+      throw markConfigurationError(error);
+    }
   }
   return extra;
 }

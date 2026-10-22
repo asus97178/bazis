@@ -224,8 +224,8 @@ describe("config objects (defineConfig → connector)", () => {
     const replica = defineConfig("db2", {
       default: { host: "b", port: 5432, database: "app", username: "u", password: secret("x") },
     });
-    expect(() => infraModule({ primary: postgres(primary), replica: postgres(replica) })).toThrow(
-      /share the same connector token/,
-    );
+    // The manifest file still imports; the application build reports it.
+    const infra = infraModule({ primary: postgres(primary), replica: postgres(replica) });
+    expect(() => createContainer(infra)).toThrow(/share the same connector token/);
   });
 });

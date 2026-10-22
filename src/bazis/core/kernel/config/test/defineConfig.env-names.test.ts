@@ -4,9 +4,12 @@ import { defineConfig, secret } from "../defineConfig";
 
 // One message used to cover four causes: "Invalid or duplicate configuration
 // environment name: SMTP_HOST." Now it names the key and the actual problem.
-function messageOf(define: () => unknown): string {
+// The declaring file still imports; the problem surfaces when the
+// configuration is validated at start.
+function messageOf(define: () => { ensureValid(): void }): string {
+  const definition = define();
   try {
-    define();
+    definition.ensureValid();
   } catch (error) {
     return redactSensitiveText((error as Error).message);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createContainer, createToken, DI, HOSTED_SERVICE } from "../../di";
+import { createContainer, createToken, DI, HOSTED_SERVICE, isConfigurationError } from "../../di";
 import { Bazis, defineConfig, secret } from "../../kernel";
 import { infraModule, InfraLifecycle, llmProfile, llmRouter, type InfraConnector } from "../index";
 
@@ -74,8 +74,15 @@ describe("Infra resource ownership", () => {
     const events: string[] = [];
     const first = connector("a", events);
     const second = { ...connector("b", events), token: first.token };
-    expect(() => createContainer({ imports: [infraModule({ a: first }), infraModule({ b: second })] }))
-      .toThrow(/share the same connector token/);
+    let failure: unknown;
+    try {
+      createContainer({ imports: [infraModule({ a: first }), infraModule({ b: second })] });
+    } catch (error) {
+      failure = error;
+    }
+    expect(String(failure)).toMatch(/share the same connector token/);
+    // 0.113.0: reported as one configuration-error line, not a crash.
+    expect(isConfigurationError(failure)).toBe(true);
     expect(events).toEqual([]);
   });
 
