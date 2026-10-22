@@ -91,11 +91,14 @@ bunx bazis g module Greeting --empty
 ```
 
 ```text
-[bazis] generated module: .../src/app/modules/greeting
-  + src/app/modules/greeting/Greeting.module.ts
-  + src/app/modules/greeting/MODULE.md
-  ~ src/app/modules/App.module.ts
-[bazis] connected in host module.
+  ── FILES ─────────────────────────────────────────── src/app/modules/greeting
+  [OK  ]  files           3 changes
+    ├─ + src/app/modules/greeting/Greeting.module.ts
+    ├─ + src/app/modules/greeting/MODULE.md
+    └─ ~ src/app/modules/App.module.ts
+  ↗  connected in src/app/modules/App.module.ts
+
+    ✔  SUCCESS   module Greeting is generated
 ```
 
 CLI создал модуль, его «паспорт» `MODULE.md` (описание ответственности и
@@ -256,7 +259,7 @@ curl -X POST http://127.0.0.1:3000/greetings \
 curl -X POST http://127.0.0.1:3000/greetings \
   -H 'content-type: application/json' -d '{"name":42}'
 # 400 {"error":"Validation failed","details":[{"property":"name",
-#   "message":"Field \"name\" must be a string","code":"type"}]}
+#   "message":"Field \"name\" must be of type string, got: number","code":"type"}]}
 ```
 
 ## 9. Запускаем тесты
@@ -275,7 +278,7 @@ bunx bazis test
 bunx bazis build --bin
 ```
 
-Получится `bin/my-app` — около 65 МБ, внутри приложение и сам Bun. На
+Получится `bin/my-app` — около 62 МБ, внутри приложение и сам Bun. На
 сервере не нужны ни Bun, ни `node_modules`, ни исходники:
 
 ```sh
