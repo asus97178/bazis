@@ -84,4 +84,22 @@ describe("CLI output", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  // 0.112.0: the scaffold does not create its table, and the hint only said
+  // "connect a database": the first GET answered 500 relation does not exist.
+  test("a module with a table says how to create it", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "bazis-cli-table-"));
+    const previous = process.cwd();
+    try {
+      const result = await generateProject({ name: "Demo", outputPath: path.join(root, "demo") });
+      process.chdir(result.projectDir);
+      const lines: string[] = [];
+      const code = await runCli(["g", "module", "Orders", "--dry-run"], { log: (line) => lines.push(line), error: (line) => lines.push(line), language: "en", codegen: async () => 0 });
+      expect(code).toBe(0);
+      expect(lines.join("\n")).toContain("its table is not created: add ensureCreated: true to ormBazis in Orders.module.ts, or write a migration");
+    } finally {
+      process.chdir(previous);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

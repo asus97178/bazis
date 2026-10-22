@@ -84,6 +84,7 @@ function configProblem(issue: ConfigIssue, screen: Screen): Problem {
   const variables = issue.env.map((name) => screen.code(name)).join(" / ");
   const causes: Record<ConfigIssue["kind"], string> = {
     "missing-secret": t.config.issue.missingSecret,
+    "empty-secret": t.config.issue.emptySecret,
     "development-secret": t.config.issue.devSecret,
     number: t.config.issue.number,
     boolean: t.config.issue.boolean,
@@ -94,6 +95,7 @@ function configProblem(issue: ConfigIssue, screen: Screen): Problem {
   };
   const fixes: string[] = [];
   if (issue.kind === "missing-secret") fixes.push(`${t.config.fix.setVariable(variables)}, ${t.config.fix.orSecretFile}`);
+  else if (issue.kind === "empty-secret") fixes.push(t.config.fix.emptySecret);
   else if (issue.kind === "development-secret") fixes.push(t.config.fix.setVariable(variables), t.config.fix.orProduction(screen.code(issue.key.split(".").at(-1) ?? issue.key)));
   else fixes.push(t.config.fix.change(issue.source === undefined ? variables : screen.code(issue.source)));
   // The wrong value and the variable that brought it.

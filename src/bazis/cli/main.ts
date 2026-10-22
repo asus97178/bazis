@@ -210,7 +210,10 @@ async function runGenerate(cwd: string, args: ParsedGenerateArgs, codegen: CliRu
   if (result.registered) s.line(`  ${s.strong("↗", PALETTE.export)}  ${s.text(t.module.registered(host ?? "App.module.ts"))}`);
   else s.warning(t.module.notRegistered);
   // What the module needs from the application to run.
-  if (args.generator === "module" && args.profile !== "empty") s.line(`  ${s.strong("◆", PALETTE.service)}  ${s.muted(t.module.needsDb)}`);
+  if (args.generator === "module" && args.profile !== "empty") {
+    s.line(`  ${s.strong("◆", PALETTE.service)}  ${s.muted(t.module.needsDb)}`);
+    s.line(`  ${s.strong("◆", PALETTE.service)}  ${s.muted(t.module.needsTable(`${args.name}.module.ts`))}`);
+  }
   if (args.generator === "module" && args.profile === "full") s.line(`  ${s.strong("◆", PALETTE.service)}  ${s.muted(t.module.needsCache)}`);
   s.line();
   if (result.dryRun) {

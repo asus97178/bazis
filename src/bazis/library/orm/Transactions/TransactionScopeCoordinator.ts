@@ -198,7 +198,7 @@ export async function transactionScope<TResult>(context: DbContext, provider: Da
 function assertRetryable(context: DbContext): void {
   const tracked = trackedEntryCount(context.changeTracker);
   if (tracked === 0) return;
-  throw new OrmTransactionScopeError(`transactionScope({ retry }) needs ${contextName(context)} without tracked entities: every attempt starts from a clean context, and the ${tracked} entities tracked before the scope would lose their changes. Start the scope before loading anything, or create a new scope for it.`);
+  throw new OrmTransactionScopeError(`transactionScope({ retry }) needs ${contextName(context)} without tracked entities: every attempt starts from a clean context, and the ${tracked === 1 ? "1 entity" : `${tracked} entities`} tracked before the scope would lose ${tracked === 1 ? "its" : "their"} changes. Start the scope before loading anything, or create a new scope for it.`);
 }
 
 async function runScope<TResult>(context: DbContext, provider: DatabaseProvider, work: (transaction: OrmTransaction) => Promise<TResult>, options: OrmTransactionScopeOptions | undefined, retryContexts?: Set<DbContext>): Promise<TResult> {

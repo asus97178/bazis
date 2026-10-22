@@ -1,4 +1,5 @@
 import type { ServiceDefinition } from "./serviceDefinition";
+import { GrpcSetupError } from "./GrpcSetupError";
 import type { Class } from "../di";
 import type { GrpcControllerDefinition } from "./contracts";
 import type { RequestModelClass } from "../http/Binding/requestModelRegistry";
@@ -62,21 +63,21 @@ export function GrpcMethod(rpcName?: string, requestModel?: RequestModelClass) {
 export function grpcControllerDefinition(controller: Class<object>): GrpcControllerDefinition {
   const carrier = (controller as unknown as { [Symbol.metadata]?: Carrier })[Symbol.metadata];
   const meta = carrier?.[GRPC_META];
-  if (!meta?.service) throw new TypeError(`${controller.name} must use @GrpcController().`);
+  if (!meta?.service) throw new GrpcSetupError(`${controller.name} must use @GrpcController().`);
   const methods = new Map<string, string | symbol>();
   for (const [methodName, rpcName] of meta.methods) {
     const keys = Object.keys(meta.service).filter((key) => {
       const rpc = meta.service![key]!;
       return key === rpcName || rpc.originalName === rpcName || rpc.path.split("/").at(-1) === rpcName;
     });
-    if (keys.length !== 1) throw new TypeError(`${controller.name}.${String(methodName)}: unknown or ambiguous RPC ${rpcName}.`);
+    if (keys.length !== 1) throw new GrpcSetupError(`${controller.name}.${String(methodName)}: unknown or ambiguous RPC ${rpcName}.`);
     const key = keys[0]!;
-    if (methods.has(key)) throw new TypeError(`${controller.name}: duplicate RPC ${rpcName}.`);
-    if (typeof controller.prototype[methodName] !== "function") throw new TypeError(`Missing RPC handler ${String(methodName)}.`);
+    if (methods.has(key)) throw new GrpcSetupError(`${controller.name}: duplicate RPC ${rpcName}.`);
+    if (typeof controller.prototype[methodName] !== "function") throw new GrpcSetupError(`Missing RPC handler ${String(methodName)}.`);
     methods.set(key, methodName);
   }
   for (const key of Object.keys(meta.service)) {
-    if (!methods.has(key)) throw new TypeError(`${controller.name}: RPC ${key} is missing @GrpcMethod().`);
+    if (!methods.has(key)) throw new GrpcSetupError(`${controller.name}: RPC ${key} is missing @GrpcMethod().`);
   }
   return Object.freeze({ controller, service: meta.service, methods, requestModels: new Map(meta.requestModels) });
 }

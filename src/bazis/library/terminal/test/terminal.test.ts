@@ -122,3 +122,15 @@ describe("screen", () => {
     expect(text()).toBe("");
   });
 });
+
+// 0.112.0: Russian skip rows said "схема не запускалось" — a neuter verb after
+// step names of every gender. The reason now reads without agreement.
+test("Russian skip reasons do not depend on the gender of the step name", () => {
+  const t = messages("ru").failure;
+  expect([t.skipConfig, t.skipInfra, t.skipCodegen, t.skipEarlier]).toEqual([
+    "без проверки — конфигурация с ошибками",
+    "без запуска — инфраструктура недоступна",
+    "без запуска — кодогенерация не удалась",
+    "без запуска — предыдущий этап не удался",
+  ]);
+});

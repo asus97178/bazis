@@ -4,6 +4,33 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.112.0 — 2026-10-22
+
+### Changed (breaking)
+
+- `secret("")` in a config declaration is a configuration error at start:
+  `secret("") is not a value: a secret cannot be empty. Write secret() for a
+  required secret, or give a non-empty development value`. Before, it looked
+  like an empty default but meant a required secret.
+
+### Fixed
+
+- `rollbackVersioned()` names an applied migration that is missing from the
+  passed list: `Migration "…" is applied but is not in the migrations passed to
+  rollbackVersioned(); pass the full list.` Before, it said `has no down()
+  method`. Both errors are `OrmError` instead of a plain `Error`.
+- A gRPC controller that does not map every RPC (or maps one twice) stops the
+  start with one `[bazis] configuration error` line (`GrpcSetupError`, a
+  `KernelError`). Before, it was a `TypeError` with a source frame.
+- `transactionScope({ retry })` with one tracked entity says "the 1 entity …
+  its changes", not "the 1 entities … their changes".
+- `bazis g module` (`--minimal`, `--full`) says that the module's table is not
+  created and how to create it: `ensureCreated: true` in `ormBazis`, or a
+  migration. Before, the first request answered `relation does not exist`.
+- Russian CLI: skipped steps read `без запуска — …` / `без проверки — …`
+  instead of `не запускалось`, which did not agree with step names such as
+  «схема».
+
 ## 0.111.2 — 2026-10-22
 
 ### Fixed
