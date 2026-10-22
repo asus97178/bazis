@@ -5,7 +5,7 @@
 `TasksService` из [рецепта CRUD](crud-module.md). Каждый видит и меняет
 только свои задачи, каждый вызов инструмента остаётся в журнале.
 
-Проверено на bazis 0.100.6. Модель в проверке — сервер с
+Проверено на bazis 0.111.2. Модель в проверке — сервер с
 OpenAI-совместимым API, который отвечает по сценарию.
 
 ## 1. Подключение модели
@@ -79,6 +79,13 @@ export function actAs(current: CurrentUser, context: AgentToolExecutionContext):
   }
 ```
 
+Инструменты получают сервис через контракт, поэтому метод нужен и в нём:
+
+```ts
+// tasks/services/ITasks.service.ts — новый метод
+  abstract open(limit: number): Promise<TaskResponse[]>;
+```
+
 ```ts
 // tasks/ai/ListTasks.tool.ts
 import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
@@ -128,6 +135,12 @@ export class ListTasksTool {
 
 ```ts
 // tasks/ai/CreateTask.tool.ts
+import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
+import { Validator } from "bazis/library/validation";
+import { CurrentUser } from "../../auth/CurrentUser";
+import { ITasksService } from "../services/ITasks.service";
+import { actAs } from "./actAs";
+
 export class CreateTaskInput {
   @Validator({ required: true, minLength: 1, maxLength: 200 })
   title!: string;
