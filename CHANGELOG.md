@@ -4,6 +4,18 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.114.0 — 2026-10-23
+
+### Changed (breaking)
+
+- `ignoreQueryFilters()` turns the filters off for the entities loaded by
+  `include(...)` / `thenInclude(...)` too: `@QueryFilter` conditions and the
+  `@SoftDelete` condition are not added to their queries. Before, only the
+  main query ignored them, so soft-deleted children stayed hidden and a
+  context filter of a child still ran. This is how EF Core treats
+  `IgnoreQueryFilters()`. A query that needs filters on the children keeps
+  them by not calling `ignoreQueryFilters()`, or adds its own `where`.
+
 ## 0.113.0 — 2026-10-22
 
 ### Changed

@@ -511,6 +511,10 @@ parameter, `@QueryFilter<T, C>((entity, context) => …)`, is kept in
 apart by the function's declared parameter count. `SqlTranslator` takes the
 effective filters (default: the fixed ones), so `EntityQuery` (queries, `find`,
 `count`), `IncludeLoader` and `ImmediateMutations` apply the same set;
-`ignoreQueryFilters()` skips evaluation entirely. A filter that throws fails
+`ignoreQueryFilters()` skips evaluation entirely; since 0.114.0 it also
+reaches `IncludeLoader` (`new IncludeLoader(runtime, plan.ignoreQueryFilters)`),
+so included entities are read without filters and the soft-delete condition,
+as in EF Core. Checks:
+[orm.ignore-query-filters-include.test.ts](test/orm.ignore-query-filters-include.test.ts). A filter that throws fails
 the query before SQL. Checks:
 [orm.context-query-filter.test.ts](test/orm.context-query-filter.test.ts).
