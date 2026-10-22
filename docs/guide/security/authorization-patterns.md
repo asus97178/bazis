@@ -204,6 +204,9 @@ export class NotesDb extends DbContext {
   all() { return this.db.notes.ignoreQueryFilters().count(); }
   ```
 
+Остальное о фильтрах — несколько условий, `ignoreQueryFilters()` и
+`include` — в главе [Фильтры запросов и мягкое удаление](../database/filters.md).
+
 Фоновым задачам и скриптам, у которых нет пользователя, нужен отдельный
 контекст без этого фильтра или явный `ignoreQueryFilters()` с собственным
 условием.
