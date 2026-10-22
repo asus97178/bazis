@@ -9,6 +9,31 @@ const lifecycles = new WeakMap<object, LifecycleBinding>();
 const values = (c: InfraConnector) => [c.token, c.config, c.phase, c.create, c.connect, c.dispose, c.healthCheck, c.providers, c.exports] as const;
 const unchanged = (c: InfraConnector, identity: ConnectorIdentity) => values(c).every((value, index) => Object.is(value, identity.fingerprint[index]));
 
+const declarationErrors = new WeakMap<object, unknown>();
+
+/**
+ * @internal A connector factory whose options are invalid returns a connector
+ * that carries the problem: `@Infra` reports it when the application is built
+ * instead of crashing the import of the manifest file.
+ */
+export function invalidConnector<T>(token: InfraConnector<T>["token"], error: unknown): InfraConnector<T> {
+  const connector: InfraConnector<T> = {
+    token,
+    create() {
+      throw error;
+    },
+    connect() {},
+    dispose() {},
+  };
+  declarationErrors.set(connector, error);
+  return connector;
+}
+
+/** @internal The declaration problem of a connector made by `invalidConnector`. */
+export function connectorDeclarationError(connector: InfraConnector): { readonly error: unknown } | undefined {
+  return declarationErrors.has(connector) ? { error: declarationErrors.get(connector) } : undefined;
+}
+
 /** @internal A factory identifies its original connector; copies inherit no identity. */
 export function identifyConnector<T>(connector: InfraConnector<T>, role: string): InfraConnector<T> {
   identities.set(connector, Object.freeze({ role, fingerprint: values(connector) }));

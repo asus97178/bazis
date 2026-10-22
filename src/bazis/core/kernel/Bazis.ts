@@ -1,4 +1,4 @@
-import { DiError } from "../di";
+import { isConfigurationError } from "../di";
 import { Kernel } from "./Kernel";
 import { KernelBuilder, type RootModuleInput } from "./KernelBuilder";
 import { KernelError, ShutdownTimeoutError } from "./errors";
@@ -76,7 +76,7 @@ export class Bazis {
       // deserve the same friendly output as build-time ones.
       if (screen !== undefined) {
         screen.failed(error, kernel);
-      } else if (error instanceof DiError || error instanceof KernelError) {
+      } else if (error instanceof KernelError || isConfigurationError(error)) {
         console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
       } else {
         console.error(`[bazis] application failed: ${formatStartupFailure(error)}`);
@@ -103,7 +103,7 @@ export function reportBuildFailure(
     process.exitCode = 1;
     return 1;
   }
-  if (error instanceof DiError || error instanceof KernelError) {
+  if (error instanceof KernelError || isConfigurationError(error)) {
     console.error(`[bazis] configuration error: ${redactSensitiveText(error.message)}`);
     process.exitCode = 1;
     return 1;

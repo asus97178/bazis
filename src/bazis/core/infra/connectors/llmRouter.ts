@@ -12,7 +12,7 @@ import {
   type AgentModelResponse,
 } from "../../agent";
 import { InfraError, type InfraConnector } from "../InfraConnector";
-import { identifyConnector } from "../connectorIdentity";
+import { identifyConnector, invalidConnector } from "../connectorIdentity";
 import { redactSensitiveText } from "../../../library/redaction";
 import { awaitAbortable } from "../../kernel/internal/awaitAbortable";
 import {
@@ -422,9 +422,16 @@ export function llmRouter(
   profiles: Readonly<Record<string, LlmModelProfile>>,
   options: LlmRouterOptions = {},
 ): InfraConnector<AgentModelProvider> {
-  const entries = profileEntries(profiles);
-  const defaultProfile = defaultProfileName(entries, options);
-  ensureFallbacksValid(entries);
+  let entries: ReturnType<typeof profileEntries>;
+  let defaultProfile: string;
+  try {
+    entries = profileEntries(profiles);
+    defaultProfile = defaultProfileName(entries, options);
+    ensureFallbacksValid(entries);
+  } catch (error) {
+    // Reported by `@Infra` when the application is built, not at import.
+    return invalidConnector(AGENT_MODEL_PROVIDER, error);
+  }
   const configs = Object.freeze(Array.from(new Set(entries.map(([, profile]) => profile.config))));
 
   // The framework LLM connector, like llmConnect: it never touches the schema,

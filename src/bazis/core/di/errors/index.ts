@@ -12,3 +12,4 @@ export { ProviderNotFoundError } from "./ProviderNotFoundError";
 export { ScopeDisposedError } from "./ScopeDisposedError";
 export { ScopedServiceFromRootError } from "./ScopedServiceFromRootError";
 export { ServiceValidationError } from "./ServiceValidationError";
+export { isConfigurationError, markConfigurationError } from "./configurationError";
