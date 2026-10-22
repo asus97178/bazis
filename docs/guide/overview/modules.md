@@ -42,8 +42,9 @@ export class AppModule {}
 | `config` | Объявления настроек модуля (`defineConfig`) — одно или массив | `taskConfig` |
 | `background` | Фоновые службы с управляемым запуском и остановкой | `[ReportScheduler]` |
 | `ormBazis` | Контекст базы данных и сущности модуля | `{ context: TaskDbContext, entities: [Task] }` |
+| `gateways` | WebSocket-шлюзы | `[ChatGateway]` |
 | `grpcControllers` | gRPC-контроллеры | `[TaskGrpcController]` |
-| `tools`, `agents`, `prompts` | Инструменты и агенты для AI | `[TaskSummaryTool]` |
+| `tools`, `agentToolHooks` | Инструменты агентов и хуки вокруг их вызовов | `[TaskSummaryTool]` |
 | `uiProfiles` | Описания интерфейса для генерируемого UI (`defineUiProfile`) | `[taskUiProfile]` |
 | `configure` | Регистрация провайдеров кодом — для редких случаев | `(di) => { ... }` |
 

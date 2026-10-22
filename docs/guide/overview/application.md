@@ -32,10 +32,12 @@ await runApp(AppModule, {
    `runApp` не нужно.
 4. Приложение работает, пока не придёт сигнал остановки.
 
-Вне production после запуска в журнале появляется строка:
+После запуска в журнале появляется строка с адресом в `listening`, в любом
+окружении (в терминале вне production вместо неё — [экран
+запуска](../cli/commands.md#экран-запуска)):
 
 ```text
-info: bazis started {"environment":"development","debug":true,"configKeys":2,"configMs":2.2,"containerMs":16.8,"hostedServices":2,"hooks":0,"startupMs":54.3}
+info: bazis started {"environment":"development","debug":true,"configKeys":2,"configMs":0.2,"containerMs":2,"hostedServices":3,"hooks":0,"startupMs":46,"listening":["http://127.0.0.1:3000"]}
 ```
 
 Ошибка на шагах 1–2 останавливает запуск до открытия порта, с кодом выхода 1:
@@ -57,6 +59,9 @@ auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 | `config` | Настройки `defineConfig`, которые не принадлежат конкретному модулю |
 | `kernel` | Окружение, тайм-ауты запуска и остановки, сигналы; см. ниже |
 | `grpc` | gRPC-сервер — независимо от HTTP |
+| `websocket` | Настройки [WebSocket](../realtime/websocket.md#вход): вход, CORS, адаптер Redis |
+| `language`, `messages` | Язык ответов фреймворка и свои тексты — [Русская локализация](../recipes/russian.md) |
+| `ui` | Генерируемый интерфейс по `uiProfiles` модулей |
 | `validator` | Своя проверка моделей запросов вместо встроенной |
 | `configure` | Тонкая настройка ядра: свой логгер, источники настроек |
 
@@ -75,7 +80,10 @@ auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 | `securityHeaders` | Включены | Заголовки безопасности; `false` — выключить |
 | `maxBodyBytes` | 1 МиБ | Предел размера тела запроса; больше — `413` |
 | `exposeErrorDetails` | Вне production | Текст и стек ошибки в ответе `500` — см. [Обработку ошибок](errors.md) |
-| `errorHandler` | — | Уведомления о неожиданных ошибках и своя запись в журнал |
+| `errorHandler` | — | Уведомления о неожиданных ошибках, своя запись в журнал, `status` — коды для своих ошибок |
+| `authorize` | — | Проверки для всех маршрутов — [закрыто по умолчанию](authorization.md#закрыто-по-умолчанию) |
+| `versioning` | Версия в пути | [Версионирование API](../http/versioning.md) |
+| `idleTimeoutSeconds` | 10 (Bun) | Простой соединения клиента |
 
 `/health` и `/docs` не зависят от `prefix`: с `prefix: "api"` маршруты
 контроллеров переезжают на `/api/...`, а `GET /health` остаётся на месте.
