@@ -9,7 +9,7 @@ API на русском:
 Пример — каталог книг из рецепта
 [Если вы пришли с NestJS](from-nestjs.md).
 
-Все примеры проверены на bazis 0.100.7 и Bun 1.4.0, выбор по `Accept-Language` — на 0.108.0.
+Все примеры проверены на bazis 0.111.2 и Bun 1.4.3.
 
 ## Язык ответов
 
@@ -40,9 +40,9 @@ POST /books  []                      → 400 {"error":"Тело запроса �
 ```text
 POST /books {"title":"","year":"abc"}
 → 400 {"error":"Проверка данных не пройдена","details":[
+    {"property":"year","message":"Поле \"year\": ожидается число, получено: строка","code":"type"},
     {"property":"title","message":"Поле \"title\": минимальная длина — 1","code":"minLength"},
-    {"property":"author","message":"Поле \"author\" обязательно для заполнения","code":"required"},
-    {"property":"year","message":"Поле \"year\": ожидается число, получено: строка","code":"type"}]}
+    {"property":"author","message":"Поле \"author\" обязательно для заполнения","code":"required"}]}
 
 {"year":1200}   → Поле "year" должно быть в диапазоне от 1450 до 2100
 {"year":1961.5} → Поле "year" должно быть целым числом

@@ -9,7 +9,7 @@
 `bazis g module <Имя> --full` сам ставит `@Authorize` на маршруты нового
 модуля.
 
-Проверено на bazis 0.105.3 и PostgreSQL 17.
+Проверено на bazis 0.111.2 и PostgreSQL 17.
 
 ## 1. Модуль
 

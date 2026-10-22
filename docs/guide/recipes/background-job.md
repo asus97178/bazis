@@ -6,7 +6,7 @@
 Напоминание приходит один раз, даже когда приложение запущено в
 нескольких экземплярах.
 
-Проверено на bazis 0.100.3 и PostgreSQL 17.
+Проверено на bazis 0.111.2 и PostgreSQL 17.
 
 ## 1. Данные
 
@@ -56,11 +56,14 @@ export class TasksDbContext extends DbContext {
 }
 ```
 
-> [!WARNING]
-> Новый столбец в уже созданной таблице `tasks` — изменение схемы:
-> `ensureCreated` его не добавит и остановит запуск
-> ([Управление схемой](../database/schema.md)). Для учебной базы удалите
-> таблицу.
+Таблица `tasks` уже есть, но удалять её не нужно: новый столбец допускает
+`NULL`, и `ensureCreated` добавит его сам вместе с новой таблицей
+([Что добавляется само](../database/schema.md#что-добавляется-само)):
+
+```text
+[orm:schema] applied 3 operation(s): create table notifications, add column tasks.remindedAt,
+  create index ix_notifications_userId on notifications (userId)
+```
 
 ## 2. Сервис
 

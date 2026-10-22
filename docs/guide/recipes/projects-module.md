@@ -6,7 +6,7 @@
 сообщается событием. Так модули зависят друг от друга только в одну
 сторону: задачи знают о проектах, проекты о задачах — нет.
 
-Проверено на bazis 0.106.0 и PostgreSQL 17.
+Проверено на bazis 0.111.2 и PostgreSQL 17.
 
 ## 1. Модуль проектов
 
@@ -279,6 +279,8 @@ export class TasksService implements ITasksService {
 
 ```ts
 // tasks/Tasks.module.ts
+import { withEventSubscribers } from "bazis/core/kernel";
+
 @Module({
   imports: [AuthModule, ProjectsModule],
   providers: [
