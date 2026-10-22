@@ -164,7 +164,7 @@ export class EntityQuery<T extends object, TResult = T> {
       result[i] = entity;
     }
     if (this.plan.includes.length > 0) {
-      await new IncludeLoader(this.runtime).load(this.model, result as object[], this.plan.includes, this.plan.noTracking);
+      await new IncludeLoader(this.runtime, this.plan.ignoreQueryFilters).load(this.model, result as object[], this.plan.includes, this.plan.noTracking);
     }
     return result as unknown as TResult[];
   }
