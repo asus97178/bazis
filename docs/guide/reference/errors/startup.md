@@ -49,11 +49,14 @@
 ### `KernelError` — имя переменной
 
 ```text
-KernelError: Configuration key "sms.host": environment variable "SMS_HOST" must start with BAZIS_: configuration reads only BAZIS_* variables (for example BAZIS_SMS_HOST).
+[bazis] configuration error: Configuration key "sms.host": environment variable "SMS_HOST" must start with BAZIS_: configuration reads only BAZIS_* variables (for example BAZIS_SMS_HOST).
 ```
 
-- **Когда.** При импорте файла с `defineConfig`, ещё до запуска, поэтому
-  печатается со стеком Bun, а не строкой `[bazis]`.
+- **Когда.** При запуске, вместе с проверкой настроек. Файл с
+  `defineConfig` импортируется без ошибки; до версии 0.113.0 она
+  случалась уже при импорте и печаталась со стеком Bun.
+- Так же — ключ в разделе окружения, которого нет в `default`
+  (`Unknown configuration key: sms.port.`), и неверный `configEnum`.
 - **Что сделать.** Имена в `env` начинаются с `BAZIS_`.
 
 ### `ConfigKeyMissingError`

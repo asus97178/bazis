@@ -161,12 +161,15 @@ export class AppInfra {}
 ключ: `llmProfile(otherConfig, …)`.
 
 Если профилей несколько, `defaultProfile` обязателен — или профиль с
-именем `default`. Неизвестный `fallback` и циклы `fallback` — ошибка уже
-при загрузке модуля с `@Infra`:
+именем `default`. Неизвестный `fallback` и циклы `fallback` останавливают
+запуск одной строкой:
 
 ```text
-InfraError: llmRouter profile "fast" fallback "smart" is not registered.
+[bazis] configuration error: llmRouter profile "fast" fallback "smart" is not registered.
 ```
+
+Сам вызов `llmRouter(...)` не бросает исключение (с версии 0.113.0):
+ошибку сообщает сборка приложения.
 
 ### Неизвестный профиль
 
