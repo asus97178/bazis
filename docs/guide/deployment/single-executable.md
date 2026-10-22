@@ -4,7 +4,7 @@
 Bun. На сервере не нужны ни Bun, ни `node_modules`, ни исходники —
 только этот файл и настройки в переменных окружения.
 
-Все примеры проверены на bazis 0.100.2 и Bun 1.4.0.
+Все примеры проверены на bazis 0.111.2 и Bun 1.4.3.
 
 ## Сборка
 
@@ -47,10 +47,26 @@ bin/shop: Mach-O 64-bit executable arm64
 
 ```ts
 import plans from "./plans.json";                                  // данные — в коде
-import templatePath from "./welcome.html" with { type: "file" };    // файл — внутри бинарника
+import templatePath from "./welcome.tpl" with { type: "file" };     // файл — внутри бинарника
 
-const html = await Bun.file(templatePath).text();
+const template = await Bun.file(templatePath).text();
 ```
+
+Импорт файла возвращает путь к нему внутри бинарника, а TypeScript нужно
+объявление расширения — как для `.proto` в главе [gRPC](../realtime/grpc.md#контракт):
+
+```ts
+// src/assets.d.ts
+declare module "*.tpl" {
+  const path: string;
+  export default path;
+}
+```
+
+Возьмите расширение, которое Bun не объявляет сам. `.html` не подойдёт:
+в типах Bun это `HTMLBundle` для сборки фронтенда, и `bazis build`
+остановится с `No overload matches this call`. `.txt`, `.toml`, `.yaml`
+Bun импортирует как содержимое, а не путь.
 
 Проверено: файл скопирован в пустой каталог и запущен оттуда.
 
