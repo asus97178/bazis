@@ -197,5 +197,6 @@ a[0] === b[0];                                                  // true
 ## Дальше
 
 - [`DbContext` и `DbSet`](dbcontext.md)
+- [Фильтры запросов и мягкое удаление](filters.md)
 - [Списки и JSON:API](../http/lists.md)
 - [Сохранение и отслеживание изменений](saving.md)
