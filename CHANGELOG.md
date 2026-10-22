@@ -34,7 +34,7 @@ contain breaking changes, a patch version does not.
 ### Added
 
 - `markConfigurationError(error)` and `isConfigurationError(error)` in
-  `bazis/di`: an extension that finds a declaration problem can mark its own
+  `bazis/core/di`: an extension that finds a declaration problem can mark its own
   error so the start reports it as a configuration error.
   `deferModuleDeclarationError(moduleRef, error)` keeps a problem found while
   a module was declared and throws it when the application builds that module.
