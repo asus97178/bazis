@@ -1,7 +1,7 @@
 # `bazis/core/di`
 
 Внедрение зависимостей: модули, регистрации, токены, контейнер, ошибки
-графа. Список — по пакету 0.112.0.
+графа. Список — по пакету 0.113.0.
 
 ## Модули
 
@@ -64,6 +64,10 @@
 `ModuleOwnedProviderConflictError`, `OptionsValidationError`. Тексты и что
 делать — [Ошибки DI](../errors/di.md).
 
+`isConfigurationError(error)` — ошибка ли это конфигурации: такие запуск
+печатает одной строкой `[bazis] configuration error`. Это `DiError` и
+ошибки, помеченные `markConfigurationError(error)`.
+
 ## Для пакетов
 
 Расширение модулей собственными полями и каналами. Приложению не нужны.
@@ -72,8 +76,8 @@
 `collectModuleUiProfiles`, `expandModuleMetadata`,
 `registerModuleMetadataExpander`, `createModuleOwnedMetadataChannel`,
 `createModuleOwnedProviderChannel`, `registerModuleOwnedProviderContributor`,
-`registerModuleOwnedContributionValidator`,
-`registerNamedDependencyEncapsulationHook`, `CLASS_PROVIDER_HOOK`,
+`registerModuleOwnedContributionValidator`, `deferModuleDeclarationError`,
+`markConfigurationError`, `registerNamedDependencyEncapsulationHook`, `CLASS_PROVIDER_HOOK`,
 `createOpenGenericTokenFamily`.
 
 ## Типы

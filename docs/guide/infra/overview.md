@@ -190,12 +190,15 @@ GET /queue  → {"sessions":"sessions","queue":"queue"}
 GET /health → … {"name":"infra:cache",…}, {"name":"infra:queue",…} …
 ```
 
-Без `token` два экземпляра конфликтуют, и приложение не загрузится:
+Без `token` два экземпляра конфликтуют, и приложение не запустится:
 
 ```text
-InfraError: Infra manifest: instances "cache" and "queue" share the same connector token;
-  each instance needs a distinct token.
+[bazis] configuration error: Infra manifest: instances "cache" and "queue" share the same connector token; each instance needs a distinct token.
 ```
+
+Ошибки манифеста — имя экземпляра, `phase`, общий токен — печатаются
+при запуске одной строкой, файл с `@Infra` импортируется без ошибки (с
+версии 0.113.0; раньше — исключение со стеком при импорте).
 
 ## Дальше
 

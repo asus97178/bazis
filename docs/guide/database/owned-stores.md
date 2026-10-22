@@ -41,11 +41,11 @@ export class NotesModule {}
 - Хранилище работает через общее подключение из `@Infra`
   (`ormBazisConnect`), как остальные контексты.
 - `ensureCreated`, `migrateOnStart` и миграции рядом с `ownedStore` не
-  нужны: хранилище само создаёт и проверяет таблицы. С ними модуль не
-  объявится:
+  нужны: хранилище само создаёт и проверяет таблицы. С ними приложение не
+  запустится:
 
   ```text
-  OrmError: ORM owned store creates and verifies its own tables; remove ensureCreated, migrateOnStart and migrations from this ormBazis entry.
+  [bazis] configuration error: ORM owned store creates and verifies its own tables; remove ensureCreated, migrateOnStart and migrations from this ormBazis entry.
   ```
 
 - С контекстом хранилища работают как с любым `DbContext`: запросы,
