@@ -1,5 +1,6 @@
 export { GrpcController, GrpcMethod } from "./decorators";
 export { GrpcError } from "./GrpcError";
+export { GrpcSetupError } from "./GrpcSetupError";
 export { grpcModule } from "./Grpc.module";
 export { GrpcServer } from "./GrpcServer";
 export { GrpcClient } from "./GrpcClient";

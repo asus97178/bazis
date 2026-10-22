@@ -202,7 +202,10 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
       const raw = selected?.raw ?? (isSecret(cell) || isEnum(cell) ? cell.default : cell);
       let value: ConfigValueType | undefined;
       if (type === "secret") {
-        if (typeof raw !== "string" || !raw.trim()) issue(key, "missing-secret", `required non-empty secret is not set (${names.get(key)!.join(", ")})`);
+        // secret("") reads like an empty default but would mean "required":
+        // the declaration is ambiguous, so it is refused with the fix.
+        if (isSecret(cell) && cell.default !== undefined && !cell.default.trim()) issue(key, "empty-secret", 'secret("") is not a value: a secret cannot be empty. Write secret() for a required secret, or give a non-empty development value');
+        else if (typeof raw !== "string" || !raw.trim()) issue(key, "missing-secret", `required non-empty secret is not set (${names.get(key)!.join(", ")})`);
         // A secret default in the code is a development value; production must
         // get the secret from a source or declare its own value explicitly.
         // No "apiKey: …" in the hint: the console redaction would hide it.

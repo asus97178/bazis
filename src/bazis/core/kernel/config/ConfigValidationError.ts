@@ -1,6 +1,6 @@
 import { KernelError } from "../errors";
 
-export type ConfigIssueKind = "missing-secret" | "development-secret" | "number" | "boolean" | "string" | "enum" | "validator" | "conflict";
+export type ConfigIssueKind = "missing-secret" | "empty-secret" | "development-secret" | "number" | "boolean" | "string" | "enum" | "validator" | "conflict";
 
 /** One invalid configuration key, with what can change it. */
 export interface ConfigIssue {

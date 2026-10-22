@@ -88,7 +88,7 @@ describe("transactionScope({ retry }) against a disposable PostgreSQL database",
     const db = context();
     await db.accounts.find(1);
     await expect(db.transactionScope(async () => undefined, { retry: true })).rejects.toThrow(
-      "transactionScope({ retry }) needs Db without tracked entities: every attempt starts from a clean context, and the 1 entities tracked before the scope would lose their changes. Start the scope before loading anything, or create a new scope for it.",
+      "transactionScope({ retry }) needs Db without tracked entities: every attempt starts from a clean context, and the 1 entity tracked before the scope would lose its changes. Start the scope before loading anything, or create a new scope for it.",
     );
     const fresh = context();
     await expect(fresh.transactionScope(() => fresh.transactionScope(async () => undefined, { retry: true }))).rejects.toBeInstanceOf(OrmTransactionScopeError);

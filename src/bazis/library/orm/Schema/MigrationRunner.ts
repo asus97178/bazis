@@ -101,8 +101,11 @@ export class MigrationRunner {
 
     for (const id of toRollback) {
       const migration = this.migrations.find((m) => m.id === id);
-      if (!migration?.down) {
-        throw new Error(`Migration "${id}" has no down() method.`);
+      if (!migration) {
+        throw new OrmError(`Migration "${id}" is applied but is not in the migrations passed to rollbackVersioned(); pass the full list.`);
+      }
+      if (!migration.down) {
+        throw new OrmError(`Migration "${id}" has no down() method.`);
       }
       await this.provider.transaction(async (tx) => {
         await migration.down!(this.context(tx));
