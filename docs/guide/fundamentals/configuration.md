@@ -188,6 +188,17 @@ Invalid configuration (environment "development"): mail.port — must be a TCP p
 mail.apiKey — required non-empty secret is not set (BAZIS_MAIL__APIKEY).
 ```
 
+- `secret("")` — не «пустое значение по умолчанию», а ошибка объявления:
+  секрет не может быть пустым. Запуск остановится и подскажет, что
+  написать:
+
+  ```text
+  auth.keyPem — secret("") is not a value: a secret cannot be empty. Write secret() for a required secret, or give a non-empty development value.
+  ```
+
+  Проверка — с версии 0.112.0. Раньше `secret("")` молча означал
+  обязательный секрет.
+
 Где хранить секреты в production, что маскируется в логах и почему
 production не запустится на секрете из `default` — в главе
 [Секреты и конфигурация](../security/secrets.md).

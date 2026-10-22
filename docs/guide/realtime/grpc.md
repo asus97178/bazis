@@ -134,8 +134,9 @@ await runApp(AppModule, {
 | Потоки в обе стороны | `AsyncIterable` запросов, контекст | `async *` |
 
 - Каждый метод сервиса из `.proto` должен быть в контроллере, иначе
-  запуск остановится:
-  `TypeError: UsersGrpcController: RPC ImportUsers is missing @GrpcMethod().`
+  запуск остановится (`GrpcSetupError`, с версии 0.112.0 — одной строкой,
+  раньше `TypeError` со стеком):
+  `[bazis] configuration error: UsersGrpcController: RPC ImportUsers is missing @GrpcMethod().`
 - Один вызов — одна область DI: `scoped`-сервисы живут до конца вызова,
   в том числе потокового.
 - Адрес по умолчанию — `127.0.0.1:50051`; чтобы сервер был виден с других

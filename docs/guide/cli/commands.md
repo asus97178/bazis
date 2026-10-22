@@ -101,7 +101,7 @@ bunx bazis new Shop --dry-run   # показать файлы, ничего не
     …
     └─ + README.md
 
-  ◆  bazis ^0.111.2 from npm
+  ◆  bazis ^0.112.0 from npm
 
     ✔  SUCCESS   project Shop is created
 
@@ -144,6 +144,7 @@ bunx bazis g module Orders --full     # CRUD, список, кэш, доступ
 
   ↗  connected in src/app/modules/App.module.ts
   ◆  this module uses a database: connect one with @Infra({ db: ormBazisConnect(dbConfig) })
+  ◆  its table is not created: add ensureCreated: true to ormBazis in Orders.module.ts, or write a migration
 
   ── BUILD ───────────────────────────────────────────────────────────────
   [OK  ]  codegen         12 files · 3 deps · 1 controller · 2 request models · 1 list  596 ms

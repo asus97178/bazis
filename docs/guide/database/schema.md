@@ -159,11 +159,17 @@ const result = await db.database.rollbackVersioned(migrations);       // пос�
 await db.database.rollbackVersioned(migrations, 2);                    // две последние
 ```
 
-Без `down` откат невозможен:
+Без `down` откат невозможен. Если последняя выполненная миграция не
+передана в список, откат тоже остановится — передавайте весь список:
 
 ```text
-Error: Migration "20261010_01_tasks_done" has no down() method.
+OrmError: Migration "20261010_01_tasks_done" has no down() method.
+OrmError: Migration "20261010_02_drop_sku" is applied but is not in the migrations passed to rollbackVersioned(); pass the full list.
 ```
+
+> [!NOTE]
+> С версии 0.112.0. Раньше обе ошибки были простым `Error`, а миграция,
+> которой нет в списке, давала `has no down() method`.
 
 ## `migrateOnStart`
 
