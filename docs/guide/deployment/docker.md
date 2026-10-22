@@ -4,7 +4,7 @@
 на втором файл кладётся в небольшой Debian. В итоговом образе нет ни Bun,
 ни `node_modules`, ни исходников.
 
-Все примеры проверены на bazis 0.100.2 (`HEALTHCHECK` — и на 0.100.3), образах `oven/bun:1.4.0` и
+Все примеры проверены на bazis 0.111.2, образах `oven/bun:1.4.0` и
 `debian:bookworm-slim`, Docker Compose 5.1 и PostgreSQL 17.
 
 ## Dockerfile
@@ -69,7 +69,7 @@ src/generated
 docker build -t shop .
 ```
 
-Сборка заняла 19 секунд, образ — 259 МБ: 138 МБ Debian и 84 МБ
+Сборка заняла 13 секунд, образ — 259 МБ: 138 МБ Debian и 84 МБ
 исполняемый файл. Образ собирается под архитектуру машины сборки: на Mac с
 Apple Silicon — `aarch64`.
 
@@ -109,6 +109,7 @@ x-app: &app
     BAZIS_DB__HOST: db
     BAZIS_DB__PORT: "5432"
     BAZIS_DB__DATABASE: shop
+    BAZIS_DB__TLS: disable       # база в той же сети Compose, без TLS
   secrets: [BAZIS_DB__PASSWORD]
 
 services:
@@ -159,6 +160,11 @@ schema-1  | [orm:schema] applied 2 operation(s): create table orders, create uni
 schema-1  | info: schema only: infrastructure and schema are ready, stopping (BAZIS_SCHEMA_ONLY) {"hostedServices":2,"startupMs":40.6}
 ```
 
+- `BAZIS_DB__TLS: disable` — потому что `postgres:17-alpine` работает без
+  TLS, а конфигурация базы из глав требует в production `verify-full`.
+  Без этой строки шаг схемы остановится:
+  `Server does not support SSL (ERR_POSTGRES_TLS_NOT_AVAILABLE)`. К базе
+  в другой сети подключайтесь с TLS и оставьте `verify-full`.
 - Compose кладёт секрет в `/run/secrets/<имя>`; имя `BAZIS_DB__PASSWORD`
   совпадает с переменной, поэтому `secretFilesSource` находит его без
   настройки. Тот же файл читает и PostgreSQL (`POSTGRES_PASSWORD_FILE`).
