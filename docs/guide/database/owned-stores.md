@@ -208,7 +208,7 @@ so it was not read. Remove such objects from the scope.
 | `ORM_OWNED_STORE_IDENTITY_MISMATCH` | Модель, версия формата или область отличаются от паспорта; неверное описание в `defineOrmOwnedStoreV1` |
 | `ORM_OWNED_STORE_IDENTITY_MISSING` | В области есть таблицы, которые хранилище не создавало |
 | `ORM_OWNED_STORE_OWNERSHIP_CONFLICT` | Таблица вне префикса, пересечение областей, остатки `rejectIfPresent`, чужой контекст на таблице хранилища |
-| `ORM_OWNED_STORE_DRIFT` | Таблицы области изменены снаружи, или в области есть объект, который bazis не читает |
+| `ORM_OWNED_STORE_DRIFT` | Таблицы области изменены снаружи, или в области есть объект, который bazis не читает. Столбец, добавленный и снова удалённый снаружи, расхождением не считается (с версии 0.115.1) |
 | `ORM_OWNED_STORE_CREATE_FAILED` | Не удалось создать таблицы (например, нет прав `CREATE`) |
 | `ORM_OWNED_STORE_LOCK_UNAVAILABLE` | Запуск прерван: связь с базой, отмена, долгая блокировка другим экземпляром |
 | `ORM_OWNED_STORE_PROVIDER_UNSUPPORTED` | Не PostgreSQL или не общее подключение из `@Infra` |
