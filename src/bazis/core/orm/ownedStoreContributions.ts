@@ -57,6 +57,10 @@ function snapshot<TContext extends DbContext>(context: ContextClass<TContext>, e
   const definition = isDefinedOrmOwnedStoreV1(source) ? source : defineOrmOwnedStoreV1(source as OrmOwnedStoreDefinitionV1);
   const expected = compileExpectedSchema(new OrmModel(entities));
   if (expected.tables.length === 0 || expected.tables.length > 512) fail("ORM_OWNED_STORE_IDENTITY_MISMATCH", `${storeName(definition)} needs 1 to 512 entities, got ${expected.tables.length}`);
+  for (const table of expected.tables) {
+    const partial = table.indexes.find((index) => index.predicate !== undefined);
+    if (partial) fail("ORM_OWNED_STORE_IDENTITY_MISMATCH", `${storeName(definition)}: index "${partial.name}" on "${table.table}" has a where condition; owned stores do not support partial indexes`);
+  }
   return Object.freeze({ identity: Object.freeze({}), context, entities: Object.freeze([...entities]), definition, expected, source });
 }
 

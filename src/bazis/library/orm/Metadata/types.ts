@@ -72,6 +72,8 @@ export interface IndexModel {
   readonly name: string;
   readonly columns: readonly string[];
   readonly unique: boolean;
+  /** Partial index condition over property names (`@Index({ where })`). */
+  readonly where?: CheckAst;
 }
 export interface CheckModel { readonly name: string; readonly expression: CheckAst }
 

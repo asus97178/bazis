@@ -1,7 +1,7 @@
 import { ModelBuildError } from "../errors";
 import { readRawEntity, type RawProperty } from "./decorators";
 import { defaultTableName, isConventionalKey, resolveColumnType } from "./conventions";
-import { validateCheckAst } from "../Schema/CheckExpression";
+import { validateCheckAst, type CheckAst } from "../Schema/CheckExpression";
 import type {
   EntityModel,
   ForeignKeyModel,
@@ -57,6 +57,7 @@ export class ModelBuilder {
           name: rawProp.index.name ?? `ix_${(raw.table ?? defaultTableName(ctor.name)).toLowerCase()}_${property.columnName}`,
           columns: [property.columnName],
           unique: rawProp.index.unique,
+          ...(rawProp.index.where === undefined ? {} : { where: rawProp.index.where }),
         });
       }
       if (rawProp.fkTarget) {
@@ -177,12 +178,13 @@ export class ModelBuilder {
         return property.columnName;
       });
       if (new Set(columns).size !== columns.length) throw new ModelBuildError(`Entity "${ctor.name}": index contains duplicate properties.`);
-      indexes.push({ name: declared.name ?? `ix_${(raw.table ?? defaultTableName(ctor.name)).toLowerCase()}_${columns.join("_")}`, columns, unique: declared.unique });
+      indexes.push({ name: declared.name ?? `ix_${(raw.table ?? defaultTableName(ctor.name)).toLowerCase()}_${columns.join("_")}`, columns, unique: declared.unique, ...(declared.where === undefined ? {} : { where: declared.where }) });
     }
     const indexNames = new Set<string>();
     for (const index of indexes) {
       if (indexNames.has(index.name)) throw new ModelBuildError(`Entity "${ctor.name}": duplicate index name "${index.name}".`);
       indexNames.add(index.name);
+      if (index.where !== undefined) validateIndexCondition(ctor.name, index.name, index.where, properties);
     }
     // Encryption with a random nonce stores equal values differently: such a
     // column cannot identify a row or be unique.
@@ -345,4 +347,25 @@ function isCanonicalRfc3339(value: string): boolean {
     if (offsetHour > 23 || offsetMinute > 59) return false;
   }
   return true;
+}
+
+/**
+ * A partial index condition uses the `@Check` operators. A date literal is
+ * refused: PostgreSQL stores it in its own time zone form, so the declared
+ * and the stored conditions could never be compared.
+ */
+function validateIndexCondition(entity: string, index: string, where: CheckAst, properties: readonly PropertyModel[]): void {
+  validateCheckAst(where, properties, `Entity "${entity}": index "${index}" condition`);
+  const byName = new Map(properties.map((property) => [property.propertyName, property]));
+  const visit = (node: CheckAst): void => {
+    switch (node.kind) {
+      case "and":
+      case "or": visit(node.left); visit(node.right); return;
+      case "not": visit(node.inner); return;
+      case "null": return;
+    }
+    if (byName.get(node.left)?.type !== "datetime") return;
+    if (node.kind === "in" || !(typeof node.right === "string" && node.right.startsWith("\0"))) throw new ModelBuildError(`Entity "${entity}": index "${index}" condition compares "${node.left}" with a date literal; use isNull()/isNotNull() or compare with another column.`);
+  };
+  visit(where);
 }

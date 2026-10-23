@@ -62,10 +62,18 @@ export interface UUIDOptions {
   readonly name?: string;
 }
 
-/** `@Index` options (on a property). */
-export interface IndexOptions {
+/** `@Index` options. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface IndexOptions<T extends object = any> {
   readonly unique?: boolean;
   readonly name?: string;
+  /**
+   * Partial index: only rows that match the condition are indexed. With
+   * `@SoftDelete` a unique index keeps deleted rows out:
+   * `@Index<User>(["email"], { unique: true, where: (u) => u.deletedAt.isNull() })`.
+   * The condition uses the same operators as `@Check`.
+   */
+  readonly where?: CheckPredicate<T>;
 }
 export interface CompositeKeyOptions { readonly name?: string }
 export type ReferentialAction = "noAction" | "restrict" | "cascade" | "setNull";
@@ -87,7 +95,7 @@ export interface RawProperty {
   required?: boolean;
   nullable?: boolean;
   default?: ColumnDefaultValue;
-  index?: { unique: boolean; name?: string };
+  index?: { unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst };
   /** `@ForeignKey(() => Principal)` on a scalar column, for the DDL FK. */
   fkTarget?: () => EntityClass;
   /** `@HasConversion(...)`: conversion before/after the dialect. */
@@ -119,7 +127,7 @@ export interface RawEntity {
   /** Soft-delete property name (see `@SoftDelete` / `@Entity({ softDelete })`). */
   softDeleteProperty?: string;
   keyDeclaration?: { properties: readonly string[]; name?: string; anchor: string; composite: boolean };
-  indexes?: Array<{ properties: readonly string[]; unique: boolean; name?: string }>;
+  indexes?: Array<{ properties: readonly string[]; unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst }>;
   foreignKeys?: Array<{ properties: readonly string[]; target: () => EntityClass; name?: string; onDelete?: ReferentialAction; onUpdate?: ReferentialAction }>;
   checks?: Array<{ name: string; expression: import("../Schema/CheckExpression").CheckAst }>;
 }
@@ -292,17 +300,21 @@ export function Required() {
 }
 
 /** Index on the property's column. */
-export function Index(options?: IndexOptions): (value: undefined, context: ClassFieldDecoratorContext) => void;
-export function Index(properties: readonly [string, ...string[]], options?: IndexOptions): (value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext) => void;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function Index<T extends object = any>(options?: IndexOptions<T>): (value: undefined, context: ClassFieldDecoratorContext) => void;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function Index<T extends object = any>(properties: readonly [string, ...string[]], options?: IndexOptions<T>): (value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext) => void;
 export function Index(first: IndexOptions | readonly [string, ...string[]] = {}, options: IndexOptions = {}) {
   if (Array.isArray(first)) {
+    const where = options.where === undefined ? undefined : compileCheck(options.where);
     return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
-      (ownRaw(context.metadata).indexes ??= []).push({ properties: [...first], unique: options.unique === true, name: options.name });
+      (ownRaw(context.metadata).indexes ??= []).push({ properties: [...first], unique: options.unique === true, name: options.name, ...(where === undefined ? {} : { where }) });
     };
   }
   const propertyOptions = first as IndexOptions;
+  const where = propertyOptions.where === undefined ? undefined : compileCheck(propertyOptions.where);
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
-    ownProperty(context.metadata, fieldName(context)).index = { unique: propertyOptions.unique === true, name: propertyOptions.name };
+    ownProperty(context.metadata, fieldName(context)).index = { unique: propertyOptions.unique === true, name: propertyOptions.name, ...(where === undefined ? {} : { where }) };
   };
 }
 

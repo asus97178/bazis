@@ -12,7 +12,10 @@ describe("strict PostgreSQL catalog normalization", () => {
     const schema = base(); const table = schema.tables.get("public.catalog")! as any;
     table.indexes = [...table.indexes, { name: "pk_catalog", columns: ["id"], unique: true, method: "btree", backingConstraint: true }, { name: "uq_catalog", columns: ["id"], unique: true, method: "btree", backingConstraint: true }];
     expect(verify(schema)).toEqual([]);
-    for (const patch of [{ predicate: "partial" }, { unsupported: true }, { method: undefined }, { columns: [], unique: false, method: "btree" as const }]) {
+    // 0.115.0: a readable partial index condition is compared, not refused.
+    const partial = base(); const partialTable = partial.tables.get("public.catalog")! as any; partialTable.indexes = [{ ...partialTable.indexes[0]!, predicate: { kind: "null", left: "id", not: false } }];
+    expect(verify(partial)).toEqual(["index.predicate"]);
+    for (const patch of [{ unsupported: true }, { method: undefined }, { columns: [], unique: false, method: "btree" as const }]) {
       const malformed = base(); const malformedTable = malformed.tables.get("public.catalog")! as any; malformedTable.indexes = [{ ...malformedTable.indexes[0]!, ...patch }];
       expect(verify(malformed)).toContain("index.unsupportedShape");
     }

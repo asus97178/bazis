@@ -125,17 +125,17 @@ export function projectCheckAstIdentifiers(ast: CheckAst, resolve: (propertyName
   }
 }
 /** Validates the complete closed AST against the compiled entity columns before DDL/snapshot rendering. */
-export function validateCheckAst(ast: CheckAst, properties: readonly PropertyModel[]): void {
+export function validateCheckAst(ast: CheckAst, properties: readonly PropertyModel[], subject = "CHECK"): void {
   const byName = new Map(properties.map((property) => [property.propertyName, property]));
   const property = (name: string): PropertyModel => {
     const value = byName.get(name);
     if (!value)
-      throw new ModelBuildError(`CHECK references unknown property "${name}".`);
+      throw new ModelBuildError(`${subject} references unknown property "${name}".`);
     return value;
   };
   const validateLiteral = (column: PropertyModel, value: CheckScalar): void => {
     if (value === null)
-      throw new ModelBuildError(`CHECK comparison for "${column.propertyName}" must use isNull()/isNotNull().`);
+      throw new ModelBuildError(`${subject} comparison for "${column.propertyName}" must use isNull()/isNotNull().`);
     const compatible = (column.type === "integer" || column.type === "real")
       ? typeof value === "number"
       : (column.type === "text" || column.type === "datetime")
@@ -144,7 +144,7 @@ export function validateCheckAst(ast: CheckAst, properties: readonly PropertyMod
           ? typeof value === "boolean"
           : false;
     if (!compatible)
-      throw new ModelBuildError(`CHECK literal is incompatible with property "${column.propertyName}".`);
+      throw new ModelBuildError(`${subject} literal is incompatible with property "${column.propertyName}".`);
   };
   const visit = (node: CheckAst): void => {
     switch (node.kind) {
@@ -162,7 +162,7 @@ export function validateCheckAst(ast: CheckAst, properties: readonly PropertyMod
       case "in": {
         const left = property(node.left);
         if (!node.values.length || node.values.length > MAX_CHECK_IN_VALUES)
-          throw new ModelBuildError(`CHECK IN requires between 1 and ${MAX_CHECK_IN_VALUES} literals.`);
+          throw new ModelBuildError(`${subject} IN requires between 1 and ${MAX_CHECK_IN_VALUES} literals.`);
         for (const value of node.values)
           validateLiteral(left, value);
         return;
@@ -173,13 +173,13 @@ export function validateCheckAst(ast: CheckAst, properties: readonly PropertyMod
         if (rightName !== undefined) {
           const right = property(rightName);
           if (left.type !== right.type)
-            throw new ModelBuildError(`CHECK column comparison requires identical column types ("${left.propertyName}", "${right.propertyName}").`);
+            throw new ModelBuildError(`${subject} column comparison requires identical column types ("${left.propertyName}", "${right.propertyName}").`);
         }
         else {
           validateLiteral(left, node.right as CheckScalar);
         }
         if ([">", ">=", "<", "<="].includes(node.op) && !["integer", "real", "text", "datetime"].includes(left.type)) {
-          throw new ModelBuildError(`CHECK ordered comparison is not supported for property "${left.propertyName}".`);
+          throw new ModelBuildError(`${subject} ordered comparison is not supported for property "${left.propertyName}".`);
         }
       }
     }
@@ -215,6 +215,13 @@ export function parseRenderedCheck(value: string): CheckAst | undefined {
     const left = parseIdentifier(nullable[1]!);
     return left ? { kind: "null", left, not: Boolean(nullable[2]) } : undefined;
   }
+  // PostgreSQL stores IN (...) as = ANY (ARRAY[...]).
+  const anyMatch = source.match(/^(.+?)\s*=\s*ANY\s*\(\s*ARRAY\[(.*)\]\s*\)$/isu);
+  if (anyMatch) {
+    const left = parseIdentifier(anyMatch[1]!);
+    const values = splitLiterals(anyMatch[2]!);
+    return left && values ? { kind: "in", left, values } : undefined;
+  }
   const inMatch = source.match(/^(.+?)\s+IN\s*\((.*)\)$/isu);
   if (inMatch) {
     const left = parseIdentifier(inMatch[1]!);
@@ -227,6 +234,46 @@ export function parseRenderedCheck(value: string): CheckAst | undefined {
   const left = parseIdentifier(comparison[1]!);
   const right = parseOperand(comparison[3]!);
   return left && right !== undefined ? { kind: "compare", left, op: comparison[2]! as "=" | "<>" | ">" | ">=" | "<" | "<=", right } : undefined;
+}
+/**
+ * Reads an expression PostgreSQL deparsed (`pg_get_expr`, a partial index
+ * predicate): casts like `'x'::text` are dropped outside string literals.
+ * Unknown syntax returns undefined.
+ */
+export function parsePostgresPredicate(value: string): CheckAst | undefined {
+  let result = "";
+  let quoted = false;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i]!;
+    if (char === "'") quoted = !quoted;
+    if (!quoted && char === ":" && value[i + 1] === ":") {
+      const cast = value.slice(i).match(/^::(?:timestamp with(?:out)? time zone|time with(?:out)? time zone|double precision|character varying|[A-Za-z_][A-Za-z0-9_]*)(?:\[\])?/u);
+      if (cast) { i += cast[0].length - 1; continue; }
+    }
+    result += char;
+  }
+  return parseRenderedCheck(result);
+}
+/**
+ * One form for equal conditions: `(a AND b) AND c` and `a AND (b AND c)` are
+ * the same chain, as PostgreSQL prints it. Used to compare a declared
+ * condition with the one read from the catalog.
+ */
+export function normalizeCheckAst(ast: CheckAst): CheckAst {
+  switch (ast.kind) {
+    case "and":
+    case "or": {
+      const items: CheckAst[] = [];
+      const collect = (node: CheckAst): void => {
+        if (node.kind === ast.kind) { collect(node.left); collect(node.right); }
+        else items.push(normalizeCheckAst(node));
+      };
+      collect(ast);
+      return items.reduce((left, right) => ({ kind: ast.kind, left, right }));
+    }
+    case "not": return { kind: "not", inner: normalizeCheckAst(ast.inner) };
+    default: return ast;
+  }
 }
 function stripOuter(value: string): string {
   while (value.startsWith("(") && value.endsWith(")") && balancedOuter(value))

@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.115.0 — 2026-10-23
+
+### Added
+
+- Partial indexes: `@Index({ where })` and `@Index([...], { where })` index
+  only the rows that match the condition. With `@SoftDelete` a unique index
+  no longer keeps the value of a deleted row:
+  `@Index<User>(["email"], { unique: true, where: (u) => u.deletedAt.isNull() })`.
+  The condition uses the `@Check` operators; `ensureCreated` creates the
+  index, adds it to an existing table and compares the stored condition on
+  every start (`index.predicate` when it differs). A date literal in the
+  condition and partial indexes in owned stores are refused.
+
+### Fixed
+
+- A `@Check` with `in([...])` or with a chain of three or more conditions
+  (`a.and(b).and(c)`) stopped the second start with `catalog.unsupported` or
+  `CHECK constraint expression differs`: PostgreSQL stores `IN` as
+  `= ANY (ARRAY[...])` and prints the chain without inner parentheses. Both
+  are now read back as declared.
+
 ## 0.114.0 — 2026-10-23
 
 ### Changed (breaking)

@@ -70,7 +70,7 @@ export function renderSafeAdditivePostgres(operation: SafeAdditiveSchemaOperatio
     case "addColumn": return `ALTER TABLE ${tableName(operation.table)} ADD COLUMN ${column(operation.column)}`;
     case "addCheck": return `ALTER TABLE ${tableName(operation.table)} ADD CONSTRAINT ${q(operation.check.name)} CHECK (${renderCheck(operation.check.expression as never, q)})`;
     case "addForeignKey": return `ALTER TABLE ${tableName(operation.table)} ADD CONSTRAINT ${q(operation.foreignKey.name)} FOREIGN KEY (${operation.foreignKey.columns.map(q).join(", ")}) REFERENCES ${q(operation.foreignKey.target.schema)}.${q(operation.foreignKey.target.table)} (${operation.foreignKey.targetColumns.map(q).join(", ")}) ON DELETE ${action(operation.foreignKey.onDelete)} ON UPDATE ${action(operation.foreignKey.onUpdate)}`;
-    case "createIndex": return `CREATE ${operation.index.unique ? "UNIQUE " : ""}INDEX ${q(operation.index.name)} ON ${tableName(operation.table)} (${operation.index.columns.map(q).join(", ")})`;
+    case "createIndex": return `CREATE ${operation.index.unique ? "UNIQUE " : ""}INDEX ${q(operation.index.name)} ON ${tableName(operation.table)} (${operation.index.columns.map(q).join(", ")})${operation.index.predicate === undefined ? "" : ` WHERE ${renderCheck(operation.index.predicate, q)}`}`;
   }
 }
 function createTable(table: ExpectedTable): string {

@@ -18,6 +18,7 @@ const descriptions: Record<SchemaDifferenceCode, string> = {
   "index.columns": "index columns or their order differ",
   "index.uniqueness": "index uniqueness differs",
   "index.method": "index method differs",
+  "index.predicate": "partial index condition (where) differs",
   "index.unsupportedShape": "index shape is unsupported by exact schema admission",
   "foreignKey.missing": "foreign key is missing",
   "foreignKey.unexpected": "foreign key is not declared in the ORM model",
