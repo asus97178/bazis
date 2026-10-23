@@ -1128,13 +1128,17 @@ function verifyOwnedStoreCatalogModelsV1(snapshot: OwnedStoreCatalogSnapshotV1, 
       readonly default: CanonicalDefault;
       readonly generation: "none" | "identityByDefault" | "uuidDefault";
     }>();
+    // A column added and dropped outside bazis stays in pg_attribute as a
+    // dropped attribute: it holds no reachable data and cannot be removed
+    // without rewriting the table. The reader skips such attributes, so live
+    // columns may have gaps in attnum; their order is what counts.
     const tableColumns = columns.get(relation.oid) ?? [];
     if (snapshot.columns.some((column) => !owned.has(column.relationOid) && !declaredToastRelationOids.has(column.relationOid)) || tableColumns.length !== expectedTable.columns.length)
       bad();
     const orderedColumns = [...tableColumns].sort((a, b) => Number(a.attnum) - Number(b.attnum));
     for (let index = 0; index < orderedColumns.length; index++) {
       const column = orderedColumns[index]!, modelColumn = expectedTable.columns[index]!;
-      if (column.name !== modelColumn.column || column.attnum !== String(index + 1) || column.dropped || !column.local || column.inheritanceCount !== "0" || column.typeOid === "0" || BigInt(column.typeOid) >= 12000n || !["integer", "real", "text", "boolean", "datetime", "json", "uuid"].includes(column.physicalType) || column.collationOid !== column.typeDefaultCollationOid || column.storageCode !== column.typeDefaultStorageCode || column.compressionCode !== "" || column.generation === "other")
+      if (column.name !== modelColumn.column || column.dropped || !column.local || column.inheritanceCount !== "0" || column.typeOid === "0" || BigInt(column.typeOid) >= 12000n || !["integer", "real", "text", "boolean", "datetime", "json", "uuid"].includes(column.physicalType) || column.collationOid !== column.typeDefaultCollationOid || column.storageCode !== column.typeDefaultStorageCode || column.compressionCode !== "" || column.generation === "other")
         bad();
       const expectedGeneration = modelColumn.generation;
       if (column.generation !== expectedGeneration || (column.generation === "none" && (column.identityCode !== "" || column.generatedCode !== "")) || (column.generation === "identityByDefault" && (column.identityCode !== "d" || column.generatedCode !== "")) || (column.generation === "uuidDefault" && (column.identityCode !== "" || column.generatedCode !== "")))

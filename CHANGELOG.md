@@ -4,6 +4,18 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.115.1 — 2026-10-23
+
+### Fixed
+
+- An owned store whose table got a column added and dropped outside bazis
+  (`ALTER TABLE … ADD COLUMN`, then `DROP COLUMN`) no longer reports
+  `ORM_OWNED_STORE_DRIFT` forever. PostgreSQL keeps such a column as a
+  dropped attribute that holds no reachable data and cannot be removed
+  without rewriting the table; the catalog reader now skips dropped
+  attributes and only the live columns and their order are verified. A
+  column that is still there remains drift.
+
 ## 0.115.0 — 2026-10-23
 
 ### Added

@@ -16,6 +16,8 @@ const registry = "__bazis_orm_owned_stores_v1";
 @Entity({ table: `${p}b_items` }) class FreshItem { @Key() id = 0; }
 @Entity({ table: `${p}c_items` }) class NextItem { @Key() id = 0; }
 @Entity({ table: `${p}d_items` }) class ForgedScopeItem { @Key() id = 0; }
+@Entity({ table: `${p}e_items` }) class DroppedColumnItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
+@Entity({ table: `${p}f_items` }) class AddedColumnItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
 class StoreDb extends DbContext {}
 
 const definition = (storeKey: string, prefix: string, extra: object = {}) => defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey: `${p}.${storeKey}`, formatVersion: 1, ownedScope: { schema: "public", tablePrefix: prefix }, ...extra });
@@ -72,6 +74,29 @@ describe("owned-store admission explains its failures against a disposable Postg
     expect(error.message).toContain("the store scope contains an object bazis does not expect there");
     expect(error.message).not.toContain("[INFO]");
     expect(error.message).not.toContain("\n");
+  }, 20_000);
+
+  // 0.116.0: a column added and dropped outside bazis leaves a dropped
+  // attribute in pg_attribute. The table matches the model again, yet the
+  // store reported drift forever and asked to restore something that cannot be.
+  live("a column added and dropped outside bazis does not block the store", async () => {
+    expect(await start(DroppedColumnItem, definition("e", `${p}e_`))).toBeUndefined();
+    const db = postgres({ url: url! });
+    try {
+      await db.execute(`ALTER TABLE "${p}e_items" ADD COLUMN extra text`, []);
+      await db.execute(`ALTER TABLE "${p}e_items" DROP COLUMN extra`, []);
+    } finally { await db.close(); }
+    const again = await start(DroppedColumnItem, definition("e", `${p}e_`));
+    expect(again === undefined ? undefined : String((again as Error).message)).toBeUndefined();
+  }, 20_000);
+
+  live("a column added outside bazis is still drift", async () => {
+    expect(await start(AddedColumnItem, definition("f", `${p}f_`))).toBeUndefined();
+    const db = postgres({ url: url! });
+    try { await db.execute(`ALTER TABLE "${p}f_items" ADD COLUMN extra text`, []); } finally { await db.close(); }
+    const error = await start(AddedColumnItem, definition("f", `${p}f_`)) as OrmOwnedStoreAdmissionError;
+    expect(error).toBeInstanceOf(OrmOwnedStoreAdmissionError);
+    expect(error.code).toBe("ORM_OWNED_STORE_DRIFT");
   }, 20_000);
 
   live("leftovers of a rejected scope are listed", async () => {
