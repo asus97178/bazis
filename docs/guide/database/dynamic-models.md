@@ -32,7 +32,7 @@ const model = buildDynamicModel(leads);
 | --- | --- |
 | `string` | `text` |
 | `int`, `bigint` | `bigint` |
-| `decimal` | `double precision` — **не точное число**, см. ниже |
+| `decimal` | `numeric` — точное число, значение — строка |
 | `bool` | `boolean` |
 | `datetime` | `timestamp with time zone` |
 | `uuid` | `text` |
@@ -45,9 +45,11 @@ const model = buildDynamicModel(leads);
 - `convention: "createdAt" | "updatedAt" | "uuid"` — значение заполняется
   при сохранении, как у [`@CreatedAt`](entities.md).
 
-> [!WARNING]
-> `decimal` хранится как `double precision`: `0.1 + 0.2` запишется как
-> `0.30000000000000004`. Для денег храните целые копейки в `int`.
+> [!NOTE]
+> До версии 0.117.0 `decimal` хранился как `double precision`, и
+> `0.1 + 0.2` записывался как `0.30000000000000004`. Теперь это точный
+> `numeric`, а значение — строка `"0.3"`
+> ([переход](../reference/upgrading.md#01170)).
 
 > [!NOTE]
 > Поле типа `uuid`, кроме ключа, заполняется само, если значение не

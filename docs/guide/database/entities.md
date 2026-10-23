@@ -67,7 +67,8 @@ Indexes:
 | --- | --- | --- |
 | `"text"` | `text` | `string` |
 | `"integer"` | `bigint` | `number` |
-| `"real"` | `double precision` | `number` |
+| `"real"` | `double precision` | `number` — **не точное** |
+| `"decimal"` | `numeric(p, s)` | `string` — точное число, [для денег](#деньги-и-точные-числа) |
 | `"boolean"` | `boolean` | `boolean` |
 | `"datetime"` | `timestamp with time zone` | `Date` |
 | `"json"` | `jsonb` | объект или массив |
@@ -85,6 +86,38 @@ Set the type: @Column({ type: "integer" }) or @Column({ type: "real" }).
 > Проверка — с версии 0.98.14. Раньше `@Column() pages = 0` молча
 > становился столбцом `text`, и после загрузки из базы `pages` был
 > строкой `"412"`.
+
+### Деньги и точные числа
+
+`real` — число с плавающей точкой: `0.1 + 0.2` в нём —
+`0.30000000000000004`. Для денег берите `decimal`:
+
+```ts
+@Entity({ table: "products" })
+export class Product {
+  @Key() id = 0;
+  @Required() @Column({ type: "decimal", precision: 12, scale: 2 }) price = "0";
+}
+```
+
+```text
+"price" numeric(12, 2) NOT NULL
+```
+
+- `precision` — сколько цифр всего, `scale` — сколько после точки. Без
+  них столбец — `numeric` любой длины.
+- Значение — **строка**: `product.price = "19.90"`. Можно передать
+  `bigint` или целое число; дробное `number` (`0.1`) ORM не примет — оно
+  уже неточное.
+- Лишние цифры ORM не округляет молча, а останавливает сохранение:
+  `Product.price: "1.005" has 3 digits after the point; numeric(12, 2) keeps 2. Round it in the code.`
+- Считайте в базе (`sum(price)`) или в коде целыми копейками через
+  `BigInt`; арифметика строк в JavaScript не работает.
+- Ключ не может быть `decimal`. В [owned stores](owned-stores.md)
+  `decimal` пока нет.
+
+> [!NOTE]
+> `decimal` — с версии 0.117.0.
 
 ### Пустые значения
 
