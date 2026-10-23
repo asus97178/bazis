@@ -165,9 +165,10 @@ export class PostgresDialect implements SqlDialect {
   createIndexSqlOne(model: EntityModel, index: IndexModel): string {
     const unique = index.unique ? "UNIQUE " : "";
     const cols = index.columns.map((column) => this.quoteId(column)).join(", ");
+    const where = index.where === undefined ? "" : ` WHERE ${renderCheck(projectCheckAstIdentifiers(index.where, (name) => model.propertyByName(name)!.columnName), (name) => this.quoteId(name))}`;
     return `CREATE ${unique}INDEX IF NOT EXISTS ${this.quoteId(index.name)} ON ${this.qualifyTable(
       model,
-    )} (${cols})`;
+    )} (${cols})${where}`;
   }
 
   addColumnSql(model: EntityModel, property: PropertyModel, foreignKey?: ForeignKeyConstraint): string {

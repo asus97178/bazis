@@ -1,3 +1,4 @@
+import type { CheckAst } from "./CheckExpression";
 /**
  * Snapshot of the actual database schema obtained by introspection. The source
  * of the "current" state for the additive auto-migration (the target is the
@@ -22,7 +23,8 @@ export interface IntrospectedIndex {
   readonly unique: boolean;
   readonly method?: "btree";
   readonly backingConstraint?: boolean;
-  readonly predicate?: string;
+  /** Partial index condition read from the catalog; unreadable ones mark the index `unsupported`. */
+  readonly predicate?: CheckAst;
   readonly unsupported?: boolean;
 }
 

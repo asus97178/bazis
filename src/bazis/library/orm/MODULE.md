@@ -518,3 +518,27 @@ as in EF Core. Checks:
 [orm.ignore-query-filters-include.test.ts](test/orm.ignore-query-filters-include.test.ts). A filter that throws fails
 the query before SQL. Checks:
 [orm.context-query-filter.test.ts](test/orm.context-query-filter.test.ts).
+
+## 16. Partial indexes (2026-10-23)
+
+`@Index({ where })` and `@Index([...], { where })` take a `CheckPredicate`,
+compiled with `compileCheck` when the decorator runs and kept as
+`IndexModel.where` (property names). `ModelBuilder` validates it with
+`validateCheckAst(…, "Entity …: index … condition")` and refuses a date
+literal: PostgreSQL stores it in the session time zone form, so the declared
+and stored conditions could not be compared. `PostgresDialect.createIndexSqlOne`
+and `renderSafeAdditivePostgres` append `WHERE …`; `compileExpectedSchema`
+projects it to column names as `predicate`.
+
+Introspection reads `pg_get_expr(indpred, indrelid, true)` and parses it with
+`parsePostgresPredicate` (casts dropped outside literals, `= ANY (ARRAY[…])`
+read as `IN`); an unreadable predicate marks the index `unsupported`.
+`ExactSchemaVerifier` compares conditions after `normalizeCheckAst` (AND/OR
+chains flattened, as PostgreSQL prints them) and reports `index.predicate`;
+`SchemaDiffer` and `SchemaAdmission` match a renamed index only with the same
+condition. CHECK constraints use the same parser and normalization, so
+`in([...])` and chains of three conditions no longer drift on restart. Owned
+stores refuse partial indexes. Checks:
+[orm.partial-index.test.ts](test/orm.partial-index.test.ts),
+[orm.partial-index.postgres.live.test.ts](test/orm.partial-index.postgres.live.test.ts),
+[orm.check-restart.postgres.live.test.ts](test/orm.check-restart.postgres.live.test.ts).

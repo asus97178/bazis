@@ -1,7 +1,8 @@
 import type { OrmExpectedSchema } from "./ExpectedSchema";
 import type { IntrospectedSchema, IntrospectedTable } from "./introspection";
 import { createHash } from "node:crypto";
-export type SchemaDifferenceCode = "table.missing" | "column.missing" | "column.unexpected" | "column.type" | "column.nullability" | "column.default" | "column.generation" | "primaryKey.missing" | "primaryKey.unexpected" | "primaryKey.name" | "primaryKey.columns" | "index.missing" | "index.unexpected" | "index.name" | "index.columns" | "index.uniqueness" | "index.method" | "index.unsupportedShape" | "foreignKey.missing" | "foreignKey.unexpected" | "foreignKey.name" | "foreignKey.columns" | "foreignKey.target" | "foreignKey.actions" | "foreignKey.deferrable" | "foreignKey.match" | "check.missing" | "check.unexpected" | "check.name" | "check.expression" | "catalog.unsupported";
+import { normalizeCheckAst, type CheckAst } from "./CheckExpression";
+export type SchemaDifferenceCode = "table.missing" | "column.missing" | "column.unexpected" | "column.type" | "column.nullability" | "column.default" | "column.generation" | "primaryKey.missing" | "primaryKey.unexpected" | "primaryKey.name" | "primaryKey.columns" | "index.missing" | "index.unexpected" | "index.name" | "index.columns" | "index.uniqueness" | "index.method" | "index.predicate" | "index.unsupportedShape" | "foreignKey.missing" | "foreignKey.unexpected" | "foreignKey.name" | "foreignKey.columns" | "foreignKey.target" | "foreignKey.actions" | "foreignKey.deferrable" | "foreignKey.match" | "check.missing" | "check.unexpected" | "check.name" | "check.expression" | "catalog.unsupported";
 export interface SafeSchemaDescriptor {
   readonly kind: "absent" | "present" | "canonicalType" | "canonicalDefault" | "canonicalGeneration" | "canonicalExpression" | "orderedColumns" | "referentialActions" | "unsupported";
   readonly value?: string;
@@ -85,7 +86,7 @@ export class ExactSchemaVerifier {
     const ordinary = actual.indexes.filter((index) => !index.backingConstraint);
     const expectedIndexes = new Map(expected.indexes.map((index) => [index.name, index]));
     for (const index of ordinary) {
-      if (index.unsupported || index.method !== "btree" || index.predicate || index.columns.length === 0)
+      if (index.unsupported || index.method !== "btree" || index.columns.length === 0)
         add("index.unsupportedShape", table, index.name, undefined, unsupported);
       else if (!expectedIndexes.has(index.name))
         add("index.unexpected", table, index.name, absent, present);
@@ -98,7 +99,7 @@ export class ExactSchemaVerifier {
       }
       if (found.name !== name)
         add("index.name", table, name, value("present", name), value("present", found.name));
-      if (found.unsupported || found.predicate || found.columns.length === 0) {
+      if (found.unsupported || found.columns.length === 0) {
         add("catalog.unsupported", table, name, undefined, unsupported);
         continue;
       }
@@ -108,6 +109,8 @@ export class ExactSchemaVerifier {
         add("index.columns", table, name, value("orderedColumns", index.columns), value("orderedColumns", found.columns));
       if (found.method !== "btree")
         add("index.method", table, name, value("present", "btree"), value("present", found.method ?? "unknown"));
+      if (!samePredicate(found.predicate, index.predicate))
+        add("index.predicate", table, name, value("canonicalExpression", index.predicate ?? null), value("canonicalExpression", found.predicate ?? null));
     }
     const foreignKeys = actual.foreignKeys ?? [];
     const expectedForeignKeys = new Map(expected.foreignKeys.map((foreignKey) => [foreignKey.name, foreignKey]));
@@ -148,11 +151,21 @@ export class ExactSchemaVerifier {
       else {
         if (found.name !== name)
           add("check.name", table, name, value("present", name), value("present", found.name));
-        if (stable(found.expression) !== stable(check.expression))
+        if (!sameExpression(found.expression, check.expression))
           add("check.expression", table, name, value("canonicalExpression", check.expression), value("canonicalExpression", found.expression));
       }
     }
   }
+}
+/** A CHECK read from the catalog against the declared one; AND/OR chains compare flat. */
+function sameExpression(found: unknown, declared: unknown): boolean {
+  const known = (value: unknown): value is CheckAst => typeof value === "object" && value !== null && (value as { kind?: unknown }).kind !== "unsupported";
+  return known(found) && known(declared) ? stable(normalizeCheckAst(found)) === stable(normalizeCheckAst(declared)) : stable(found) === stable(declared);
+}
+/** @internal Two partial index conditions (or their absence) are the same. */
+export function samePredicate(a: CheckAst | undefined, b: CheckAst | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return stable(normalizeCheckAst(a)) === stable(normalizeCheckAst(b));
 }
 function same<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((entry, index) => stable(entry) === stable(b[index]));

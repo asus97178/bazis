@@ -476,7 +476,7 @@ export class PostgresProvider implements DatabaseProvider {
       const column = String(row.column_name);
       return [column, { name: column, notNull: row.not_null === true, isPrimaryKey: primaryColumns.has(column), ...normalized, physicalType: exact ? exactPostgresType(String(row.type_name), normalized.physicalType) : normalized.physicalType }];
     }));
-    const indexRows = await executor.query(`SELECT ic.relname AS index_name, ix.indisunique AS is_unique, am.amname AS method, ix.indpred IS NOT NULL AS has_predicate, ix.indisvalid AS is_valid, ix.indisready AS is_ready, ix.indnkeyatts AS key_count, k.ord, a.attname AS column_name, k.attnum = 0 AS is_expression, k.ord > ix.indnkeyatts AS is_include,
+    const indexRows = await executor.query(`SELECT ic.relname AS index_name, ix.indisunique AS is_unique, am.amname AS method, ix.indpred IS NOT NULL AS has_predicate, pg_get_expr(ix.indpred, ix.indrelid, true) AS predicate, ix.indisvalid AS is_valid, ix.indisready AS is_ready, ix.indnkeyatts AS key_count, k.ord, a.attname AS column_name, k.attnum = 0 AS is_expression, k.ord > ix.indnkeyatts AS is_include,
       EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = ix.indexrelid AND c.contype IN ('p', 'u')) AS backing_constraint
       FROM pg_index ix JOIN pg_class ic ON ic.oid = ix.indexrelid JOIN pg_class tc ON tc.oid = ix.indrelid JOIN pg_namespace n ON n.oid = tc.relnamespace JOIN pg_am am ON am.oid = ic.relam JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY k(attnum, ord) ON true LEFT JOIN pg_attribute a ON a.attrelid = tc.oid AND a.attnum = k.attnum
       WHERE n.nspname = $1 AND tc.relname = $2 ORDER BY ic.relname, k.ord`, [schema, name]);

@@ -1,6 +1,6 @@
 import type { Row } from "./types";
 import type { IntrospectedColumn, IntrospectedIndex, IntrospectedForeignKey } from "../Schema/introspection";
-import { parseRenderedCheck } from "../Schema/CheckExpression";
+import { parsePostgresPredicate, type CheckAst } from "../Schema/CheckExpression";
 
 export function canonicalPostgresColumn(type: string, defaultExpression: string | null, identity: string): Pick<IntrospectedColumn, "physicalType" | "default" | "generation" | "unsupported"> {
   const physicalType = canonicalPostgresType(type);
@@ -78,10 +78,10 @@ function stripPostgresCasts(value: string): string { return value.replace(/::(?:
 function stripPostgresOuter(value: string): string { while (value.startsWith("(") && value.endsWith(")")) value = value.slice(1, -1).trim(); return value; }
 
 export function collectPostgresIndexes(rows: readonly Row[], exact = false): IntrospectedIndex[] {
-  const byName = new Map<string, { unique: boolean; columns: string[]; method: "btree" | undefined; backingConstraint: boolean; unsupported: boolean; predicate?: string }>();
+  const byName = new Map<string, { unique: boolean; columns: string[]; method: "btree" | undefined; backingConstraint: boolean; unsupported: boolean; predicate?: CheckAst }>();
   for (const row of rows) {
     const name = String(row.index_name); let index = byName.get(name);
-    if (!index) { index = { unique: row.is_unique === true, columns: [], method: String(row.method) === "btree" ? "btree" : undefined, backingConstraint: row.backing_constraint === true, unsupported: row.is_expression === true || row.is_valid !== true || row.is_ready !== true }; if (row.has_predicate === true) index.predicate = "unsupported"; byName.set(name, index); }
+    if (!index) { index = { unique: row.is_unique === true, columns: [], method: String(row.method) === "btree" ? "btree" : undefined, backingConstraint: row.backing_constraint === true, unsupported: row.is_expression === true || row.is_valid !== true || row.is_ready !== true }; if (row.has_predicate === true) { const predicate = typeof row.predicate === "string" ? parsePostgresPredicate(row.predicate) : undefined; if (predicate === undefined) index.unsupported = true; else index.predicate = predicate; } byName.set(name, index); }
     if (row.column_name == null || (exact && row.is_include === true)) index.unsupported = true; else index.columns.push(String(row.column_name));
   }
   return [...byName.entries()].map(([name, value]) => ({ name, unique: value.unique, columns: value.columns, method: value.method, backingConstraint: value.backingConstraint, predicate: value.predicate, unsupported: value.unsupported }));
@@ -100,8 +100,8 @@ export function collectPostgresForeignKeys(rows: readonly Row[], exact = false):
 function postgresAction(code: string): { readonly value: string; readonly unsupported: boolean } { switch (code) { case "a": return { value: "noAction", unsupported: false }; case "r": return { value: "restrict", unsupported: false }; case "c": return { value: "cascade", unsupported: false }; case "n": return { value: "setNull", unsupported: false }; default: return { value: "unknown", unsupported: true }; } }
 
 export function canonicalPostgresCheck(name: string, definition: string): { readonly name: string; readonly expression: unknown; readonly unsupported: boolean } {
-  const body = definition.trim().match(/^CHECK\s*\((.*)\)$/isu)?.[1]?.replace(/::(?:[A-Za-z_][A-Za-z0-9_]*(?:\[\])?)/gu, "");
-  const expression = body === undefined ? undefined : parseRenderedCheck(body);
+  const body = definition.trim().match(/^CHECK\s*\((.*)\)$/isu)?.[1];
+  const expression = body === undefined ? undefined : parsePostgresPredicate(body);
   return { name, expression: expression ?? { kind: "unsupported" }, unsupported: expression === undefined };
 }
 

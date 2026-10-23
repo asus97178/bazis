@@ -2,7 +2,8 @@ import type { DatabaseProvider, SchemaAdmissionScope } from "../Providers/types"
 import { SchemaAdmissionError, SchemaMigrationRequiredError, SchemaVerificationError } from "../errors";
 import type { OrmModel } from "../Metadata/OrmModel";
 import { compileExpectedSchema, type OrmExpectedSchema } from "./ExpectedSchema";
-import { ExactSchemaVerifier, type SchemaVerificationResult } from "./ExactSchemaVerifier";
+import { ExactSchemaVerifier, samePredicate, type SchemaVerificationResult } from "./ExactSchemaVerifier";
+import { renderCheck } from "./CheckExpression";
 import { classifySafeAdditive, renderSafeAdditivePostgres, type SafeAdditiveSchemaOperation } from "./SafeAdditiveSchema";
 import type { IntrospectedSchema } from "./introspection";
 
@@ -113,7 +114,7 @@ function describeOperation(operation: SafeAdditiveSchemaOperation): string {
     case "addColumn": return `add column ${tableName(operation.table.schema, operation.table.table)}.${operation.column.column}`;
     case "addCheck": return `add check ${operation.check.name} on ${tableName(operation.table.schema, operation.table.table)}`;
     case "addForeignKey": return `add foreign key ${operation.foreignKey.name} on ${tableName(operation.table.schema, operation.table.table)}`;
-    case "createIndex": return `create ${operation.index.unique ? "unique " : ""}index ${operation.index.name} on ${tableName(operation.table.schema, operation.table.table)} (${operation.index.columns.join(", ")})`;
+    case "createIndex": return `create ${operation.index.unique ? "unique " : ""}index ${operation.index.name} on ${tableName(operation.table.schema, operation.table.table)} (${operation.index.columns.join(", ")})${operation.index.predicate === undefined ? "" : ` where ${renderCheck(operation.index.predicate, (name) => name)}`}`;
   }
 }
 
@@ -135,7 +136,7 @@ function alignIndexNames(expected: OrmExpectedSchema, actual: IntrospectedSchema
     let indexes = found.indexes;
     for (const index of table.indexes) {
       if (indexes.some((item) => item.name === index.name)) continue;
-      const match = indexes.find((item) => !item.backingConstraint && !item.unsupported && !item.predicate && item.method === "btree" && !expectedNames.has(item.name)
+      const match = indexes.find((item) => !item.backingConstraint && !item.unsupported && samePredicate(item.predicate, index.predicate) && item.method === "btree" && !expectedNames.has(item.name)
         && item.unique === index.unique && item.columns.length === index.columns.length && item.columns.every((column, position) => column === index.columns[position]));
       if (!match) continue;
       warnings.push(`table ${quote(table.schema)}.${quote(table.table)}: index is named ${quote(match.name)}, the model expects ${quote(index.name)}. `

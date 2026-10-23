@@ -1,6 +1,8 @@
 import { entityStorageKey } from "./tableKey";
 import type { ColumnType, EntityModel, IndexModel, PropertyModel } from "../Metadata/types";
 import type { IntrospectedSchema, IntrospectedTable } from "./introspection";
+import { projectCheckAstIdentifiers, type CheckAst } from "./CheckExpression";
+import { samePredicate } from "./ExactSchemaVerifier";
 
 /**
  * Additive schema change operation. Destructive changes (drop/type change) never
@@ -89,7 +91,7 @@ export class SchemaDiffer {
     for (const index of model.indexes) {
       if (existing.has(index.name)) continue;
       // The same index under another name (for example from before 0.98.20) is not duplicated.
-      const renamed = table.indexes.find((item) => !declared.has(item.name) && !item.backingConstraint && !item.predicate && item.unique === index.unique
+      const renamed = table.indexes.find((item) => !declared.has(item.name) && !item.backingConstraint && !item.unsupported && samePredicate(item.predicate, projectedWhere(model, index)) && item.unique === index.unique
         && item.columns.length === index.columns.length && item.columns.every((column, position) => column === index.columns[position]));
       if (renamed) {
         warnings.push(`table "${model.tableName}": index "${renamed.name}" matches "${index.name}" from the model except for its name (left untouched; to align it run: ALTER INDEX "${renamed.name}" RENAME TO "${index.name}";).`);
@@ -98,4 +100,9 @@ export class SchemaDiffer {
       operations.push({ kind: "createIndex", model, index });
     }
   }
+}
+
+/** The index condition over column names, as the catalog reports it. */
+function projectedWhere(model: EntityModel, index: EntityModel["indexes"][number]): CheckAst | undefined {
+  return index.where === undefined ? undefined : projectCheckAstIdentifiers(index.where, (name) => model.propertyByName(name)!.columnName);
 }

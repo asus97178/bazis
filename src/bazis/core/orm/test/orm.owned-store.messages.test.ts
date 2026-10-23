@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, Module } from "@/core/di";
-import { Column, DbContext, defineOrmOwnedStoreV1, Entity, Key, OrmOwnedStoreAdmissionError, ormModule, type DatabaseProvider } from "@/core/orm";
+import { Column, DbContext, defineOrmOwnedStoreV1, Entity, Index, Key, OrmOwnedStoreAdmissionError, ormModule, type DatabaseProvider } from "@/core/orm";
 import { explainOwnedStoreFailureV1 } from "@/library/orm/Schema/OwnedStoreExplain";
 
 const provider = { name: "postgres", dialect: { name: "postgres" }, query: async () => [], execute: async () => ({ changes: 0, lastInsertId: 0 }), transaction: async <T>(work: never) => work as T, ping: async () => true, close: async () => undefined, introspect: async () => ({ tables: new Map() }) } as unknown as DatabaseProvider;
@@ -57,6 +57,13 @@ describe("owned-store graph errors name stores and tables", () => {
       { context: OtherDb, entities: [NoteV2Item], ownedStore: store("acme.notes.v2", "notes"), registerRepositories: false },
     )).message;
     expect(message).toStartWith('ORM_OWNED_STORE_OWNERSHIP_CONFLICT: Owned store "acme.notes" (schema "public", prefix "notes_") overlaps the scope of owned store "acme.notes.v2" (schema "public", prefix "notes"); two prefixes overlap when one starts with the other');
+  });
+  test("a partial index in a store table", () => {
+    // 0.115.0: @Index({ where }) is for ordinary contexts; owned stores refuse it.
+    @Entity({ table: "notes_flags" })
+    @Index<{ id: number; done: boolean }>(["id"], { unique: true, where: (f) => f.done.eq(false) })
+    class NoteFlag { @Key() id = 0; @Column({ type: "boolean" }) done = false; }
+    expect(failure(app({ context: NotesDb, entities: [NoteFlag], ownedStore: store("acme.notes", "notes_"), registerRepositories: false })).message).toBe('ORM_OWNED_STORE_IDENTITY_MISMATCH: Owned store "acme.notes" (schema "public", prefix "notes_"): index "ix_notes_flags_id" on "notes_flags" has a where condition; owned stores do not support partial indexes.');
   });
   test("a store key declared twice", () => {
     expect(failure(app(
