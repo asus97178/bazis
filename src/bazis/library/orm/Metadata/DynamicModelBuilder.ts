@@ -118,7 +118,7 @@ const LOGICAL_TO_STORAGE: Record<ScalarLogicalFieldType, StorageColumnType> = {
   string: "text",
   int: "integer",
   bigint: "integer",
-  decimal: "real",
+  decimal: "decimal",
   bool: "boolean",
   datetime: "datetime",
   uuid: "text",

@@ -58,6 +58,8 @@ function snapshot<TContext extends DbContext>(context: ContextClass<TContext>, e
   const expected = compileExpectedSchema(new OrmModel(entities));
   if (expected.tables.length === 0 || expected.tables.length > 512) fail("ORM_OWNED_STORE_IDENTITY_MISMATCH", `${storeName(definition)} needs 1 to 512 entities, got ${expected.tables.length}`);
   for (const table of expected.tables) {
+    const decimal = table.columns.find((column) => column.physicalType.startsWith("decimal"));
+    if (decimal) fail("ORM_OWNED_STORE_IDENTITY_MISMATCH", `${storeName(definition)}: column "${decimal.column}" of "${table.table}" is decimal; owned stores do not support decimal columns`);
     const partial = table.indexes.find((index) => index.predicate !== undefined);
     if (partial) fail("ORM_OWNED_STORE_IDENTITY_MISMATCH", `${storeName(definition)}: index "${partial.name}" on "${table.table}" has a where condition; owned stores do not support partial indexes`);
   }

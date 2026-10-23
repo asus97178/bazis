@@ -34,6 +34,13 @@ export interface ColumnOptions {
   readonly nullable?: boolean;
   /** Closed physical PostgreSQL default. It is not an application initializer or SQL fragment. */
   readonly default?: ColumnDefaultValue;
+  /**
+   * `type: "decimal"` only: the exact `numeric(precision, scale)` column. The
+   * value is a string (`"19.90"`); a value with more digits than declared is
+   * refused instead of being rounded by the database.
+   */
+  readonly precision?: number;
+  readonly scale?: number;
 }
 export type ColumnDefaultValue = null | boolean | number | string;
 
@@ -95,6 +102,8 @@ export interface RawProperty {
   required?: boolean;
   nullable?: boolean;
   default?: ColumnDefaultValue;
+  precision?: number;
+  scale?: number;
   index?: { unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst };
   /** `@ForeignKey(() => Principal)` on a scalar column, for the DDL FK. */
   fkTarget?: () => EntityClass;
@@ -286,6 +295,8 @@ export function Column(options: ColumnOptions = {}) {
     prop.columnName = options.name;
     prop.type = options.type;
     prop.default = options.default;
+    prop.precision = options.precision;
+    prop.scale = options.scale;
     if (options.nullable !== undefined) {
       prop.nullable = options.nullable;
     }

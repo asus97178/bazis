@@ -542,3 +542,20 @@ stores refuse partial indexes. Checks:
 [orm.partial-index.test.ts](test/orm.partial-index.test.ts),
 [orm.partial-index.postgres.live.test.ts](test/orm.partial-index.postgres.live.test.ts),
 [orm.check-restart.postgres.live.test.ts](test/orm.check-restart.postgres.live.test.ts).
+
+## 17. Exact decimal (2026-10-23)
+
+`StorageColumnType` has `decimal`: `@Column({ type: "decimal", precision,
+scale })` renders `numeric(p, s)` (plain `numeric` without precision). The
+value is a string; `Providers/decimalValue.ts` accepts a decimal string, a
+bigint or a safe integer (`decimalParameter`, used by the dialect and by
+immediate mutations) and refuses a float. Writes (`CommandBuilder`,
+immediate `executeUpdate`/`insertIfAbsent`) call `assertDecimalFits`: more
+fraction digits than `scale`, or more whole digits than `precision - scale`,
+is an `OrmError` instead of PostgreSQL's silent rounding; conditions are not
+limited. The expected and catalog type labels are `decimal(p,s)` / `decimal`
+(`canonicalPostgresType` reads `numeric(p,s)`; numeric is no longer read as
+`real`). Keys cannot be decimal (so foreign keys never are); owned stores
+refuse decimal columns; the dynamic logical `decimal` maps to `decimal`.
+Checks: [orm.decimal.test.ts](test/orm.decimal.test.ts),
+[orm.decimal.postgres.live.test.ts](test/orm.decimal.postgres.live.test.ts).

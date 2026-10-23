@@ -91,7 +91,7 @@ export interface SqlDialect {
   /** PostgreSQL parameter placeholder by index (0-based): `$1`, `$2`, …. */
   parameter(index: number): string;
   /** Column type in DDL. */
-  columnType(type: ColumnType): string;
+  columnType(type: ColumnType, property?: PropertyModel): string;
   /** Whether `INSERT ... RETURNING` is supported. */
   readonly supportsReturning: boolean;
   /** Encodes a property value into a query parameter for this DBMS. */

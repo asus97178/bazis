@@ -1,6 +1,7 @@
 import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import type { SqlDialect, SqlParam } from "../Providers/types";
 import { encodeProperty } from "../Providers/propertyConversion";
+import { assertDecimalFits } from "../Providers/decimalValue";
 import { EntityState } from "../Tracking/EntityState";
 import type { TrackedEntry } from "../Tracking/ChangeTracker";
 
@@ -56,7 +57,7 @@ export class CommandBuilder {
     const tuples = entities.map((entity) => {
       const placeholders = columns.map((property) => {
         const placeholder = this.dialect.parameter(params.length);
-        params.push(encodeProperty(property, entity[property.propertyName], this.dialect));
+        params.push(this.written(model, property, entity[property.propertyName]));
         return placeholder;
       });
       return `(${placeholders.join(", ")})`;
@@ -99,7 +100,7 @@ export class CommandBuilder {
     const params: SqlParam[] = [];
     const assignments = columns.map((property) => {
       const placeholder = this.dialect.parameter(params.length);
-      params.push(encodeProperty(property, entity[property.propertyName], this.dialect));
+      params.push(this.written(model, property, entity[property.propertyName]));
       return `${this.dialect.quoteId(property.columnName)} = ${placeholder}`;
     });
     const where = this.keyPredicate(model, entity, params);
@@ -107,6 +108,12 @@ export class CommandBuilder {
       ", ",
     )} WHERE ${where}`;
     return { sql, params };
+  }
+
+  /** A written value; a decimal that would lose digits is refused before SQL. */
+  private written(model: EntityModel, property: PropertyModel, value: unknown): SqlParam {
+    if (!property.converter) assertDecimalFits(model.name, property, value);
+    return encodeProperty(property, value, this.dialect);
   }
 
   private delete(entity: Record<string, unknown>, model: EntityModel): DbCommand {

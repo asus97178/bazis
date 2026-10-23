@@ -9,6 +9,7 @@ import type {
   CheckModel,
   KeyGeneration,
   PropertyModel,
+  StorageColumnType,
   RelationModel,
 } from "./types";
 import type { CanonicalDefault } from "../Schema/introspection";
@@ -261,6 +262,7 @@ export class ModelBuilder {
       raw.nullable === false ||
       resolved.impliedRequired === true;
     const databaseDefault = ModelBuilder.defaultFor(entityName, raw, storageType, isKey, generated, convention, required);
+    const digits = ModelBuilder.decimalDigits(entityName, raw, storageType);
     return {
       propertyName: raw.propertyName,
       columnName: raw.columnName ?? raw.propertyName,
@@ -272,7 +274,22 @@ export class ModelBuilder {
       convention,
       uuidVersion: raw.uuidVersion,
       databaseDefault,
+      ...digits,
     };
+  }
+
+  /** `precision`/`scale` belong to `decimal`: 1–1000 digits, scale 0–precision, scale needs precision. */
+  private static decimalDigits(entityName: string, raw: RawProperty, type: StorageColumnType): { precision?: number; scale?: number } {
+    if (type === "decimal" && raw.isKey === true) throw new ModelBuildError(`Entity "${entityName}": key "${raw.propertyName}" cannot be decimal; use an integer, text or UUID key.`);
+    const { precision, scale } = raw;
+    if (precision === undefined && scale === undefined) return {};
+    const where = `Entity "${entityName}": property "${raw.propertyName}"`;
+    if (type !== "decimal") throw new ModelBuildError(`${where}: precision and scale need @Column({ type: "decimal" }).`);
+    if (precision === undefined) throw new ModelBuildError(`${where}: scale needs precision, for example { precision: 12, scale: 2 }.`);
+    if (!Number.isSafeInteger(precision) || precision < 1 || precision > 1000) throw new ModelBuildError(`${where}: precision must be an integer from 1 to 1000.`);
+    const digitsAfter = scale ?? 0;
+    if (!Number.isSafeInteger(digitsAfter) || digitsAfter < 0 || digitsAfter > precision) throw new ModelBuildError(`${where}: scale must be an integer from 0 to precision (${precision}).`);
+    return { precision, scale: digitsAfter };
   }
 
   private static primaryKeyFor(

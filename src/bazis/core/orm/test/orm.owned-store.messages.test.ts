@@ -65,6 +65,12 @@ describe("owned-store graph errors name stores and tables", () => {
     class NoteFlag { @Key() id = 0; @Column({ type: "boolean" }) done = false; }
     expect(failure(app({ context: NotesDb, entities: [NoteFlag], ownedStore: store("acme.notes", "notes_"), registerRepositories: false })).message).toBe('ORM_OWNED_STORE_IDENTITY_MISMATCH: Owned store "acme.notes" (schema "public", prefix "notes_"): index "ix_notes_flags_id" on "notes_flags" has a where condition; owned stores do not support partial indexes.');
   });
+  test("a decimal column in a store table", () => {
+    // 0.117.0: decimal is for ordinary contexts; owned stores refuse it.
+    @Entity({ table: "notes_prices" })
+    class NotePrice { @Key() id = 0; @Column({ type: "decimal", precision: 12, scale: 2 }) amount = "0"; }
+    expect(failure(app({ context: NotesDb, entities: [NotePrice], ownedStore: store("acme.notes", "notes_"), registerRepositories: false })).message).toBe('ORM_OWNED_STORE_IDENTITY_MISMATCH: Owned store "acme.notes" (schema "public", prefix "notes_"): column "amount" of "notes_prices" is decimal; owned stores do not support decimal columns.');
+  });
   test("a store key declared twice", () => {
     expect(failure(app(
       { context: NotesDb, entities: [NoteItem], ownedStore: store("acme.notes", "notes_"), registerRepositories: false },

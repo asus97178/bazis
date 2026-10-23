@@ -3,6 +3,7 @@ import type { ForeignKeyConstraint, RowLockMode, SqlDialect, SqlParam } from "./
 import { projectCheckAstIdentifiers, renderCheck } from "../Schema/CheckExpression";
 import { resolvedForeignKey } from "./resolvedForeignKey";
 import { physicalTableIdentity } from "../Schema/tableKey";
+import { decimalParameter } from "./decimalValue";
 
 const jsonScalarParameters = new WeakSet<object>();
 
@@ -55,6 +56,8 @@ export class PostgresDialect implements SqlDialect {
       case "integer":
       case "real":
         return typeof value === "bigint" ? value : Number(value);
+      case "decimal":
+        return decimalParameter(value);
       case "text":
         return typeof value === "string" ? value : String(value);
     }
@@ -78,6 +81,9 @@ export class PostgresDialect implements SqlDialect {
         return typeof value === "bigint" ? value : Number(value);
       case "real":
         return Number(value);
+      case "decimal":
+        // Exact: PostgreSQL numeric stays a string, never a float.
+        return typeof value === "string" ? value : String(value);
       case "text":
         return typeof value === "string" ? value : String(value);
     }
@@ -106,12 +112,14 @@ export class PostgresDialect implements SqlDialect {
     return `$${index + 1}`;
   }
 
-  columnType(type: ColumnType): string {
+  columnType(type: ColumnType, property?: PropertyModel): string {
     switch (type) {
       case "integer":
         return "bigint";
       case "real":
         return "double precision";
+      case "decimal":
+        return property?.precision === undefined ? "numeric" : `numeric(${property.precision}, ${property.scale ?? 0})`;
       case "boolean":
         return "boolean";
       case "datetime":
@@ -137,7 +145,7 @@ export class PostgresDialect implements SqlDialect {
         return `${this.quoteId(property.columnName)} uuid NOT NULL PRIMARY KEY`;
       }
       const foreignKey = foreignKeys.find((candidate) => (candidate.columns ?? [candidate.column]).includes(property.columnName));
-      const parts = [this.quoteId(property.columnName), this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property))];
+      const parts = [this.quoteId(property.columnName), this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property), property)];
       if (property.required) {
         parts.push("NOT NULL");
       }
@@ -175,7 +183,7 @@ export class PostgresDialect implements SqlDialect {
     const parts = [
       `ALTER TABLE ${this.qualifyTable(model)} ADD COLUMN IF NOT EXISTS`,
       this.quoteId(property.columnName),
-      this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property)),
+      this.ddlColumnType(this.foreignKeyColumnType(foreignKey, property), property),
     ];
     if (property.required) {
       // An invented FK value (0/empty UUID) cannot safely backfill existing rows.
@@ -197,6 +205,7 @@ export class PostgresDialect implements SqlDialect {
     switch (type) {
       case "integer":
       case "real":
+      case "decimal":
         return "0";
       case "boolean":
         return "false";
@@ -209,8 +218,8 @@ export class PostgresDialect implements SqlDialect {
     }
   }
 
-  private ddlColumnType(type: ColumnType | "uuid"): string {
-    return type === "uuid" ? "uuid" : this.columnType(type);
+  private ddlColumnType(type: ColumnType | "uuid", property?: PropertyModel): string {
+    return type === "uuid" ? "uuid" : this.columnType(type, property);
   }
 
   private foreignKeyColumnType(fk: ForeignKeyConstraint | undefined, property: PropertyModel): ColumnType | "uuid" {
@@ -233,3 +242,4 @@ export function renderPostgresSkipLocked(dialect: SqlDialect): string {
   }
   return " SKIP LOCKED";
 }
+

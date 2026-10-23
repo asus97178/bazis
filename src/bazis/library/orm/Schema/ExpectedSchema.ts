@@ -1,4 +1,4 @@
-import type { EntityModel } from "../Metadata/types";
+import type { EntityModel, PropertyModel } from "../Metadata/types";
 import type { OrmModel } from "../Metadata/OrmModel";
 import type { CanonicalDefault, GenerationStrategy } from "./introspection";
 import { projectCheckAstIdentifiers, type CheckAst } from "./CheckExpression";
@@ -31,7 +31,7 @@ function compileTable(model: EntityModel, byCtor: ReadonlyMap<EntityModel["ctor"
   const columns = model.properties.map((property) => ({
     property: property.propertyName,
     column: property.columnName,
-    physicalType: types.get(property)!,
+    physicalType: property.type === "decimal" ? decimalPhysicalType(property) : types.get(property)!,
     nullable: !property.required,
     default: property.databaseDefault,
     generation: property.generation === "identity" ? "identityByDefault" as const : property.generation === "uuid" ? "uuidDefault" as const : "none" as const,
@@ -42,4 +42,9 @@ function compileTable(model: EntityModel, byCtor: ReadonlyMap<EntityModel["ctor"
     return { name: foreignKey.name ?? `fk_${table}_${foreignKey.properties.join("_")}`, columns: foreignKey.properties.map((name) => model.propertyByName(name)!.columnName), target: { schema: schemaOf(target), table: physicalTableIdentity(target).table }, targetColumns: target.key.map((property) => property.columnName), onDelete: foreignKey.onDelete, onUpdate: foreignKey.onUpdate };
   });
   return Object.freeze({ schema, table, columns: Object.freeze(columns), primaryKey: Object.freeze({ name: model.keyName ?? `pk_${table}`, columns: Object.freeze(model.key.map((property) => property.columnName)) }), indexes: Object.freeze(model.indexes.map((index) => Object.freeze({ name: index.name, columns: Object.freeze([...index.columns]), unique: index.unique, method: "btree" as const, ...(index.where === undefined ? {} : { predicate: projectCheckAstIdentifiers(index.where, (name) => model.propertyByName(name)!.columnName) }) }))), foreignKeys: Object.freeze(foreignKeys), checks: Object.freeze(model.checks.map((check) => Object.freeze({ name: check.name, expression: projectCheckAstIdentifiers(check.expression, (name) => model.propertyByName(name)!.columnName) }))) });
+}
+
+/** `decimal(12,2)` for numeric(12, 2), `decimal` for an unbounded numeric: the catalog reports the same label. */
+export function decimalPhysicalType(property: Pick<PropertyModel, "precision" | "scale">): string {
+  return property.precision === undefined ? "decimal" : `decimal(${property.precision},${property.scale ?? 0})`;
 }
