@@ -1,9 +1,9 @@
 import { DatabaseFacade } from "./DatabaseFacade";
 import type { DbContextOptions } from "./DbContextOptions";
-import { EntityNotMappedError } from "./errors";
+import { EntityNotMappedError, OrmError } from "./errors";
 import { DbSet } from "./Query/DbSet";
 import type { DbContextRuntime } from "./runtime";
-import { SaveExecutor } from "./Saving/SaveExecutor";
+import { hasPendingRollback, SaveExecutor } from "./Saving/SaveExecutor";
 import { ChangeTracker } from "./Tracking/ChangeTracker";
 import { EntityState } from "./Tracking/EntityState";
 import { monitorImmediateOperation, monitorWholeOperation, observedProvider, transactionScope } from "./Transactions/TransactionScopeCoordinator";
@@ -86,6 +86,20 @@ export abstract class DbContext {
 
   stateOf(entity: object): EntityState {
     return this.changeTracker.stateOf(entity);
+  }
+
+  /**
+   * Stops tracking `entity`: its changes are no longer saved and the next
+   * read returns a fresh object (`Entry(e).State = Detached` in EF Core). Use
+   * it to drop the changes a rolled-back scope left in the context; an entity
+   * saved in a scope that is still open cannot be detached, because that
+   * scope's rollback would restore it.
+   */
+  detach(entity: object): void {
+    if (hasPendingRollback(this.changeTracker, entity)) {
+      throw new OrmError(`${entity.constructor.name} was saved in a transaction scope that is still open; detach it after the scope ends.`);
+    }
+    this.changeTracker.detach(entity);
   }
 
   /**

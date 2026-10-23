@@ -4,6 +4,32 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.116.0 — 2026-10-23
+
+### Changed (breaking)
+
+- Codegen refuses a route parameter whose type does not match the route
+  constraint: `@Get(":id(int)") byId(id: string)` stops with
+  `BAZIS_HTTP_BINDING_UNRESOLVED: … route parameter "id" is constrained to
+  (int), so it arrives as a number; declare it as number`. Before, the router
+  passed the number `7` to a parameter typed `string`. `(int)` and `(number)`
+  need `number`, `(bool)` needs `boolean`, `(uuid)` and `(alpha)` need
+  `string`; the same holds for `FromRoute<…>`.
+
+### Added
+
+- `DbContext.detach(entity)` stops tracking one entity, like
+  `Entry(e).State = Detached` in EF Core. After a rolled-back
+  `transactionScope` the context keeps the entity's changes so the work can be
+  retried; `detach` drops them without touching the row. An entity saved in a
+  scope that is still open cannot be detached (`OrmError`), because that
+  scope's rollback would restore it.
+
+### Fixed
+
+- `HEAD` on a `GET` route answers with the `content-length` of the `GET`
+  response instead of `0` for string, JSON and byte bodies.
+
 ## 0.115.1 — 2026-10-23
 
 ### Fixed

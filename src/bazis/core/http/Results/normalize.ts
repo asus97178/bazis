@@ -88,6 +88,12 @@ export function normalizeResult(result: unknown, ctx: HttpContext, defaults: Res
   if (status === 204 || status === 304) {
     payload = null;
   }
+  // A known length survives HEAD: the server answers it with the headers of
+  // this response and no body, and Bun would otherwise send content-length: 0.
+  const length = typeof payload === "string" ? Buffer.byteLength(payload) : payload instanceof Uint8Array || payload instanceof ArrayBuffer ? payload.byteLength : undefined;
+  if (length !== undefined && !headers.has("content-length")) {
+    headers.set("content-length", String(length));
+  }
 
   return new Response(payload, { status, headers });
 }
