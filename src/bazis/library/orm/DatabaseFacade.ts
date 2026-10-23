@@ -5,7 +5,7 @@ import { Migrator, type MigrationResult } from "./Schema/Migrator";
 import { MigrationRunner, type Migration, type VersionedMigrationResult } from "./Schema/MigrationRunner";
 import { SchemaDiffer } from "./Schema/SchemaDiffer";
 import { SchemaAdmissionEngine, type EnsureCreatedResult } from "./Schema/SchemaAdmission";
-import { entityStorageKey } from "./Schema/tableKey";
+import { entityStorageKey, foreignKeyName } from "./Schema/tableKey";
 
 /** Result of `ensureCreated` together with versioned migrations. */
 export interface EnsureCreatedWithMigrationsResult extends EnsureCreatedResult {
@@ -166,7 +166,7 @@ export class DatabaseFacade {
       const constraint: ForeignKeyConstraint = {
         column: columns[0]!.columnName,
         columns: columns.map((column) => column!.columnName),
-        name: fk.name,
+        name: foreignKeyName(model, fk),
         referencedTable: this.referencedTableName(target),
         referencedColumn: target.key[0].columnName,
         referencedColumns: target.key.map((property) => property.columnName),

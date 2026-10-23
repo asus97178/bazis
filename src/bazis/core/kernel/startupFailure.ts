@@ -5,6 +5,8 @@ import { ShutdownTimeoutError, StartupFailuresError, StartupTimeoutError } from 
 const MAX_CAUSES = 5;
 /** Properties already printed in the header, the frames or the cause chain. */
 const SHOWN = new Set(["name", "message", "stack", "cause", "code", "errno", "errors", "failures"]);
+/** Where in PostgreSQL's own sources the error was raised: nothing to act on. Hint, detail and the object names stay. */
+const POSTGRES_INTERNALS = new Set(["file", "line", "routine", "severity", "severity_local"]);
 const INSPECT = { depth: null, colors: false, customInspect: false, getters: false, maxArrayLength: null, maxStringLength: null } as const;
 
 /**
@@ -34,7 +36,8 @@ export function formatStartupFailure(error: unknown): string {
     if (!(current instanceof StartupFailuresError)) lines.push(...(current.stack ?? "").split("\n").filter((line) => /^\s+at /.test(line)));
     // Timeouts already say their limit and what was pending in the message.
     const restated = current instanceof StartupTimeoutError || current instanceof ShutdownTimeoutError;
-    const details = restated ? {} : Object.fromEntries(Object.entries(current).filter(([name]) => !SHOWN.has(name)));
+    const internals = current.name === "PostgresError" ? POSTGRES_INTERNALS : undefined;
+    const details = restated ? {} : Object.fromEntries(Object.entries(current).filter(([name]) => !SHOWN.has(name) && !internals?.has(name)));
     if (Object.keys(details).length > 0) lines.push(inspect(redactSensitive(details), INSPECT));
     current = current.cause;
   }

@@ -31,7 +31,9 @@ export function holdResponseScope(
     if (signal.aborted && !body.locked) void body.cancel(signal.reason).catch(() => undefined);
     void Promise.resolve().then(dispose).then(complete, reject);
   };
-  cleanup = finished(body, { signal }, finish);
+  // Types only: with the DOM lib (TypeScript's default) Response.body is the
+  // DOM ReadableStream, which node:stream's typings do not list.
+  cleanup = finished(body as unknown as Parameters<typeof finished>[0], { signal }, finish);
 
   // Qualified Bun 1.4 consumes native Blob/file bodies directly: bodyUsed is
   // true, but no JS reader is acquired and its stream never emits finished.
