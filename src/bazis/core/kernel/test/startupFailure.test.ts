@@ -44,3 +44,14 @@ test("services that failed together are listed once, without kernel frames or an
     '  - Error: Infra connector "redis": failed to connect within 5000 ms.',
   ].join("\n"));
 });
+
+// 0.117.1: a PostgresError printed where in PostgreSQL's sources it was
+// raised (file, line, routine, severity); the hint and detail are what help.
+test("a PostgresError keeps hint and detail but not PostgreSQL's source location", () => {
+  const error = Object.assign(new Error('relation "nope" does not exist'), { name: "PostgresError", code: "ERR_POSTGRES_SERVER_ERROR", errno: "42P01", severity: "ERROR", file: "parse_relation.c", line: "1449", routine: "parserOpenTable", hint: "Check the table name.", detail: "In schema public." });
+  const text = formatStartupFailure(error);
+  expect(text).toContain('PostgresError [ERR_POSTGRES_SERVER_ERROR, 42P01]: relation "nope" does not exist');
+  expect(text).toContain("Check the table name.");
+  expect(text).toContain("In schema public.");
+  for (const noise of ["parse_relation.c", "1449", "parserOpenTable", "severity"]) expect(text).not.toContain(noise);
+});

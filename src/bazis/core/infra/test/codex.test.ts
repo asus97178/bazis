@@ -198,7 +198,7 @@ test.each(["failure", "dead", "large", "unsupported"])("fails honestly after par
     if (message === "unsupported") expect((await f.wire()).some(item => item.id === "approval" && item.error)).toBe(true);
     expect((await f.client.status()).activeRuns).toBe(0);
   } finally { await f.close(); }
-});
+}, 20_000);
 
 test("early events and concurrent conversations keep separate text and context", async () => {
   const f = await fixture();

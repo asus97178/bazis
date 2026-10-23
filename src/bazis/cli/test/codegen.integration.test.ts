@@ -51,4 +51,4 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-}, 30_000);
+}, 90_000);

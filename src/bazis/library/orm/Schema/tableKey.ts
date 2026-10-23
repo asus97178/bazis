@@ -24,3 +24,13 @@ export function entityStorageKey(model: EntityModel): string {
 export function introspectedTableKey(schema: string, table: string): string {
   return schema === "public" ? table : `${schema}.${table}`;
 }
+
+/** `pk_<table>` unless the key is named; ensureCreated and migrate() name the primary key the same way. */
+export function primaryKeyName(model: EntityModel): string {
+  return model.keyName ?? `pk_${physicalTableIdentity(model).table}`;
+}
+
+/** `fk_<table>_<properties>` unless the foreign key is named, for every way a table is created. */
+export function foreignKeyName(model: EntityModel, foreignKey: { readonly name?: string; readonly properties: readonly string[] }): string {
+  return foreignKey.name ?? `fk_${physicalTableIdentity(model).table}_${foreignKey.properties.join("_")}`;
+}

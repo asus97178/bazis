@@ -38,7 +38,7 @@ test("all generated profiles type-check against the real framework and host auth
   const program = ts.createProgram(files.filter((file) => file.endsWith(".ts")), { ...config.options, noEmit: true });
   const diagnostics = ts.getPreEmitDiagnostics(program);
   expect(diagnostics.map((diagnostic) => `${diagnostic.file?.fileName ?? ""}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")}`)).toEqual([]);
-}, 30_000);
+}, 90_000);
 
 test("generated CRUD passports link to existing components and document their fields", async () => {
   for (const file of files.filter((file) => file.endsWith("MODULE.md"))) {

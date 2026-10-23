@@ -53,7 +53,7 @@ describe("UUID v7 primary keys", () => {
   test("DDL declares a native uuid key without gen_random_uuid()", () => {
     const dialect = new PostgresDialect();
     const sql = dialect.createTableSql(ModelBuilder.build(Order), []);
-    expect(sql).toContain(`"id" uuid NOT NULL PRIMARY KEY`);
+    expect(sql).toMatch(/"id" uuid NOT NULL CONSTRAINT "pk_[a-z0-9_]+" PRIMARY KEY/);
     expect(sql).not.toContain("gen_random_uuid");
     expect(dialect.createTableSql(ModelBuilder.build(LegacyOrder), [])).toContain("DEFAULT gen_random_uuid()");
   });

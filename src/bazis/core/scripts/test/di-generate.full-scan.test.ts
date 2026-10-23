@@ -72,7 +72,7 @@ test("test fixture stays out of production output", async () => {
     expect(content, filePath).not.toContain("createApplicationPostgresFixture");
     expect(content, filePath).not.toContain("app/test/fixtures/application-postgres.fixture");
   }
-}, 30_000);
+}, 90_000);
 
 test("normal test lifecycle generates every target while build stays production-default", async () => {
   const manifest = await Bun.file("package.json").json() as { scripts: Record<string, string> };

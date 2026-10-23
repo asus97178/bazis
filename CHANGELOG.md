@@ -4,6 +4,24 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.117.1 — 2026-10-24
+
+### Fixed
+
+- Tables created by `migrate()` (`migrateOnStart`, versioned `CREATE TABLE`)
+  name their keys like `ensureCreated`: `pk_<table>` and
+  `fk_<table>_<properties>` instead of PostgreSQL's `<table>_pkey` and
+  `<table>_<column>_fkey`. Before, such a table could not move to
+  `ensureCreated`: the foreign key name is checked exactly.
+- A `PostgresError` in a startup failure no longer prints where PostgreSQL
+  raised it (`file`, `line`, `routine`, `severity`); `hint`, `detail` and the
+  object names stay.
+- An application type-checked with the DOM lib (TypeScript's default when
+  `lib` is not set) no longer fails on `core/http/HttpContext/responseLifetime.ts`.
+- Tests that timed out on a loaded machine (owned-store catalog boundary and
+  snapshot budget, CLI codegen and templates, full codegen scan, Codex partial
+  text) get room.
+
 ## 0.117.0 — 2026-10-23
 
 ### Added
