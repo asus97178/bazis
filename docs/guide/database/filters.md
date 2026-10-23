@@ -9,7 +9,7 @@
 - `@QueryFilter(...)` — своё условие для всех запросов к сущности.
 - `ignoreQueryFilters()` — снять оба вида условий в одном запросе.
 
-Все примеры проверены на bazis 0.114.0 и PostgreSQL 17.
+Все примеры проверены на bazis 0.115.0 и PostgreSQL 17.
 
 ## Мягкое удаление
 
@@ -170,14 +170,35 @@ SELECT "id", "listId", "title", "deletedAt" FROM "items" WHERE "deletedAt" IS NU
 UniqueViolationError: Unique constraint "ix_users_email" violated.
 ```
 
-Частичных индексов (`… WHERE "deletedAt" IS NULL`) у `@Index` нет. Есть
-три пути:
+Сделайте индекс частичным — условие `where` оставит в нём только
+неудалённые строки:
 
-- восстанавливать удалённую запись вместо новой: найдите её через
-  `ignoreQueryFilters()`;
-- при удалении менять уникальное значение, например дописывать к email
-  `#deleted-<id>`;
-- не делать столбец уникальным в базе и проверять повтор в сервисе.
+```ts
+@Entity({ table: "users" })
+@Index<User>(["email"], { unique: true, where: (u) => u.deletedAt.isNull() })
+export class User {
+  @Key() id = 0;
+  @Required() @Column({ type: "text" }) email = "";
+  @SoftDelete() deletedAt: Date | null = null;
+}
+```
+
+```text
+CREATE UNIQUE INDEX "ix_users_email" ON "public"."users" ("email") WHERE "deletedAt" IS NULL
+```
+
+- Удалённый `ann@x.io` больше не мешает: новый пользователь с тем же
+  адресом сохраняется. Два **неудалённых** с одним адресом — по-прежнему
+  `UniqueViolationError`.
+- В `where` — те же операторы, что в
+  [`@Check`](entities.md#индексы-и-проверки). Сравнивать дату с
+  литералом нельзя — только `isNull()`, `isNotNull()` или другой столбец.
+- `ensureCreated` добавит индекс и к уже существующей таблице, а при
+  каждом запуске сверяет условие с базой. Изменили `where` — запуск
+  остановится (`partial index condition (where) differs`): поменяйте
+  индекс [миграцией](schema.md).
+- Частичные индексы — с версии 0.115.0; в
+  [owned stores](owned-stores.md) их нет.
 
 ## Свой фильтр
 
