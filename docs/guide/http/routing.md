@@ -67,11 +67,17 @@ TasksController.again. Routes that differ only in parameter names are the same r
 | `:n` и `n: string` | `"42"` | `"abc"` |
 | `:n` и `n: number` | `42` | **400** `Validation failed`, в `details` — `{"property":"n","code":"type"}` |
 | `:n(int)` и `n: number` | `42` | **404** — маршрут просто не совпал |
+| `:n(int)` и `n: string` | — | `bazis codegen` останавливается: `route parameter "n" is constrained to (int), so it arrives as a number; declare it as number` |
 
 Разница важна: ограничение в шаблоне (`(int)`, `(uuid)`…) участвует в
 выборе маршрута, а тип параметра — только в преобразовании уже выбранного.
 Если адрес с буквами вместо числа — это «нет такого ресурса», ставьте
 ограничение; если «неверный запрос» — оставьте тип.
+
+Тип параметра должен совпадать с ограничением: `(int)` и `(number)` —
+`number`, `(bool)` — `boolean`, `(uuid)` и `(alpha)` — `string`. Иначе
+кодогенерация остановится (с версии 0.116.0; раньше `id: string` молча
+получал число).
 
 `*path` получает остаток пути целиком: `/tasks/files/a/b.txt` →
 `path = "a/b.txt"`.
