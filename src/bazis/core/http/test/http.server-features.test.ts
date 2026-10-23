@@ -175,6 +175,11 @@ describe("HTTP: automatic HEAD", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(await response.text()).toBe("");
+    // 0.116.0: HEAD carried content-length: 0 instead of the GET length.
+    const get = await fetch(`${app.base}/things/7`);
+    expect(response.headers.get("content-length")).toBe(get.headers.get("content-length"));
+    expect(Number(response.headers.get("content-length"))).toBeGreaterThan(0);
+    await get.text();
   });
 
   test("HEAD on a route without GET -> 405", async () => {

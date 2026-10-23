@@ -1173,6 +1173,32 @@ function routeParamNames(controller: ts.ClassDeclaration, method: ts.MethodDecla
   return names;
 }
 
+/** Route parameters with a constraint, `:id(int)` -> id: int, from the controller and method templates. */
+function routeParamConstraints(controller: ts.ClassDeclaration, method: ts.MethodDeclaration): Map<string, string> {
+  const constraints = new Map<string, string>();
+  for (const decorators of [ts.getDecorators(controller) ?? [], ts.getDecorators(method) ?? []]) {
+    for (const decorator of decorators) {
+      const firstArg = decoratorCall(decorator)?.call?.arguments[0];
+      if (!firstArg || !ts.isStringLiteralLike(firstArg)) continue;
+      for (const segment of firstArg.text.split("/")) {
+        const param = /^:([A-Za-z_][A-Za-z0-9_]*)\(([A-Za-z]+)\)/.exec(segment);
+        if (param) constraints.set(param[1] as string, param[2] as string);
+      }
+    }
+  }
+  return constraints;
+}
+
+/**
+ * The router converts a constrained segment before binding, so the parameter
+ * must be declared with the converted type; otherwise its TypeScript type lies.
+ */
+function constraintMismatch(paramName: string, declared: string | undefined, constraint: string | undefined): string | undefined {
+  const expected = constraint === "int" || constraint === "number" ? "number" : constraint === "bool" ? "boolean" : constraint === "uuid" || constraint === "alpha" ? "string" : undefined;
+  if (expected === undefined || declared === undefined || declared === expected) return undefined;
+  return `route parameter "${paramName}" is constrained to (${constraint}), so it arrives as a ${expected}; declare it as ${expected}`;
+}
+
 /** Reuses the request hydration graph; no reflection metadata/runtime TS imports. */
 function collectGrpcBindings(source: ts.SourceFile): void {
   const visit = (node: ts.Node): void => {
@@ -1455,6 +1481,7 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
   for (const { name, routes, member } of controllerActions(node)) {
     collectOpenApiOperation(controllerName, member);
     const routeParams = routeParamNames(node, routes);
+    const constraints = routeParamConstraints(node, routes);
     const specs: HttpBindingSpec[] = [];
     let bodyCount = 0;
     let failed: string | undefined;
@@ -1471,6 +1498,12 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
       // An explicit source: FromQuery<…>, FromHeader<…>, FromBody<…>, FromRoute<…>.
       const marker = typeNode ? sourceMarker(typeNode) : undefined;
       if (marker !== undefined) {
+        const routeName = marker.kind === "FromRoute" ? marker.name ?? paramName : undefined;
+        const mismatch = routeName === undefined ? undefined : constraintMismatch(routeName, marker.inner?.getText().trim(), constraints.get(routeName));
+        if (mismatch !== undefined) {
+          failed = mismatch;
+          break;
+        }
         const spec = markerBindingSpec(marker, paramName, optional, routeParams);
         if (typeof spec === "string") {
           failed = spec;
@@ -1494,6 +1527,11 @@ function collectControllerBindings(node: ts.ClassDeclaration, controllerName: st
         continue;
       }
       if (routeParams.has(paramName)) {
+        const mismatch = constraintMismatch(paramName, keywordType, constraints.get(paramName));
+        if (mismatch !== undefined) {
+          failed = mismatch;
+          break;
+        }
         // Constraint conversion happens in the router; add type only for plain :params.
         const type = keywordType !== undefined ? PRIMITIVE_QUERY_TYPES[keywordType] : undefined;
         specs.push({ source: "route", name: paramName, type: type === "string" ? undefined : type, optional });

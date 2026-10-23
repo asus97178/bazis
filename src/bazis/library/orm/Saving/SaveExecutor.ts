@@ -36,6 +36,11 @@ interface RollbackToken {
 
 /** Per-tracker, per-entity save baselines. It is deliberately transient and never part of TrackedEntry. */
 const rollbackTokens = new WeakMap<ChangeTracker, WeakMap<object, RollbackToken>>();
+
+/** @internal The entity was saved in a transaction scope that has not ended yet. */
+export function hasPendingRollback(tracker: ChangeTracker, entity: object): boolean {
+  return rollbackTokens.get(tracker)?.get(entity) !== undefined;
+}
 const uncertainTrackers = new WeakSet<ChangeTracker>();
 
 export interface SaveOptions {

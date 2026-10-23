@@ -243,6 +243,14 @@ export class ChangeTracker {
     this.entries.set(entry.entity, entry);
   }
 
+  /** Stops tracking one entity: it becomes Detached and leaves the identity map. */
+  detach(entity: object): void {
+    const entry = this.entries.get(entity);
+    if (!entry) return;
+    this.unindexByKey(entry);
+    this.entries.delete(entity);
+  }
+
   clear(): void {
     this.entries.clear();
     this.identity.clear();
