@@ -9,10 +9,12 @@ export function canonicalPostgresColumn(type: string, defaultExpression: string 
   return { physicalType, default: defaultValue.value, generation, unsupported: physicalType === "unknown" || defaultValue.unsupported || (identity !== "" && identity !== "d") };
 }
 
-export function canonicalPostgresType(type: string): "integer" | "real" | "text" | "boolean" | "datetime" | "json" | "uuid" | "unknown" {
+export function canonicalPostgresType(type: string): "integer" | "real" | "text" | "boolean" | "datetime" | "json" | "uuid" | "decimal" | `decimal(${number},${number})` | "unknown" {
+  const numeric = type.trim().toLowerCase().match(/^numeric(?:\((\d+),\s*(\d+)\))?$/u);
+  if (numeric) return numeric[1] === undefined ? "decimal" : `decimal(${Number(numeric[1])},${Number(numeric[2])})`;
   switch (type.trim().toLowerCase()) {
     case "smallint": case "integer": case "bigint": return "integer";
-    case "real": case "double precision": case "numeric": return "real";
+    case "real": case "double precision": return "real";
     case "text": case "character varying": case "character": return "text";
     case "boolean": return "boolean";
     case "timestamp with time zone": return "datetime";
@@ -25,6 +27,8 @@ export function canonicalPostgresType(type: string): "integer" | "real" | "text"
 /** Exact admission accepts only the physical spellings rendered by PostgresDialect. */
 export function exactPostgresType(type: string, canonical: IntrospectedColumn["physicalType"]): IntrospectedColumn["physicalType"] {
   const raw = type.trim().toLowerCase();
+  // numeric and numeric(p,s) are the spellings PostgresDialect renders for decimal.
+  if (/^numeric(?:\(\d+,\s*\d+\))?$/u.test(raw)) return canonical;
   switch (raw) {
     case "bigint": case "double precision": case "text": case "boolean": case "timestamp with time zone": case "jsonb": case "uuid": return canonical;
     default: return `${canonical ?? "unknown"}:${raw}`;

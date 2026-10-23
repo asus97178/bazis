@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.117.0 — 2026-10-23
+
+### Added
+
+- An exact decimal column for money and other exact numbers:
+  `@Column({ type: "decimal", precision: 12, scale: 2 })` creates
+  `numeric(12, 2)` (`numeric` without `precision`). The value is a string
+  (`"19.90"`); a bigint or a safe integer is accepted too, a float such as
+  `0.1` is refused. A value with more digits than the column keeps is refused
+  before the write (`Price.amount: "1.005" has 3 digits after the point;
+  numeric(12, 2) keeps 2`) instead of being rounded by PostgreSQL. A key
+  cannot be decimal; owned stores refuse decimal columns.
+
+### Changed (breaking)
+
+- The dynamic-model field type `decimal` is an exact `numeric` holding a
+  string, not `double precision` holding a number. An existing dynamic table
+  with such a column stops `ensureCreated` with `column type differs`;
+  convert it once: `ALTER TABLE … ALTER COLUMN … TYPE numeric USING …::numeric`.
+- Schema checks read a PostgreSQL `numeric` column as `decimal`, no longer as
+  `real`: a `real` property over a `numeric` column is now a type difference.
+
 ## 0.116.0 — 2026-10-23
 
 ### Changed (breaking)

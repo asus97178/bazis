@@ -94,7 +94,11 @@ function literal(value: ExpectedColumn["default"], physicalType: string): string
   }
   switch (value.kind) { case "null": return "NULL"; case "boolean": return value.value ? "TRUE" : "FALSE"; case "number": return String(value.value); case "string": return `'${value.value.replaceAll("'", "''")}'`; case "uuidV4": return "gen_random_uuid()"; default: throw new Error("Unrenderable PostgreSQL schema default."); }
 }
-function type(value: string): string { return value === "integer" ? "bigint" : value === "real" ? "double precision" : value === "datetime" ? "timestamptz" : value === "json" ? "jsonb" : value; }
+function type(value: string): string {
+  const decimal = value.match(/^decimal(?:\((\d+),(\d+)\))?$/u);
+  if (decimal) return decimal[1] === undefined ? "numeric" : `numeric(${decimal[1]}, ${decimal[2]})`;
+  return value === "integer" ? "bigint" : value === "real" ? "double precision" : value === "datetime" ? "timestamptz" : value === "json" ? "jsonb" : value;
+}
 function q(value: string): string { return `"${value.replaceAll('"', '""')}"`; }
 function tableName(table: Pick<ExpectedTable, "schema" | "table">): string { return `${q(table.schema)}.${q(table.table)}`; }
 function action(value: string): string { return value === "noAction" ? "NO ACTION" : value === "setNull" ? "SET NULL" : value.toUpperCase(); }

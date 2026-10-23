@@ -7,7 +7,7 @@ import type { CanonicalDefault } from "../Schema/introspection";
  * Physical column type in the database (DDL, encode/decode). The provider
  * dialect maps it to the types of a concrete DBMS (`SqlDialect.columnType`).
  */
-export type StorageColumnType = "integer" | "real" | "text" | "boolean" | "datetime" | "json";
+export type StorageColumnType = "integer" | "real" | "decimal" | "text" | "boolean" | "datetime" | "json";
 
 /**
  * Semantic `@Column({ type })` types with automatic behavior on `SaveChanges`.
@@ -63,6 +63,9 @@ export interface PropertyModel {
   readonly convention?: PropertyConvention;
   /** UUID version for `@UUID` (default v4). */
   readonly uuidVersion?: "v4" | "v7";
+  /** `decimal`: total digits and digits after the point (`numeric(precision, scale)`); absent for plain `numeric`. */
+  readonly precision?: number;
+  readonly scale?: number;
   /** Closed physical database default; it never affects entity initialization. */
   readonly databaseDefault: CanonicalDefault;
 }

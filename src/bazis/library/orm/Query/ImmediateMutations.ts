@@ -2,6 +2,7 @@ import { types } from "node:util";
 import { OrmError, OrmTrackedMutationConflictError, OrmUndeclaredConflictTargetError, OrmUnsafeImmediateMutationError } from "../errors";
 import { isDatabaseGenerated, type EntityModel, type PropertyModel } from "../Metadata/types";
 import { convertsValue } from "../Providers/propertyConversion";
+import { assertDecimalFits, decimalText } from "../Providers/decimalValue";
 import type { DbContextRuntime } from "../runtime";
 import { hasTrackedEntriesForModel } from "../Tracking/ChangeTracker";
 import { isPostgresJsonScalarParameter } from "../Providers/PostgresDialect";
@@ -19,7 +20,7 @@ export type OrmUniqueKeySelectorV1<T extends object> = (entity: FieldSelector<T>
 export function executeImmediateUpdate<T extends object>(model: EntityModel, runtime: DbContextRuntime, plan: QueryPlan, values: OrmUpdateValuesV1<T>): Promise<OrmMutationResultV1> {
   return runtime.runImmediateOperation(async () => {
     guard(model, runtime); const admittedPlan = admitPlan(plan, "executeUpdate");
-    const conditions = effectiveConditions(model, admittedPlan, runtime); const assignments = encodeAssignments(runtime, admitUpdateValues(model, values));
+    const conditions = effectiveConditions(model, admittedPlan, runtime); const assignments = encodeAssignments(runtime, model, admitUpdateValues(model, values));
     const compiled = new SqlTranslator(model, runtime.provider.dialect).immediateUpdate(assignments, conditions, (property, value) => encode(runtime, property, snapshot(value), true));
     Object.freeze(compiled.params);
     guard(model, runtime);
@@ -42,7 +43,7 @@ export function executeImmediateDelete(model: EntityModel, runtime: DbContextRun
 export function insertIfAbsent<T extends object>(model: EntityModel, runtime: DbContextRuntime, entity: T, options: { readonly conflictBy: OrmUniqueKeySelectorV1<T> }): Promise<OrmInsertIfAbsentResultV1> {
   return runtime.runImmediateOperation(async () => {
     guard(model, runtime); if (runtime.provider.dialect.name !== "postgres") unsafe();
-    const admitted = admitInsertValues(model, entity); const columns = conflictTarget(model, options); const values = encodeAssignments(runtime, admitted);
+    const admitted = admitInsertValues(model, entity); const columns = conflictTarget(model, options); const values = encodeAssignments(runtime, model, admitted);
     const compiled = new SqlTranslator(model, runtime.provider.dialect).immediateInsert(values, columns);
     Object.freeze(compiled.params);
     guard(model, runtime);
@@ -136,7 +137,8 @@ function admitInsertValues<T extends object>(model: EntityModel, entity: T): rea
   return Object.freeze(out.map((value) => Object.freeze(value)));
 }
 function unsetKey(value: unknown): boolean { return value === undefined || value === null || value === "" || value === 0; }
-function encodeAssignments(runtime: DbContextRuntime, assignments: readonly AdmittedAssignment[]): readonly { readonly property: PropertyModel; readonly value: SqlParam }[] {
+function encodeAssignments(runtime: DbContextRuntime, model: EntityModel, assignments: readonly AdmittedAssignment[]): readonly { readonly property: PropertyModel; readonly value: SqlParam }[] {
+  for (const { property, value } of assignments) if (!property.converter && decimalText(value) !== undefined) assertDecimalFits(model.name, property, value);
   return Object.freeze(assignments.map(({ property, value }) => Object.freeze({ property, value: value === null && !convertsValue(property, null) ? null : encode(runtime, property, value) })));
 }
 function encode(runtime: DbContextRuntime, property: PropertyModel, input: unknown, allowNull = false): SqlParam {
@@ -248,6 +250,7 @@ function storageValue(value: unknown, type: PropertyModel["type"], allowNull = f
   if (type === "boolean" && typeof safe !== "boolean") unsafe();
   if (type === "integer" && !(typeof safe === "bigint" ? safe >= -9223372036854775808n && safe <= 9223372036854775807n : typeof safe === "number" && Number.isSafeInteger(safe))) unsafe();
   if (type === "real" && !(typeof safe === "number" && Number.isFinite(safe))) unsafe();
+  if (type === "decimal" && decimalText(safe) === undefined) unsafe();
   if (type === "datetime" && (typeof safe !== "object" || safe === null || Object.getPrototypeOf(safe) !== capturedDatePrototype)) unsafe();
   if (type === "json" && !jsonValue(safe)) unsafe();
   return safe as SqlParam;

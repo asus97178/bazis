@@ -30,7 +30,8 @@ describe("DynamicModelBuilder", () => {
     expect(model.key[0].generation).toBe("identity");
 
     expect(model.propertyByName("title")?.type).toBe("text");
-    expect(model.propertyByName("price")?.type).toBe("real");
+    // 0.117.0: the logical decimal is an exact numeric, not a double.
+    expect(model.propertyByName("price")?.type).toBe("decimal");
     expect(model.propertyByName("active")?.type).toBe("boolean");
     expect(model.propertyByName("meta")?.type).toBe("json");
     expect(model.propertyByName("title")?.required).toBe(true);
