@@ -47,6 +47,42 @@ export function redactTraceValues<T>(values: readonly T[], options: SensitiveRed
   return values.map(() => replacement);
 }
 
+/** Values shorter than this are not remembered: masking them would hide ordinary words ("postgres"). */
+export const MIN_REMEMBERED_SECRET_LENGTH = 10;
+const rememberedSecrets = new Set<string>();
+let longestFirst: readonly string[] = [];
+
+/**
+ * Remembers a secret value: from now on every redaction removes it wherever it
+ * appears, also in plain text without a marker such as `password=`. `Secret`
+ * calls it for every configuration secret. Process-wide; values shorter than
+ * {@link MIN_REMEMBERED_SECRET_LENGTH} are recognised only by their shape.
+ */
+export function rememberSecretValue(value: string): void {
+  // A connection URL keeps naming its server: only its password is the secret,
+  // and the userinfo pattern already hides user:password@ in the URL itself.
+  const password = urlPassword(value);
+  if (password !== undefined) {
+    if (password !== "") rememberSecretValue(password);
+    return;
+  }
+  if (value.length < MIN_REMEMBERED_SECRET_LENGTH || rememberedSecrets.has(value)) return;
+  rememberedSecrets.add(value);
+  // A longer value first, so a secret that contains another one goes whole.
+  longestFirst = [...rememberedSecrets].sort((left, right) => right.length - left.length);
+}
+
+/** The decoded password of a URL with userinfo (`""` for user only), or undefined for other values. */
+function urlPassword(value: string): string | undefined {
+  if (!/^[a-z][a-z0-9+.-]*:\/\/[^\s/?#@]+@/i.test(value)) return undefined;
+  try {
+    const url = new URL(value);
+    return decodeURIComponent(url.password);
+  } catch {
+    return undefined;
+  }
+}
+
 export function isSensitiveKey(key: string, options: SensitiveRedactionOptions = {}): boolean {
   return keyIsSensitive(key, normalizeOptions(options));
 }
@@ -177,7 +213,9 @@ function normalizeKey(key: string): string {
 }
 
 function redactText(value: string, replacement: string): string {
-  return value
+  let text = value;
+  for (const secret of longestFirst) if (text.includes(secret)) text = text.replaceAll(secret, replacement);
+  return text
     .replace(SECRET_TEXT_PATTERN, (_match, name: string, separator: string) => `${name}${separator}${replacement}`)
     .replace(BEARER_TEXT_PATTERN, (_match, scheme: string) => `${scheme} ${replacement}`)
     .replace(URL_USERINFO_PATTERN, (_match, scheme: string, userinfo: string) =>

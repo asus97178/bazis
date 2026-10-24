@@ -607,7 +607,7 @@ function row(v: unknown): OwnedStoreRegistryRowV1 {
     bad();
   return Object.freeze(out as OwnedStoreRegistryRowV1);
 }
-export function validateOwnedStoreRegistryV1(rows: unknown, defs: readonly OrmOwnedStoreDefinitionV1[]): readonly OwnedStoreRegistryRowV1[] {
+export function validateOwnedStoreRegistryV1(rows: unknown, _defs: readonly OrmOwnedStoreDefinitionV1[]): readonly OwnedStoreRegistryRowV1[] {
   const out = dense(rows, row, 4096);
   const keys = new Set<string>();
   for (const x of out) {
@@ -619,9 +619,9 @@ export function validateOwnedStoreRegistryV1(rows: unknown, defs: readonly OrmOw
     if (keys.has(x.storeKey))
       throw failure("ORM_OWNED_STORE_OWNERSHIP_CONFLICT");
     keys.add(x.storeKey);
-    const d = defs.find(y => y.storeKey === x.storeKey);
-    if (d && (x.formatVersion !== String(d.formatVersion) || x.ownedSchema !== d.ownedScope.schema || x.tablePrefix !== d.ownedScope.tablePrefix))
-      throw failure("ORM_OWNED_STORE_IDENTITY_MISMATCH");
+    // A row that differs from the code (format version, scope) is refused by
+    // admission's assertCurrent, after the row is recorded for the explainer,
+    // so the message can name what changed.
   }
   for (let i = 0; i < out.length; i++)
     for (let j = i + 1; j < out.length; j++) {

@@ -41,7 +41,7 @@ test("registry rejects proxies, sparse/extended arrays, scalar bounds and confli
   expect(() => validateOwnedStoreRegistryV1([row(), row()], [definition])).toThrow("ORM_OWNED_STORE_OWNERSHIP_CONFLICT");
   expect(() => validateOwnedStoreRegistryV1([rowFor("other", "bazis_"), row()], [])).toThrow("ORM_OWNED_STORE_OWNERSHIP_CONFLICT");
   expect(() => validateOwnedStoreRegistryV1([{ ...row(), ownedScopeHash: "sha256:".concat("0".repeat(64)) }], [definition])).toThrow("ORM_OWNED_STORE_DRIFT");
-  expect(() => validateOwnedStoreRegistryV1([rowFor("fixtures", "different_")], [definition])).toThrow("ORM_OWNED_STORE_IDENTITY_MISMATCH");
+  expect(validateOwnedStoreRegistryV1([rowFor("fixtures", "different_")], [definition])).toHaveLength(1);
 });
 
 test("registry validates every row scope hash and Unicode pairs before identity", () => {
@@ -62,7 +62,9 @@ test("registry distinguishes a coherent version tuple from scope-hash drift befo
   const v2 = { ...v1, formatVersion: "2", ownedScopeHash: canonicalOwnedStoreScopeHashV1(version2), modelHash: canonicalOwnedStoreModelHashV1(version2, expected) };
   expect(validateOwnedStoreRegistryV1([v1], [definition])).toHaveLength(1);
   expect(() => validateOwnedStoreRegistryV1([{ ...v1, formatVersion: "2" }], [definition])).toThrow("ORM_OWNED_STORE_DRIFT");
-  expect(() => validateOwnedStoreRegistryV1([v2], [definition])).toThrow("ORM_OWNED_STORE_IDENTITY_MISMATCH");
+  // 0.118.0: a coherent row of another version parses; admission refuses it
+  // after recording it, so the message names both versions.
+  expect(validateOwnedStoreRegistryV1([v2], [definition])).toHaveLength(1);
 });
 
 test("four catalog root DTO parsers copy complete closed records", () => {
