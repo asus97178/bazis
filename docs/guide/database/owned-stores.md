@@ -118,8 +118,10 @@ declare a new storeKey with a tablePrefix that does not overlap the old one, mov
 and their row in __bazis_orm_owned_stores_v1 (rejectIfPresent can guard against leftovers).
 ```
 
-Другая `formatVersion` при той же модели даёт то же решение, но
-начало причины другое: `the registered identity does not match the code`.
+Другая `formatVersion` при той же модели даёт то же решение, а причина
+называет обе версии: `… is registered with format version 1, the code
+declares 2.` (до версии 0.118.0 — общее `the registered identity does not
+match the code`).
 
 Миграций для хранилищ нет. Новая версия — **новое хранилище**.
 
