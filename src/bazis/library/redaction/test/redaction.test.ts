@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { redactSensitive, redactSensitiveText } from "@/library/redaction";
+import { redactSensitive, redactSensitiveText, rememberSecretValue } from "@/library/redaction";
 
 describe("sensitive redaction", () => {
   test("redacts common secret keys recursively without mutating the source", () => {
@@ -65,5 +65,33 @@ describe("sensitive redaction", () => {
       { expected: { kind: "absent" }, actual: { kind: "absent" } },
     ]);
     expect((redactSensitive(error) as unknown as { differences: unknown }).differences).toEqual(redactSensitive(shared));
+  });
+});
+
+// 0.118.0: redaction knew secrets only by shape (key names, password=, Bearer,
+// URL userinfo). A revealed secret pasted into plain text reached the logs.
+describe("known secret values", () => {
+  test("a remembered value is removed wherever it appears", () => {
+    rememberSecretValue("sk-live-4f9a7c2e1b8d");
+    expect(redactSensitiveText("calling the API with sk-live-4f9a7c2e1b8d failed")).toBe("calling the API with *** failed");
+    expect(redactSensitive({ note: "key=sk-live-4f9a7c2e1b8d;" })).toEqual({ note: "key=***;" });
+    expect(redactSensitiveText("sk-live-4f9a7c2e1b8d", { replacement: "[hidden]" })).toBe("[hidden]");
+  });
+  test("a value shorter than 10 characters is not remembered: it would mask ordinary words", () => {
+    rememberSecretValue("postgres");
+    expect(redactSensitiveText("postgres://db:5432/app")).toBe("postgres://db:5432/app");
+  });
+  test("a longer value wins over its own prefix", () => {
+    rememberSecretValue("abcdefghij");
+    rememberSecretValue("abcdefghij-0123456789");
+    expect(redactSensitiveText("token abcdefghij-0123456789 end")).toBe("token *** end");
+  });
+});
+
+describe("known secret values in connection URLs", () => {
+  test("a URL with credentials keeps its server; its password is remembered", () => {
+    rememberSecretValue("redis://app:Very-Long-Pass-42@cache.internal:6379");
+    expect(redactSensitiveText("failed to connect to redis://app:Very-Long-Pass-42@cache.internal:6379")).toBe("failed to connect to redis://***:***@cache.internal:6379");
+    expect(redactSensitiveText("AUTH Very-Long-Pass-42")).toBe("AUTH ***");
   });
 });

@@ -16,6 +16,7 @@ const registry = "__bazis_orm_owned_stores_v1";
 @Entity({ table: `${p}b_items` }) class FreshItem { @Key() id = 0; }
 @Entity({ table: `${p}c_items` }) class NextItem { @Key() id = 0; }
 @Entity({ table: `${p}d_items` }) class ForgedScopeItem { @Key() id = 0; }
+@Entity({ table: `${p}g_items` }) class FormatItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
 @Entity({ table: `${p}e_items` }) class DroppedColumnItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
 @Entity({ table: `${p}f_items` }) class AddedColumnItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
 class StoreDb extends DbContext {}
@@ -97,6 +98,16 @@ describe("owned-store admission explains its failures against a disposable Postg
     const error = await start(AddedColumnItem, definition("f", `${p}f_`)) as OrmOwnedStoreAdmissionError;
     expect(error).toBeInstanceOf(OrmOwnedStoreAdmissionError);
     expect(error.code).toBe("ORM_OWNED_STORE_DRIFT");
+  }, 20_000);
+
+  // 0.118.0: a changed formatVersion said only "the registered identity does
+  // not match the code"; it now names both versions.
+  live("a changed formatVersion names the registered and the declared version", async () => {
+    expect(await start(FormatItem, definition("g", `${p}g_`))).toBeUndefined();
+    const error = await start(FormatItem, definition("g", `${p}g_`, { formatVersion: 2 })) as OrmOwnedStoreAdmissionError;
+    expect(error).toBeInstanceOf(OrmOwnedStoreAdmissionError);
+    expect(error.code).toBe("ORM_OWNED_STORE_IDENTITY_MISMATCH");
+    expect(error.message).toContain(`Owned store "${p}.g" (schema "public", prefix "${p}g_") is registered with format version 1, the code declares 2.`);
   }, 20_000);
 
   live("leftovers of a rejected scope are listed", async () => {

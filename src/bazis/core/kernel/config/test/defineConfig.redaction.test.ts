@@ -59,3 +59,11 @@ test("a wrong value of a sensitive key is not quoted (0.98.29)", () => {
   const text = errorText(() => config.resolve("development"));
   expect(text).toBe('Invalid configuration (environment "development"): db.password — expected a finite number (BAZIS_DB__PASSWORD).');
 });
+
+// 0.118.0: a resolved secret is remembered, so its value is removed from
+// logs and error texts even without a marker such as "apiKey=".
+test("a resolved secret value is masked in any text", () => {
+  const mail = defineConfig("maskmail", { default: { apiKey: secret("re_live_8f3c29a1d7e4") } });
+  const key = mail.resolve("development").get("apiKey").reveal();
+  expect(redactSensitiveText(`POST /emails failed for ${key} (401)`)).toBe("POST /emails failed for *** (401)");
+});

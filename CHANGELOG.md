@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.118.0 — 2026-10-24
+
+### Changed
+
+- Every configuration secret is remembered by value: logs, startup errors and
+  error responses remove it wherever it appears, also in plain text without a
+  marker such as `apiKey=` or `Bearer`. Before, redaction recognised secrets
+  only by their shape, so a revealed secret pasted into a message reached the
+  log. Values shorter than 10 characters are still recognised only by shape
+  (masking them would hide ordinary words such as `postgres`); for a
+  connection URL with credentials only the password is remembered, so the
+  message keeps naming the server. `rememberSecretValue(value)` in
+  `bazis/library/redaction` does the same for a secret from another source.
+
+### Fixed
+
+- An owned store whose `formatVersion` (or registered scope) differs from the
+  code names it: `… is registered with format version 1, the code declares
+  2.` Before, the registry row was refused while it was read, so the message
+  said only `the registered identity does not match the code`.
+
 ## 0.117.1 — 2026-10-24
 
 ### Fixed

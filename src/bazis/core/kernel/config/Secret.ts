@@ -1,3 +1,5 @@
+import { rememberSecretValue } from "../../../library/redaction";
+
 const REDACTED = "***";
 
 /**
@@ -9,6 +11,8 @@ export class Secret {
 
   public constructor(value: string) {
     this.#value = value;
+    // Logs and errors drop the value even where it was pasted as plain text.
+    rememberSecretValue(value);
   }
 
   public reveal(): string {
