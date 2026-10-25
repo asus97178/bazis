@@ -204,22 +204,27 @@ module extension of the Agent API. There is no second entry in `providers`.
 A pack with N parts is 2 + 2N files.
 
 Every generated controller (`--minimal` and `--full`, whatever the module name)
-has this shape; `<Module>` is the module name as typed, `<Entity>` its singular
-record name:
+has this shape. For `bazis g module Admins` (record `Admin`):
 
 ```ts
-@Get()               async list(query: FromQuery<<Module>ListQuery>, ctx: HttpContext)
+@Get()               async list(query: FromQuery<AdminsListQuery>, ctx: HttpContext)
 @Get(":id(uuid)")    async getById(id: FromRoute<string>)
-@Post()              async create(body: FromBody<Create<Entity>Request>, ctx: HttpContext)
-@Put(":id(uuid)")    async update(id: FromRoute<string>, body: FromBody<Update<Entity>Request>)
+@Post()              async create(body: FromBody<CreateAdminRequest>, ctx: HttpContext)
+@Put(":id(uuid)")    async update(id: FromRoute<string>, body: FromBody<UpdateAdminRequest>)
 @Delete(":id(uuid)") async delete(id: FromRoute<string>)
 ```
+
+The generic argument is the module's own contract class: the list model
+`AdminsListQuery` (`http/contracts/AdminsList.query.ts`) and the request models
+`CreateAdminRequest`/`UpdateAdminRequest` (`http/contracts/Admins.requests.ts`).
+Another module gets its own names the same way (`g module Orders` →
+`FromQuery<OrdersListQuery>`, `FromBody<CreateOrderRequest>`).
 
 Rules: every HTTP source is marked (`FromQuery`, `FromRoute`, `FromBody`;
 `FromHeader` when a header is read). The list model goes through
 `FromQuery<…ListQuery>` like any other query source. Markers exist only in
 controllers; services take plain types (`getAll(query: ListQuery)`,
-`create(body: Create<Entity>Request)`) and know nothing about HTTP. Codegen
+`create(body: CreateAdminRequest)`) and know nothing about HTTP. Codegen
 binds the markers exactly as it would infer the types; the markers keep the
 source visible. `FromHeader` is not generated: plain CRUD reads no header, and
 the template does not invent one (an idempotency key belongs to the operations
