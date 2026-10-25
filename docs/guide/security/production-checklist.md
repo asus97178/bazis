@@ -65,9 +65,9 @@
   Strict-Transport-Security: max-age=15552000; includeSubDomains
   ```
 
-- [ ] **`trustProxy` включён, только если приложение доступно
-  исключительно через прокси.** Иначе клиент сам выберет себе IP-адрес
-  в `X-Forwarded-For` и обойдёт лимиты ([За прокси](../http/rate-limit.md#за-прокси)).
+- [ ] **За прокси указаны `trustedProxies` — только адреса ваших
+  прокси.** Тогда лимиты и журнал видят настоящий адрес клиента, а
+  подделать его в обход прокси нельзя ([За nginx](../deployment/production.md#за-nginx)).
 - [ ] **CORS — явный список источников.** `credentials: true` вместе с
   `origin: "*"` приложение не пропустит при запуске
   ([CORS](../http/cors-headers-log.md#cors)).
