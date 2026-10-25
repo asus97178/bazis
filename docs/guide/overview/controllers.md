@@ -229,6 +229,8 @@ GET /catalog/search?q=dune&page_size=5&page_size=50
 | `ctx.query(name)` | Значение из строки запроса |
 | `ctx.header(name)` | Заголовок запроса; для проверяемого значения — `FromHeader` |
 | `ctx.text()`, `ctx.formData()` | Тело как текст или форма |
+| `ctx.clientIp` | Адрес клиента; за nginx — с [`trustedProxies`](../deployment/production.md#за-nginx) |
+| `ctx.peerIp` | Адрес самого соединения (за прокси — адрес прокси) |
 | `ctx.request` | Исходный `Request` |
 | `ctx.state` | Данные, которые middleware передают дальше по запросу |
 
