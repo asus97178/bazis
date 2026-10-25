@@ -43,6 +43,15 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
     const bindings = await Bun.file(path.join(generated, "bindings.ts")).text();
     expect(bindings).toContain("CliGuestController");
     expect(bindings).toContain("CliCatalogController");
+    // 0.119.0: the generated controller marks every HTTP source explicitly, and
+    // codegen binds them as before: the list model as a JSON:API list query,
+    // the request models as bodies, id from the path.
+    const [controllerPath] = await Array.fromAsync(new Bun.Glob("**/CliGuest.controller.ts").scan({ cwd: modules, absolute: true }));
+    const controller = await Bun.file(controllerPath!).text();
+    for (const signature of ["list(query: FromQuery<CliGuestListQuery>, ctx: HttpContext)", "getById(id: FromRoute<string>)", "create(body: FromBody<CreateCliGuestRequest>, ctx: HttpContext)", "update(id: FromRoute<string>, body: FromBody<UpdateCliGuestRequest>)", "delete(id: FromRoute<string>)"]) expect(controller).toContain(signature);
+    expect(bindings).toContain('"list":[{"source":"list","model":"CliGuestListQuery","optional":false},{"source":"context"');
+    expect(bindings).toContain('"create":[{"source":"body","model":"CreateCliGuestRequest","optional":false}');
+    expect(bindings).toContain('"update":[{"source":"route","name":"id","optional":false},{"source":"body","model":"UpdateCliGuestRequest","optional":false}]');
     // Tool DTOs get JSON schemas for the model; there is no agent catalog.
     const openApi = await Bun.file(path.join(generated, "openapi.ts")).text();
     expect(openApi).toContain("CliCatalogSummaryToolInput");

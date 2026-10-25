@@ -243,6 +243,7 @@ saving. The application's existing authorization is used here.
 import {
   Authorize, Controller, Created, Get, HttpContext,
   ModelValidationError, NotFound, Ok, Post,
+  type FromBody, type FromRoute,
 } from "bazis/core/http";
 import { requireTokenKind } from "../../auth/jwtAuth";
 import { TokenKind } from "../../auth/tokenKinds";
@@ -256,7 +257,7 @@ export class TaskController {
   constructor(private readonly tasks: ITaskService) {}
 
   @Post()
-  async create(input: CreateTaskRequest, ctx: HttpContext) {
+  async create(input: FromBody<CreateTaskRequest>, ctx: HttpContext) {
     try {
       const task = await this.tasks.create(input);
       return Created(`${ctx.path}/${task.id}`, task);
@@ -269,7 +270,7 @@ export class TaskController {
   }
 
   @Get(":id(int)")
-  async getById(id: number) {
+  async getById(id: FromRoute<number>) {
     const task = await this.tasks.getById(id);
     return task === null ? NotFound({ error: "Task not found" }) : Ok(task);
   }
@@ -277,7 +278,11 @@ export class TaskController {
 ```
 
 Inputs: `POST /api/tasks` takes a body; `GET /api/tasks/:id` takes an integer `id`
-from the path. Creation returns 201 and Location; reading returns 200 or 404.
+from the path. Every HTTP source is marked: `FromBody<…>`, `FromRoute<…>`,
+`FromQuery<…>` (also for a `ListRequest` model) and `FromHeader<…, "Name">`.
+Codegen would infer the same sources from the types; the markers make the
+controller readable without knowing those rules, and generated controllers
+follow the same convention. Creation returns 201 and Location; reading returns 200 or 404.
 Field errors map to 400. `/api` comes from the host settings, and `ctx.path` keeps
 the actual prefix in Location.
 

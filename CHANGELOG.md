@@ -4,6 +4,18 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.119.0 — 2026-10-26
+
+### Changed
+
+- `bazis g module` (`--minimal`, `--full`) generates a controller that marks
+  every HTTP source: `list(query: FromQuery<…ListQuery>, ctx)`,
+  `getById(id: FromRoute<string>)`, `create(body: FromBody<…Request>, ctx)`,
+  `update(id: FromRoute<string>, body: FromBody<…Request>)`. Codegen binds
+  them exactly as it inferred them before; the markers make the source
+  visible in the code. `FromHeader` is not generated: plain CRUD reads no
+  header. Modules generated earlier keep working unchanged.
+
 ## 0.118.0 — 2026-10-24
 
 ### Changed

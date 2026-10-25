@@ -201,7 +201,13 @@ CLI does not print hundreds of vendor paths.
 Module profiles: `empty` is 2 files; `minimal` is 10; `full` is 14, including the passport.
 In `full` the Tool is registered once in `tools`; the scoped provider is created by the
 module extension of the Agent API. There is no second entry in `providers`.
-A pack with N parts is 2 + 2N files. CRUD uses RequestModel and the email validator;
+A pack with N parts is 2 + 2N files. The generated controller marks every HTTP
+source explicitly: `FromQuery<…ListQuery>` for the list, `FromRoute<string>` for
+`:id(uuid)`, `FromBody<…Request>` for create and update. Codegen binds them the
+same way it would infer them; the markers keep the source visible in the code.
+`FromHeader` is not generated: plain CRUD reads no header, and the template does
+not invent one (an idempotency key belongs to the operations that need it).
+CRUD uses RequestModel and the email validator;
 both CRUD profiles create getAll(query): PageResult with paging (HTTP: 20 by default,
 at most 100). The controller builds JSON:API; summary returns the total count and at
 most 20 names in id order. The service gets the DbContext through codegen and calls
