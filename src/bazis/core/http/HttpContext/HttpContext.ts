@@ -42,7 +42,10 @@ export class HttpContext {
     readonly apiVersion?: string,
     /** Optional maximum request body size enforced while reading body streams. */
     private readonly maxBodyBytes?: number,
-    /** Remote peer address reported by Bun (not a forwarded header). */
+    /**
+     * The client's address: the connection's, or with `http.trustedProxies`
+     * the address a trusted proxy forwarded in `X-Forwarded-For`.
+     */
     readonly clientIp?: string,
     /** Validator captured by the owning HTTP server. */
     readonly modelValidator?: ModelValidator,
@@ -52,6 +55,8 @@ export class HttpContext {
      * `undefined` without `language`.
      */
     readonly language?: string,
+    /** The address of the TCP connection itself (nginx behind a proxy), never a header. */
+    readonly peerIp?: string,
   ) {}
 
   get method(): string {

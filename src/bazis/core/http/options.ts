@@ -110,6 +110,14 @@ export interface HttpModuleOptions {
    * Default: 1 MiB. `0` disables the framework check.
    */
   readonly maxBodyBytes?: number;
+  /**
+   * Proxies whose `X-Forwarded-For` names the client: IP addresses and subnets,
+   * for example `["127.0.0.1", "10.0.0.0/8"]` for nginx. Then `ctx.clientIp`
+   * is the client's address; a connection from any other address keeps its
+   * own (the header cannot be forged by reaching the app directly), and
+   * `ctx.peerIp` is always the connection's address. Default: none.
+   */
+  readonly trustedProxies?: readonly string[];
   /** Per-connection idle timeout in seconds (Bun.serve, 0–255). Default: Bun's. */
   readonly idleTimeoutSeconds?: number;
   /** Maximum wait for request-scope disposal. Default 5000ms; `0` restores an unbounded wait. */

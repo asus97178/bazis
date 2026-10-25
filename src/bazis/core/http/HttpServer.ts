@@ -23,6 +23,7 @@ import { HTTP_ERROR_HOOK, ROUTE_MIDDLEWARE_COMPOSER, SERVER_MIDDLEWARE, sortByOr
 import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions, HttpServerOptions } from "./options";
 import { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
 import { HttpSetupError } from "./Errors/HttpError";
+import { clientAddress, trustedProxies, type TrustedProxies } from "./HttpContext/clientAddress";
 import { EN_HTTP_MESSAGES, formatMessage, languageHeaders, type HttpMessageKey, type MessageParams, type SelectedLanguage } from "./Errors/messages";
 import { getModelValidator, type ModelValidator } from "./Binding/modelValidator";
 
@@ -41,6 +42,12 @@ function json(status: number, body: unknown, headers?: Record<string, string>): 
     status,
     headers: { "content-type": "application/json; charset=utf-8", ...headers },
   });
+}
+
+/** The client's address (after trusted proxies) and the connection's own. */
+interface ClientConnection {
+  readonly clientIp?: string;
+  readonly peerIp?: string;
 }
 
 /** HEAD responses must carry no body, only headers/status. */
@@ -82,6 +89,7 @@ export class HttpServer implements HostedService {
   private globalCors: CorsOptions | undefined;
   /** Body cap in bytes; `undefined` when the limit is disabled (`maxBodyBytes: 0`). */
   private readonly maxBodyBytes?: number;
+  private readonly trustedProxies?: TrustedProxies;
   private readonly requestScopeDisposeTimeoutMs?: number;
   private readonly responseCompletions = new Set<Promise<void>>();
   /** Absolute health-probe path, or `undefined` when disabled. */
@@ -112,6 +120,7 @@ export class HttpServer implements HostedService {
       throw new HttpSetupError("inspectableRedirects must be a boolean.");
     }
     this.maxBodyBytes = options.maxBodyBytes === 0 ? undefined : (options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES);
+    this.trustedProxies = options.trustedProxies === undefined || options.trustedProxies.length === 0 ? undefined : trustedProxies(options.trustedProxies);
     this.requestScopeDisposeTimeoutMs = options.requestScopeDisposeTimeoutMs === 0
       ? undefined
       : options.requestScopeDisposeTimeoutMs ?? DEFAULT_REQUEST_SCOPE_DISPOSE_TIMEOUT_MS;
@@ -376,11 +385,12 @@ export class HttpServer implements HostedService {
     }
   }
 
-  private async dispatch(incoming: Request, clientIp?: string): Promise<Response> {
+  private async dispatch(incoming: Request, peerIp?: string): Promise<Response> {
     const request = this.withAbsoluteUrl(incoming);
     let response: Response;
     try {
-      response = await this.handle(request, clientIp);
+      const client: ClientConnection = { clientIp: clientAddress(peerIp, request.headers.get("x-forwarded-for"), this.trustedProxies), peerIp };
+      response = await this.handle(request, client);
     } catch (error) {
       // Covers failures before a request context can be created. Normal route
       // and short-circuit failures are handled by the configured error boundary.
@@ -440,34 +450,34 @@ export class HttpServer implements HostedService {
     return new Request(new URL(request.url, `http://${host}:${server?.port ?? 80}`).href, request);
   }
 
-  private async handle(request: Request, clientIp?: string): Promise<Response> {
+  private async handle(request: Request, client: ClientConnection): Promise<Response> {
     const url = new URL(request.url);
 
     if (this.healthPath !== undefined && url.pathname === this.healthPath && isReadMethod(request.method)) {
-      return this.runShortCircuit(request, url, clientIp, () => this.healthResponse());
+      return this.runShortCircuit(request, url, client, () => this.healthResponse());
     }
 
     if (this.docs !== undefined) {
       const docsResponse = serveOpenApiDocs(this.docs, url.pathname, request.method);
       if (docsResponse !== undefined) {
-        return this.runShortCircuit(request, url, clientIp, () => docsResponse);
+        return this.runShortCircuit(request, url, client, () => docsResponse);
       }
     }
 
     if (isPreflight(request)) {
       const corsOptions = this.globalCors ?? this.routeCors(request, url);
       if (corsOptions !== undefined) {
-        return this.runShortCircuit(request, url, clientIp, () => preflightResponse(corsOptions, request));
+        return this.runShortCircuit(request, url, client, () => preflightResponse(corsOptions, request));
       }
     }
 
     const segments = parseRequestPath(url.pathname);
     if (!segments) {
       if (this.maxBodyBytes !== undefined && exceedsBodyLimit(request, this.maxBodyBytes)) {
-        return this.runShortCircuit(request, url, clientIp, () =>
+        return this.runShortCircuit(request, url, client, () =>
           this.errorJson(request, 413, "payloadTooLarge", { details: { maxBytes: this.maxBodyBytes } }));
       }
-      return this.runShortCircuit(request, url, clientIp, () => this.errorJson(request, 400, "malformedPath"));
+      return this.runShortCircuit(request, url, client, () => this.errorJson(request, 400, "malformedPath"));
     }
 
     const match = this.router!.match(request.method, segments, this.readVersion(request, url));
@@ -475,18 +485,18 @@ export class HttpServer implements HostedService {
       ? (match.action.maxBodyBytes ?? this.maxBodyBytes)
       : this.maxBodyBytes;
     if (effectiveMaxBodyBytes !== undefined && exceedsBodyLimit(request, effectiveMaxBodyBytes)) {
-      return this.runShortCircuit(request, url, clientIp, () =>
+      return this.runShortCircuit(request, url, client, () =>
         this.errorJson(request, 413, "payloadTooLarge", { details: { maxBytes: effectiveMaxBodyBytes } }));
     }
     if (match.kind === "not-found") {
-      return this.runShortCircuit(request, url, clientIp, () => this.errorJson(request, 404, "notFound"));
+      return this.runShortCircuit(request, url, client, () => this.errorJson(request, 404, "notFound"));
     }
     if (match.kind === "method-not-allowed") {
-      return this.runShortCircuit(request, url, clientIp, () =>
+      return this.runShortCircuit(request, url, client, () =>
         this.errorJson(request, 405, "methodNotAllowed", {}, { allow: match.allow.join(", ") }));
     }
     if (match.kind === "unsupported-version") {
-      return this.runShortCircuit(request, url, clientIp, () =>
+      return this.runShortCircuit(request, url, client, () =>
         this.errorJson(request, 400, "unsupportedApiVersion", { details: { supported: match.supported } }));
     }
 
@@ -498,9 +508,10 @@ export class HttpServer implements HostedService {
       scope,
       match.action.version,
       effectiveMaxBodyBytes,
-      clientIp,
+      client.clientIp,
       this.modelValidator,
       this.selected(request)?.language,
+      client.peerIp,
     );
     let scopeTransferred = false;
     try {
@@ -532,7 +543,7 @@ export class HttpServer implements HostedService {
   private async runShortCircuit(
     request: Request,
     url: URL,
-    clientIp: string | undefined,
+    client: ClientConnection,
     produce: () => Response | Promise<Response>,
   ): Promise<Response> {
     const scope = this.provider.createScope();
@@ -543,9 +554,10 @@ export class HttpServer implements HostedService {
       scope,
       undefined,
       this.maxBodyBytes,
-      clientIp,
+      client.clientIp,
       this.modelValidator,
       this.selected(request)?.language,
+      client.peerIp,
     );
     const terminal: HttpMiddleware = async (context) => {
       context.response = await produce();

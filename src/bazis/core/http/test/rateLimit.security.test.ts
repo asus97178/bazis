@@ -18,25 +18,18 @@ describe("HTTP rateLimit security", () => {
       .rejects.toBeInstanceOf(TooManyRequestsError);
   });
 
-  test("trusted proxy mode uses the address the proxy appended, not the client-written ones", async () => {
-    const middleware = rateLimit({ windowMs: 1_000, max: 1, trustProxy: true });
-    // The client writes the first entries; the proxy appends 203.0.113.9.
-    await middleware(context("10.0.0.1", "198.51.100.1, 203.0.113.9"), async () => {});
-    await expect(middleware(context("10.0.0.1", "198.51.100.2, 203.0.113.9"), async () => {}))
-      .rejects.toBeInstanceOf(TooManyRequestsError);
-    // Another real client behind the same proxy has its own quota.
-    await middleware(context("10.0.0.1", "203.0.113.10"), async () => {});
+  // 0.120.0: the server resolves the client through http.trustedProxies;
+  // rateLimit keys by ctx.clientIp and no longer reads the header itself.
+  test("each client address has its own quota", async () => {
+    const middleware = rateLimit({ windowMs: 1_000, max: 1 });
+    await middleware(context("203.0.113.9"), async () => {});
+    await expect(middleware(context("203.0.113.9"), async () => {})).rejects.toBeInstanceOf(TooManyRequestsError);
+    await middleware(context("203.0.113.10"), async () => {});
   });
 
-  test("trustProxy: n takes the address n hops from the end", async () => {
-    const middleware = rateLimit({ windowMs: 1_000, max: 1, trustProxy: 2 });
-    // client-written, real client (seen by the CDN), CDN (seen by nginx).
-    await middleware(context("10.0.0.1", "1.1.1.1, 203.0.113.9, 192.0.2.1"), async () => {});
-    await expect(middleware(context("10.0.0.1", "1.1.1.2, 203.0.113.9, 192.0.2.1"), async () => {}))
-      .rejects.toBeInstanceOf(TooManyRequestsError);
-    // Fewer entries than proxies: the first one.
-    await middleware(context("10.0.0.1", "203.0.113.11"), async () => {});
-    expect(() => rateLimit({ windowMs: 1_000, max: 1, trustProxy: 0 })).toThrow("rateLimit trustProxy");
+  test("the removed trustProxy and proxyHeader point to http.trustedProxies", () => {
+    expect(() => rateLimit({ windowMs: 1_000, max: 1, trustProxy: true } as never)).toThrow("rateLimit trustProxy was removed: list the proxies in http.trustedProxies");
+    expect(() => rateLimit({ windowMs: 1_000, max: 1, proxyHeader: "x-real-ip" } as never)).toThrow("rateLimit proxyHeader was removed");
   });
 
   test("responses carry RateLimit headers, 429 included", async () => {
