@@ -201,12 +201,35 @@ CLI does not print hundreds of vendor paths.
 Module profiles: `empty` is 2 files; `minimal` is 10; `full` is 14, including the passport.
 In `full` the Tool is registered once in `tools`; the scoped provider is created by the
 module extension of the Agent API. There is no second entry in `providers`.
-A pack with N parts is 2 + 2N files. The generated controller marks every HTTP
-source explicitly: `FromQuery<…ListQuery>` for the list, `FromRoute<string>` for
-`:id(uuid)`, `FromBody<…Request>` for create and update. Codegen binds them the
-same way it would infer them; the markers keep the source visible in the code.
-`FromHeader` is not generated: plain CRUD reads no header, and the template does
-not invent one (an idempotency key belongs to the operations that need it).
+A pack with N parts is 2 + 2N files.
+
+Every generated controller (`--minimal` and `--full`, whatever the module name)
+has this shape. For `bazis g module Admins` (record `Admin`):
+
+```ts
+@Get()               async list(query: FromQuery<AdminsListQuery>, ctx: HttpContext)
+@Get(":id(uuid)")    async getById(id: FromRoute<string>)
+@Post()              async create(body: FromBody<CreateAdminRequest>, ctx: HttpContext)
+@Put(":id(uuid)")    async update(id: FromRoute<string>, body: FromBody<UpdateAdminRequest>)
+@Delete(":id(uuid)") async delete(id: FromRoute<string>)
+```
+
+The generic argument is the module's own contract class: the list model
+`AdminsListQuery` (`http/contracts/AdminsList.query.ts`) and the request models
+`CreateAdminRequest`/`UpdateAdminRequest` (`http/contracts/Admins.requests.ts`).
+Another module gets its own names the same way (`g module Orders` →
+`FromQuery<OrdersListQuery>`, `FromBody<CreateOrderRequest>`).
+
+Rules: every HTTP source is marked (`FromQuery`, `FromRoute`, `FromBody`;
+`FromHeader` when a header is read). The list model goes through
+`FromQuery<…ListQuery>` like any other query source. Markers exist only in
+controllers; services take plain types (`getAll(query: ListQuery)`,
+`create(body: CreateAdminRequest)`) and know nothing about HTTP. Codegen
+binds the markers exactly as it would infer the types; the markers keep the
+source visible. `FromHeader` is not generated: plain CRUD reads no header, and
+the template does not invent one (an idempotency key belongs to the operations
+that need it). The shape is checked by
+[codegen.integration.test.ts](test/codegen.integration.test.ts).
 CRUD uses RequestModel and the email validator;
 both CRUD profiles create getAll(query): PageResult with paging (HTTP: 20 by default,
 at most 100). The controller builds JSON:API; summary returns the total count and at

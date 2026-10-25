@@ -314,7 +314,7 @@ export class TasksService implements ITasksService {
 
 ```ts
 // src/app/modules/tasks/http/Tasks.controller.ts
-import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "bazis/core/http";
+import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 import { buildListDocument } from "bazis/library/jsonapi";
 import { TasksListQuery } from "./contracts/TasksList.query";
 import { CreateTaskRequest, UpdateTaskRequest } from "./contracts/Tasks.requests";
@@ -325,41 +325,46 @@ export class TasksController {
   constructor(private readonly tasks: ITasksService) {}
 
   @Get()
-  async list(query: TasksListQuery, ctx: HttpContext) {
+  async list(query: FromQuery<TasksListQuery>, ctx: HttpContext) {
     const { items, total } = await this.tasks.list(query);
     return buildListDocument(items, query, total, { basePath: ctx.path });
   }
 
   @Get(":id(uuid)")
-  async get(id: string) {
+  async get(id: FromRoute<string>) {
     const task = await this.tasks.get(id);
     return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
   }
 
   @Post()
-  async create(body: CreateTaskRequest, ctx: HttpContext) {
+  async create(body: FromBody<CreateTaskRequest>, ctx: HttpContext) {
     const task = await this.tasks.create(body);
     return Created(`${ctx.path}/${task.id}`, task);
   }
 
   @Put(":id(uuid)")
-  async update(id: string, body: UpdateTaskRequest) {
+  async update(id: FromRoute<string>, body: FromBody<UpdateTaskRequest>) {
     const task = await this.tasks.update(id, body);
     return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
   }
 
   @Post(":id(uuid)/complete")
-  async complete(id: string) {
+  async complete(id: FromRoute<string>) {
     const task = await this.tasks.complete(id);
     return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
   }
 
   @Delete(":id(uuid)")
-  async delete(id: string) {
+  async delete(id: FromRoute<string>) {
     return (await this.tasks.delete(id)) ? NoContent() : NotFound({ error: `task ${id} not found` });
   }
 }
 ```
+
+`FromQuery`, `FromRoute` и `FromBody` показывают, откуда берётся каждый
+аргумент; без них кодогенерация выведет то же самое из типов
+([Явный источник](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute)).
+`g module` с версии 0.119.0 генерирует контроллер именно так.
 
 `:id(uuid)` пропускает к методу только UUID: `/tasks/not-a-uuid` получит
 `404` ещё в маршрутизаторе. Своё действие — обычный маршрут
