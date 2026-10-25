@@ -11,6 +11,8 @@ export interface AccessLogEntry {
   readonly durationMs: number;
   /** Correlation id from {@link createCorrelationIdMiddleware}, if present. */
   readonly requestId?: string;
+  /** `ctx.clientIp`: the client's address, through `http.trustedProxies`. */
+  readonly clientIp?: string;
 }
 
 export interface AccessLogOptions {
@@ -42,6 +44,7 @@ function resolveSink(options: AccessLogOptions): (entry: AccessLogEntry) => void
           status: entry.status,
           durationMs: entry.durationMs,
           ...(entry.requestId !== undefined ? { requestId: entry.requestId } : {}),
+          ...(entry.clientIp !== undefined ? { clientIp: entry.clientIp } : {}),
         },
       );
   }
@@ -75,6 +78,7 @@ export function accessLog(options: AccessLogOptions = {}): HttpMiddleware {
             status: ctx.response?.status ?? 0,
             durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
             ...(typeof requestId === "string" ? { requestId } : {}),
+            ...(ctx.clientIp !== undefined ? { clientIp: ctx.clientIp } : {}),
           });
         }
       } catch (error) {

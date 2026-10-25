@@ -444,6 +444,11 @@ line per request: `[http] GET /api/users 200 12.3ms <request-id>`.
 | `logger` | `Logger` | the `LOGGER` from DI | Structured sink: `logger.info` per request |
 | `skip` | `(ctx) => boolean` | — | Return `true` to skip a request (e.g. noisy probes) |
 
+`AccessLogEntry`: `method`, `path`, `status`, `durationMs`, `requestId?` (from the
+correlation middleware) and `clientIp?` (`ctx.clientIp`, the client's address behind
+`http.trustedProxies`). The structured logger gets the same fields; the plain stdout
+line does not print the address.
+
 ### `createCorrelationIdMiddleware(options?)`
 
 Reads `x-request-id` or generates a UUID, stores it in `ctx.state`, echoes it on the
@@ -476,9 +481,7 @@ server fails at startup so it never opens credentialed allow-any-origin.
 | --- | --- | --- | --- |
 | `windowMs` | `number` | — | window size (ms) |
 | `max` | `number` | — | max requests per key per window |
-| `keyOf` | `(ctx) => string` | the direct peer IP, else one shared bucket | the bucket key |
-| `trustProxy` | `boolean` | `false` | trust the first forwarded hop |
-| `proxyHeader` | `string` | `x-forwarded-for` | the forwarded address header, only with `trustProxy` |
+| `keyOf` | `(ctx) => string` | `ctx.clientIp`, else one shared bucket | the bucket key |
 | `maxBuckets` | `number` | `10000` | hard cap of in-process buckets; new keys get 429 when full |
 
 Exceeding the limit → `TooManyRequestsError` (429 + `Retry-After`).
@@ -505,7 +508,8 @@ Exceeding the limit → `TooManyRequestsError` (429 + `Retry-After`).
 | `ctx.json()` | the JSON body (cached per request) |
 | `ctx.text()`, `ctx.formData()` | alternative bodies |
 | `ctx.apiVersion` | the API version when versioning is on |
-| `ctx.clientIp` | the direct peer IP, when available |
+| `ctx.clientIp` | the client's address: the connection's, or behind `http.trustedProxies` the one a trusted proxy forwarded in `X-Forwarded-For` |
+| `ctx.peerIp` | the address of the connection itself (the proxy), never a header |
 
 ### Passing data between middleware
 
@@ -996,6 +1000,7 @@ inline is handy when the route options are already one object `{ code: 201, midd
 | `Middleware/securityHeaders.ts` | default security headers |
 | `Middleware/cors.ts` | CORS + preflight helpers |
 | `Middleware/rateLimit.ts` | the in-memory rate limiter |
+| `HttpContext/clientAddress.ts` | `http.trustedProxies`: the client's address from `X-Forwarded-For` of a trusted proxy |
 | `correlation/` | `createCorrelationIdMiddleware` |
 | `middlewareTokens.ts` | `SERVER_MIDDLEWARE`, `ROUTE_MIDDLEWARE_COMPOSER`, `HTTP_ERROR_HOOK` |
 | `Routing/RouterBuilder.ts` | builds the chain at startup |

@@ -65,9 +65,8 @@ its bucket; finished windows free space for new keys.
 | `windowMs` | number, required | none | A positive finite number; the window length |
 | `max` | number, required | none | A positive safe integer; requests per key per window |
 | `maxBuckets` | number, optional | 10000 | A positive safe integer; new keys are rejected when it is full |
-| `keyOf` | function, optional | the direct IP or a shared `*` | The application chooses the client/user identifier |
-| `trustProxy` | boolean, optional | false | When on, the first forwarded IP is accepted |
-| `proxyHeader` | string, optional | `x-forwarded-for` | The forwarded IP source, only with `trustProxy` |
+| `keyOf` | function, optional | `ctx.clientIp` or a shared `*` | The application chooses the client/user identifier |
+| `trustProxy`, `proxyHeader` | — | — | Removed in 0.120.0: an `HttpSetupError` names `http.trustedProxies` |
 
 A regular request and a rejection at a full table do O(1) Map operations.
 A search of finished windows, O(maxBuckets), is allowed when free space is needed
@@ -187,7 +186,28 @@ Exceeding `maxLength`/`length` keeps HTTP 400 with `Validation failed` and the
 public `details`, but does not run `pattern` beyond the upper bound in the same
 decorator. Check: [validation-admission.test.ts](test/validation-admission.test.ts).
 
+## Client address behind trusted proxies (2026-10-26, 0.120.0)
+
+`http.trustedProxies` lists addresses and subnets (`["127.0.0.1", "10.0.0.0/8"]`,
+IPv4 and IPv6; `::ffff:a.b.c.d` is IPv4). `HttpContext/clientAddress.ts` resolves
+`ctx.clientIp` once per request in `HttpServer.dispatch`: a connection from an
+unlisted address keeps its own address and the header is ignored, so a client
+that reaches the app directly cannot forge it; from a listed proxy,
+`X-Forwarded-For` is read from the right, listed hops are skipped and the first
+unlisted address is the client; a malformed entry stops the walk at the last
+address known for sure. `ctx.peerIp` is always the connection's address. An
+invalid entry is an `HttpSetupError` at start. `rateLimit` keys by
+`ctx.clientIp` and the access log entry carries `clientIp`. The hop-counting
+`rateLimit({ trustProxy, proxyHeader })` is removed: it believed a forged header
+whenever the app was reachable without the proxy. Checks:
+[http.client-address.test.ts](test/http.client-address.test.ts), the trusted
+proxies block of [http.server-features.test.ts](test/http.server-features.test.ts),
+[rateLimit.security.test.ts](test/rateLimit.security.test.ts).
+
 ## Rate limit client address and headers (2026-10-09, 0.98.9)
+
+> Superseded by `http.trustedProxies` in 0.120.0 (above); kept as history.
+
 
 Behind trusted proxies `rateLimit` takes the client address the proxies appended:
 `trustProxy: true` — the last `X-Forwarded-For` entry, `trustProxy: n` — the entry `n`

@@ -4,6 +4,28 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.120.0 — 2026-10-26
+
+### Added
+
+- `http.trustedProxies` (`runApp({ http: { trustedProxies: ["127.0.0.1"] } })`):
+  addresses and subnets of the proxies in front of the app, such as nginx.
+  `ctx.clientIp` is then the client's address from `X-Forwarded-For`, read
+  from the right and skipping the listed proxies, so entries a client wrote
+  itself are never believed. A connection from any other address keeps its
+  own address: reaching the app without the proxy cannot forge it. An
+  invalid entry stops the start.
+- `ctx.peerIp`: the address of the connection itself (the proxy).
+- The access log entry has `clientIp` (also in the structured logger fields).
+
+### Changed (breaking)
+
+- `rateLimit` keys by `ctx.clientIp`; its `trustProxy` and `proxyHeader`
+  options are removed and stop the start with a hint to `http.trustedProxies`.
+  They counted hops from the end of `X-Forwarded-For` without checking where
+  the connection came from, so an app reachable without the proxy took a
+  forged address.
+
 ## 0.119.0 — 2026-10-26
 
 ### Changed

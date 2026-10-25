@@ -403,3 +403,32 @@ describe("HTTP: generated API docs", () => {
     }
   });
 });
+
+// 0.120.0: behind nginx ctx.clientIp was nginx's own address. With
+// http.trustedProxies the server takes the client from X-Forwarded-For, but
+// only when the connection comes from a listed proxy.
+describe("HTTP: trusted proxies", () => {
+  const clientOf = async (options: Omit<HttpModuleOptions, "imports" | "port">, forwarded: string) => {
+    const entries: AccessLogEntry[] = [];
+    const app = await startServer({ ...options, health: true, accessLog: { log: (entry) => entries.push(entry) } });
+    try {
+      await (await fetch(`${app.base}/health`, { headers: { "x-forwarded-for": forwarded } })).text();
+      return entries[0]?.clientIp;
+    } finally {
+      await app.dispose();
+    }
+  };
+
+  test("a listed proxy forwards the client; client-written entries in front are not believed", async () => {
+    expect(await clientOf({ trustedProxies: ["127.0.0.1", "::1"] }, "1.2.3.4, 203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  test("a connection from an unlisted address keeps its own: the header cannot be forged", async () => {
+    expect(await clientOf({ trustedProxies: ["10.0.0.0/8"] }, "203.0.113.7")).toMatch(/^(127\.0\.0\.1|::1)$/);
+    expect(await clientOf({}, "203.0.113.7")).toMatch(/^(127\.0\.0\.1|::1)$/);
+  });
+
+  test("an invalid entry stops the start", async () => {
+    await expect(startServer({ trustedProxies: ["nginx"] })).rejects.toThrow('http.trustedProxies: "nginx" is not an IP address');
+  });
+});
