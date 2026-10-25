@@ -559,7 +559,7 @@ marked "not used" with a short reason, without creating stubs.
 | ORM entity | `model/` | Model fields with types, keys, nullability, defaults and constraints | Data owned by the module; not an automatic HTTP model |
 | DbContext / repository | `model/` | Options, provider, entities; read and change criteria | Data access through the existing ORM |
 | Migration | `migrations/` | Version, execution context, expected schema state | A concrete schema change and its execution conditions |
-| HTTP controller | `http/` | DI service; path/query/body/header; server HTTP/auth context | Request binding and validation, the service call, the HTTP result |
+| HTTP controller | `http/` | DI service; path/query/body/header, each marked with `FromRoute`/`FromQuery`/`FromBody`/`FromHeader`; server HTTP/auth context | Request binding and validation, the service call, the HTTP result |
 | Request/command | `http/contracts/`, `contracts/` | Each input field per the §7 rules | Runtime validation at the matching boundary |
 | List/query model | `http/contracts/` | Allowed sort/filter/page, operators and limits | A typed query, not arbitrary column access |
 | Response and mapper | `http/contracts/`, `contracts/` | The service result/model; the list of published fields | A stable output DTO with a described serialization format |
