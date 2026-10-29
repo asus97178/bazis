@@ -1,5 +1,6 @@
 import { MessageRegistry } from "./MessageRegistry";
 import { RuleEngine } from "./RuleEngine";
+import { RuleSet, type FieldRules } from "./RuleSet";
 import type { ValidationResult } from "./ValidationResult";
 import { registerFieldRule } from "./metadata";
 import type { ValidatorOptions } from "./types/ValidatorOptions";
@@ -73,6 +74,18 @@ export const Validator = Object.assign(
      */
     validateAsync(instance: object): Promise<ValidationResult> {
       return RuleEngine.validateAsync(instance);
+    },
+    /**
+     * Rules as data, without a class: for objects whose fields are known only
+     * at run time. Compiled once; keep the result and reuse it.
+     *
+     * ```ts
+     * const rules = Validator.ruleSet({ title: { required: true, maxLength: 200 } });
+     * rules.validate(row).isValid;
+     * ```
+     */
+    ruleSet(rules: FieldRules): RuleSet {
+      return new RuleSet(rules);
     },
 
     /**

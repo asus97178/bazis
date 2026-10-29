@@ -49,6 +49,24 @@ export class RuleEngine {
     return new ValidationResult(errors);
   }
 
+  /** Synchronous validation of any object by a precompiled plan (see `RuleSet`). */
+  static validatePlan(plan: readonly CompiledRule[], value: object): ValidationResult {
+    const errors: ValidationError[] = [];
+    RuleEngine.run(plan, value, "", errors, undefined, undefined);
+    return new ValidationResult(errors);
+  }
+
+  /** Asynchronous validation of any object by a precompiled plan (see `RuleSet`). */
+  static async validatePlanAsync(plan: readonly CompiledRule[], value: object): Promise<ValidationResult> {
+    const errors: ValidationError[] = [];
+    const jobs: AsyncJob[] = [];
+    RuleEngine.run(plan, value, "", errors, jobs, undefined);
+    for (const job of jobs) {
+      await job();
+    }
+    return new ValidationResult(errors);
+  }
+
   /**
    * Asynchronous validation: all synchronous rules run immediately, async
    * `custom` functions run sequentially after them (deterministic error order).
@@ -75,6 +93,17 @@ export class RuleEngine {
     if (!plan) {
       return;
     }
+    RuleEngine.run(plan, instance, prefix, errors, jobs, seen);
+  }
+
+  private static run(
+    plan: readonly CompiledRule[],
+    instance: object,
+    prefix: string,
+    errors: ValidationError[],
+    jobs: AsyncJob[] | undefined,
+    seen: Set<object> | undefined,
+  ): void {
     for (const rule of plan) {
       RuleEngine.applyRule(rule, instance, prefix, errors, jobs, seen);
     }

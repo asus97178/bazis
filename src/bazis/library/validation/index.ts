@@ -8,6 +8,7 @@
  * methods `validate` / `validateAsync` / `setDefaultMessages`.
  */
 export { Validator } from "./Validator";
+export { RuleSet, type FieldRules } from "./RuleSet";
 export { modelValidatorAdapter } from "./modelValidatorAdapter";
 export { ValidationError } from "./ValidationError";
 export { ValidationResult } from "./ValidationResult";

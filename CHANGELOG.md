@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.121.0 — 2026-10-28
+
+### Added
+
+- `Validator.ruleSet({ field: options | options[] })` and the `RuleSet`
+  class: validation rules as data, for objects whose fields are known only at
+  run time (rows of tables created by users, rules stored in a database).
+  The same options, engine, codes and messages as `@Validator`; the rules are
+  compiled once, `validate` / `validateAsync` check a plain object. A field
+  name from `Object.prototype` (`__proto__`, `constructor`…) is rejected.
+
 ## 0.120.0 — 2026-10-26
 
 ### Added
