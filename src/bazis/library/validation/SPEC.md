@@ -412,6 +412,34 @@ Validator.validate(new ChildDto());  // checks both id and extra
 Validator.validate(new BaseDto());   // only id
 ```
 
+### 4.13 Rules as data: `Validator.ruleSet`
+
+When the fields are known only at run time (a table created by a user, rules
+stored in a database), there is no class to decorate. `Validator.ruleSet`
+takes the same options per field name and compiles them once:
+
+```ts
+const rules = Validator.ruleSet({
+  title: { required: true, maxLength: 200 },
+  amount: [{ type: "number", min: 0 }, { integer: true }],   // like two decorators
+});
+
+rules.validate({ title: "", amount: -1.5 }).errors;
+// [amount: min, amount: integer] — "" is a value, so required passes
+await rules.validateAsync(row);   // when a rule has an async custom
+rules.fields;                     // ["title", "amount"]
+```
+
+- Codes, paths, `params` and messages are the same as with `@Validator`.
+- The plan is compiled in the constructor (RegExp, enum Set) and not cached
+  globally: keep the `RuleSet` while the rules are valid and build a new one
+  when they change.
+- Only the named fields are read. A field name that exists on
+  `Object.prototype` (`__proto__`, `constructor`, `toString`…) throws
+  `TypeError`, so a plain object never yields an inherited value.
+- `nested: true` validates a nested value only if it is an instance of a
+  decorated class, as with decorators.
+
 ---
 
 ## 5. Result: `ValidationResult` and `ValidationError`

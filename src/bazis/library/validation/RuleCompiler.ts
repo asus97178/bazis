@@ -1,4 +1,4 @@
-import { rulesOf } from "./metadata";
+import { rulesOf, type FieldRule } from "./metadata";
 import type { ValidatorOptions } from "./types/ValidatorOptions";
 
 /**
@@ -69,9 +69,18 @@ export class RuleCompiler {
     if (!rules) {
       return undefined;
     }
+    const plan = RuleCompiler.compileRules(rules);
+    RuleCompiler.cache.set(ctor, plan);
+    return plan;
+  }
+
+  /**
+   * Compiles a rule list that is not tied to a class (see `RuleSet`). Not
+   * cached: the caller keeps the result for as long as the rules are valid.
+   */
+  static compileRules(rules: readonly FieldRule[]): CompiledRule[] {
     const plan = rules.map((rule) => RuleCompiler.compile(rule.property, rule.options));
     RuleCompiler.assignNestedCarriers(plan);
-    RuleCompiler.cache.set(ctor, plan);
     return plan;
   }
 
