@@ -71,6 +71,7 @@ Checks: [agent.data-definition.test.ts](test/agent.data-definition.test.ts).
 | Tool contracts | [internal/ToolContract.validator.ts](internal/ToolContract.validator.ts) | DTO binding, calling the given schema validator and diagnostic code/message/details; does not decide the effect outcome |
 | Audit projection | [internal/ToolAudit.projector.ts](internal/ToolAudit.projector.ts) | A snapshot of the call/result, masking and freezing; does not call the sink and does not choose a retry |
 | JSON Schema | [internal/AgentJsonSchema.ts](internal/AgentJsonSchema.ts) | Checks a bounded set of rules; an unknown rule is a rejection |
+| Tool runner | [ToolRunner.ts](ToolRunner.ts) | Runs Tools by name without a model: catalog by tags, contracts, `run` through the Tool executor |
 | Context | [AgentContextBuilder.ts](AgentContextBuilder.ts) | Protects current messages and applies three budgets |
 
 ## 3. Connection and DI
@@ -106,6 +107,22 @@ contributions, without agents and prompts. A repeated call for one container ret
 the same registry; a WeakMap does not retain a finished container. Different
 containers are isolated. There is no file scanning, no AppModule import and no
 implicit inclusion of regular providers. `AgentRuntime.listTools()` returns it.
+
+### Running Tools without a model
+
+`ToolRunner` is for code that chooses the Tool itself, such as a business-process
+engine or a scheduled job. `...toolRunnerProviders` register it as a singleton
+exported by type; the factory reads optional `TOOL_RUNNER_OPTIONS` (the Tool executor
+options plus `logger`) from the root container and the runner is built when the
+application starts, so wrong options fail the start. `listTools(tags)` keeps the Tools
+that carry every given tag, `describe(name)` returns the contract with JSON schemas,
+and `run(name, input, options)` goes through AgentToolExecutor with
+`allowUnboundTools`: input/output validation, scope, approval, audit, hooks, retries
+and deadline stay; only the agent visibility check is absent, so the caller decides
+which Tools it may run (for example by tag). `run` returns the `AgentToolResult` and
+does not throw for a Tool failure. Write and external Tools still need an audit sink
+and pass the approval policy. Check:
+[agent.tool-runner.test.ts](test/agent.tool-runner.test.ts).
 
 `fromDefinition` picks the assigned names from `catalog.listTools()` and creates a
 separate run snapshot. The registry does not cancel the permission, approval and input
