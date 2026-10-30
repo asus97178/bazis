@@ -1,0 +1,70 @@
+import { Column, Entity, Index, UUID } from "../../../orm";
+
+/** `completed` and `cancelled` are finished: retention deletes them. `failed` waits for retry or cancel. */
+export type InstanceStatus = "running" | "completed" | "cancelled" | "failed";
+
+export type StartedVia = "manual" | "event" | "schedule";
+
+/**
+ * One run of a process. Bound to the version it started with: a new publication
+ * does not touch it. Its data: the input, the variables `saveTo` writes and the
+ * result of each step by node id.
+ */
+@Index(["partition", "status"])
+@Index(["processKey", "status"])
+@Index(["status", "endedAt"])
+@Entity({ table: "bazis_wf_run_instances" })
+export class WfInstance {
+  @UUID({ version: "v7" })
+  id = "";
+
+  /** The version (a Definitions row: a reference without a foreign key). */
+  @Column({ type: "uuid" })
+  versionId = "";
+
+  @Column({ type: "text" })
+  processKey = "";
+
+  @Column({ type: "integer" })
+  version = 0;
+
+  /** The application's scope: a space, an organization. Never interpreted. */
+  @Column({ type: "text", nullable: true })
+  partition: string | null = null;
+
+  @Column({ type: "text" })
+  status: InstanceStatus = "running";
+
+  @Column({ type: "json" })
+  input: Record<string, unknown> = {};
+
+  @Column({ type: "json" })
+  vars: Record<string, unknown> = {};
+
+  /** The result of every passed step by node id: `$nodes.<node>.<field>`. */
+  @Column({ type: "json" })
+  nodes: Record<string, unknown> = {};
+
+  @Index()
+  @Column({ type: "text", nullable: true })
+  businessKey: string | null = null;
+
+  @Column({ type: "text" })
+  startedVia: StartedVia = "manual";
+
+  @Column({ type: "text" })
+  startedByKind: "user" | "system" = "user";
+
+  @Column({ type: "text" })
+  startedById = "";
+
+  /** Why the instance failed: node, code and message. */
+  @Column({ type: "json", nullable: true })
+  error: { readonly node: string; readonly code: string; readonly message: string } | null = null;
+
+  @Column({ type: "createdAt" })
+  createdAt = new Date(0);
+
+  @Column({ type: "datetime", nullable: true })
+  endedAt: Date | null = null;
+}

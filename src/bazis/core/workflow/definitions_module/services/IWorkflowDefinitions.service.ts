@@ -1,0 +1,79 @@
+import type { AgentToolContract } from "../../../agent";
+import type { ProcessDocument, ProcessIssue } from "../../../../library/workflow";
+import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
+
+export interface ProcessSummary {
+  readonly key: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly latestVersion: number | null;
+  readonly retentionDays: number | null;
+  readonly archived: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export interface ProcessDetails extends ProcessSummary {
+  /** The draft a designer edits; may hold validation errors. */
+  readonly draft: unknown;
+  readonly draftUpdatedAt: Date | null;
+  readonly draftUpdatedBy: WorkflowActor | null;
+}
+
+export interface VersionSummary {
+  readonly id: string;
+  readonly key: string;
+  readonly version: number;
+  readonly publishedAt: Date;
+  readonly publishedBy: WorkflowActor;
+}
+
+export interface VersionDetails extends VersionSummary {
+  readonly document: ProcessDocument;
+}
+
+export interface CreateProcess {
+  readonly key: string;
+  readonly title: string;
+  readonly description?: string | null;
+  readonly retentionDays?: number | null;
+}
+
+export interface UpdateProcess {
+  readonly title?: string;
+  readonly description?: string | null;
+  readonly retentionDays?: number | null;
+  readonly archived?: boolean;
+}
+
+export interface ProcessListQuery extends WorkflowPaging {
+  readonly archived?: boolean;
+  /** Part of the key or title, case-insensitive. */
+  readonly search?: string;
+}
+
+/**
+ * The process catalog: drafts and immutable published versions
+ * (WORKFLOW-001 §3). Errors are {@link WorkflowError}: `not_found`, `conflict`,
+ * `invalid_document` with the issues, `invalid_input`.
+ */
+export abstract class IWorkflowDefinitions {
+  abstract list(query?: ProcessListQuery): Promise<WorkflowPage<ProcessSummary>>;
+  abstract get(key: string): Promise<ProcessDetails>;
+  abstract create(process: CreateProcess, actor: WorkflowActor): Promise<ProcessDetails>;
+  abstract update(key: string, changes: UpdateProcess, actor: WorkflowActor): Promise<ProcessDetails>;
+  /** Stores the draft even with errors and returns every validation finding. */
+  abstract saveDraft(key: string, document: unknown, actor: WorkflowActor): Promise<{ readonly issues: readonly ProcessIssue[] }>;
+  /** Validates the draft and stores it as the next version; the same document again returns the latest version. */
+  abstract publish(key: string, actor: WorkflowActor): Promise<VersionDetails>;
+  abstract versions(key: string): Promise<readonly VersionSummary[]>;
+  abstract version(key: string, version: number): Promise<VersionDetails>;
+  /** The latest published version of a process that is not archived. */
+  abstract latest(key: string): Promise<VersionDetails>;
+  /** A version by id, for the engine; `undefined` if there is none. */
+  abstract versionById(id: string): Promise<VersionDetails | undefined>;
+  /** Processes with a retention period: what the retention service deletes. */
+  abstract retentionPolicies(): Promise<readonly { readonly key: string; readonly retentionDays: number }[]>;
+  /** The Tools a service task may call, with their input and output schemas. */
+  abstract tools(): readonly AgentToolContract[];
+}

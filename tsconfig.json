@@ -21,6 +21,12 @@
       "bazis": [
         "./src/bazis/index.ts"
       ],
+      "bazis/core/workflow": [
+        "./src/bazis/core/workflow/index.ts"
+      ],
+      "bazis/library/workflow": [
+        "./src/bazis/library/workflow/index.ts"
+      ],
       "bazis/core/agent": [
         "./src/bazis/core/agent/index.ts"
       ],

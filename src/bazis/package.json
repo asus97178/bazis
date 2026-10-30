@@ -1,6 +1,6 @@
 {
   "name": "bazis",
-  "version": "0.123.0",
+  "version": "0.124.0",
   "description": "Modular backend framework for Bun in TypeScript: DI wired by codegen, HTTP, a PostgreSQL ORM, JWT, WebSocket, agents and a CLI.",
   "license": "MIT",
   "author": "Alexander Alenin",
@@ -43,6 +43,7 @@
     "./core/orm": "./core/orm/index.ts",
     "./core/testing": "./core/testing/index.ts",
     "./core/websocket": "./core/websocket/index.ts",
+    "./core/workflow": "./core/workflow/index.ts",
     "./library/boundary": "./library/boundary/index.ts",
     "./library/http-client": "./library/http-client/index.ts",
     "./library/jsonapi": "./library/jsonapi/index.ts",
@@ -52,7 +53,8 @@
     "./library/redaction": "./library/redaction/index.ts",
     "./library/terminal": "./library/terminal/index.ts",
     "./library/ui": "./library/ui/index.ts",
-    "./library/validation": "./library/validation/index.ts"
+    "./library/validation": "./library/validation/index.ts",
+    "./library/workflow": "./library/workflow/index.ts"
   },
   "bin": {
     "bazis": "./cli/main.ts"
