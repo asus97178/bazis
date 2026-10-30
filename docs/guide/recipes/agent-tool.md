@@ -5,7 +5,7 @@
 `TasksService` из [рецепта CRUD](crud-module.md). Каждый видит и меняет
 только свои задачи, каждый вызов инструмента остаётся в журнале.
 
-Проверено на bazis 0.111.2. Модель в проверке — сервер с
+Проверено на bazis 0.123.0. Модель в проверке — сервер с
 OpenAI-совместимым API, который отвечает по сценарию.
 
 ## 1. Подключение модели
@@ -44,7 +44,7 @@ export class AppInfra {}
 работают от его имени:
 
 ```ts
-// tasks/ai/actAs.ts
+// tasks/tools/actAs.ts
 import type { AgentToolExecutionContext } from "bazis/core/agent";
 import type { CurrentUser } from "../../auth/CurrentUser";
 import type { TokenKind } from "../../auth/tokenKinds";
@@ -87,7 +87,7 @@ export function actAs(current: CurrentUser, context: AgentToolExecutionContext):
 ```
 
 ```ts
-// tasks/ai/ListTasks.tool.ts
+// tasks/tools/ListTasks.tool.ts
 import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
 import { Validator } from "bazis/library/validation";
 import { CurrentUser } from "../../auth/CurrentUser";
@@ -118,6 +118,7 @@ export class ListTasksOutput {
   input: ListTasksInput,
   output: ListTasksOutput,
   sideEffect: "read",
+  callers: ["agent"],
 })
 export class ListTasksTool {
   constructor(private readonly tasks: ITasksService, private readonly current: CurrentUser) {}
@@ -134,7 +135,7 @@ export class ListTasksTool {
 ```
 
 ```ts
-// tasks/ai/CreateTask.tool.ts
+// tasks/tools/CreateTask.tool.ts
 import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
 import { Validator } from "bazis/library/validation";
 import { CurrentUser } from "../../auth/CurrentUser";
@@ -163,6 +164,7 @@ export class CreatedTask {
   input: CreateTaskInput,
   output: CreatedTask,
   sideEffect: "write",
+  callers: ["agent"],
 })
 export class CreateTaskTool {
   constructor(private readonly tasks: ITasksService, private readonly current: CurrentUser) {}
@@ -188,8 +190,8 @@ export class CreateTaskTool {
 политика пропускает вызовы только от вошедшего пользователя:
 
 ```ts
-// tasks/ai/agentOptions.ts
-import { AGENT_RUNTIME_OPTIONS, type AgentRuntimeOptions } from "bazis/core/agent";
+// tasks/agentOptions.ts
+import { TOOL_EXECUTION_OPTIONS, type ToolExecutionOptions } from "bazis/core/agent";
 import { DI } from "bazis/core/di";
 import { LOGGER, type Logger } from "bazis/core/kernel";
 
@@ -197,18 +199,15 @@ import { LOGGER, type Logger } from "bazis/core/kernel";
  * Every tool call leaves a line in the application log, and a tool runs only
  * for a signed-in user: the controller puts the user into the run's metadata.
  */
-export const agentOptions = DI.singleton(DI.factoryProvider(AGENT_RUNTIME_OPTIONS, [LOGGER], (logger: Logger): AgentRuntimeOptions => ({
-  maxSteps: 4,
-  toolExecutorOptions: {
-    auditSink: (entry) => logger.info("agent tool", {
-      phase: entry.phase,
-      tool: entry.toolName,
-      user: entry.metadata.userId,
-      status: entry.result?.status,
-      durationMs: entry.durationMs,
-    }),
-    approvalPolicy: (request) => typeof request.metadata.userId === "string",
-  },
+export const agentOptions = DI.singleton(DI.factoryProvider(TOOL_EXECUTION_OPTIONS, [LOGGER], (logger: Logger): ToolExecutionOptions => ({
+  auditSink: (entry) => logger.info("agent tool", {
+    phase: entry.phase,
+    tool: entry.toolName,
+    user: entry.metadata.userId,
+    status: entry.result?.status,
+    durationMs: entry.durationMs,
+  }),
+  approvalPolicy: (request) => typeof request.metadata.userId === "string",
 })));
 ```
 

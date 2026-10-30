@@ -53,7 +53,9 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `TOOL_NOT_REGISTERED` | `Tool "orders.find" is not registered.` | Модель назвала инструмент, которого нет |
 | `TOOL_NOT_VISIBLE_TO_AGENT` | `Tool "orders.cancel" is not visible to agent "support".` | Инструмент есть, но не в списке агента |
 | `TOOL_CALL_INVALID` | `Tool call is invalid.` | Неверная форма вызова от модели |
-| `TOOL_AGENT_REQUIRED` | `Tool "orders.find" execution requires agentName.` | Инструмент вызван вне агента без `agentName` |
+| `TOOL_CALLER_NOT_ALLOWED` | `Tool "orders.cancel" may not be called by "workflow" (callers: agent).` | Вызывающего нет в `callers` инструмента; `status: "denied"` ([Инструменты](../../ai/tools.md#инструмент)) |
+| `TOOL_CALLER_REQUIRED` | `Tool "orders.find" execution requires an agent or a caller.` | Исполнитель вызван без агента и без `caller` (с 0.123.0; раньше `TOOL_AGENT_REQUIRED`) |
+| `TOOL_ACTOR_REQUIRED` | `Tool "orders.cancel" changes data: pass actor, the user or system the call runs for.` | `ToolRunner` вызывает `write` или `external` без `actor` ([Вызов без модели](../../ai/tools.md#вызов-без-модели)) |
 | `TOOL_METHOD_MISSING` | `Tool "orders.find" must expose execute(input, context).` | В классе инструмента нет `execute` |
 | `TOOL_RESOLVE_FAILED` | `Tool could not be created.` | Не удалось создать инструмент из DI |
 
@@ -73,7 +75,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 | Код | Текст | Когда |
 | --- | --- | --- |
-| `TOOL_AUDIT_REQUIRED` | `Tool "orders.cancel" has side effects and requires an audit sink.` | Инструмент с записью без `auditSink` в `AGENT_RUNTIME_OPTIONS` ([Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение)) |
+| `TOOL_AUDIT_REQUIRED` | `Tool "orders.cancel" has side effects and requires an audit sink.` | Инструмент с записью без `auditSink` в `TOOL_EXECUTION_OPTIONS` ([Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение)) |
 | `TOOL_APPROVAL_REQUIRED` | `Tool "orders.cancel" requires explicit approval.` | Инструмент объявлен с `approval: "required"`, а политики подтверждения нет |
 | `TOOL_APPROVAL_POLICY_MISSING` | `Tool "orders.cancel" requires an approval policy.` | `approval: "policy"` у инструмента с записью, а политики нет. Инструменты только для чтения без политики выполняются |
 | `TOOL_APPROVAL_DENIED` | `Tool execution was denied by approval policy.` | Политика отказала; `status: "denied"` |

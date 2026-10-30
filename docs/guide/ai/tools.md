@@ -1,20 +1,21 @@
 # Инструменты
 
-Инструмент — то, что агент может сделать в вашем приложении: найти заказ,
+Инструмент — операция вашего приложения с контрактом: найти заказ,
 посчитать цену, отменить бронь. Это класс с декоратором `@Tool` и методом
-`execute`. Агент вызывает инструмент по имени, рантайм проверяет аргументы,
-создаёт экземпляр через DI и возвращает модели результат.
+`execute`. Вызвать его может агент (его выбирает модель) или код, который
+решает сам, — например движок бизнес-процессов. Исполнитель один: он
+проверяет аргументы, создаёт экземпляр через DI и возвращает результат.
 
 Как агенту дают инструменты — в главе [Агенты](agents.md). Здесь — как
 написать сам инструмент.
 
-Все примеры проверены на bazis 0.111.0. Модель в проверках — скрипт с
+Все примеры проверены на bazis 0.123.0. Модель в проверках — скрипт с
 заданными шагами.
 
 ## Инструмент
 
 ```ts
-// catalog/Price.tool.ts
+// catalog/tools/Price.tool.ts
 import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
 import { Validator } from "bazis/library/validation";
 
@@ -34,6 +35,7 @@ export class PriceOutput {
   input: PriceInput,
   output: PriceOutput,
   sideEffect: "read",
+  callers: ["agent"],
 })
 export class PriceTool {
   constructor(private readonly prices: PriceService) {}
@@ -53,7 +55,10 @@ export class PriceTool {
 export class CatalogModule {}
 ```
 
-Инструмент объявляется полем `tools` своего модуля и видит его сервисы.
+Инструмент лежит в папке `tools/` модуля, которому принадлежит операция,
+объявляется полем `tools` этого модуля и видит его сервисы. Как
+контроллер, он тонкий: проверяет вход, вызывает сервис и собирает
+результат, а правила остаются в сервисе.
 Регистрировать его в `providers` не нужно: каждый вызов получает свою
 область DI и новый экземпляр, как контроллер на запрос.
 
@@ -66,7 +71,18 @@ export class CatalogModule {}
 | `sideEffect` | `none`, `read`, `write`, `external` — что инструмент меняет |
 | `approval` | `never`, `policy`, `required` — нужно ли подтверждение, см. [Агенты](agents.md#настройки-аудит-и-подтверждение) |
 | `timeoutMs` | Срок вызова, по умолчанию 30 секунд |
-| `tags` | Метки для каталога и редактора агентов |
+| `callers` | **Обязательно.** Кто может вызывать: `"agent"` — агенты, другой id (`"workflow"`) — код через [`ToolRunner`](#вызов-без-модели) |
+| `tags` | Метки для каталога и поиска; на доступ не влияют |
+
+Инструмент без `callers` останавливает запуск:
+
+```text
+[bazis] configuration error: Tool "catalog.price" (PriceTool) declares no callers: list who may call it, for example callers: ["agent"] for LLM agents or ["workflow"] for a process engine.
+```
+
+Вызов от того, кого нет в `callers`, получает отказ
+`TOOL_CALLER_NOT_ALLOWED` ещё до проверки аргументов. Агенту инструмент,
+кроме `callers: ["agent"]`, нужен и в его `toolNames`.
 
 Пишите `description` для модели: коротко, что делает и когда звать. От
 него зависит, выберет ли модель инструмент.
@@ -178,7 +194,7 @@ throw new Error("db host 10.0.0.5 is down, password=hunter2")
 операции — по сроку они прервутся:
 
 ```ts
-@Tool({ name: "lab.slow", description: "Медленное чтение.", sideEffect: "read", timeoutMs: 100 })
+@Tool({ name: "lab.slow", description: "Медленное чтение.", sideEffect: "read", timeoutMs: 100, callers: ["agent"] })
 ```
 
 ```text
@@ -194,7 +210,7 @@ throw new Error("db host 10.0.0.5 is down, password=hunter2")
 останавливается, модель больше не вызывается:
 
 ```text
-@Tool({ name: "lab.slow-write", sideEffect: "write", timeoutMs: 100 })
+@Tool({ name: "lab.slow-write", sideEffect: "write", timeoutMs: 100, callers: ["agent"] })
 
 → инструмент: TOOL_TIMEOUT_OUTCOME_UNKNOWN
 → запуск:     failed, AGENT_TOOL_OUTCOME_UNKNOWN
@@ -226,11 +242,12 @@ if (gateway.busy) throw new AgentToolPreCommitError("Платёжный шлюз
 ## Повторы
 
 По умолчанию упавший вызов не повторяется: ошибка уходит модели. Повторы
-включает `retryPolicy` в настройках рантайма:
+включает `retryPolicy` в настройках исполнения инструментов — они общие
+для агентов и `ToolRunner`:
 
 ```ts
-DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, {
-  toolExecutorOptions: { retryPolicy: { maxAttempts: 3, delayMs: 100, backoff: "exponential" } },
+DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
+  retryPolicy: { maxAttempts: 3, delayMs: 100, backoff: "exponential" },
 }))
 ```
 
@@ -256,6 +273,50 @@ lab.flaky падает два раза:
 lab.flaky-write: AgentToolPreCommitError, затем успех
 → success, {"attempt":3,"key":"agent:40:inv-d52c…:2:c1"}
 ```
+
+## Вызов без модели
+
+Когда инструмент выбирает код, а не модель — движок бизнес-процессов,
+задача по расписанию, — его вызывает `ToolRunner`. Фреймворк регистрирует
+его сам, если в приложении есть инструменты. Код привязывает его к своему
+id вызывающего:
+
+```ts
+import { ToolRunner, type BoundToolRunner } from "bazis/core/agent";
+
+export class ProcessSteps {
+  private readonly tools: BoundToolRunner;
+
+  constructor(runner: ToolRunner) {
+    this.tools = runner.as("workflow");
+  }
+
+  run(step: { tool: string; input: unknown }, instanceId: string, userId: string) {
+    return this.tools.run(step.tool, step.input, {
+      actor: { kind: "user", id: userId },
+      idempotencyKey: `${instanceId}:${step.tool}`,
+    });
+  }
+}
+```
+
+- `as("workflow")` видит только инструменты, у которых в `callers` есть
+  `"workflow"`: `listTools(tags)`, `getTool`, `describe` и `run`. Имя
+  инструмента может прийти из данных (сохранённого процесса), но вызвать
+  чужой инструмент не получится — `TOOL_CALLER_NOT_ALLOWED`.
+- `actor` — от чьего имени вызов: `{ kind: "user" | "system", id }`. Для
+  `write` и `external` он обязателен (`TOOL_ACTOR_REQUIRED`); политика
+  подтверждения и аудит получают его вместе с `caller`.
+- `run` не бросает исключение из-за ошибки инструмента: она приходит
+  результатом со `status` и `error.code`.
+- Проверка аргументов, подтверждение, аудит, хуки, повторы и срок — те же,
+  что у агента; настраиваются один раз в `TOOL_EXECUTION_OPTIONS`.
+- `as("agent")` запрещён: агенты вызывают инструменты через
+  [`AgentRuntime`](agents.md).
+
+> [!NOTE]
+> `callers`, папка `tools/`, `ToolRunner` и `TOOL_EXECUTION_OPTIONS` — с
+> версии 0.123.0 ([переход](../reference/upgrading.md#01230)).
 
 ## Дальше
 

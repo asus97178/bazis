@@ -1,15 +1,18 @@
 # `bazis/core/agent`
 
 Агенты: инструменты, запуск, аудит и подтверждение, хуки, контракты для
-своих адаптеров моделей. Список — по пакету 0.120.0.
+своих адаптеров моделей. Список — по пакету 0.123.0.
 
 ## Для приложения
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Tool(options)` | Класс-инструмент, который вызывает модель: `name`, `description`, `input`, `output`, `sideEffect`, `approval`, `timeoutMs`, `tags` | [Инструменты](../../ai/tools.md) |
+| `Tool(options)` | Класс-инструмент: `name`, `description`, `callers`, `input`, `output`, `sideEffect`, `approval`, `timeoutMs`, `tags` | [Инструменты](../../ai/tools.md) |
+| `ToolRunner` | Вызов инструментов без модели: `as(caller)` возвращает `BoundToolRunner`; внедряется по типу | [Вызов без модели](../../ai/tools.md#вызов-без-модели) |
+| `BoundToolRunner` | Инструменты одного вызывающего: `listTools(tags?)`, `getTool`, `describe`, `run(name, input, options)` | [Вызов без модели](../../ai/tools.md#вызов-без-модели) |
+| `TOOL_EXECUTION_OPTIONS` | Настройки исполнения инструментов для агентов и `ToolRunner`: подтверждение, журнал аудита, хуки, сроки, повторы | [Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение) |
 | `AgentRuntime` | Запуск агента: `run(definition, options)`, проверка определения `check(definition)`, `listTools()`; внедряется по типу | [Запуск](../../ai/agents.md#запуск) |
-| `AGENT_RUNTIME_OPTIONS` | Настройки рантайма: пределы, политика подтверждения, журнал аудита, сборка контекста | [Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение) |
+| `AGENT_RUNTIME_OPTIONS` | Настройки рантайма агента: пределы шагов и времени, сборка контекста | [Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение) |
 | `ToolError` | Ошибка, текст которой модель видит как есть | [Ошибки](../../ai/tools.md#ошибки) |
 | `AgentToolPreCommitError` | Ошибка «запись не началась»: вызов можно повторить с ключом идемпотентности | [Повторы](../../ai/tools.md#повторы) |
 | `AgentSetupError`, `AgentRuntimeError`, `AgentToolExecutionError`, `AgentSemanticError`, `AgentModelTimeoutError` | Ошибки настройки и адаптеров | [Ошибки агентов](../errors/agents.md#классы-исключений) |
@@ -38,7 +41,7 @@
   `AgentRuntimeToolCallContext`, `AgentRuntimeToolExecutionOptions`,
   `AgentInvocation`, `AgentInvocationOptions`, `AgentUsage`,
   `AgentFinishReason`, `AgentStreamEvent`.
-- **Инструменты:** `ToolOptions`, `ToolDefinition`, `ToolMetadata`,
+- **Инструменты:** `ToolOptions`, `ToolExecutionOptions`, `ToolRunOptions`, `ToolDefinition`, `ToolMetadata`,
   `ToolSideEffect`, `ToolApproval`, `AgentExecutableTool`,
   `AgentToolContract`, `AgentToolCall`, `AgentToolResult`,
   `AgentToolResultStatus`, `AgentToolError`, `AgentToolExecutionContext`,

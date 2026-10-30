@@ -184,6 +184,48 @@ email!: string;
 недоступны сервисы из DI. Проверки, которым нужна база данных приложения,
 обычно делают в сервисе, а в модели оставляют проверки формы данных.
 
+## Правила как данные: `Validator.ruleSet`
+
+Бывает, что поля известны только во время работы: таблицы, которые
+создаёт пользователь, правила, сохранённые в базе. Класс с `@Validator`
+для них не написать — правила можно передать данными:
+
+```ts
+import { Validator } from "bazis/library/validation";
+
+const rules = Validator.ruleSet({
+  title: { required: true, notEmpty: true, maxLength: 200 },
+  amount: [{ type: "number", min: 0 }, { integer: true }],
+});
+
+const result = rules.validate({ title: "", amount: -1.5 });
+```
+
+`result.isValid` — `false`, в `result.errors` три нарушения (проверено на
+0.123.0):
+
+```json
+[
+  { "property": "title", "code": "notEmpty", "message": "Field \"title\" must not be empty" },
+  { "property": "amount", "code": "min", "message": "Field \"amount\" must be at least 0" },
+  { "property": "amount", "code": "integer", "message": "Field \"amount\" must be an integer" }
+]
+```
+
+- Параметры правил, коды и тексты — те же, что у `@Validator`; несколько
+  правил одного поля — массивом, как несколько декораторов.
+- Правила разбираются один раз при создании: держите набор рядом с
+  описанием таблицы и переиспользуйте.
+- `validate` — синхронно, `validateAsync` — с асинхронными `custom`.
+  `rules.fields` — имена полей с правилами.
+- `required` ловит только `undefined` и `null`; пустую строку — `notEmpty`,
+  как и у `@Validator`.
+- Читаются только перечисленные поля. Имя из `Object.prototype`
+  (`__proto__`, `constructor`) набор не примет.
+
+> [!NOTE]
+> `Validator.ruleSet` — с версии 0.121.0.
+
 ## Свои тексты и русский язык
 
 Свой текст для правила — через `message`. В тексте работают подстановки
