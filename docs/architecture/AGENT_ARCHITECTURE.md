@@ -12,6 +12,9 @@ Then a path to run a definition as data and a separate user-facing Vue chat were
 added. In bazis 0.99.0 the declarations through classes (`@Agent`, `@Task`,
 `@Prompt`, `@Module.agents`) were removed: a definition is the only way to declare an agent.
 
+Tools are shared by agents and other callers (a process engine) per
+[TOOLS-001](TOOLS.md).
+
 ## 1. The accepted separation
 
 **An application has modules and, separately, agents. Agents have tools.**

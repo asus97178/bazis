@@ -250,8 +250,10 @@ needs no `model/`, `DbContext` or `migrations/`. HTTP and AI are optional as wel
 Empty directories and "for the future" stubs are not created.
 
 Agent declarations and the prompts they own live outside the module per
-[AGENT-ARCH-001](AGENT_ARCHITECTURE.md). The `ai/tools` directory may contain
-adapters of this module's public services; it does not define the set of agents.
+[AGENT-ARCH-001](AGENT_ARCHITECTURE.md). Tools live in the module's `tools/`
+directory and declare who may call them per [TOOLS-001](TOOLS.md) (accepted;
+the `ai/tools` layout below is replaced in bazis 0.123.0); they do not define the
+set of agents.
 The current CLI `--full` still creates an agent inside the module: splitting the
 generation is part of the first migration stage, not a completed change of this layout.
 
