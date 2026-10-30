@@ -11,7 +11,7 @@ afterEach(() => { restoreGeneratedOpenApiRegistry(snapshot); });
 
 class SharedInput { declare id: string; }
 class SharedOutput { declare answer: string; }
-@Tool({ name: "schema.identity", description: "Exact DTO identities", input: SharedInput, output: SharedOutput })
+@Tool({ callers: ["agent"], name: "schema.identity", description: "Exact DTO identities", input: SharedInput, output: SharedOutput })
 class IdentityTool { execute(input: SharedInput) { return { answer: input.id }; } }
 
 function identityCatalog() {

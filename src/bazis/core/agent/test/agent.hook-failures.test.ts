@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { withToolExecution } from "./toolExecution.fixture";
 import { DiError, Module, createContainer, scoped } from "@/core/di";
 import { defineConfig, secret } from "@/core/kernel";
 import type { LogFields, Logger } from "@/core/kernel/logging/Logger";
@@ -24,7 +25,7 @@ class MemoryLogger implements Logger {
   error(message: string, fields?: LogFields) { this.errors.push({ message, fields }); }
 }
 
-@Tool({ name: "orders.cancel", description: "Cancels an order.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "orders.cancel", description: "Cancels an order.", sideEffect: "write" })
 class CancelTool { execute() { return { cancelled: true }; } }
 
 class LimitHook {
@@ -50,15 +51,12 @@ function cancelOnce(requests: AgentModelRequest[]): AgentModelProvider {
 async function runWith(hooks: NonNullable<Parameters<typeof Module>[0]["agentToolHooks"]>) {
   @Module({ tools: [CancelTool], providers: [scoped(CancelTool)], agentToolHooks: hooks })
   class OrdersModule {}
-  const container = createContainer(OrdersModule);
   const audit: AgentToolAuditEntry[] = [];
+  const container = createContainer(withToolExecution(OrdersModule, { auditSink: (entry) => { audit.push(entry); }, approvalPolicy: () => true }));
   const logger = new MemoryLogger();
   const requests: AgentModelRequest[] = [];
   try {
-    const runtime = new AgentRuntime(container, cancelOnce(requests), {
-      logger,
-      toolExecutorOptions: { auditSink: (entry) => { audit.push(entry); }, approvalPolicy: () => true },
-    });
+    const runtime = new AgentRuntime(container, cancelOnce(requests), { logger });
     const result = await runtime.run({ name: "operator", instructions: "", toolNames: ["orders.cancel"] }, { input: "cancel" });
     return { result, audit, logger };
   } finally {

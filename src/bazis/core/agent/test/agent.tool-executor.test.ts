@@ -46,7 +46,7 @@ const defaultedRetryObservations: Array<{
 }> = [];
 
 @Tool({
-  name: "catalog.defaulted-retry",
+  callers: ["agent"], name: "catalog.defaulted-retry",
   description: "Checks stable effective input across retries.",
   input: DefaultedRetryInput,
   sideEffect: "read",
@@ -80,7 +80,7 @@ class DelayedDisposeState {
   }
 }
 
-@Tool({ name: "catalog.delayed-dispose", description: "Checks bounded scope disposal.", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "catalog.delayed-dispose", description: "Checks bounded scope disposal.", sideEffect: "read" })
 class DelayedDisposeTool {
   constructor(private readonly _state: DelayedDisposeState) {}
 
@@ -97,7 +97,7 @@ class ThrowingDisposeState {
 
 let postCommitWriteCalls = 0;
 
-@Tool({ name: "catalog.delayed-dispose-write", description: "Writes before a slow disposer.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "catalog.delayed-dispose-write", description: "Writes before a slow disposer.", sideEffect: "write" })
 class DelayedDisposeWriteTool {
   constructor(private readonly _state: DelayedDisposeState) {}
 
@@ -107,7 +107,7 @@ class DelayedDisposeWriteTool {
   }
 }
 
-@Tool({ name: "catalog.throwing-dispose-write", description: "Writes before a throwing disposer.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "catalog.throwing-dispose-write", description: "Writes before a throwing disposer.", sideEffect: "write" })
 class ThrowingDisposeWriteTool {
   constructor(private readonly _state: ThrowingDisposeState) {}
 
@@ -118,7 +118,7 @@ class ThrowingDisposeWriteTool {
 }
 
 @Tool({
-  name: "catalog.invalid-write-output",
+  callers: ["agent"], name: "catalog.invalid-write-output",
   description: "Writes before returning an invalid output.",
   output: SearchOutput,
   sideEffect: "write",
@@ -130,7 +130,7 @@ class InvalidWriteOutputTool {
   }
 }
 
-@Tool({ name: "catalog.commit-then-throw", description: "Commits and then throws.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "catalog.commit-then-throw", description: "Commits and then throws.", sideEffect: "write" })
 class CommitThenThrowTool {
   execute(): never {
     postCommitWriteCalls += 1;
@@ -149,7 +149,7 @@ class ToolState {
 }
 
 @Tool({
-  name: "catalog.search",
+  callers: ["agent", "jobs"], name: "catalog.search",
   description: "Find products in the catalog.",
   input: SearchInput,
   output: SearchOutput,
@@ -173,7 +173,7 @@ class SearchCatalogTool {
 let reindexCalls = 0;
 
 @Tool({
-  name: "catalog.reindex",
+  callers: ["agent"], name: "catalog.reindex",
   description: "Rebuild product search index.",
   sideEffect: "write",
 })
@@ -198,7 +198,7 @@ class RetryToolState {
 }
 
 @Tool({
-  name: "catalog.flaky-read",
+  callers: ["agent"], name: "catalog.flaky-read",
   description: "A read tool that succeeds after transient failures.",
   sideEffect: "read",
 })
@@ -225,7 +225,7 @@ let flakyWriteCalls = 0;
 const flakyWriteIdempotencyKeys: JsonValue[] = [];
 
 @Tool({
-  name: "catalog.flaky-write",
+  callers: ["agent"], name: "catalog.flaky-write",
   description: "A write tool that succeeds after a transient failure.",
   sideEffect: "write",
 })
@@ -246,13 +246,13 @@ class FlakyWriteTool {
 }
 
 @Tool({
-  name: "catalog.missing-execute",
+  callers: ["agent"], name: "catalog.missing-execute",
   description: "A broken tool without execute method.",
 })
 class MissingExecuteTool {}
 
 @Tool({
-  name: "catalog.invalid-result",
+  callers: ["agent"], name: "catalog.invalid-result",
   description: "A broken tool returning non-JSON data.",
 })
 class InvalidResultTool {
@@ -262,7 +262,7 @@ class InvalidResultTool {
 }
 
 @Tool({
-  name: "catalog.bad-output",
+  callers: ["agent"], name: "catalog.bad-output",
   description: "A broken tool returning data that fails output validation.",
   output: SearchOutput,
 })
@@ -286,7 +286,7 @@ class SlowToolState {
 }
 
 @Tool({
-  name: "catalog.slow",
+  callers: ["agent"], name: "catalog.slow",
   description: "A slow tool.",
   timeoutMs: 1,
 })
@@ -306,7 +306,7 @@ class SlowTool {
 let hiddenToolCalls = 0;
 
 @Tool({
-  name: "catalog.hidden",
+  callers: ["agent"], name: "catalog.hidden",
   description: "A registered tool not visible to the catalog agent.",
 })
 class HiddenTool {
@@ -317,7 +317,7 @@ class HiddenTool {
 }
 
 @Tool({
-  name: "catalog.secret-echo",
+  callers: ["agent"], name: "catalog.secret-echo",
   description: "Echoes input and sensitive output for audit redaction tests.",
   sideEffect: "read",
 })
@@ -927,7 +927,7 @@ describe("agent tool executor", () => {
       });
 
       expect(withoutAgent.status).toBe("error");
-      expect(withoutAgent.error?.code).toBe("TOOL_AGENT_REQUIRED");
+      expect(withoutAgent.error?.code).toBe("TOOL_CALLER_REQUIRED");
       expect(unknownAgent.error?.code).toBe("AGENT_NOT_REGISTERED");
       expect(hidden.status).toBe("denied");
       expect(hidden.error?.code).toBe("TOOL_NOT_VISIBLE_TO_AGENT");
@@ -937,13 +937,19 @@ describe("agent tool executor", () => {
     }
   });
 
-  test("can explicitly execute tools without agent visibility checks", async () => {
-    const { executor, container } = createExecutor({ allowUnboundTools: true, schemaValidator: modelValidatorAdapter });
+  // 0.123.0 (TOOLS-001): without an agent the caller must be named, and the
+  // Tool's callers decide; there is no "unbound" bypass any more.
+  test("a caller listed in callers runs the Tool without an agent; others are refused", async () => {
+    const { executor, container } = createExecutor({ schemaValidator: modelValidatorAdapter });
     try {
-      const result = await executor.execute(agentToolCall({ id: "call-1", name: "catalog.search", input: { query: "keyboard" } }));
+      const listed = await executor.execute(agentToolCall({ id: "call-1", name: "catalog.search", input: { query: "keyboard" } }), { caller: "jobs", actor: { kind: "system", id: "nightly" } });
+      expect(listed.status).toBe("success");
+      expect(listed.metadata).toMatchObject({ executionApproval: "not-required" });
 
-      expect(result.status).toBe("success");
-      expect(result.metadata).toMatchObject({ executionApproval: "not-required" });
+      const unlisted = await executor.execute(agentToolCall({ id: "call-2", name: "catalog.search", input: { query: "keyboard" } }), { caller: "workflow" });
+      expect(unlisted.status).toBe("denied");
+      expect(unlisted.error?.code).toBe("TOOL_CALLER_NOT_ALLOWED");
+      expect(unlisted.error?.message).toBe('Tool "catalog.search" may not be called by "workflow" (callers: agent, jobs).');
     } finally {
       await container.dispose();
     }

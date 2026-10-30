@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { withToolExecution } from "./toolExecution.fixture";
 import { createContainer, Module, scoped } from "../../di";
 import { registerGeneratedOpenApiMetadata, restoreGeneratedOpenApiRegistry, snapshotGeneratedOpenApiRegistry } from "../../http/OpenApi/generatedOpenApiRegistry";
 import { registerRequestModelShape, restoreRequestModelRegistry, snapshotRequestModelRegistry } from "../../http/Binding/requestModelRegistry";
@@ -41,7 +42,7 @@ describe("Agent regressions: interrupted effects", () => {
           let effects = 0, disposals = 0;
           const events: AgentToolSettlementEventV1[] = [];
           const observerOutcomes: string[] = [];
-          @Tool({ name: "audit.pending", description: "Controlled pending effect", sideEffect })
+          @Tool({ callers: ["agent"], name: "audit.pending", description: "Controlled pending effect", sideEffect })
           class PendingTool {
             async execute() { started.resolve(); await release.promise; effects++; return { done: true }; }
             [Symbol.dispose]() { disposals++; disposed.resolve(); }
@@ -88,7 +89,7 @@ describe("Agent regressions: interrupted effects", () => {
   test("runtime stops before the next model dispatch when hooked writes time out", async () => {
     const release = gate(), disposed = gate();
     let calls = 0, effects = 0;
-    @Tool({ name: "audit.write", description: "Delayed write", sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "audit.write", description: "Delayed write", sideEffect: "write" })
     class WriteTool {
       async execute() { await release.promise; effects++; return {}; }
       [Symbol.dispose]() { disposed.resolve(); }
@@ -100,14 +101,14 @@ describe("Agent regressions: interrupted effects", () => {
       { kind: "settlement", id: "settle", version: 1, handler: Settlement },
       { kind: "observer", id: "observe", version: 1, handler: Observer },
     ], exports: [] }) class Fixture {}
-    const container = createContainer(Fixture);
+    const container = createContainer(withToolExecution(Fixture, { defaultTimeoutMs: 30, approvalPolicy: () => true, auditSink: () => {} }));
     const runtime = new AgentRuntime(container, {
       complete(request) {
         calls++;
         return calls === 1 ? agentModelResponse({ invocationId: request.invocationId, finishReason: "tool-calls", toolCalls: [agentToolCall({ id: "write", name: "audit.write" })] })
           : agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", "done") });
       },
-    }, { toolExecutorOptions: { defaultTimeoutMs: 30, approvalPolicy: () => true, auditSink: () => {} } });
+    });
     try {
       const result = await runtime.run(WriteAgent, { input: "write" });
       expect(result.error?.code).toBe("AGENT_TOOL_OUTCOME_UNKNOWN");
@@ -195,7 +196,7 @@ describe("Agent regressions: structured contracts", () => {
       class Parent { @Validator({ required: true, nested: true }) child = new Child(); }
       if (generated) registerGeneratedOpenApiMetadata({ schemas: { Parent: { type: "object", properties: { child: { type: "object", properties: { amount: { type: "number", minimum: 1 } }, required: ["amount"] } }, required: ["child"] } }, operations: {} });
       let executions = 0;
-      @Tool({ name: "audit.nested", description: "Nested round trip", input: Parent, output: Parent, sideEffect: "read" })
+      @Tool({ callers: ["agent"], name: "audit.nested", description: "Nested round trip", input: Parent, output: Parent, sideEffect: "read" })
       class NestedTool {
         execute(input: Parent, context: AgentToolExecutionContext) {
           expect(input.child).toBeInstanceOf(Child);
@@ -229,7 +230,7 @@ describe("Agent regressions: structured contracts", () => {
     registerRequestModelShape(ArrayParent, { children: { model: ArrayChild, array: true } });
     registerGeneratedOpenApiMetadata({ schemas: { ArrayParent: { type: "object", properties: { children: { type: "array", items: { type: "object", properties: { amount: { type: "number" } }, required: ["amount"] } } }, required: ["children"] } }, operations: {} });
     let executions = 0;
-    @Tool({ name: "audit.array", description: "Array round trip", input: ArrayParent, output: ArrayParent, sideEffect: "read" })
+    @Tool({ callers: ["agent"], name: "audit.array", description: "Array round trip", input: ArrayParent, output: ArrayParent, sideEffect: "read" })
     class ArrayTool {
       execute(input: ArrayParent) {
         expect(input.children[0]).toBeInstanceOf(ArrayChild);

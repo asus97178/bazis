@@ -1,4 +1,5 @@
 import type { SensitiveRedactionOptions } from "../../../library/redaction";
+import type { ToolActor } from "../metadata";
 import { redactSensitive } from "../../../library/redaction";
 import type { ToolDefinition } from "../AgentRegistry";
 import type { AgentToolAuditHookProjectionV1 } from "../AgentToolHooks";
@@ -23,6 +24,10 @@ export interface AgentToolAuditEntry {
   readonly phase: AgentToolAuditPhase;
   readonly callId: string;
   readonly toolName: string;
+  /** `"agent"` for an agent call, otherwise the runner's caller id. */
+  readonly caller?: string;
+  /** On whose behalf the call ran. */
+  readonly actor?: ToolActor;
   readonly agentName?: string;
   readonly invocationId?: string;
   readonly attempt?: number;
@@ -39,6 +44,8 @@ export interface AgentToolAuditEntry {
 }
 
 interface ToolAuditOptions {
+  readonly caller?: string;
+  readonly actor?: ToolActor;
   readonly agentName?: string;
   readonly invocationId?: string;
   readonly auditRedaction?: SensitiveRedactionOptions | false;
@@ -70,6 +77,8 @@ export class ToolAuditProjector {
       phase: AgentToolAuditPhase;
       callId: string;
       toolName: string;
+      caller?: string;
+      actor?: ToolActor;
       agentName?: string;
       invocationId?: string;
       attempt?: number;
@@ -92,6 +101,13 @@ export class ToolAuditProjector {
       metadata: this.redactAuditValue(metadata, options) as JsonObject,
     };
 
+    const caller = options.agentName !== undefined || agentName !== undefined ? "agent" : options.caller;
+    if (caller !== undefined) {
+      entry.caller = caller;
+    }
+    if (options.actor !== undefined) {
+      entry.actor = options.actor;
+    }
     if (agentName !== undefined || options.agentName !== undefined) {
       entry.agentName = agentName ?? options.agentName;
     }

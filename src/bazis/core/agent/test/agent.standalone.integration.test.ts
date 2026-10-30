@@ -72,7 +72,7 @@ export const unrelated = true;
 `);
     await write("src/agent.ts", `import { Tool } from "bazis/core/agent";
 import { SharedInput, SharedOutput } from "./alpha/contracts";
-@Tool({ name: "identity.tool", description: "Echo a declared field", input: SharedInput, output: SharedOutput })
+@Tool({ callers: ["agent"], name: "identity.tool", description: "Echo a declared field", input: SharedInput, output: SharedOutput })
 export class IdentityTool { execute(input: SharedInput): SharedOutput { return { answer: input.id }; } }
 `);
     await write("src/index.ts", `import { createContainer } from "bazis/core/di";

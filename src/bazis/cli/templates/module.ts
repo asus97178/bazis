@@ -49,7 +49,7 @@ export function buildModuleTemplates(
   return [
     ...base,
     { relativePath: `background/${naming.module}.reporter.ts`, content: statsReporterFile(naming) },
-    { relativePath: `ai/tools/${naming.module}Summary.tool.ts`, content: aiToolFile(naming) },
+    { relativePath: `tools/${naming.module}Summary.tool.ts`, content: toolFile(naming) },
   ];
 }
 
@@ -57,7 +57,7 @@ function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const moduleImport = "import { Module, scoped } from \"bazis/core/di\";";
   const backgroundImport = profile === "full" ? `import { ${n.module}Reporter } from "./background/${n.module}.reporter";\n` : "";
   const aiImports = profile === "full"
-    ? `import { ${n.module}SummaryTool } from "./ai/tools/${n.module}Summary.tool";
+    ? `import { ${n.module}SummaryTool } from "./tools/${n.module}Summary.tool";
 `
     : "";
   const backgroundLine = profile === "full" ? `  background: [${n.module}Reporter],\n` : "";
@@ -397,10 +397,10 @@ export class ${n.module}Reporter extends PeriodicBackgroundService {
 }
 
 
-function aiToolFile(n: ModuleNaming): string {
+function toolFile(n: ModuleNaming): string {
   return `import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
 import { Validator } from "bazis/library/validation";
-import type { I${n.module}Service } from "../../services/I${n.module}.service";
+import type { I${n.module}Service } from "../services/I${n.module}.service";
 
 export class ${n.module}SummaryToolInput {
   @Validator({ required: true, minLength: 3 })
@@ -420,6 +420,7 @@ export class ${n.module}SummaryToolOutput {
   input: ${n.module}SummaryToolInput,
   output: ${n.module}SummaryToolOutput,
   sideEffect: "read",
+  callers: ["agent"],
 })
 export class ${n.module}SummaryTool {
   constructor(private readonly ${n.collection}: I${n.module}Service) {}

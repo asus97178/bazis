@@ -71,7 +71,7 @@ Checks: [agent.data-definition.test.ts](test/agent.data-definition.test.ts).
 | Tool contracts | [internal/ToolContract.validator.ts](internal/ToolContract.validator.ts) | DTO binding, calling the given schema validator and diagnostic code/message/details; does not decide the effect outcome |
 | Audit projection | [internal/ToolAudit.projector.ts](internal/ToolAudit.projector.ts) | A snapshot of the call/result, masking and freezing; does not call the sink and does not choose a retry |
 | JSON Schema | [internal/AgentJsonSchema.ts](internal/AgentJsonSchema.ts) | Checks a bounded set of rules; an unknown rule is a rejection |
-| Tool runner | [ToolRunner.ts](ToolRunner.ts) | Runs Tools by name without a model: catalog by tags, contracts, `run` through the Tool executor |
+| Tool runner | [ToolRunner.ts](ToolRunner.ts) | Runs Tools without a model for one caller id (`as(caller)`): catalog filtered by `callers`, contracts, `run` through the Tool executor |
 | Context | [AgentContextBuilder.ts](AgentContextBuilder.ts) | Protects current messages and applies three budgets |
 
 ## 3. Connection and DI
@@ -80,9 +80,11 @@ The TypeScript entry is [index.ts](index.ts); `AgentRegistry` and `AgentToolExec
 are internal. The application `@Module` declares `tools`, `agentToolHooks` and regular
 providers. `llmConnect` and `llmRouter` register `AgentRuntime` (singleton, exported
 by type) next to `AGENT_MODEL_PROVIDER`; the factory reads optional
-`AGENT_RUNTIME_OPTIONS` from the root container, so any module may register it. The
-default `toolExecutorOptions.schemaValidator` is `modelValidatorAdapter`. Invalid
-options and hook setup fail on the first resolve of `AgentRuntime`. Tool implementations are resolved
+`AGENT_RUNTIME_OPTIONS` from the root container, so any module may register it. Tool
+execution settings (approval policy, audit sink, retries, deadline, hooks) come from
+`TOOL_EXECUTION_OPTIONS`, shared with `ToolRunner` (TOOLS-001 §6); the default
+`schemaValidator` is `modelValidatorAdapter`. Invalid options and hook setup fail on
+the first resolve of `AgentRuntime`. Tool implementations are resolved
 in a scope through the existing DI; class dependencies stay in constructors. The
 `imports` and `exports` lists belong to the connecting module. The facade introduces
 no separate DI exports. The model port is `AgentModelProvider`; model choice and
@@ -108,21 +110,25 @@ the same registry; a WeakMap does not retain a finished container. Different
 containers are isolated. There is no file scanning, no AppModule import and no
 implicit inclusion of regular providers. `AgentRuntime.listTools()` returns it.
 
-### Running Tools without a model
+### Who may call a Tool and running Tools without a model (0.123.0)
 
-`ToolRunner` is for code that chooses the Tool itself, such as a business-process
-engine or a scheduled job. `...toolRunnerProviders` register it as a singleton
-exported by type; the factory reads optional `TOOL_RUNNER_OPTIONS` (the Tool executor
-options plus `logger`) from the root container and the runner is built when the
-application starts, so wrong options fail the start. `listTools(tags)` keeps the Tools
-that carry every given tag, `describe(name)` returns the contract with JSON schemas,
-and `run(name, input, options)` goes through AgentToolExecutor with
-`allowUnboundTools`: input/output validation, scope, approval, audit, hooks, retries
-and deadline stay; only the agent visibility check is absent, so the caller decides
-which Tools it may run (for example by tag). `run` returns the `AgentToolResult` and
-does not throw for a Tool failure. Write and external Tools still need an audit sink
-and pass the approval policy. Check:
-[agent.tool-runner.test.ts](test/agent.tool-runner.test.ts).
+Per [TOOLS-001](../../../docs/architecture/TOOLS.md) every `@Tool` lists its `callers`
+(required, non-empty; checked when the module registers the Tool, so a missing list
+is one configuration-error line). `AgentToolExecutor` derives the caller of a call:
+`"agent"` when `agentName` is set, otherwise the explicit `caller`; none is
+`TOOL_CALLER_REQUIRED`, one not in `callers` is `TOOL_CALLER_NOT_ALLOWED` (denied,
+before input validation). The agent visibility check (`toolNames`) still applies to
+agents. `caller` and `actor` (`{ kind: "user" | "system", id }`) reach the approval
+request and the audit entry. There is no unbound bypass (`allowUnboundTools` removed).
+
+`ToolRunner` is provided by a global module that the metadata expander imports for
+every module that declares `tools`, so an application never registers it and two
+modules cannot create two runners; a hosted check builds it at start.
+`runner.as(caller)` returns `BoundToolRunner` (`as("agent")` is refused): its
+`listTools(tags)`, `getTool`, `describe` and `run` see only Tools whose `callers`
+include the id; tags only narrow the list. `run` refuses a `write`/`external` Tool
+without `actor` (`TOOL_ACTOR_REQUIRED`) and otherwise returns the executor's result
+without throwing. Check: [agent.tool-runner.test.ts](test/agent.tool-runner.test.ts).
 
 `fromDefinition` picks the assigned names from `catalog.listTools()` and creates a
 separate run snapshot. The registry does not cancel the permission, approval and input

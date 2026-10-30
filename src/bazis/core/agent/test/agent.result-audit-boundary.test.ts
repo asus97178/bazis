@@ -4,9 +4,9 @@ import { Tool, agentToolCall, type AgentToolExecutionContext, type AgentToolSett
 import { AgentToolExecutor } from "../AgentToolExecutor";
 import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 
-@Tool({ name: "result-boundary.read", description: "read", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "result-boundary.read", description: "read", sideEffect: "read" })
 class ReadTool { execute(_input: unknown, _context: AgentToolExecutionContext) { return { ok: true }; } }
-@Tool({ name: "result-boundary.write", description: "write", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "result-boundary.write", description: "write", sideEffect: "write" })
 class WriteTool { execute(_input: unknown, _context: AgentToolExecutionContext) { return { ok: true }; } }
 const BoundaryAgent = agentDefinition({ name: "result-boundary-agent", tools: [ReadTool, WriteTool] });
 class Settlement { settle(_event: AgentToolSettlementEventV1) { return { status: "recorded" as const }; } }

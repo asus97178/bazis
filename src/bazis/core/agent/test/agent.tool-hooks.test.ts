@@ -66,7 +66,7 @@ function reset(): void {
 
 function never<T>(): Promise<T> { return new Promise<T>(() => undefined); }
 
-@Tool({ name: "hook.matrix", description: "Focused Agent Tool Hook dispatcher fixture.", sideEffect: "read" })
+@Tool({ callers: ["agent", "jobs"], name: "hook.matrix", description: "Focused Agent Tool Hook dispatcher fixture.", sideEffect: "read" })
 class HookMatrixTool {
   public constructor() { state.toolConstructed += 1; }
   public execute(_input: unknown, context: AgentToolExecutionContext): unknown {
@@ -75,7 +75,7 @@ class HookMatrixTool {
   }
 }
 
-@Tool({ name: "hook.matrix.write", description: "Focused committed-write fixture.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "hook.matrix.write", description: "Focused committed-write fixture.", sideEffect: "write" })
 class HookMatrixWriteTool {
   public constructor() { state.toolConstructed += 1; }
   public execute(_input: unknown, context: AgentToolExecutionContext): unknown {
@@ -86,7 +86,7 @@ class HookMatrixWriteTool {
 
 class HookMatrixInput { public value = ""; }
 
-@Tool({ name: "hook.matrix.schema", description: "Focused schema gate fixture.", input: HookMatrixInput, sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "hook.matrix.schema", description: "Focused schema gate fixture.", input: HookMatrixInput, sideEffect: "read" })
 class HookMatrixSchemaTool {
   public constructor() { state.toolConstructed += 1; }
   public execute(_input: unknown, context: AgentToolExecutionContext): unknown {
@@ -415,7 +415,7 @@ describe("Agent Tool Hooks dispatcher", () => {
       const named = await executor.execute(agentToolCall({ id: "named", name: "hook.matrix" }), { agentName: AGENT });
       const namedTrace = [...state.order];
       reset();
-      const unbound = await executor.execute(agentToolCall({ id: "unbound", name: "hook.matrix" }), { allowUnboundTools: true });
+      const unbound = await executor.execute(agentToolCall({ id: "unbound", name: "hook.matrix" }), { caller: "jobs" });
       expect(named.status).toBe("success");
       expect(unbound.status).toBe("success");
       expect(state.order).toEqual(namedTrace);

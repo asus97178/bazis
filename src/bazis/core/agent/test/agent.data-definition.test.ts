@@ -26,10 +26,10 @@ test("a meta-agent definition runs without an agent class; later edits of the so
   } finally { await container.dispose(); }
 });
 
-@Tool({ name: "host.read", description: "Approved reader", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "host.read", description: "Approved reader", sideEffect: "read" })
 class HostReadTool { execute() { return "Read through ToolExecutor"; } }
 
-@Tool({ name: "host.hidden", description: "Registered, but not named by the agent", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "host.hidden", description: "Registered, but not named by the agent", sideEffect: "read" })
 class HostHiddenTool { execute() { return "must not run"; } }
 
 test("an agent sees only the registered tools it names and calls them through the tool executor", async () => {

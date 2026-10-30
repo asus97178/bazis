@@ -384,11 +384,11 @@ The tool reads a task through the same public service. The input is a positive
 integer `id`; the output is a `TaskResponse` or `null` in the `task` field.
 
 ```ts
-// file: src/app/modules/task/ai/tools/TaskLookupTool.ts
+// file: src/app/modules/task/tools/TaskLookup.tool.ts
 import { Tool, type AgentToolExecutionContext } from "bazis/core/agent";
 import { Validator } from "bazis/library/validation";
-import { TaskResponse } from "../../contracts/TaskResponse";
-import type { ITaskService } from "../../services/ITask.service";
+import { TaskResponse } from "../contracts/TaskResponse";
+import type { ITaskService } from "../services/ITask.service";
 
 export class TaskLookupInput {
   @Validator({ required: true, type: "number", integer: true, positive: true })
@@ -405,6 +405,7 @@ export class TaskLookupOutput {
   input: TaskLookupInput,
   output: TaskLookupOutput,
   sideEffect: "read",
+  callers: ["agent", "workflow"],
 })
 export class TaskLookupTool {
   constructor(private readonly tasks: ITaskService) {}
@@ -420,9 +421,11 @@ export class TaskLookupTool {
 }
 ```
 
-The input is checked by the regular Tool execution in the Agent Runtime. A direct
-`new` and an `execute` call do not get this check automatically. An agent's access
-to the tool is configured separately; the HTTP `@Authorize` decorator does not apply to it.
+The input is checked by the regular Tool execution (an agent's `AgentRuntime` or
+`ToolRunner.as("workflow")`). A direct `new` and an `execute` call do not get this
+check automatically. `callers` says who may call the Tool at all; an agent also
+needs it in its `toolNames` ([TOOLS-001](TOOLS.md)). The HTTP `@Authorize`
+decorator does not apply to it.
 
 ### 2.4. Registering the extra components
 
@@ -432,7 +435,7 @@ Changes in the existing Task.module.ts when all three capabilities are enabled:
  import { TaskController } from "./http/TaskController";
 +import { TaskStatsReporter } from "./background/TaskStatsReporter";
 +import { TasksAdminUiProfile } from "./ui/TasksAdminUiProfile";
-+import { TaskLookupTool } from "./ai/tools/TaskLookupTool";
++import { TaskLookupTool } from "./tools/TaskLookup.tool";
 
 -  providers: [scoped(ITaskService, TaskService)],
 +  providers: [

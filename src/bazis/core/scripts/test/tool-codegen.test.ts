@@ -11,9 +11,9 @@ describe("tool schema codegen", () => {
       source("src/app/catalog/Search.tool.ts", `
         export class SearchInput {}
         export class SearchOutput {}
-        @Tool({ name: "catalog.search", description: "Searches.", input: SearchInput, output: SearchOutput, sideEffect: "read" })
+        @Tool({ callers: ["agent"], name: "catalog.search", description: "Searches.", input: SearchInput, output: SearchOutput, sideEffect: "read" })
         export class SearchCatalogTool {}
-        @Tool({ name: "catalog.ping", description: "No contracts." })
+        @Tool({ callers: ["agent"], name: "catalog.ping", description: "No contracts." })
         export class PingTool {}
       `),
     ]);
@@ -26,7 +26,7 @@ describe("tool schema codegen", () => {
 
   test("uses the OpenAPI naming policy for schema names", () => {
     const result = collectToolSchemaModels([
-      source("src/app/a.ts", `export class Query {}\n@Tool({ name: "a", description: "A.", input: Query }) export class ATool {}`),
+      source("src/app/a.ts", `export class Query {}\n@Tool({ callers: ["agent"], name: "a", description: "A.", input: Query }) export class ATool {}`),
     ], { schemaNameForDeclaration: (name) => `App.${name}` });
     expect(result.schemaNames).toEqual(["App.Query"]);
   });
@@ -35,9 +35,9 @@ describe("tool schema codegen", () => {
     const result = collectToolSchemaModels([
       source("src/app/one.ts", `
         export class Shared {}
-        @Tool({ name: "private", description: "Private." }) class PrivateTool {}
-        @Tool({ name: "dynamic", description: "Dynamic.", input: contracts.input }) export class DynamicTool {}
-        @Tool({ name: "shared", description: "Shared.", input: Shared }) export class SharedTool {}
+        @Tool({ callers: ["agent"], name: "private", description: "Private." }) class PrivateTool {}
+        @Tool({ callers: ["agent"], name: "dynamic", description: "Dynamic.", input: contracts.input }) export class DynamicTool {}
+        @Tool({ callers: ["agent"], name: "shared", description: "Shared.", input: Shared }) export class SharedTool {}
       `),
       source("src/app/two.ts", "export class Shared {}"),
     ]);

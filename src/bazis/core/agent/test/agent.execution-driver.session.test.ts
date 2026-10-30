@@ -16,7 +16,7 @@ import { AgentExecutionBoundaryError, AgentExecutionDriver } from "../internal/A
 import type { AgentSessionPreparationV1 } from "../internal/AgentExecutionDriver";
 import { canonicalAgentExecutionCheckpointV1, evolveAgentExecutionCheckpointV1, parseAgentExecutionCheckpointV1, type AgentExecutionBoundary, type AgentExecutionCheckpointV1 } from "../internal/AgentExecutionState";
 
-@Tool({ name: "session.echo", description: "Deterministic test Tool.", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "session.echo", description: "Deterministic test Tool.", sideEffect: "read" })
 class SessionEchoTool {
   static calls: number[] = [];
   execute(input: JsonValue, _context: AgentToolExecutionContext): JsonValue {
@@ -73,11 +73,11 @@ function desiredBoundary(): AgentExecutionBoundary {
 
 const DesiredLegacyAgent = agentDefinition({ name: "desired-legacy" });
 let desiredKeyEffects = 0;
-@Tool({ name: "desired.key", description: "Key failure probe.", sideEffect: "read" }) class DesiredKeyTool { execute(): JsonValue { desiredKeyEffects += 1; return { ok: true }; } }
+@Tool({ callers: ["agent"], name: "desired.key", description: "Key failure probe.", sideEffect: "read" }) class DesiredKeyTool { execute(): JsonValue { desiredKeyEffects += 1; return { ok: true }; } }
 const DesiredKeyAgent = agentDefinition({ name: "desired-key-agent", tools: [DesiredKeyTool] });
 
 const desiredPhaseEffects: number[] = [];
-@Tool({ name: "desired.phase", description: "Phase probe.", sideEffect: "read" }) class DesiredPhaseTool { execute(input: JsonValue): JsonValue { desiredPhaseEffects.push((input as { index: number }).index); return input; } }
+@Tool({ callers: ["agent"], name: "desired.phase", description: "Phase probe.", sideEffect: "read" }) class DesiredPhaseTool { execute(input: JsonValue): JsonValue { desiredPhaseEffects.push((input as { index: number }).index); return input; } }
 const DesiredPhaseAgent = agentDefinition({ name: "desired-phase-agent", tools: [DesiredPhaseTool] });
 class DesiredPhaseProvider implements AgentModelProvider {
   calls = 0;
@@ -222,8 +222,8 @@ test("desired suspension after committed second Tool returns exact settled candi
 });
 
 let desiredUnknownEffects = 0; let desiredSuffixEffects = 0;
-@Tool({ name: "desired.unknown", description: "Write unknown probe.", sideEffect: "write", timeoutMs: 5 }) class DesiredUnknownTool { execute(): Promise<JsonValue> { desiredUnknownEffects += 1; return new Promise(() => undefined); } }
-@Tool({ name: "desired.suffix", description: "Must not run.", sideEffect: "read" }) class DesiredSuffixTool { execute(): JsonValue { desiredSuffixEffects += 1; return { bad: true }; } }
+@Tool({ callers: ["agent"], name: "desired.unknown", description: "Write unknown probe.", sideEffect: "write", timeoutMs: 5 }) class DesiredUnknownTool { execute(): Promise<JsonValue> { desiredUnknownEffects += 1; return new Promise(() => undefined); } }
+@Tool({ callers: ["agent"], name: "desired.suffix", description: "Must not run.", sideEffect: "read" }) class DesiredSuffixTool { execute(): JsonValue { desiredSuffixEffects += 1; return { bad: true }; } }
 const DesiredUnknownAgent = agentDefinition({ name: "desired-unknown-agent", tools: [DesiredUnknownTool, DesiredSuffixTool] });
 
 test("desired unknown middle write records canonical audit and afterTool terminal prefix before stopping suffix", async () => {

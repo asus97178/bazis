@@ -65,7 +65,8 @@ updates the passport. `full` stays an atomic module. `pack` holds independent em
 
 **Agents and modules:** per [AGENT-ARCH-001](../../../docs/architecture/AGENT_ARCHITECTURE.md)
 agents are data, not module members (bazis 0.99.0). `--full` generates a Tool in
-`ai/tools` and lists it in `@Module.tools`; it generates no agent. An agent
+`tools/` with `callers: ["agent"]` per [TOOLS-001](../../../docs/architecture/TOOLS.md)
+and lists it in `@Module.tools`; it generates no agent. An agent
 definition names the Tool and runs through `AgentRuntime.run`.
 
 Project OpenAPI codegen now takes inherited DTO properties into account, including an
@@ -249,11 +250,11 @@ The pack folder is `{kebab-name}_modules`, a part is `{kebab-part}_module`.
 Names follow the module as it was typed (`g module Stats`). A file name is the class
 name with the role moved into a suffix: `StatsController` → `http/Stats.controller.ts`,
 `StatsListQuery` → `http/contracts/StatsList.query.ts`, `StatsSummaryTool` →
-`ai/tools/StatsSummary.tool.ts`. The full set: `Stats.module.ts`,
+`tools/StatsSummary.tool.ts`. The full set: `Stats.module.ts`,
 `model/Stats.model.ts`, `model/Stats.dbContext.ts`, `services/IStats.service.ts`,
 `services/Stats.service.ts`, `http/Stats.controller.ts`,
 `http/contracts/Stats.requests.ts`, `Stats.responses.ts`, `StatsList.query.ts`;
-`--full` adds `background/Stats.reporter.ts` and `ai/tools/StatsSummary.tool.ts`.
+`--full` adds `background/Stats.reporter.ts` and `tools/StatsSummary.tool.ts`.
 Role classes: `StatsModule`, `StatsController`, `IStatsService`/`StatsService`,
 `StatsDbContext`, `StatsListQuery`, `StatsReporter`, `StatsSummaryTool`.
 The record and its DTOs stay singular: `class Stat`, `CreateStatRequest`,

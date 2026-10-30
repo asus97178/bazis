@@ -66,7 +66,7 @@ adapters that access it.
 | ${e}Response / ${m}Summary / to${e}Response | [responses](http/contracts/${m}.responses.ts) | ORM entity | Public data projection |
 | ${m}ListQuery | [list](http/contracts/${m}List.query.ts) | Query string | ListQuery, filters/sorting/pages |
 ${profile === "full" ? `| ${m}Reporter | [background](background/${m}.reporter.ts) | ServiceProvider, Logger, AbortSignal | Runs count and logs it |
-| ${m}SummaryTool | [tool](ai/tools/${m}Summary.tool.ts) | I${m}Service, input, context | Summary for an agent |
+| ${m}SummaryTool | [tool](tools/${m}Summary.tool.ts) | I${m}Service, input, context | Summary for an agent |
 ` : ""}
 
 ## Wiring, DI and data

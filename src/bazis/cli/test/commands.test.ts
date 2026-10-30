@@ -200,11 +200,11 @@ test("files and role classes are named by the module; the record and its DTOs st
   const files = result.files.map((file) => path.relative(result.moduleDir, file)).sort();
   expect(files).toEqual([
     "MODULE.md", "Stats.module.ts",
-    "ai/tools/StatsSummary.tool.ts",
     "background/Stats.reporter.ts",
     "http/Stats.controller.ts", "http/contracts/Stats.requests.ts", "http/contracts/Stats.responses.ts", "http/contracts/StatsList.query.ts",
     "model/Stats.dbContext.ts", "model/Stats.model.ts",
     "services/IStats.service.ts", "services/Stats.service.ts",
+    "tools/StatsSummary.tool.ts",
   ]);
   const source = async (file: string) => readFile(path.join(result.moduleDir, file), "utf8");
   expect(await source("Stats.module.ts")).toContain("export class StatsModule {}");
