@@ -4,6 +4,22 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.122.0 — 2026-10-30
+
+### Added
+
+- `ToolRunner`: runs the application's Tools (`@Module.tools`) by name
+  without a model, for code that chooses the Tool itself, such as a
+  business-process engine or a scheduled job. `listTools(tags)` filters the
+  catalog by tags, `describe(name)` gives the contract with JSON schemas,
+  `run(name, input, { idempotencyKey, metadata, signal, ... })` calls the
+  Tool through the same executor as an agent: input and output validation,
+  DI scope, approval policy, audit, hooks, retries and deadline. A Tool
+  failure comes back as the result, not an exception.
+- `toolRunnerProviders` and `TOOL_RUNNER_OPTIONS`: `ToolRunner` as a
+  singleton injectable by type, configured with the Tool executor options;
+  the runner is built at start, so wrong options stop the application.
+
 ## 0.121.0 — 2026-10-28
 
 ### Added

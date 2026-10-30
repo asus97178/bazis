@@ -37,6 +37,13 @@ export {
   type AgentRuntimeToolExecutionOptions,
 } from "./AgentRuntime";
 export {
+  TOOL_RUNNER_OPTIONS,
+  ToolRunner,
+  toolRunnerProviders,
+  type ToolRunOptions,
+  type ToolRunnerOptions,
+} from "./ToolRunner";
+export {
   ApproximateAgentContextTokenEstimator,
   DefaultAgentContextBuilder,
   mergeAgentContextLimits,
