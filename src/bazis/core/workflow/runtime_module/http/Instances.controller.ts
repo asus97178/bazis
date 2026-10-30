@@ -1,3 +1,4 @@
+import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
 import { Controller, Created, Get, Post, type HttpContext } from "../../../http";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import { authorize, body, optionalString, pagingQuery, param, requiredString } from "../../internal/http";
@@ -69,4 +70,5 @@ export class InstancesController {
     return await this.runtime.retry(instance.id, { actor });
   }
 }
+contextOnlyController(InstancesController);
 
