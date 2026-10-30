@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { withToolExecution } from "./toolExecution.fixture";
 import { Module, createContainer, scoped } from "@/core/di";
 import type { LogFields, Logger } from "@/core/kernel/logging/Logger";
 import {
@@ -21,7 +22,7 @@ class MemoryLogger implements Logger {
 }
 
 let charges = 0;
-@Tool({ name: "pay.charge", description: "Charges a card.", sideEffect: "external" })
+@Tool({ callers: ["agent"], name: "pay.charge", description: "Charges a card.", sideEffect: "external" })
 class ChargeTool { execute() { charges++; return { charged: true }; } }
 
 class AllowHook { enforce() { return { decision: "allow" as const }; } }
@@ -45,11 +46,11 @@ async function charge(toolExecutorOptions: AgentToolExecutorOptions, hooks = fal
     ...(hooks ? { agentToolHooks: [{ kind: "enforcement" as const, id: "guard", version: 1, handler: AllowHook }] } : {}),
   })
   class PayModule {}
-  const container = createContainer(PayModule);
+  const container = createContainer(withToolExecution(PayModule, { approvalPolicy: () => true, ...toolExecutorOptions }));
   const logger = new MemoryLogger();
   charges = 0;
   try {
-    const runtime = new AgentRuntime(container, callOnce([]), { logger, toolExecutorOptions: { approvalPolicy: () => true, ...toolExecutorOptions } });
+    const runtime = new AgentRuntime(container, callOnce([]), { logger });
     const result = await runtime.run({ name: "cashier", instructions: "", toolNames: ["pay.charge"] }, { input: "pay" });
     return { result, logger, charges };
   } finally {

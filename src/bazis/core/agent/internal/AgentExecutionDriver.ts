@@ -80,12 +80,19 @@ export interface AgentRuntimeOptions {
   readonly timeoutMs?: number;
   readonly contextBuilder?: AgentContextBuilder;
   readonly contextLimits?: AgentContextLimits;
-  readonly toolExecutorOptions?: AgentToolExecutorOptions;
   /**
    * Where failures of the model and unexpected tool failures go, with their
    * stack. The LLM connectors pass the application logger.
    */
   readonly logger?: Logger;
+}
+
+/**
+ * @internal The driver also takes the Tool execution settings; `AgentRuntime`
+ * reads them from `TOOL_EXECUTION_OPTIONS`, shared with `ToolRunner`.
+ */
+export interface AgentExecutionDriverOptions extends AgentRuntimeOptions {
+  readonly toolExecutorOptions?: AgentToolExecutorOptions;
 }
 
 export interface AgentRuntimeInvokeOptions {
@@ -515,7 +522,7 @@ export class AgentExecutionDriver {
     services: ServiceProvider,
     private readonly registry: AgentRegistry,
     private readonly modelProvider: AgentModelProvider,
-    options: AgentRuntimeOptions = {},
+    options: AgentExecutionDriverOptions = {},
   ) {
     assertPositiveInteger(options.maxSteps, "AgentRuntime.maxSteps");
     assertPositiveInteger(options.maxToolCallsPerStep, "AgentRuntime.maxToolCallsPerStep");

@@ -1,11 +1,13 @@
 import { createToken, type ServiceProvider } from "../di";
 import { modelValidatorAdapter } from "../../library/validation";
 import { AgentSetupError } from "./errors";
+import { TOOL_EXECUTION_OPTIONS } from "./toolExecutionOptions";
 import type { AgentDataDefinition } from "./AgentDataDefinition";
 import { AgentRegistry, type ToolDefinition } from "./AgentRegistry";
 import {
   AgentExecutionDriver,
   type AgentRuntimeInvokeOptions,
+  type AgentExecutionDriverOptions,
   type AgentRuntimeOptions,
   type AgentRuntimeResult,
 } from "./internal/AgentExecutionDriver";
@@ -13,6 +15,7 @@ import type { AgentModelProvider } from "./ModelProvider";
 
 export {
   type AgentRuntimeInvokeOptions,
+  type AgentExecutionDriverOptions,
   type AgentRuntimeOptions,
   type AgentRuntimeResult,
   type AgentRuntimeStatus,
@@ -42,7 +45,7 @@ export const AGENT_RUNTIME_OPTIONS = createToken<AgentRuntimeOptions>("AgentRunt
  */
 export class AgentRuntime {
   private readonly catalog: AgentRegistry;
-  private readonly options: AgentRuntimeOptions;
+  private readonly options: AgentExecutionDriverOptions;
 
   constructor(
     private readonly services: ServiceProvider,
@@ -50,9 +53,11 @@ export class AgentRuntime {
     options: AgentRuntimeOptions = {},
   ) {
     this.catalog = AgentRegistry.fromContainer(services);
+    // One Tool execution setup for agents and ToolRunner (TOOLS-001 §6).
+    const { logger: _toolLogger, ...toolExecutorOptions } = services.has(TOOL_EXECUTION_OPTIONS) ? services.resolve(TOOL_EXECUTION_OPTIONS) : {};
     this.options = {
       ...options,
-      toolExecutorOptions: { schemaValidator: modelValidatorAdapter, ...options.toolExecutorOptions },
+      toolExecutorOptions: { schemaValidator: modelValidatorAdapter, ...toolExecutorOptions },
     };
     // Invalid options and hook setup fail here, at the first resolve, not on the first run.
     new AgentExecutionDriver(services, this.catalog, modelProvider, this.options);

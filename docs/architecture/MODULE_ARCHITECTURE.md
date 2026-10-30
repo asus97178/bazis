@@ -251,9 +251,8 @@ Empty directories and "for the future" stubs are not created.
 
 Agent declarations and the prompts they own live outside the module per
 [AGENT-ARCH-001](AGENT_ARCHITECTURE.md). Tools live in the module's `tools/`
-directory and declare who may call them per [TOOLS-001](TOOLS.md) (accepted;
-the `ai/tools` layout below is replaced in bazis 0.123.0); they do not define the
-set of agents.
+directory and declare who may call them per [TOOLS-001](TOOLS.md) (since bazis
+0.123.0); they do not define the set of agents.
 The current CLI `--full` still creates an agent inside the module: splitting the
 generation is part of the first migration stage, not a completed change of this layout.
 
@@ -569,7 +568,7 @@ marked "not used" with a short reason, without creating stubs.
 | External adapter / client | `infra/` | Connection settings, DI port, request and time limits | Translating the external contract into the module contract |
 | Background handler | `background/` | DI; schedule/event; `AbortSignal`; payload, if any | Managed work and correct resource release |
 | UI profile | `ui/` | `surface`, controller/request/response references, operations and navigation | An interface declaration; not a replacement for server authorization |
-| Module Tool adapter | `ai/tools/`, `ai/contracts/` | The §5.3 contracts; input schema, DI and runtime context | Calls public application operations and returns a checkable output; the agent is declared separately |
+| Tool | `tools/`, `tools/contracts/` | The input DTO, `callers` (who may call it), DI of the module's services and the runtime context | Calls the module's services and returns a checkable output; agents and processes are callers per [TOOLS-001](TOOLS.md) |
 | Event adapter | `events/` | Event type/version, payload and context per the integration API | Translating the event into module operations |
 | Errors | `errors/` | Code, domain details and the original cause per the contract | A defined error without leaking internal data |
 | Internal implementation | `internal/`, next to the owner | Typed local arguments and deps | An implementation detail, not a public input |

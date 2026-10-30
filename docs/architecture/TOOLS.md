@@ -1,7 +1,7 @@
 # Tools: one contract for agents and processes
 
 Identifier: **TOOLS-001**. Version: **1.0**. Date: **2026-10-31**.
-Status: **accepted by the user; implementation planned for bazis 0.123.0**.
+Status: **implemented in bazis 0.123.0**.
 Basis: `ToolRunner` (0.122.0) let a business-process engine call Tools without a
 model. The user asked where and how Tools should live now that an LLM agent and a
 process engine call the same operations, and accepted the recommendations below.

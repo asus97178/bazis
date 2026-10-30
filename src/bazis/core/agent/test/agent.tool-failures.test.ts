@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import type { ToolExecutionOptions } from "../toolExecutionOptions";
+import { withToolExecution } from "./toolExecution.fixture";
 import { DI, Module, createContainer, scoped } from "@/core/di";
 import { defineConfig, secret } from "@/core/kernel";
 import { LOGGER, type LogFields, type Logger } from "@/core/kernel/logging/Logger";
@@ -25,16 +27,16 @@ class MemoryLogger implements Logger {
 
 let preCommitFailures = 0;
 
-@Tool({ name: "fail.crash", description: "Throws an unexpected error.", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "fail.crash", description: "Throws an unexpected error.", sideEffect: "read" })
 class CrashTool { execute() { throw new Error("db host 10.0.0.5 is down, password=hunter2"); } }
 
-@Tool({ name: "fail.reply", description: "Reports a failure to the model.", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "fail.reply", description: "Reports a failure to the model.", sideEffect: "read" })
 class ReplyTool { execute() { throw new ToolError("Товар kiwi снят с продажи"); } }
 
-@Tool({ name: "fail.write", description: "Throws after a write started.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "fail.write", description: "Throws after a write started.", sideEffect: "write" })
 class CrashWriteTool { execute() { throw new Error("connection reset by 10.0.0.5"); } }
 
-@Tool({ name: "fail.precommit", description: "Fails before writing, once.", sideEffect: "write" })
+@Tool({ callers: ["agent"], name: "fail.precommit", description: "Fails before writing, once.", sideEffect: "write" })
 class PreCommitTool {
   execute() {
     if (preCommitFailures-- > 0) throw new AgentToolPreCommitError("Платёжный шлюз занят");
@@ -42,7 +44,7 @@ class PreCommitTool {
   }
 }
 
-@Tool({ name: "fail.resolve", description: "Cannot be constructed.", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "fail.resolve", description: "Cannot be constructed.", sideEffect: "read" })
 class BrokenConstructorTool {
   constructor() { throw new Error("missing secret key=abc123"); }
   execute() { return null; }
@@ -65,12 +67,12 @@ function callOnce(name: string, requests: AgentModelRequest[]): AgentModelProvid
   };
 }
 
-async function runTool(name: string, options: ConstructorParameters<typeof AgentRuntime>[2] = {}) {
-  const container = createContainer(FailuresModule);
+async function runTool(name: string, execution: ToolExecutionOptions = {}) {
+  const container = createContainer(withToolExecution(FailuresModule, execution));
   const logger = new MemoryLogger();
   const requests: AgentModelRequest[] = [];
   try {
-    const runtime = new AgentRuntime(container, callOnce(name, requests), { logger, ...options });
+    const runtime = new AgentRuntime(container, callOnce(name, requests), { logger });
     const result = await runtime.run({ name: "support", instructions: "", toolNames: [name] }, { input: "go" });
     const sent = requests[1]?.messages.at(-1)?.content[0];
     return { result, logger, sent: JSON.stringify(sent ?? null) };
@@ -99,7 +101,7 @@ test("a ToolError message reaches the model as written and is not logged", async
 });
 
 test("an exception after a write started hides the cause from the model and logs it", async () => {
-  const { result, logger, sent } = await runTool("fail.write", { toolExecutorOptions: { auditSink: () => undefined, approvalPolicy: () => true } });
+  const { result, logger, sent } = await runTool("fail.write", { auditSink: () => undefined, approvalPolicy: () => true });
   expect(result.error?.code).toBe("AGENT_TOOL_OUTCOME_UNKNOWN");
   expect(result.toolResults[0]?.error?.message).toBe('Tool "fail.write" threw after side-effect execution started; retry safety is unknown.');
   expect(JSON.stringify(result)).not.toContain("10.0.0.5");
@@ -109,11 +111,11 @@ test("an exception after a write started hides the cause from the model and logs
 
 test("AgentToolPreCommitError keeps its message for the model and stays retryable", async () => {
   preCommitFailures = 1;
-  const failed = await runTool("fail.precommit", { toolExecutorOptions: { auditSink: () => undefined, approvalPolicy: () => true } });
+  const failed = await runTool("fail.precommit", { auditSink: () => undefined, approvalPolicy: () => true });
   expect(failed.result.toolResults[0]?.error).toEqual({ code: "TOOL_EXECUTION_FAILED", message: "Платёжный шлюз занят" });
   expect(failed.logger.errors).toEqual([]);
   preCommitFailures = 1;
-  const retried = await runTool("fail.precommit", { toolExecutorOptions: { auditSink: () => undefined, approvalPolicy: () => true, retryPolicy: { maxAttempts: 2 } } });
+  const retried = await runTool("fail.precommit", { auditSink: () => undefined, approvalPolicy: () => true, retryPolicy: { maxAttempts: 2 } });
   expect(retried.result.toolResults[0]).toMatchObject({ status: "success", output: { paid: true } });
 });
 

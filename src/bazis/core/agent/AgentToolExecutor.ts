@@ -1,4 +1,5 @@
 import { ToolContractValidator, toolContractName, toolErrorMessage as errorMessageOf, type AgentToolSchemaValidator } from "./internal/ToolContract.validator";
+import type { ToolActor } from "./metadata";
 import { ToolAuditProjector, type AgentToolAuditEntry, type AgentToolAuditFailureMode } from "./internal/ToolAudit.projector";
 export type { AgentToolValidationIssue, AgentToolValidationResult, AgentToolSchemaValidator } from "./internal/ToolContract.validator";
 export type { AgentToolAuditPhase, AgentToolAuditFailureMode, AgentToolAuditToolInfo, AgentToolAuditEntry } from "./internal/ToolAudit.projector";
@@ -69,6 +70,9 @@ export interface AgentToolApprovalRequest {
   readonly call: AgentToolCall;
   readonly tool: ToolDefinition;
   readonly reason: AgentToolApprovalReason;
+  /** `"agent"` for an agent call, otherwise the runner's caller id. */
+  readonly caller: string;
+  readonly actor?: ToolActor;
   readonly agentName?: string;
   readonly invocationId?: string;
   readonly idempotencyKey?: string;
@@ -111,7 +115,6 @@ export interface AgentToolExecutorOptions {
   readonly defaultTimeoutMs?: number;
   /** Maximum time to wait for a tool DI scope disposer after execution settles. */
   readonly scopeDisposeTimeoutMs?: number;
-  readonly allowUnboundTools?: boolean;
   readonly allowUnvalidatedSchemas?: boolean;
   /** Side-effecting tools require an audit sink unless this explicit escape hatch is set. */
   readonly allowUnauditedSideEffects?: boolean;
@@ -123,6 +126,13 @@ export interface AgentToolExecutorOptions {
 
 export interface AgentToolExecutionOptions {
   readonly agentName?: string;
+  /**
+   * Who calls the Tool when there is no agent (`ToolRunner.as("workflow")`).
+   * An agent call is the `"agent"` caller. The Tool's `callers` must list it.
+   */
+  readonly caller?: string;
+  /** On whose behalf the call runs; reaches the approval policy and the audit. */
+  readonly actor?: ToolActor;
   readonly invocationId?: string;
   readonly metadata?: unknown;
   readonly approvalPolicy?: AgentToolApprovalPolicy;
@@ -135,7 +145,6 @@ export interface AgentToolExecutionOptions {
   readonly timeoutMs?: number;
   /** Per-call override for the bounded DI scope disposal wait. */
   readonly scopeDisposeTimeoutMs?: number;
-  readonly allowUnboundTools?: boolean;
   readonly allowUnvalidatedSchemas?: boolean;
   readonly allowUnauditedSideEffects?: boolean;
   readonly signal?: AbortSignal;
@@ -418,7 +427,6 @@ export class AgentToolExecutor {
   private readonly retryPolicy: RetrySettings;
   private readonly defaultTimeoutMs?: number;
   private readonly scopeDisposeTimeoutMs: number;
-  private readonly allowUnboundTools: boolean;
   private readonly allowUnvalidatedSchemas: boolean;
   private readonly allowUnauditedSideEffects: boolean;
   private readonly auditProjector: ToolAuditProjector;
@@ -445,7 +453,6 @@ export class AgentToolExecutor {
       ? undefined
       : options.defaultTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
     this.scopeDisposeTimeoutMs = options.scopeDisposeTimeoutMs ?? DEFAULT_SCOPE_DISPOSE_TIMEOUT_MS;
-    this.allowUnboundTools = options.allowUnboundTools === true;
     this.allowUnvalidatedSchemas = options.allowUnvalidatedSchemas === true;
     this.allowUnauditedSideEffects = options.allowUnauditedSideEffects === true;
     this.auditProjector = new ToolAuditProjector(options.auditRedaction ?? {});
@@ -1240,17 +1247,26 @@ export class AgentToolExecutor {
     tool: ToolDefinition,
     options: AgentToolExecutionOptions,
   ): AgentVisibilityDecision {
-    const allowUnboundTools = options.allowUnboundTools ?? this.allowUnboundTools;
-    if (!options.agentName) {
-      if (allowUnboundTools) {
-        return { allowed: true };
-      }
+    // Who may call is declared on the Tool (TOOLS-001); tags never decide it.
+    const caller = callerOf(options);
+    if (caller === undefined) {
       return {
         allowed: false,
-        code: "TOOL_AGENT_REQUIRED",
-        message: `Tool "${tool.metadata.name}" execution requires agentName.`,
+        code: "TOOL_CALLER_REQUIRED",
+        message: `Tool "${tool.metadata.name}" execution requires an agent or a caller.`,
         status: "error",
       };
+    }
+    if (!tool.metadata.callers.includes(caller)) {
+      return {
+        allowed: false,
+        code: "TOOL_CALLER_NOT_ALLOWED",
+        message: `Tool "${tool.metadata.name}" may not be called by "${caller}" (callers: ${tool.metadata.callers.join(", ")}).`,
+        status: "denied",
+      };
+    }
+    if (!options.agentName) {
+      return { allowed: true };
     }
 
     const agent = this.registry.getAgent(options.agentName);
@@ -1314,6 +1330,8 @@ export class AgentToolExecutor {
         call,
         tool,
         reason,
+        caller: callerOf(options) ?? "",
+        ...(options.actor === undefined ? {} : { actor: options.actor }),
         agentName: options.agentName,
         invocationId: options.invocationId,
         idempotencyKey,
@@ -2205,4 +2223,9 @@ export class AgentToolExecutor {
   private durationMs(startedAt: number): number {
     return Math.max(0, Date.now() - startedAt);
   }
+}
+
+/** The caller of a call: an agent call is `"agent"`, otherwise the explicit caller. */
+function callerOf(options: AgentToolExecutionOptions): string | undefined {
+  return options.agentName ? "agent" : options.caller;
 }

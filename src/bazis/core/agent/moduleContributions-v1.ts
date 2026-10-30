@@ -60,7 +60,11 @@ registerModuleOwnedProviderContributor((metadata: BazisModuleMetadata, context) 
   const owner = metadata as BazisModuleRef;
   const fields = metadata as BazisModuleMetadata & AgentModuleFields;
   for (const target of classValues(fields.tools, "tools")) {
-    if (!toolMetadataOf(target)) throw new AgentSetupError(`${target.name || "<anonymous class>"} is listed as a tool but is not decorated with @Tool(...).`);
+    const tool = toolMetadataOf(target);
+    if (!tool) throw new AgentSetupError(`${target.name || "<anonymous class>"} is listed as a tool but is not decorated with @Tool(...).`);
+    if (tool.callers.length === 0) {
+      throw new AgentSetupError(`Tool "${tool.name}" (${target.name || "<anonymous class>"}) declares no callers: list who may call it, for example callers: ["agent"] for LLM agents or ["workflow"] for a process engine.`);
+    }
     try {
       context.registerScoped(TOOL_CHANNEL, scoped(target), Object.freeze({ target, owner }));
     } catch (error) {

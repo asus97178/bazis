@@ -8,6 +8,12 @@ import { AgentSetupError } from "./errors";
 const TOOL_META = Symbol.for("bazis:agent:tool");
 
 export type ToolSideEffect = "none" | "read" | "write" | "external";
+
+/** On whose behalf a Tool runs: a user, or the system (a process, a job). */
+export interface ToolActor {
+  readonly kind: "user" | "system";
+  readonly id: string;
+}
 export type ToolApproval = "never" | "policy" | "required";
 
 export interface ToolOptions {
@@ -18,6 +24,13 @@ export interface ToolOptions {
   readonly sideEffect?: ToolSideEffect;
   readonly approval?: ToolApproval;
   readonly timeoutMs?: number;
+  /**
+   * Who may call the Tool: `"agent"` for LLM agents, any other id for code that
+   * runs Tools itself (`ToolRunner.as("workflow")`). Required and non-empty;
+   * a caller not listed is refused with TOOL_CALLER_NOT_ALLOWED.
+   */
+  readonly callers: readonly string[];
+  /** Grouping and search only; tags never decide who may call a Tool. */
   readonly tags?: readonly string[];
 }
 
@@ -29,6 +42,7 @@ export interface ToolMetadata {
   readonly sideEffect: ToolSideEffect;
   readonly approval: ToolApproval;
   readonly timeoutMs?: number;
+  readonly callers: readonly string[];
   readonly tags: readonly string[];
 }
 
@@ -49,6 +63,14 @@ function readonlyTextList(values: readonly string[] | undefined, field: string):
     return Object.freeze([]);
   }
   return Object.freeze(values.map((value) => text(value, field)));
+}
+
+/** A caller id: `agent` or an application id such as `workflow`. */
+export function callerId(value: unknown): string {
+  if (typeof value !== "string" || !/^[a-z][a-z0-9_.-]{0,63}$/u.test(value)) {
+    throw new AgentSetupError(`@Tool.callers: ${JSON.stringify(value)} is not a caller id such as "agent" or "workflow".`);
+  }
+  return value;
 }
 
 function positiveInteger(value: number | undefined, field: string): number | undefined {
@@ -89,6 +111,9 @@ export function defineToolMetadata(_target: object, metadata: object, options: T
     sideEffect,
     approval: approvalFor(sideEffect, options.approval),
     timeoutMs: positiveInteger(options.timeoutMs, "@Tool.timeoutMs"),
+    // Checked when the module registers the Tool, so a missing list prints as
+    // one configuration-error line at start instead of failing the import.
+    callers: Array.isArray(options.callers) ? Object.freeze(options.callers.map((caller) => callerId(caller))) : Object.freeze([]),
     tags: readonlyTextList(options.tags, "@Tool.tags"),
   });
   (metadata as MetadataCarrier)[TOOL_META] = normalized;

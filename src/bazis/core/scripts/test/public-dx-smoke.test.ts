@@ -1,4 +1,5 @@
 import { registerGeneratedBindings } from "../../http/Binding/autoBindings";
+import { TOOL_EXECUTION_OPTIONS } from "bazis/core/agent";
 import { describe, expect, test } from "bun:test";
 import {
   AgentRuntime,
@@ -92,7 +93,7 @@ registerGeneratedBindings(DxController, {
 }, new Map([]));
 
 @Tool({
-  name: "dx.lookup",
+  callers: ["agent"], name: "dx.lookup",
   description: "Read DX smoke data.",
   sideEffect: "read",
 })
@@ -210,6 +211,7 @@ const publicHookContractsAreGroupedContracts: PublicHookContractsAreGroupedContr
 ];
 
 @Module({
+  providers: [di.singletonValue(TOOL_EXECUTION_OPTIONS, { auditSink: () => undefined, requiredPlatformHooks: dxRequiredPlatformHooks })],
   imports: [
     DxFeatureModule,
     http.httpModule({
@@ -254,7 +256,7 @@ describe("public bazis DX smoke", () => {
 
       const agents = new AgentRuntime(container, {
         complete: (request) => agentModelResponse({ invocationId: request.invocationId, finishReason: "stop", message: agentMessage("assistant", "ok") }),
-      }, { toolExecutorOptions: { auditSink: () => undefined, requiredPlatformHooks: dxRequiredPlatformHooks } });
+      });
       expect(agents.listTools().map((tool) => [tool.metadata.name, tool.metadata.sideEffect])).toEqual([["dx.lookup", "read"]]);
       const result = await agents.run({ name: "dx-agent", instructions: "DX smoke agent", toolNames: ["dx.lookup"] }, { input: "hi" });
       expect(result.status).toBe("completed");

@@ -36,13 +36,8 @@ export {
   type AgentRuntimeToolCallContext,
   type AgentRuntimeToolExecutionOptions,
 } from "./AgentRuntime";
-export {
-  TOOL_RUNNER_OPTIONS,
-  ToolRunner,
-  toolRunnerProviders,
-  type ToolRunOptions,
-  type ToolRunnerOptions,
-} from "./ToolRunner";
+export { BoundToolRunner, ToolRunner, type ToolRunOptions } from "./ToolRunner";
+export { TOOL_EXECUTION_OPTIONS, type ToolExecutionOptions } from "./toolExecutionOptions";
 export {
   ApproximateAgentContextTokenEstimator,
   DefaultAgentContextBuilder,

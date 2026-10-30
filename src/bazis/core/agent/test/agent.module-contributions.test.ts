@@ -8,7 +8,7 @@ import { getAgentModuleContributionsV1 } from "../moduleContributions-v1";
 let toolConstructed = 0;
 let toolExecuted = 0;
 
-@Tool({ name: "agent.contribution.tool", description: "Test Tool", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "agent.contribution.tool", description: "Test Tool", sideEffect: "read" })
 class ContributionTool {
   public constructor() { toolConstructed += 1; }
   public execute(): object { toolExecuted += 1; return {}; }
@@ -74,7 +74,7 @@ describe("Agent module contributions v1", () => {
   });
 
   test("rejects duplicate Tool names, repeated classes, and multiple owners before activation", () => {
-    @Tool({ name: "agent.contribution.tool", description: "Conflicting name" }) class ConflictingTool {}
+    @Tool({ callers: ["agent"], name: "agent.contribution.tool", description: "Conflicting name" }) class ConflictingTool {}
     for (const build of [
       () => createContainer({ tools: [ContributionTool, ContributionTool] }),
       () => createContainer({ tools: [ContributionTool, ConflictingTool] }),
@@ -126,7 +126,7 @@ describe("Agent module contributions v1", () => {
     @Module({ tools: [PlainTool], providers: [scoped(PlainTool)] }) class MissingMetadataModule {}
     expect(() => createContainer(MissingMetadataModule)).toThrow(AgentSetupError);
     expect(() => {
-      @Tool({ name: " ", description: "Invalid Tool" })
+      @Tool({ callers: ["agent"], name: " ", description: "Invalid Tool" })
       class InvalidMetadataTool {}
       return InvalidMetadataTool;
     }).toThrow(AgentSetupError);

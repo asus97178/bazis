@@ -4,6 +4,39 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.123.0 — 2026-10-31
+
+Tools are one contract for every caller: LLM agents and code that runs them
+itself, such as a business-process engine (spec TOOLS-001).
+0.122.0 was not published; its `ToolRunner` ships here in the reworked form.
+
+### Changed (breaking)
+
+- `@Tool` requires `callers`: who may call the Tool, `"agent"` for LLM agents
+  or an application id such as `"workflow"`. A Tool without it stops the start
+  with the fix. A call by a caller that is not listed is refused with
+  `TOOL_CALLER_NOT_ALLOWED`; tags no longer have anything to do with access.
+- `ToolRunner` is registered by the framework for any module that declares
+  `tools`; `toolRunnerProviders` is removed. Code binds it to its caller id:
+  `runner.as("workflow")` returns a `BoundToolRunner` whose `listTools`,
+  `getTool`, `describe` and `run` see only that caller's Tools.
+  `as("agent")` is refused: agents run through `AgentRuntime`.
+- Tool execution settings for every caller are one value of
+  `TOOL_EXECUTION_OPTIONS` (approval policy, audit sink, retries, deadline,
+  hooks). `AGENT_RUNTIME_OPTIONS.toolExecutorOptions` and `TOOL_RUNNER_OPTIONS`
+  are removed.
+- `AgentToolExecutor` has no `allowUnboundTools`: a call without an agent names
+  its `caller` (`TOOL_CALLER_REQUIRED` otherwise).
+- `bazis g module --full` generates the Tool in `tools/` (not `ai/tools/`)
+  with `callers: ["agent"]`.
+
+### Added
+
+- `actor` (`{ kind: "user" | "system", id }`): on whose behalf a Tool runs. It
+  reaches the approval request and the audit entry together with `caller`.
+  `BoundToolRunner.run` requires it for `write` and `external` Tools
+  (`TOOL_ACTOR_REQUIRED`).
+
 ## 0.122.0 — 2026-10-30
 
 ### Added

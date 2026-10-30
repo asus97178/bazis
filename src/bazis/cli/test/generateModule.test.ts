@@ -138,8 +138,11 @@ export class AppModule {}
     expect(controller).toContain("@OutputCache");
 
     // Agents are data run by AgentRuntime; the module ships only its Tool.
-    const tool = await readFile(path.join(moduleDir, "ai/tools/CatalogSummary.tool.ts"), "utf8");
+    const tool = await readFile(path.join(moduleDir, "tools/CatalogSummary.tool.ts"), "utf8");
     expect(tool).toContain('@Tool({\n  name: "catalogs.summary"');
+    // 0.123.0 (TOOLS-001): Tools live in tools/ and say who may call them.
+    expect(tool).toContain('callers: ["agent"],');
+    expect(await Bun.file(path.join(moduleDir, "ai")).exists()).toBe(false);
     expect(await Bun.file(path.join(moduleDir, "ai/agents")).exists()).toBe(false);
     expect(await Bun.file(path.join(moduleDir, "ai/contracts")).exists()).toBe(false);
 

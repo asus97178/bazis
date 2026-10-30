@@ -6,7 +6,7 @@ import { AgentRegistry } from "../AgentRegistry";
 class SearchInput { query = ""; }
 
 @Tool({
-  name: "catalog.search",
+  callers: ["agent"], name: "catalog.search",
   description: "Find products in the catalog.",
   input: SearchInput,
   sideEffect: "read",
@@ -25,6 +25,7 @@ describe("tool metadata", () => {
       sideEffect: "read",
       approval: "policy",
       timeoutMs: 500,
+      callers: ["agent"],
       tags: ["catalog"],
     });
     expect(Object.isFrozen(toolMetadataOf(SearchCatalogTool))).toBe(true);
@@ -32,9 +33,9 @@ describe("tool metadata", () => {
   });
 
   test("write and external tools require approval by default", () => {
-    @Tool({ name: "catalog.reindex", description: "Rebuilds the product search index.", sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "catalog.reindex", description: "Rebuilds the product search index.", sideEffect: "write" })
     class ReindexTool {}
-    @Tool({ name: "mail.send", description: "Sends an email.", sideEffect: "external" })
+    @Tool({ callers: ["agent"], name: "mail.send", description: "Sends an email.", sideEffect: "external" })
     class SendMailTool {}
 
     expect(toolMetadataOf(ReindexTool)?.approval).toBe("required");
@@ -43,7 +44,7 @@ describe("tool metadata", () => {
 
   test("an unsafe tool cannot opt out of approval, and invalid options are setup errors", () => {
     expect(() => {
-      @Tool({ name: "catalog.delete", description: "Deletes a product.", sideEffect: "write", approval: "never" })
+      @Tool({ callers: ["agent"], name: "catalog.delete", description: "Deletes a product.", sideEffect: "write", approval: "never" })
       class DeleteProductTool {}
       return DeleteProductTool;
     }).toThrow(AgentSetupError);
@@ -64,7 +65,7 @@ describe("tool metadata", () => {
 
 describe("tool catalog", () => {
   test("collects @Module.tools from the whole module graph", () => {
-    @Tool({ name: "orders.find", description: "Finds an order.", sideEffect: "read" })
+    @Tool({ callers: ["agent"], name: "orders.find", description: "Finds an order.", sideEffect: "read" })
     class FindOrderTool {}
     @Module({ tools: [FindOrderTool], providers: [scoped(FindOrderTool)] })
     class OrdersModule {}
@@ -83,9 +84,9 @@ describe("tool catalog", () => {
   });
 
   test("fails fast on duplicate tool names", () => {
-    @Tool({ name: "catalog.search", description: "First search tool." })
+    @Tool({ callers: ["agent"], name: "catalog.search", description: "First search tool." })
     class FirstSearchTool {}
-    @Tool({ name: "catalog.search", description: "Second search tool." })
+    @Tool({ callers: ["agent"], name: "catalog.search", description: "Second search tool." })
     class SecondSearchTool {}
     @Module({ tools: [FirstSearchTool, SecondSearchTool], providers: [scoped(FirstSearchTool), scoped(SecondSearchTool)] })
     class BrokenModule {}

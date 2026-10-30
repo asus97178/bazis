@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { withToolExecution } from "./toolExecution.fixture";
 import { DI, createContainer, Module, scoped } from "@/core/di";
 import { defineConfig, secret } from "@/core/kernel";
 import { Infra, llmConnect, llmProfile, llmRouter, openAiCompatibleAdapter, type LlmProviderAdapter } from "@/core/infra";
@@ -34,7 +35,7 @@ import { agentDefinition } from "./agentDefinition.fixture";
 const CATALOG_AGENT = "catalog-agent";
 
 @Tool({
-  name: "catalog.search",
+  callers: ["agent"], name: "catalog.search",
   description: "Searches the product catalog.",
   sideEffect: "read",
 })
@@ -626,7 +627,7 @@ describe("agent runtime", () => {
   test("derives distinct default, prefixed and custom idempotency keys for every model call", async () => {
     const observed: { invocationId: string; callId: string; key: string | null }[] = [];
 
-    @Tool({ name: "keys.capture", description: "Captures the runtime idempotency key.", sideEffect: "read" })
+    @Tool({ callers: ["agent"], name: "keys.capture", description: "Captures the runtime idempotency key.", sideEffect: "read" })
     class CaptureKeyTool {
       execute(_input: JsonValue, context: AgentToolExecutionContext): JsonObject {
         observed.push({
@@ -702,7 +703,7 @@ describe("agent runtime", () => {
   test("rejects a model call id already present in invocation history before repeating its side effect", async () => {
     let executions = 0;
 
-    @Tool({ name: "history.write", description: "Writes once.", sideEffect: "write", approval: "required" })
+    @Tool({ callers: ["agent"], name: "history.write", description: "Writes once.", sideEffect: "write", approval: "required" })
     class HistoryWriteTool {
       execute(): JsonObject {
         executions += 1;
@@ -723,10 +724,8 @@ describe("agent runtime", () => {
     class AppModule {}
 
     const existingCall = agentToolCall({ id: "call-existing", name: "history.write" });
-    const container = createContainer(AppModule);
-    const runtime = new AgentRuntime(container, new ReusingProvider(), {
-      toolExecutorOptions: { approvalPolicy: () => true, auditSink: () => undefined },
-    });
+    const container = createContainer(withToolExecution(AppModule, { approvalPolicy: () => true, auditSink: () => undefined }));
+    const runtime = new AgentRuntime(container, new ReusingProvider());
     try {
       const result = await runtime.run(HistoryAgent, {
         id: "inv-history",
@@ -754,7 +753,7 @@ describe("agent runtime", () => {
     const entries: AgentToolAuditEntry[] = [];
     let providerCalls = 0;
 
-    @Tool({ name: "slow.write", description: "Completes after the caller timeout.", sideEffect: "write", timeoutMs: 1 })
+    @Tool({ callers: ["agent"], name: "slow.write", description: "Completes after the caller timeout.", sideEffect: "write", timeoutMs: 1 })
     class SlowWriteTool {
       async execute(): Promise<JsonObject> {
         await Bun.sleep(20);
@@ -782,13 +781,11 @@ describe("agent runtime", () => {
     @Module({ tools: [SlowWriteTool], providers: [scoped(SlowWriteTool)] })
     class AppModule {}
 
-    const container = createContainer(AppModule);
-    const runtime = new AgentRuntime(container, new ContinuingProvider(), {
-      toolExecutorOptions: {
-        approvalPolicy: () => true,
-        auditSink: (entry) => { entries.push(entry); },
-      },
-    });
+    const container = createContainer(withToolExecution(AppModule, {
+      approvalPolicy: () => true,
+      auditSink: (entry) => { entries.push(entry); },
+    }));
+    const runtime = new AgentRuntime(container, new ContinuingProvider());
     try {
       const result = await runtime.run(SlowWriteAgent, { id: "inv-slow-write", input: "write" });
       expect(result.status).toBe("failed");
@@ -807,7 +804,7 @@ describe("agent runtime", () => {
     let writes = 0;
     let providerCalls = 0;
 
-    @Tool({ name: "audited.write", description: "A write requiring durable result audit.", sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "audited.write", description: "A write requiring durable result audit.", sideEffect: "write" })
     class AuditedWriteTool {
       execute(): JsonObject {
         writes += 1;
@@ -835,15 +832,13 @@ describe("agent runtime", () => {
     @Module({ tools: [AuditedWriteTool], providers: [scoped(AuditedWriteTool)] })
     class AppModule {}
 
-    const container = createContainer(AppModule);
-    const runtime = new AgentRuntime(container, new UnsafeContinuingProvider(), {
-      toolExecutorOptions: {
-        approvalPolicy: () => true,
-        auditSink: (entry) => {
-          if (entry.phase === "result") throw new Error("audit storage unavailable");
-        },
+    const container = createContainer(withToolExecution(AppModule, {
+      approvalPolicy: () => true,
+      auditSink: (entry) => {
+        if (entry.phase === "result") throw new Error("audit storage unavailable");
       },
-    });
+    }));
+    const runtime = new AgentRuntime(container, new UnsafeContinuingProvider());
     try {
       const result = await runtime.run(AuditedWriteAgent, { id: "inv-audited-write", input: "write" });
       expect(writes).toBe(1);
@@ -873,23 +868,23 @@ describe("agent runtime", () => {
       }
     }
 
-    @Tool({ name: "commit.invalid-output", description: "Commits then returns invalid output.", output: InvalidCommittedOutput, sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "commit.invalid-output", description: "Commits then returns invalid output.", output: InvalidCommittedOutput, sideEffect: "write" })
     class InvalidCommittedOutputTool {
       execute(): JsonObject {
         return { count: "invalid" };
       }
     }
-    @Tool({ name: "commit.throwing-dispose", description: "Commits before throwing dispose.", sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "commit.throwing-dispose", description: "Commits before throwing dispose.", sideEffect: "write" })
     class ThrowingCommittedDisposeTool {
       constructor(private readonly _state: ThrowingCommittedState) {}
       execute(): JsonObject { return { committed: true }; }
     }
-    @Tool({ name: "commit.slow-dispose", description: "Commits before slow dispose.", sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "commit.slow-dispose", description: "Commits before slow dispose.", sideEffect: "write" })
     class SlowCommittedDisposeTool {
       constructor(private readonly _state: SlowCommittedState) {}
       execute(): JsonObject { return { committed: true }; }
     }
-    @Tool({ name: "commit.then-throw", description: "Commits and then throws.", sideEffect: "write" })
+    @Tool({ callers: ["agent"], name: "commit.then-throw", description: "Commits and then throws.", sideEffect: "write" })
     class CommitThenThrowTool {
       execute(): never {
         commitThenThrows += 1;
@@ -930,7 +925,19 @@ describe("agent runtime", () => {
       }
     }
 
-    const container = createContainer(AppModule);
+    const container = createContainer(withToolExecution(AppModule, {
+      approvalPolicy: () => true,
+      auditSink: () => undefined,
+      scopeDisposeTimeoutMs: 1,
+      schemaValidator: {
+        validate(instance) {
+          const count = (instance as { count?: unknown }).count;
+          return typeof count === "number"
+            ? { isValid: true, errors: [] }
+            : { isValid: false, errors: [{ property: "count", message: "count must be a number" }] };
+        },
+      },
+    }));
     const cases = [
       ["commit.invalid-output", "TOOL_POST_EXECUTION_FAILED_OUTCOME_UNKNOWN"],
       ["commit.throwing-dispose", "TOOL_SCOPE_DISPOSE_FAILED_OUTCOME_UNKNOWN"],
@@ -940,21 +947,7 @@ describe("agent runtime", () => {
     try {
       for (const [toolName, expectedToolCode] of cases) {
         const provider = new SingleToolProvider(toolName);
-        const runtime = new AgentRuntime(container, provider, {
-          toolExecutorOptions: {
-            approvalPolicy: () => true,
-            auditSink: () => undefined,
-            scopeDisposeTimeoutMs: 1,
-            schemaValidator: {
-              validate(instance) {
-                const count = (instance as { count?: unknown }).count;
-                return typeof count === "number"
-                  ? { isValid: true, errors: [] }
-                  : { isValid: false, errors: [{ property: "count", message: "count must be a number" }] };
-              },
-            },
-          },
-        });
+        const runtime = new AgentRuntime(container, provider);
         const result = await runtime.run(PostCommitAgent, {
           id: `inv-${toolName}`,
           input: "commit",
@@ -973,7 +966,7 @@ describe("agent runtime", () => {
 
   test("rejects malformed provider envelopes before any tool effect", async () => {
     let effects = 0;
-    @Tool({ name: "raw.effect", description: "Must not run.", sideEffect: "read" })
+    @Tool({ callers: ["agent"], name: "raw.effect", description: "Must not run.", sideEffect: "read" })
     class RawEffectTool { execute(): JsonObject { effects += 1; return { ok: true }; } }
     const RawProviderAgent = agentDefinition({ name: "raw-provider-agent", tools: [RawEffectTool] });
     @Module({ tools: [RawEffectTool], providers: [scoped(RawEffectTool)] })
@@ -1000,7 +993,7 @@ describe("agent runtime", () => {
 
   test("rejects an entire mixed provider tool batch before the valid Tool can execute", async () => {
     let effects = 0;
-    @Tool({ name: "batch.valid", description: "Must not execute in malformed batch.", sideEffect: "read" })
+    @Tool({ callers: ["agent"], name: "batch.valid", description: "Must not execute in malformed batch.", sideEffect: "read" })
     class ValidBatchTool { execute(): JsonObject { effects += 1; return { ok: true }; } }
     const MixedBatchAgent = agentDefinition({ name: "mixed-batch-agent", tools: [ValidBatchTool] });
     @Module({ tools: [ValidBatchTool], providers: [scoped(ValidBatchTool)] })
@@ -1040,7 +1033,7 @@ describe("agent runtime", () => {
 
   test("rejects a mixed raw OpenAI-compatible vendor batch before Tool execution", async () => {
     let effects = 0;
-    @Tool({ name: "adapter.valid", description: "valid", sideEffect: "read" }) class ValidTool { execute() { effects += 1; return { ok: true }; } }
+    @Tool({ callers: ["agent"], name: "adapter.valid", description: "valid", sideEffect: "read" }) class ValidTool { execute() { effects += 1; return { ok: true }; } }
     const BatchAgent = agentDefinition({ name: "adapter-batch-agent", tools: [ValidTool] });
     @Module({ tools: [ValidTool], providers: [scoped(ValidTool)] }) class AppModule {}
     const provider = openAiCompatibleAdapter({ fetch: async () => Response.json({ choices: [{ finish_reason: "tool_calls", message: { tool_calls: [{ id: "valid", type: "function", function: { name: "adapter_valid", arguments: "{}" } }, { id: "bad", type: "unknown" }] } }] }) }).create({ provider: "openai-compatible", model: "test", baseUrl: "https://invalid", apiKey: "secret" }) as AgentModelProvider;

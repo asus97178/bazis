@@ -79,24 +79,25 @@ A class schema comes from codegen (the class must be reachable for OpenAPI or
 be a Tool contract); `agentJsonSchema(name, schema)` takes a JSON Schema
 directly.
 
-Runtime settings — limits, approval policy, audit sink, context builder —
-are registered once:
+Runtime settings (limits, context builder) and Tool execution settings
+(approval policy, audit sink, retries) are registered once; the Tool settings
+are shared by agents and `ToolRunner`:
 
 ```ts
 @Module({
-  providers: [DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, {
-    maxSteps: 6,
-    toolExecutorOptions: {
-      approvalPolicy: (request) => request.tool.sideEffect === "read",
+  providers: [
+    DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, { maxSteps: 6 })),
+    DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
+      approvalPolicy: (request) => request.tool.metadata.sideEffect === "read",
       auditSink: (entry) => auditStore.write(entry),
-    },
-  }))],
+    })),
+  ],
 })
 export class AgentSettingsModule {}
 ```
 
 Tool input and output are validated by the model validator
-(`modelValidatorAdapter`) unless `toolExecutorOptions.schemaValidator` says
+(`modelValidatorAdapter`) unless `TOOL_EXECUTION_OPTIONS.schemaValidator` says
 otherwise. Audit entries redact `input`, `result` and execution `metadata`
 by default using `bazis/library/redaction`.
 

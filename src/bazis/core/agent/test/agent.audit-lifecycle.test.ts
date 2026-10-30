@@ -10,7 +10,7 @@ import { AgentToolExecutor } from "../AgentToolExecutor";
 import { AgentRegistry } from "../AgentRegistry";
 import { agentDefinition, agentRegistry } from "./agentDefinition.fixture";
 
-@Tool({ name: "audit.lifecycle.read", description: "Audit lifecycle fixture.", sideEffect: "read" })
+@Tool({ callers: ["agent"], name: "audit.lifecycle.read", description: "Audit lifecycle fixture.", sideEffect: "read" })
 class AuditLifecycleReadTool {
   execute(_input: unknown, _context: AgentToolExecutionContext): unknown { return { ok: true }; }
 }
