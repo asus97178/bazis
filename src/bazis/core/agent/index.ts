@@ -87,6 +87,7 @@ export {
   toolMetadataOf,
   type ToolApproval,
   type ToolMetadata,
+  type ToolActor,
   type ToolOptions,
   type ToolSideEffect,
 } from "./metadata";

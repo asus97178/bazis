@@ -4,6 +4,40 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.124.0 — 2026-10-31
+
+Business processes in the framework, stage 1 of spec WORKFLOW-001: an
+application gets process definitions, execution, HTTP and background work
+without a CMS. No UI: a designer and task inbox build on these services.
+
+### Added
+
+- `bazis/library/workflow`: the process document `bazis.workflow/v1` (13 node
+  kinds), `validateProcess` with every finding at once (including Tools that
+  do not list `workflow` in `callers`), data paths `$input / $vars / $nodes`,
+  conditions without code, form fields and their check, `durationMs`.
+- `bazis/core/workflow`: the composite `WorkflowModule` of two parts with
+  their own owned stores, services and HTTP.
+  - `WorkflowDefinitionsModule` / `IWorkflowDefinitions`: a process catalog
+    with drafts and immutable published versions (`bazis_wf_def_*`);
+    `/workflow/processes…` and `/workflow/tools`.
+  - `WorkflowRuntimeModule` / `IWorkflowRuntime`: instances, tokens, jobs and
+    history (`bazis_wf_run_*`); manual start, service tasks through
+    `ToolRunner.as("workflow")` on behalf of who started the instance with the
+    token id as idempotency key, user tasks as waits (`completeToken`),
+    exclusive and parallel gateways, cancel and retry; `/workflow/instances…`.
+    A worker claims jobs with `SKIP LOCKED` and a lease; retention deletes old
+    finished instances. Settings `workflow.worker.*` and `workflow.retention.*`.
+  - Events `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
+    `WORKFLOW_INSTANCE_FINISHED`, published after the step commits.
+  - Ports: `WorkflowAccess` (who calls and what is allowed; without one the
+    workflow HTTP answers 403) and `WorkflowInputValidator`. Errors are
+    `WorkflowError` with a code and its HTTP status.
+- `ToolActor` is exported from `bazis/core/agent`.
+
+Not yet: retries and error boundaries, timers, events and schedules, the
+tasks part (stages 2–4 of WORKFLOW-001).
+
 ## 0.123.0 — 2026-10-31
 
 Tools are one contract for every caller: LLM agents and code that runs them

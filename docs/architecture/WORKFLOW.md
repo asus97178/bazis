@@ -1,7 +1,7 @@
 # Бизнес-процессы во фреймворке
 
 Идентификатор: **WORKFLOW-001**. Версия: **1.1**. Дата: **2026-10-31**.
-Статус: **принята; реализуется по этапам §12**.
+Статус: **принята; этап 1 реализован в bazis 0.124.0, этапы 2–5 — §12**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
 HTTP и фоновое исполнение — без CMS. UI во фреймворк не входит: дизайнер,
@@ -34,6 +34,7 @@ src/bazis/core/workflow/               составной модуль WorkflowM
   Workflow.module.ts                   только imports / exports частей
   index.ts                             точка входа bazis/core/workflow
   access/WorkflowAccess.ts             порт прав HTTP (общий контракт частей)
+  contracts/                           WorkflowError, WorkflowInputValidator, общие типы
   definitions_module/                  «какие процессы есть»
   runtime_module/                      «как процессы исполняются»
   tasks_module/                        «задачи сотрудникам»
@@ -113,11 +114,17 @@ export class AppModule {}
   `boolean`, `date`, `datetime`, `enum` (`values`), `required`. Проверку
   можно заменить портом `WorkflowInputValidator` (§9).
 - `diagram` хранится и отдаётся как есть, фреймворк его не читает.
-- `validateProcess(document, { tools })` возвращает все замечания с кодом и
-  узлом или переходом: `no_start`, `no_end`, `unreachable`, `dead_end`,
-  `unknown_kind`, `config_invalid`, `unknown_tool`, `bad_flow`, `bad_condition`,
-  `default_flow`, `boundary_target`, `too_large`. `serviceTask` должен называть
-  Tool, у которого в `callers` есть `workflow`.
+- `validateProcess(document, { tools })` возвращает все замечания сразу:
+  `severity` (`error` не даёт опубликовать, `warning` — подсказка дизайнеру),
+  код и узел или переход. Коды: `schema`, `too_large`, `input_invalid`,
+  `id_invalid`, `unknown_kind`, `title_invalid`, `config_invalid`,
+  `unknown_tool`, `flow_dangling`, `flow_self`, `flow_duplicate`, `no_start`,
+  `no_end`, `start_incoming`, `start_outgoing`, `end_outgoing`, `end_incoming`,
+  `activity_incoming`, `activity_outgoing`, `gateway_flows`, `boundary_attach`,
+  `boundary_incoming`, `boundary_outgoing`, `condition_missing`,
+  `condition_invalid`, `condition_not_allowed`, `default_invalid`,
+  `unreachable`, `dead_end`, `diagram_missing`, `diagram_orphan`.
+  `serviceTask` должен называть Tool, у которого в `callers` есть `workflow`.
 - Пределы: 500 узлов, 1000 переходов, 1 МБ, глубина условий 8.
 
 ## 3. Definitions
@@ -209,7 +216,7 @@ tools(): readonly WorkflowToolInfo[]                               // катал
 **`WfJob`** (`bazis_wf_run_jobs`) — отложенная работа: `id`, `kind` (`tool`,
 `timer`, `retry`, `schedule`), `instanceId`, `tokenId` (null у `schedule`),
 `versionId` (для `schedule`), `dueAt`, `attempts`, `lockedUntil`, `lastError`.
-Частичный индекс `dueAt WHERE lockedUntil IS NULL`.
+Индекс `dueAt` (частичные индексы owned store не принимает); воркер берёт задания по `id`, как требует `SKIP LOCKED` в ORM.
 
 **`WfSubscription`** (`bazis_wf_run_subscriptions`) — ожидание события: `id`,
 `instanceId`, `tokenId`, `eventKey`, `correlation`, `partition`, `createdAt`.
@@ -230,7 +237,7 @@ tools(): readonly WorkflowToolInfo[]                               // катал
 start(processKey, { input, partition?, businessKey?, actor }): Promise<InstanceDetails> // invalid_input с issues
 cancel(instanceId, { reason?, actor })                     // wrong_status, если уже завершён
 retry(instanceId, { actor })                               // wrong_status, если не failed
-emit(eventKey, payload, { correlation?, partition? })      // старт, продолжение ожидания, граничное событие
+emit(eventKey, payload, { correlation?, partition? })      // этап 3: старт, продолжение ожидания, граничное событие
 completeToken(tokenId, output, actor)                      // для userTask; проверяет output по форме
 instances(query: { partition?, status?, processKey?, businessKey?, startedById?, limit?, offset? })
 instance(instanceId): Promise<InstanceDetails>             // с токенами
@@ -282,8 +289,8 @@ history(instanceId): Promise<readonly HistoryEntry[]>
 ```ts
 export const workflowRuntimeConfig = defineConfig("workflow", {
   default: {
-    worker: { enabled: true, intervalMs: 1000, batchSize: 10 },
-    retention: { enabled: true, intervalMs: 3_600_000, batchSize: 500 },
+    "worker.enabled": true, "worker.intervalMs": 1000, "worker.batchSize": 10,
+    "retention.enabled": true, "retention.intervalMs": 3_600_000, "retention.batchSize": 500,
   },
 });
 ```
@@ -375,7 +382,8 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
   реализацию, HTTP модуля отвечает 403. Сервисы порт не проверяют: их вызывает
   код приложения, который сам решает, что можно.
 - Приложение регистрирует реализацию в любом модуле:
-  `DI.singleton(WorkflowAccess, AppWorkflowAccess)`.
+  `DI.singleton(DI.classProvider(WorkflowAccess, AppWorkflowAccess, []))`.
+  Так же подключается свой `WorkflowInputValidator`.
 - Списки фильтруются тем же портом: `instances.read` проверяется на
   `partition` из запроса.
 
