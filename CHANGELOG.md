@@ -4,6 +4,17 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.124.1 — 2026-10-31
+
+### Fixed
+
+- An application started with a stale codegen (sources changed after
+  `bazis codegen`) refused the framework's own controllers — the workflow HTTP
+  of 0.124.0 and the UI surface routes — as "has parameters but no generated
+  argument bindings". Those controllers read the `HttpContext` themselves and
+  are never covered by the application's codegen; the check now applies to
+  application controllers only.
+
 ## 0.124.0 — 2026-10-31
 
 Business processes in the framework, stage 1 of spec WORKFLOW-001: an

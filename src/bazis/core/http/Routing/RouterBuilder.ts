@@ -2,6 +2,7 @@ import type { Class, Token } from "../../di";
 import { assertConsumes, bindArguments } from "../Binding/ParameterBinder";
 import { resolveGeneratedBindings } from "../Binding/autoBindings";
 import { generatedSourcesAreStale } from "../../generatedFingerprint";
+import { isContextOnlyController } from "./contextOnlyControllers";
 import { controllerMetaOf, type ActionMeta, type ControllerMeta } from "../Decorators/metadata";
 import { HttpSetupError } from "../Errors/HttpError";
 import type { HttpContext } from "../HttpContext/HttpContext";
@@ -237,7 +238,7 @@ function assertBindingsFresh(
   methodName: string | symbol,
   bindings: readonly unknown[] | undefined,
 ): void {
-  if (bindings !== undefined || !generatedSourcesAreStale()) {
+  if (bindings !== undefined || isContextOnlyController(controllerClass) || !generatedSourcesAreStale()) {
     return;
   }
   const method = (controllerClass.prototype as Record<string | symbol, unknown>)[methodName];

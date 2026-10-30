@@ -1,3 +1,4 @@
+import { contextOnlyController } from "../../http/Routing/contextOnlyControllers";
 import {
   Controller,
   ForbiddenError,
@@ -183,6 +184,7 @@ export class UiSurfaceHttpController {
     return versionedJson(ctx, document, document.metadata.revision);
   }
 }
+contextOnlyController(UiSurfaceHttpController);
 
 function validateSurfaceRegistration(
   options: RunAppUiSurfaceOptions,

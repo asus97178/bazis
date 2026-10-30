@@ -1,3 +1,4 @@
+import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
 import { Controller, Created, Get, Patch, Post, Put, type HttpContext } from "../../../http";
 import { authorize, body, optionalInteger, optionalString, pagingQuery, param, requiredString } from "../../internal/http";
 import { WorkflowError } from "../../contracts/WorkflowError";
@@ -90,3 +91,4 @@ export class ProcessesController {
     return { data: this.definitions.tools() };
   }
 }
+contextOnlyController(ProcessesController);
