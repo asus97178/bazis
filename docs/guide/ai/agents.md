@@ -312,22 +312,23 @@ POST /agents/operator/ask {"question":"отмени заказ 7"}
 
 Изменения, сделанные агентом, должны оставлять след, и решать, разрешено
 ли действие, должно приложение. Обе вещи задаёт токен
-`AGENT_RUNTIME_OPTIONS` — его можно зарегистрировать в любом модуле:
+`TOOL_EXECUTION_OPTIONS` — настройки исполнения инструментов, общие для
+агентов и [`ToolRunner`](tools.md#вызов-без-модели). Настройки самого
+агента (`maxSteps`, `timeoutMs`) — в `AGENT_RUNTIME_OPTIONS`. Оба токена
+можно зарегистрировать в любом модуле:
 
 ```ts
-import { AGENT_RUNTIME_OPTIONS, type AgentRuntimeOptions } from "bazis/core/agent";
+import { AGENT_RUNTIME_OPTIONS, TOOL_EXECUTION_OPTIONS, type ToolExecutionOptions } from "bazis/core/agent";
 import { DI, Module, singleton } from "bazis/core/di";
 
 @Module({
   providers: [
     singleton(ToolAuditLog),
-    DI.singleton(DI.factoryProvider(AGENT_RUNTIME_OPTIONS, [ToolAuditLog], (audit: ToolAuditLog): AgentRuntimeOptions => ({
-      maxSteps: 6,
-      toolExecutorOptions: {
-        auditSink: (entry) => audit.write(entry),
-        // Чтение разрешено всегда, изменение — только от имени администратора.
-        approvalPolicy: (request) => request.tool.metadata.sideEffect === "read" || request.metadata.role === "admin",
-      },
+    DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, { maxSteps: 6 })),
+    DI.singleton(DI.factoryProvider(TOOL_EXECUTION_OPTIONS, [ToolAuditLog], (audit: ToolAuditLog): ToolExecutionOptions => ({
+      auditSink: (entry) => audit.write(entry),
+      // Чтение разрешено всегда, изменение — только от имени администратора.
+      approvalPolicy: (request) => request.tool.metadata.sideEffect === "read" || request.metadata.role === "admin",
     }))),
   ],
   exports: [ToolAuditLog],
@@ -360,9 +361,9 @@ POST /agents/support/ask              {"question":"Где заказ 42?"}
 | --- | --- |
 | `maxSteps` | Предел вызовов модели за запуск (по умолчанию 8) |
 | `timeoutMs` | Срок одного вызова модели (по умолчанию 60 с, `0` — без срока) |
-| `toolExecutorOptions.auditSink` | Куда писать журнал вызовов инструментов |
-| `toolExecutorOptions.approvalPolicy` | Разрешить ли вызов: `(request) => boolean` |
-| `toolExecutorOptions.defaultTimeoutMs` | Срок вызова инструмента (по умолчанию 30 с) |
+| `TOOL_EXECUTION_OPTIONS.auditSink` | Куда писать журнал вызовов инструментов |
+| `TOOL_EXECUTION_OPTIONS.approvalPolicy` | Разрешить ли вызов: `(request) => boolean`; в `request` есть `caller` (`"agent"`) и `actor` |
+| `TOOL_EXECUTION_OPTIONS.defaultTimeoutMs` | Срок вызова инструмента (по умолчанию 30 с) |
 | `contextLimits` | Сколько истории отправлять модели |
 
 Когда политика задана, она решает за **каждый** инструмент, кроме тех, у

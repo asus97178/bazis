@@ -217,7 +217,8 @@ observer     orders.cancel  {"id":"tool.metrics","outcome":"recorded"}
 ключи:
 
 ```ts
-toolExecutorOptions: {
+// значение TOOL_EXECUTION_OPTIONS
+{
   auditSink: (entry) => audit.write(entry),
   auditRedaction: { sensitiveKeys: ["card"] },
 }
@@ -260,7 +261,8 @@ error: Agent tool audit failed {"phase":"attempt","mode":"best-effort","agent":"
 его в `requiredPlatformHooks`:
 
 ```ts
-toolExecutorOptions: {
+// значение TOOL_EXECUTION_OPTIONS
+{
   auditSink: (entry) => audit.write(entry),
   requiredPlatformHooks: [{ owner: ComplianceModule, kind: "enforcement", id: "compliance", version: 1 }],
 }
