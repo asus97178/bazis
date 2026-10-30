@@ -6,6 +6,10 @@ Scope: native Tools from bazis code and their assignment to meta-agents through 
 
 ## 1. Placement and registration
 
+> Superseded for new code by [TOOLS-001](TOOLS.md): a Tool lives in the `tools/`
+> folder of the module that owns the operation and declares its `callers`. The
+> osnova layout below is kept as history.
+
 The shared atomic [ToolsModule](https://github.com/asus97178/osnova/blob/d01528af91e8aed69e21d5f5c8ac256a6f3f2fd0/src/app/modules/agents/tools/MODULE.md)
 of the osnova application lives inside its existing agents area. One tool is a
 class with an execute method. It may use the public services of several modules.
