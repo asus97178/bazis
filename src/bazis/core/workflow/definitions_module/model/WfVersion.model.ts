@@ -9,7 +9,8 @@ export class WfVersion {
   @UUID({ version: "v7" })
   id = "";
 
-  @Column({ type: "uuid" })
+  /** A reference: the foreign key makes the column a native uuid. A non-key `type: "uuid"` would generate a value. */
+  @Column({ type: "text" })
   processId = "";
 
   @Column({ type: "integer" })

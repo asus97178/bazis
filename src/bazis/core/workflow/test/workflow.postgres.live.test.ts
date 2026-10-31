@@ -24,9 +24,11 @@ import {
   type WorkflowTokenClosed,
 } from "@/core/workflow";
 import { WorkflowRetention } from "../runtime_module/background/WorkflowRetention";
+import { Schedules } from "../runtime_module/internal/Schedules";
+import { RuntimeDbContext } from "../runtime_module/model/Runtime.dbContext";
 
 /**
- * Live check of stages 1 and 2 of WORKFLOW-001 on PostgreSQL, through HTTP as an
+ * Live check of stages 1–3 of WORKFLOW-001 on PostgreSQL, through HTTP as an
  * application without the CMS would use it. Runs only against a throwaway
  * database whose name starts with `bazis_wf_`: set `BAZIS_WORKFLOW_PG_URL`.
  * The test drops the workflow tables before it starts.
@@ -287,7 +289,9 @@ test.skipIf(!enabled)("a paid order runs the Tools on behalf of the starter and 
   expect(approvals.find((a) => a.tool.metadata.name === "payments.charge")).toMatchObject({ caller: "workflow", actor: { kind: "user", id: "u-7" } });
 
   const history = (await call("GET", `/workflow/instances/${done.id}/history`)).body.data;
-  expect(history[0]).toMatchObject({ type: "started", actor: { kind: "user", id: "u-7" } });
+  // 0.126.0: instance-level entries have no token (0.124–0.125 stored a generated uuid).
+  expect(history[0]).toMatchObject({ type: "started", tokenId: null, actor: { kind: "user", id: "u-7" } });
+  expect(history.at(-1)).toMatchObject({ type: "completed", tokenId: null });
   expect(history.at(-1).type).toBe("completed");
   expect(history.filter((h: { type: string }) => h.type === "tool")).toHaveLength(3);
   expect(seen.finished).toContainEqual({ instanceId: done.id, processKey: "order", partition: "space-1", status: "completed" });
@@ -356,6 +360,10 @@ const doc = (nodes: Record<string, unknown>, flows: Record<string, unknown>, inp
 interface Snapshot {
   readonly id: string;
   readonly status: string;
+  readonly partition: string | null;
+  readonly startedVia: string;
+  readonly startedBy: { readonly kind: string; readonly id: string };
+  readonly input: Record<string, unknown>;
   readonly nodes: Record<string, unknown>;
   readonly tokens: readonly { readonly nodeId: string; readonly status: string; readonly id: string }[];
 }
@@ -462,6 +470,97 @@ test.skipIf(!enabled)("stage 2: an interrupting boundary timer takes over a task
     expect(done.status).toBe("completed");
   } finally {
     await scope.dispose();
+  }
+});
+
+test.skipIf(!enabled)("stage 3: a wait takes the event of its correlation; HTTP delivers events too", async () => {
+  await publish("awaits", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Wait: { kind: "eventWait", title: "Paid", config: { event: "payments.received", correlation: "$input.orderId", saveTo: "payment" } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "Wait" }, b: { source: "Wait", target: "End" } }, { fields: [{ code: "orderId", type: "string", required: true }] }));
+  const one = (await call("POST", "/workflow/instances", { processKey: "awaits", input: { orderId: "1" } })).body.id;
+  const two = (await call("POST", "/workflow/instances", { processKey: "awaits", input: { orderId: "2" } })).body.id;
+  const scope = app.container.createScope();
+  try {
+    const runtime = scope.resolve(IWorkflowRuntime);
+    expect(await runtime.emit("payments.received", { amount: 5 })).toEqual({ started: [], continued: [], rejected: [] });
+    expect(await runtime.emit("payments.received", { amount: 10 }, { correlation: "1" })).toEqual({ started: [], continued: [one], rejected: [] });
+    expect((await runtime.instance(one))).toMatchObject({ status: "completed", vars: { payment: { amount: 10 } } });
+    expect((await runtime.instance(two)).status).toBe("running");
+  } finally {
+    await scope.dispose();
+  }
+  const delivered = await call("POST", "/workflow/events/payments.received", { payload: { amount: 20 }, correlation: "2" });
+  expect(delivered.status).toBe(202);
+  expect(delivered.body.continued).toEqual([two]);
+  const history = (await call("GET", `/workflow/instances/${two}/history`)).body.data;
+  expect(history.find((h: { type: string }) => h.type === "event")).toMatchObject({ nodeId: "Wait", data: { event: "payments.received" } });
+});
+
+test.skipIf(!enabled)("stage 3: an event starts the processes listening for it; a boundary event interrupts a task", async () => {
+  await publish("welcome", doc({
+    Start: { kind: "eventStart", title: "Signed up", config: { event: "users.signed-up" } },
+    Email: { kind: "serviceTask", title: "Email", config: { tool: "notify.email", input: { to: "$input.email" } } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "Email" }, b: { source: "Email", target: "End" } }, { fields: [{ code: "email", type: "string", required: true }] }));
+  const scope = app.container.createScope();
+  try {
+    const runtime = scope.resolve(IWorkflowRuntime);
+    const result = await runtime.emit("users.signed-up", { email: "a@b.c", plan: "pro" }, { partition: "space-9" });
+    expect(result.started).toHaveLength(1);
+    expect(result.rejected).toEqual([]);
+    const started = await until(result.started[0]!, (i) => i.status !== "running");
+    expect(started).toMatchObject({ status: "completed", partition: "space-9", startedVia: "event", startedBy: { kind: "system", id: "event:users.signed-up" }, input: { email: "a@b.c" } });
+    expect((await runtime.emit("users.signed-up", { plan: "free" })).rejected).toEqual([{ processKey: "welcome", issues: [expect.objectContaining({ field: "email", code: "required" })] }]);
+  } finally {
+    await scope.dispose();
+  }
+
+  await publish("cancellable", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Review: { kind: "userTask", title: "Review", config: { assignee: { role: "support" } } },
+    Cancelled: { kind: "boundaryEvent", title: "Cancelled", attachedTo: "Review", config: { event: "orders.cancelled", correlation: "$input.orderId" } },
+    End: { kind: "end", title: "End" },
+    Dropped: { kind: "end", title: "Dropped" },
+  }, { a: { source: "Start", target: "Review" }, b: { source: "Review", target: "End" }, c: { source: "Cancelled", target: "Dropped" } }, { fields: [{ code: "orderId", type: "string", required: true }] }));
+  const id = (await call("POST", "/workflow/instances", { processKey: "cancellable", input: { orderId: "77" } })).body.id;
+  expect((await call("POST", "/workflow/events/orders.cancelled", { payload: { by: "client" }, correlation: "77" })).body.continued).toEqual([id]);
+  const done = await until(id, (i) => i.status !== "running");
+  expect(done.tokens.map((t) => [t.nodeId, t.status])).toEqual([["Start", "done"], ["Review", "cancelled"], ["Cancelled", "done"], ["Dropped", "done"]]);
+  expect(done.nodes.Cancelled).toEqual({ by: "client" });
+  expect(seen.closed).toContainEqual({ instanceId: id, tokenId: done.tokens[1]!.id, reason: "interrupted" });
+});
+
+test.skipIf(!enabled)("stage 3: a scheduled version gets one job; a firing starts an instance and plans the next", async () => {
+  await publish("nightly", doc({
+    Start: { kind: "scheduleStart", title: "Every minute", config: { cron: "* * * * *" } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "End" } }));
+  const sql = postgres({ url });
+  const jobs = async () => (await sql.query(`SELECT id, "dueAt", "versionId" FROM "bazis_wf_run_jobs" WHERE kind = 'schedule'`, [])) as { id: string; dueAt: Date; versionId: string }[];
+  const scope = app.container.createScope();
+  try {
+    const schedules = scope.resolve(Schedules);
+    await Promise.all([schedules.reconcile(), app.container.createScope().resolve(Schedules).reconcile()]);
+    const [job] = await jobs();
+    expect(await jobs()).toHaveLength(1);
+    const runtime = scope.resolve(IWorkflowRuntime);
+    const before = (await runtime.instances({ processKey: "nightly" })).total;
+    const row = (await scope.resolve(RuntimeDbContext).jobs.asNoTracking().firstOrDefault((j) => j.id.eq(job!.id)))!;
+    await schedules.fire(row);
+    const after = await runtime.instances({ processKey: "nightly" });
+    expect(after.total).toBe(before + 1);
+    expect(after.items[0]).toMatchObject({ status: "completed", startedVia: "schedule", startedBy: { kind: "system", id: "schedule" } });
+    const [moved] = await jobs();
+    expect(new Date(moved!.dueAt).getTime() - new Date(job!.dueAt).getTime()).toBe(60_000);
+
+    await call("PATCH", "/workflow/processes/nightly", { archived: true });
+    await schedules.reconcile();
+    expect(await jobs()).toEqual([]);
+  } finally {
+    await scope.dispose();
+    await sql.close();
   }
 });
 

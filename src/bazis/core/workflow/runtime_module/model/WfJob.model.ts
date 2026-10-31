@@ -19,15 +19,15 @@ export class WfJob {
 
   /** `null` for a `schedule` job: its instance does not exist yet. */
   @Index()
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "text", nullable: true })
   instanceId: string | null = null;
 
   @Index()
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "text", nullable: true })
   tokenId: string | null = null;
 
   /** The version a `schedule` job starts. */
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "text", nullable: true })
   versionId: string | null = null;
 
   @Index()

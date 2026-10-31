@@ -141,6 +141,16 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     return await this.version(key, row.latestVersion);
   }
 
+  async published(): Promise<readonly VersionDetails[]> {
+    const processes = await this.db.processes.asNoTracking().where((p) => p.archivedAt.isNull().and(p.latestVersion.isNotNull())).toList();
+    if (processes.length === 0) return [];
+    const byId = new Map(processes.map((process) => [process.id, process]));
+    const versions = await this.db.versions.asNoTracking().where((v) => v.processId.in([...byId.keys()])).toList();
+    return versions
+      .filter((version) => byId.get(version.processId)?.latestVersion === version.version)
+      .map((version) => versionOf(byId.get(version.processId)!.key, version));
+  }
+
   async versionById(id: string): Promise<VersionDetails | undefined> {
     if (!isUuid(id)) return undefined;
     const version = await this.db.versions.asNoTracking().firstOrDefault((v) => v.id.eq(id));

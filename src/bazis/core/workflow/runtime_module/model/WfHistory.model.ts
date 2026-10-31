@@ -11,10 +11,10 @@ export class WfHistory {
   @UUID({ version: "v7" })
   id = "";
 
-  @Column({ type: "uuid" })
+  @Column({ type: "text" })
   instanceId = "";
 
-  @Column({ type: "uuid", nullable: true })
+  @Column({ type: "text", nullable: true })
   tokenId: string | null = null;
 
   @Column({ type: "text", nullable: true })

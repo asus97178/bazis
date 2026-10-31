@@ -9,11 +9,11 @@ export class WfSubscription {
   @UUID({ version: "v7" })
   id = "";
 
-  @Column({ type: "uuid" })
+  @Column({ type: "text" })
   instanceId = "";
 
   @Index()
-  @Column({ type: "uuid" })
+  @Column({ type: "text" })
   tokenId = "";
 
   @Column({ type: "text" })

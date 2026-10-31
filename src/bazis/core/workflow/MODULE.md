@@ -1,7 +1,7 @@
 # WorkflowModule
 
 Passport version: 1.0. Check date: 2026-10-31.
-Status: implemented for stages 1–2 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
+Status: implemented for stages 1–3 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.
@@ -55,6 +55,10 @@ internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
   failure and retry, retention, a second start over the existing stores; stage 2:
   `config.retry` with one idempotency key over three attempts, a `ToolError` reason
   routed to `boundaryError` without retries, `timerCatch` by duration and by date,
-  interrupting and non-interrupting `boundaryTimer` on a user task.
+  interrupting and non-interrupting `boundaryTimer` on a user task; stage 3: a
+  correlated `eventWait` through the service and HTTP, `eventStart` with the
+  payload checked against the input, an interrupting `boundaryEvent` on a task,
+  one schedule job under concurrent reconciles, a firing that starts an instance
+  and plans the next minute, an archived process losing its job.
 - Not checked: OpenAPI of the workflow routes (the framework's controllers read
   `HttpContext` directly and do not appear in the application's OpenAPI document).

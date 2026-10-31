@@ -4,6 +4,34 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.126.0 — 2026-10-31
+
+Business processes, stage 3 of WORKFLOW-001: events and schedules. Every node
+kind of `bazis.workflow/v1` now runs.
+
+### Added
+
+- `IWorkflowRuntime.emit(eventKey, payload, { correlation?, partition?, actor? })`
+  and `POST /workflow/events/:eventKey` (right `events.emit`): moves the
+  instances waiting in `eventWait` or `boundaryEvent` (matched by correlation and
+  partition) and starts processes whose latest version has an `eventStart` for
+  the key. Returns `{ started, continued, rejected }`.
+- `eventWait` and `boundaryEvent` (interrupting or not) with an optional
+  `correlation` path; the event payload is the step result.
+- `scheduleStart` with a five-field cron in UTC: one job per scheduled version,
+  reconciled at start and every minute; a firing starts the instances and plans
+  the next one in one transaction.
+- `parseCron` in `bazis/library/workflow`; `validateProcess` checks cron fields.
+- `IWorkflowDefinitions.published()`: the latest version of every active process.
+
+### Fixed
+
+- Workflow references (`tokenId`, `versionId` and the instance ids) were declared
+  as generated uuid columns, so an empty `tokenId` of an instance-level history
+  entry (`started`, `completed`, `cancelled`) got a random uuid. They are plain
+  references now; the tables do not change. Cleanup of existing rows:
+  `reference/upgrading.md`.
+
 ## 0.125.0 — 2026-10-31
 
 Business processes, stage 2 of WORKFLOW-001: retries, error handling and timers.

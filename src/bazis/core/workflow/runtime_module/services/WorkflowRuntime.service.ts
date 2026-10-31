@@ -1,4 +1,4 @@
-import type { FormSpec } from "../../../../library/workflow";
+import type { FormIssue, FormSpec } from "../../../../library/workflow";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import type { WorkflowInputValidator } from "../../contracts/WorkflowInputValidator";
@@ -10,6 +10,8 @@ import type { WfInstance } from "../model/WfInstance.model";
 import type { WfToken } from "../model/WfToken.model";
 import {
   IWorkflowRuntime,
+  type EmitOptions,
+  type EmitResult,
   type HistoryEntry,
   type InstanceDetails,
   type InstanceListQuery,
@@ -18,6 +20,7 @@ import {
 } from "./IWorkflowRuntime.service";
 
 const STATUSES = new Set(["running", "completed", "cancelled", "failed"]);
+const EVENT_KEY = /^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$/;
 
 export class WorkflowRuntime extends IWorkflowRuntime {
   constructor(
@@ -85,6 +88,45 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     });
     if (done === null) throw notFound(token.instanceId);
     return await this.instance(token.instanceId);
+  }
+
+  async emit(eventKey: string, payload: unknown = {}, options: EmitOptions = {}): Promise<EmitResult> {
+    if (typeof eventKey !== "string" || !EVENT_KEY.test(eventKey)) throw new WorkflowError("invalid_input", "eventKey must look like payments.received");
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) throw new WorkflowError("invalid_input", "payload must be a JSON object");
+    const data = payload as Record<string, unknown>;
+    const correlation = optionalText(options.correlation, "correlation");
+    const partition = optionalText(options.partition, "partition");
+    const actor = options.actor ?? { kind: "system" as const, id: `event:${eventKey}` };
+    actorOf(actor);
+
+    let waits = this.db.subscriptions.asNoTracking().where((s) => s.eventKey.eq(eventKey));
+    waits = correlation === null ? waits.where((s) => s.correlation.isNull()) : waits.where((s) => s.correlation.isNull().or(s.correlation.eq(correlation)));
+    if (partition !== null) waits = waits.where((s) => s.partition.eq(partition));
+    const continued = new Set<string>();
+    for (const wait of await waits.orderBy((s) => s.id).toList()) {
+      const moved = await this.engine.inStep(wait.instanceId, async (step) => {
+        await this.db.subscriptions.asNoTracking().where((s) => s.id.eq(wait.id)).executeDelete();
+        return await this.engine.eventReceived(step, wait.tokenId, eventKey, data);
+      });
+      if (moved === true) continued.add(wait.instanceId);
+    }
+
+    const started: string[] = [];
+    const rejected: { processKey: string; issues: readonly FormIssue[] }[] = [];
+    for (const version of await this.definitions.published()) {
+      for (const [nodeId, node] of Object.entries(version.document.nodes)) {
+        if (node.kind !== "eventStart" || node.config?.event !== eventKey) continue;
+        // An event carries more than a process needs: fields the input does not declare are dropped, not refused.
+        const { value, issues: all } = await this.validator.validate(version.document.input, data, { purpose: "input", processKey: version.key, partition });
+        const issues = all.filter((issue) => issue.code !== "unknown");
+        if (issues.length > 0) {
+          rejected.push({ processKey: version.key, issues });
+          continue;
+        }
+        started.push(await this.engine.begin(this.engine.cache(version), nodeId, { input: value, partition, businessKey: correlation, startedVia: "event", actor }));
+      }
+    }
+    return { started, continued: [...continued], rejected };
   }
 
   async instances(query: InstanceListQuery = {}): Promise<WorkflowPage<InstanceSummary>> {

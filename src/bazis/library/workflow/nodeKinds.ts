@@ -1,3 +1,4 @@
+import { parseCron } from "./cron";
 import { checkFormSpec } from "./formFields";
 import { DATA_PATH } from "./paths";
 import type { NodeKind } from "./ProcessDocument";
@@ -42,8 +43,7 @@ function first(...checks: (string | null)[]): string | null {
 function cron(config: Record<string, unknown>): string | null {
   const value = config.cron;
   if (typeof value !== "string") return "config.cron is required";
-  const parts = value.trim().split(/\s+/);
-  return parts.length === 5 && parts.every((part) => /^[\d*/,\-]+$/.test(part)) ? null : "config.cron must have five fields";
+  return parseCron(value) === undefined ? "config.cron must be five valid fields: minute hour day month weekday (UTC)" : null;
 }
 
 /** A timer: either `duration` (ISO 8601) or `at`, a path to a date in instance data. */
@@ -99,7 +99,7 @@ export const NODE_KINDS: readonly NodeKindDefinition[] = Object.freeze([
   { kind: "parallelGateway", role: "gateway", check: none },
   { kind: "boundaryError", role: "boundary", check: (c) => string(c, "errorCode", /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/, false) },
   { kind: "boundaryTimer", role: "boundary", check: (c) => first(timer(c), boolean(c, "interrupting")) },
-  { kind: "boundaryEvent", role: "boundary", check: (c) => first(string(c, "event", DOTTED_KEY), boolean(c, "interrupting")) },
+  { kind: "boundaryEvent", role: "boundary", check: (c) => first(string(c, "event", DOTTED_KEY), string(c, "correlation", DATA_PATH, false), boolean(c, "interrupting")) },
   { kind: "end", role: "end", check: none },
 ] satisfies NodeKindDefinition[]);
 

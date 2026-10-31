@@ -21,4 +21,5 @@ export { PROCESS_LIMITS, validateProcess, hasErrors, type ProcessIssue, type Pro
 export { DATA_PATH, isPath, readPath, resolveInput, type InstanceData } from "./paths";
 export { evaluateCondition } from "./conditions";
 export { durationMs } from "./duration";
+export { parseCron, type CronSchedule } from "./cron";
 export { checkFormSpec, formFieldCodes, validateForm, type FormField, type FormFieldType, type FormIssue, type FormSpec } from "./formFields";

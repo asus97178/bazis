@@ -70,6 +70,8 @@ export abstract class IWorkflowDefinitions {
   abstract version(key: string, version: number): Promise<VersionDetails>;
   /** The latest published version of a process that is not archived. */
   abstract latest(key: string): Promise<VersionDetails>;
+  /** The latest version of every process that is not archived: where event and scheduled starts come from. */
+  abstract published(): Promise<readonly VersionDetails[]>;
   /** A version by id, for the engine; `undefined` if there is none. */
   abstract versionById(id: string): Promise<VersionDetails | undefined>;
   /** Processes with a retention period: what the retention service deletes. */
