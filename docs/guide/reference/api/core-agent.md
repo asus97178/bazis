@@ -1,7 +1,7 @@
 # `bazis/core/agent`
 
 Агенты: инструменты, запуск, аудит и подтверждение, хуки, контракты для
-своих адаптеров моделей. Список — по пакету 0.123.0.
+своих адаптеров моделей. Список — по пакету 0.124.1.
 
 ## Для приложения
 
@@ -41,7 +41,7 @@
   `AgentRuntimeToolCallContext`, `AgentRuntimeToolExecutionOptions`,
   `AgentInvocation`, `AgentInvocationOptions`, `AgentUsage`,
   `AgentFinishReason`, `AgentStreamEvent`.
-- **Инструменты:** `ToolOptions`, `ToolExecutionOptions`, `ToolRunOptions`, `ToolDefinition`, `ToolMetadata`,
+- **Инструменты:** `ToolOptions`, `ToolActor`, `ToolExecutionOptions`, `ToolRunOptions`, `ToolDefinition`, `ToolMetadata`,
   `ToolSideEffect`, `ToolApproval`, `AgentExecutableTool`,
   `AgentToolContract`, `AgentToolCall`, `AgentToolResult`,
   `AgentToolResultStatus`, `AgentToolError`, `AgentToolExecutionContext`,

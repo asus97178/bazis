@@ -92,17 +92,21 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Хуки инструментов и аудит](ai/hooks.md) — `enforcement`, `settlement`, `observer`, причина отказа для модели, журнал вызовов и маскировка, отказ журнала, обязательные хуки
 - ✅ [LLM-коннекторы](ai/llm-connectors.md) — конфигурация `llm`, `llmConnect` и `openAiCompatibleAdapter`, что уходит провайдеру, здоровье, профили `llmRouter`, запасная модель, ошибки, свой адаптер
 
-## 9. Инфраструктура
+## 9. Бизнес-процессы
+
+- ✅ [Бизнес-процессы](workflow/processes.md) — `WorkflowModule`, документ процесса, публикация версий, запуск, ошибка шага и повтор, задача сотруднику, отмена, права `WorkflowAccess`, несколько экземпляров
+
+## 10. Инфраструктура
 
 - ✅ [Обзор `@Infra`](infra/overview.md) — манифест, клиенты по типу, порядок старта и остановки, сбой подключения, срок старта, здоровье, два экземпляра одного типа
 - ✅ [Коннекторы](infra/connectors.md) — PostgreSQL (`postgres`), Redis, OpenSearch, Codex; LLM — в [отдельной главе](ai/llm-connectors.md)
 - ✅ [Свой коннектор](infra/custom-connector.md) — клиент, тип для внедрения, `InfraConnector`, конфигурация и секреты, сервис поверх клиента
 
-## 10. CLI
+## 11. CLI
 
 - ✅ [Команды CLI](cli/commands.md) — вывод и язык, `new`, `g module`, `g pack`, `codegen`, `dev` и экран запуска, `test`, `build` и исполняемый файл, коды выхода, переменные окружения
 
-## 11. Развёртывание
+## 12. Развёртывание
 
 - ✅ [Один исполняемый файл](deployment/single-executable.md) — сборка, что попадает внутрь, запуск, среда production, шаг схемы
 - ✅ [Настройка продакшена](deployment/production.md) — точка входа для production, переменные окружения, журнал, сроки, порядок выкладки
@@ -110,7 +114,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Плавная остановка и health](deployment/graceful-shutdown.md) — `SIGTERM`, срок остановки и коды выхода, `/health`, проверки Kubernetes
 - ✅ [Платформы](deployment/platforms.md) — glibc и musl, Linux-файл с Mac (`--platform`), systemd
 
-## 12. Рецепты
+## 13. Рецепты
 
 - ✅ [CRUD-модуль целиком](recipes/crud-module.md)
 - ✅ [JWT и защита маршрутов](recipes/jwt-auth.md)
@@ -122,7 +126,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Если вы пришли с NestJS](recipes/from-nestjs.md)
 - ✅ [Если вы пришли с ASP.NET Core](recipes/from-aspnet-core.md)
 
-## 13. Справочник
+## 14. Справочник
 
 - ✅ [API по точкам входа `bazis/...`](reference/api/README.md)
 - ✅ [Команды CLI](cli/commands.md)

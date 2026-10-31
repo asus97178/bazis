@@ -4,7 +4,7 @@
 не экспортировано из них, — внутреннее. На каждой странице — все экспорты
 точки входа по группам, с главой руководства, где о них подробно.
 
-Списки — по пакету 0.123.0.
+Списки — по пакету 0.124.1.
 
 ## Приложение
 
@@ -33,6 +33,7 @@
 | [`bazis/core/websocket`](core-websocket.md) | WebSocket: шлюзы, комнаты, адаптеры |
 | [`bazis/core/grpc`](core-grpc.md) | gRPC: сервер и клиент |
 | [`bazis/core/agent`](core-agent.md) | Агенты и инструменты |
+| [`bazis/core/workflow`](core-workflow.md) | Бизнес-процессы: модуль, сервисы, события |
 
 ## Библиотеки
 
@@ -48,6 +49,7 @@
 | [`bazis/library/terminal`](library-terminal.md) | Экраны CLI |
 | [`bazis/library/orm`](library-orm.md) | ORM без DI — в приложении `bazis/core/orm` |
 | [`bazis/library/http-client`](library-http-client.md) | HTTP-клиент без DI — в приложении `bazis/core/http-client` |
+| [`bazis/library/workflow`](library-workflow.md) | Формат документа процесса и его проверка |
 | [`bazis/library/boundary`](library-boundary.md) | Безопасная граница JSON, каноничный JSON, схемы |
 | [`bazis/library/ui`](library-ui.md) | UI-профили — экспериментально |
 
