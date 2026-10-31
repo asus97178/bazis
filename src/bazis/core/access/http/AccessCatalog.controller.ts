@@ -1,6 +1,6 @@
 import { contextOnlyController } from "../../http/Routing/contextOnlyControllers";
 import { Authorize, BadRequestError, Controller, Get, NotFoundError, type HttpContext } from "../../http";
-import { AccessCatalog } from "../catalog/AccessCatalog";
+import { IAccessCatalog } from "../catalog/IAccessCatalog.service";
 import { can } from "../check/can";
 import type { Scope } from "../contracts/types";
 
@@ -15,7 +15,7 @@ export class AccessCatalogController {
   @Authorize(can("access.catalog.read"))
   catalogList(ctx: HttpContext) {
     return {
-      data: ctx.services.resolve(AccessCatalog).permissions().map(({ key, spec, module }) => ({
+      data: ctx.services.resolve(IAccessCatalog).permissions().map(({ key, spec, module }) => ({
         key,
         module,
         title: spec.title,
@@ -31,7 +31,7 @@ export class AccessCatalogController {
   @Get("references/:kind")
   @Authorize(can("access.catalog.read"))
   async references(ctx: HttpContext) {
-    const kind = ctx.services.resolve(AccessCatalog).referenceKind(String(ctx.params.kind ?? ""));
+    const kind = ctx.services.resolve(IAccessCatalog).referenceKind(String(ctx.params.kind ?? ""));
     if (kind === undefined) throw new NotFoundError();
     const limit = integer(ctx.query("limit"), "limit", 50, 1, 200);
     const offset = integer(ctx.query("offset"), "offset", 0, 0, 1_000_000);

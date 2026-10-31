@@ -25,7 +25,7 @@
 
 | Кто | Что делает | Чего не знает |
 | --- | --- | --- |
-| Модуль с действиями (процессы, DM, файлы, «Заказы») | Объявляет permissions и атрибуты объектов; ставит `can(…)` на маршруты; фильтрует списки через `Access` | Ролей, пространств, организаций, кто админ |
+| Модуль с действиями (процессы, DM, файлы, «Заказы») | Объявляет permissions и атрибуты объектов; ставит `can(…)` на маршруты; фильтрует списки через `IAccess` | Ролей, пространств, организаций, кто админ |
 | Система прав (одна на приложение) | Хранит роли и правила; по субъекту и праву отдаёт гранты; раскрывает деревья и «моё» | Как модуль проверяет объект и строит запрос |
 | Фреймворк (`bazis/core/access`) | Собирает каталог; сопоставляет гранты с объектом; переводит гранты в условие запроса; кэширует на время запроса | Как устроены роли |
 | Проверка маршрутов приложения | Кто сделал запрос: токен, сессия, блокировка; кладёт принципала | Прав на действия |
@@ -97,7 +97,7 @@ export class WorkflowModule {}
 
 Каталог собирается при старте из `@Module({ permissions })` всех модулей
 (канал метаданных модуля `access.permission/v1`, как `processes`) и доступен
-сервису `AccessCatalog` и по HTTP (§7).
+сервису `IAccessCatalog` и по HTTP (§7).
 
 ## 4. Гранты
 
@@ -199,7 +199,7 @@ type Condition =
 // маршрут, где объект известен из запроса
 @Authorize(can("orders.create", (ctx) => ({ scope: ctx.header("x-shop") ?? null })))
 
-// код (сервис Access)
+// код (сервис IAccess)
 const my = await access.for(ctx);                            // субъект запроса; нет — 401
 await my.can("workflow.instances.read", { ...instance, scope: instance.partition }); // false → 403 или 404 решает вызывающий
 const filter = await my.filter("workflow.instances.read");   // для списков → grantsToWhere
@@ -252,6 +252,10 @@ abstract class References {
 приложения своими экранами.
 
 ## 8. По умолчанию: `RolesAccessPolicy`
+
+`AccessModule` регистрирует `singleton(AccessPolicy, RolesAccessPolicy)`;
+приложение со своей системой прав регистрирует свою реализацию
+`AccessPolicy` в своём модуле, и она заменяет эту.
 
 Приложение без своей системы прав получает работающую:
 
@@ -308,7 +312,7 @@ export class AppModule {}
 
 1. **`bazis/core/access`**: `definePermissions`, `@Module({ permissions,
    references })`, каталог и его проверки при старте, `AccessPolicy`,
-   условия и их пределы, `can`, `Access` (`can`, `filter`, `fields`, `as`),
+   условия и их пределы, `can`, `IAccess` (`can`, `filter`, `fields`, `as`),
    `grantsToWhere`, `maskFields`, `RolesAccessPolicy` и `@Module({ roles })`,
    `StaticAccessPolicy`, HTTP каталога. Эталонное приложение
    `examples/workflow` (WORKFLOW-002 §1.1) получает права через него.

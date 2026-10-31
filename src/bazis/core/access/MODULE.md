@@ -34,25 +34,28 @@ error stops the build, not a request.
 | --- | --- | --- | --- |
 | `definePermissions`, `PermissionSpec` | [catalog/permissions.ts](catalog/permissions.ts) | — | frozen declarations; `permissionProblems` |
 | Module fields `permissions`, `references`, `roles` | [catalog/moduleFields.ts](catalog/moduleFields.ts) | DI module-owned metadata channels `access.permission/v1`, `access.reference/v1`, `access.role/v1` | contributions; build-time checks (`AccessSetupError`) |
-| `AccessCatalog` (singleton) | [catalog/AccessCatalog.ts](catalog/AccessCatalog.ts) | `SERVICE_PROVIDER`: the container's contributions | permissions, reference kinds, roles |
+| `IAccessCatalog` → `AccessCatalog` (singleton) | [catalog](catalog) | `SERVICE_PROVIDER`: the container's contributions | permissions, reference kinds, roles |
 | `AccessPolicy` (port) | [contracts/AccessPolicy.ts](contracts/AccessPolicy.ts) | — | `subject`, `grants`, `ownerIds`, `principals` |
 | `AttributeLookup`, `References` (ports of declaring modules) | [contracts](contracts) | — | column conditions for lookups; values of reference kinds |
 | Conditions | [check/conditions.ts](check/conditions.ts) | — | `grantProblem` (limits: depth 8, 200 nodes, `maxInList`), `evaluate` |
 | List filter | [check/filter.ts](check/filter.ts) | ORM `Operand` | `AccessFilter`, `grantsToWhere` |
-| `Access` (singleton), `SubjectAccess` | [check/Access.ts](check/Access.ts) | `AccessCatalog`, `RolesAccessPolicy`, `accessConfig`; `AccessPolicy` and lookups from the request scope | `for(ctx)`, `as(subject, scope)`, `can`, `filter`, `fields`, `principals`, `ownerIds`; `maskFields` |
-| `can(permission, objectOf?)` | [check/can.ts](check/can.ts) | `Access` | an `AuthorizeCheck` |
-| `defineRoles`, `RolesAccessPolicy` (singleton) | [roles](roles) | `AccessCatalog`, `accessConfig` | the default rights system |
-| `AccessCatalogController` (context only) | [http/AccessCatalog.controller.ts](http/AccessCatalog.controller.ts) | `AccessCatalog`, `Access` from the request scope | `GET /access/catalog`, `GET /access/references/:kind` |
+| `IAccess` → `Access` (singleton), `SubjectAccess` | [check](check) | `IAccessCatalog`, `accessConfig`; `AccessPolicy` and lookups from the request scope | `for(ctx)`, `as(subject, scope)`, `can`, `filter`, `fields`, `principals`, `ownerIds`; `maskFields` |
+| `can(permission, objectOf?)` | [check/can.ts](check/can.ts) | `IAccess` | an `AuthorizeCheck` |
+| `defineRoles`; `AccessPolicy` → `RolesAccessPolicy` (singleton) | [roles](roles) | `IAccessCatalog`, `accessConfig` | the default rights system; the application's own `AccessPolicy` registration replaces it |
+| `AccessCatalogController` (context only) | [http/AccessCatalog.controller.ts](http/AccessCatalog.controller.ts) | `IAccessCatalog`, `IAccess` from the request scope | `GET /access/catalog`, `GET /access/references/:kind` |
 | `StaticAccessPolicy` | [testing/index.ts](testing/index.ts) | — | grants from a table, for tests |
 
-exports: `[AccessCatalog, Access, RolesAccessPolicy]`.
+exports: `[IAccessCatalog, IAccess, AccessPolicy]`.
 
 ## 3. Connection and DI
 
 The application imports `AccessModule` once. A module that declares
 permissions, references or roles without it in the graph stops the build.
-The rights system is `AccessPolicy` registered in any module; without one
-`Access` uses `RolesAccessPolicy`. Lookup and `References` classes are
+Every service is registered as contract → implementation with explicit
+dependencies (the framework's classes are not covered by the application's
+codegen). The rights system is the `AccessPolicy` token: `AccessModule`
+registers `RolesAccessPolicy`, and the application's own registration in its
+module replaces it. Lookup and `References` classes are
 registered by the declaring module in its `providers` and resolved in the
 request scope; an unregistered one stops the build.
 

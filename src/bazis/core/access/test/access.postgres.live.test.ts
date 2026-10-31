@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema } from "@/library/orm";
-import { Access, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Grants } from "@/core/access";
+import { IAccess, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Grants } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
 import { DI, Module } from "@/core/di";
 import { createTestContainer } from "@/core/testing";
@@ -67,7 +67,7 @@ describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
       await ctx.saveChanges();
 
       const scope = (await createTestContainer(AppModule)).createScope();
-      const access = scope.resolve(Access).as({ sub: "user:7" }, scope);
+      const access = scope.resolve(IAccess).as({ sub: "user:7" }, scope);
       const where = grantsToWhere(await access.filter("shop.items.read"));
       expect(typeof where).toBe("object");
       const listed = (await db().items.asNoTracking().where(() => where as Exclude<typeof where, string>).orderBy((i) => i.id).toList()).map((item) => item.id);

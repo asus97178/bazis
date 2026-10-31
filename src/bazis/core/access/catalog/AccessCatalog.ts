@@ -1,6 +1,7 @@
 import type { Class, ServiceProvider } from "../../di";
 import type { References } from "../contracts/References";
 import type { RolePermission } from "../roles/roles";
+import { IAccessCatalog } from "./IAccessCatalog.service";
 import { declarationsOf } from "./moduleFields";
 import type { PermissionSpec } from "./permissions";
 
@@ -25,16 +26,14 @@ export interface DeclaredRole {
   readonly module: string;
 }
 
-/**
- * Everything the application's modules declared about access: permissions,
- * reference kinds and default roles. Checked when the application is built.
- */
-export class AccessCatalog {
+/** The catalog read from the container's module contributions. */
+export class AccessCatalog extends IAccessCatalog {
   private readonly byKey: ReadonlyMap<string, OwnedPermission>;
   private readonly byKind: ReadonlyMap<string, OwnedReferenceKind>;
   private readonly byName: ReadonlyMap<string, DeclaredRole>;
 
   constructor(services: ServiceProvider) {
+    super();
     const { permissions, kinds, roles } = declarationsOf(services);
     this.byKey = new Map([...permissions].sort((a, b) => a.key.localeCompare(b.key)).map((item) => [item.key, item]));
     this.byKind = new Map([...kinds].sort((a, b) => a.kind.localeCompare(b.kind)).map((item) => [item.kind, item]));
@@ -49,7 +48,6 @@ export class AccessCatalog {
     return this.byKey.get(key);
   }
 
-  /** The permission or an error: asking for an undeclared one is a bug of the caller. */
   require(key: string): OwnedPermission {
     const permission = this.byKey.get(key);
     if (permission === undefined) throw new TypeError(`Permission "${key}" is not declared: add it to definePermissions(...) of a module's permissions.`);

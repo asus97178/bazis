@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import {
-  Access,
+  IAccess,
   AccessFilterTooLargeError,
   AccessModule,
   AccessPolicy,
@@ -69,7 +69,7 @@ async function accessWith(policy: AccessPolicy) {
   @Module({ imports: [OrdersModule], providers: [DI.singleton(DI.valueProvider(AccessPolicy, policy))] })
   class AppModule {}
   const scope = (await createTestContainer(AppModule)).createScope();
-  return { as: (subject: { sub: string }) => scope.resolve(Access).as(subject, scope) };
+  return { as: (subject: { sub: string }) => scope.resolve(IAccess).as(subject, scope) };
 }
 
 test("declarations are checked when the application is built", async () => {
@@ -222,7 +222,7 @@ class OrdersController {
   @Get(":id")
   async get(ctx: HttpContext) {
     const order = { id: ctx.params.id, shopId: "s1", customerId: ctx.params.id === "1" ? "5" : "6", total: 10 };
-    const access = await ctx.services.resolve(Access).for(ctx);
+    const access = await ctx.services.resolve(IAccess).for(ctx);
     if (!(await access.can("orders.read", { ...order, scope: order.shopId }))) throw new NotFoundError();
     return order;
   }
@@ -256,7 +256,7 @@ test("the default rights system: roles from the token, permissions from @Module(
 
     const scope = app.container.createScope();
     const subject = { sub: "staff:5", id: "5", roles: ["clerk"] };
-    expect(await scope.resolve(Access).as(subject, scope).principals(["s1"])).toEqual([{ scope: "s1", principals: ["user:5", "role:clerk"] }]);
+    expect(await scope.resolve(IAccess).as(subject, scope).principals(["s1"])).toEqual([{ scope: "s1", principals: ["user:5", "role:clerk"] }]);
   } finally {
     await app.stop();
   }

@@ -3,10 +3,11 @@ import type { AccessSubject, Grants, Scope } from "./types";
 
 /**
  * The rights system of the application (ACCESS-001 §4.1): a CMS roles module,
- * `bazis/identity`, or the roles of `@Module({ roles })` by default. It answers
- * with data — grants — and the framework checks objects and filters lists by
- * them itself. Register one implementation in any module:
- * `DI.singleton(DI.classProvider(AccessPolicy, AppAccessPolicy))`.
+ * `bazis/identity`, or the roles of `@Module({ roles })` by default
+ * (`RolesAccessPolicy`). It answers with data — grants — and the framework
+ * checks objects and filters lists by them itself. The application replaces
+ * the default in its module: `singleton(AccessPolicy, AppAccessPolicy)` (or
+ * `scoped`, when it needs a DbContext).
  */
 export abstract class AccessPolicy {
   /** Who makes the request: usually reads the principal the application's route check put into `ctx.state`. */

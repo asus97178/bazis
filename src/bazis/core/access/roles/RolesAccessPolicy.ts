@@ -1,6 +1,6 @@
 import type { ConfigView } from "../../kernel";
 import { PRINCIPAL_STATE_KEY, type AuthorizeContext, type RequestPrincipal } from "../../http";
-import type { AccessCatalog } from "../catalog/AccessCatalog";
+import type { IAccessCatalog } from "../catalog/IAccessCatalog.service";
 import { AccessPolicy, type ScopePrincipals } from "../contracts/AccessPolicy";
 import type { AccessSubject, Grant, Grants, Scope } from "../contracts/types";
 
@@ -13,14 +13,14 @@ export interface RoleSubject extends AccessSubject {
 type AccessSettings = ConfigView<{ kindClaim: string; roleClaim: string; maxInList: number }>;
 
 /**
- * The rights system of an application without its own one (ACCESS-001 §8):
- * the principal of the route check is the subject, its roles come from the
+ * The default `AccessPolicy` (ACCESS-001 §8); an application replaces it by
+ * registering its own: `singleton(AccessPolicy, AppAccessPolicy)`. The principal of the route check is the subject, its roles come from the
  * `access.roleClaim` claim, their permissions from `@Module({ roles })`. A role
  * nobody declared gives nothing; without roles everything is denied. A step
  * until `bazis/identity`.
  */
 export class RolesAccessPolicy extends AccessPolicy {
-  constructor(private readonly catalog: AccessCatalog, private readonly config: AccessSettings) {
+  constructor(private readonly catalog: IAccessCatalog, private readonly config: AccessSettings) {
     super();
   }
 

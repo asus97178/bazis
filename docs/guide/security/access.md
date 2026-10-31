@@ -61,7 +61,7 @@ export class OrdersModule {}
 ## Проверить маршрут
 
 ```ts
-import { Access, can } from "bazis/core/access";
+import { IAccess, can } from "bazis/core/access";
 
 @Controller("orders")
 export class OrdersController {
@@ -72,7 +72,7 @@ export class OrdersController {
   @Get(":id")
   async get(ctx: HttpContext) {
     const order = await this.orders.find(ctx.params.id);
-    const access = await ctx.services.resolve(Access).for(ctx);
+    const access = await ctx.services.resolve(IAccess).for(ctx);
     if (!(await access.can("orders.read", { ...order, scope: order.shopId }))) throw new NotFoundError();
     return order;
   }
@@ -92,7 +92,7 @@ export class OrdersController {
 import { grantsToWhere } from "bazis/core/access";
 
 async list(ctx: HttpContext) {
-  const access = await ctx.services.resolve(Access).for(ctx);
+  const access = await ctx.services.resolve(IAccess).for(ctx);
   const where = grantsToWhere(await access.filter("orders.read"));
   if (where === "none") return { data: [], meta: { total: 0 } };
   let query = this.db.orders.asNoTracking();
@@ -157,7 +157,8 @@ export class AppAccessPolicy extends AccessPolicy {
   }
 }
 
-DI.singleton(DI.classProvider(AccessPolicy, AppAccessPolicy))
+// в модуле приложения: своя система прав вместо ролей по умолчанию
+singleton(AccessPolicy, AppAccessPolicy)   // или scoped, если ей нужен DbContext
 ```
 
 Грант — где (`scopes`: список разделов или `"all"`) и при каком условии
@@ -204,7 +205,7 @@ const app = await startTestApp(AppModule, {
 
 ```ts
 const scope = app.container.createScope();
-const access = scope.resolve(Access).as({ sub: "user:7" }, scope);
+const access = scope.resolve(IAccess).as({ sub: "user:7" }, scope);
 ```
 
 ## Дальше

@@ -7,8 +7,10 @@ import "./catalog/moduleFields";
 
 export { AccessModule } from "./Access.module";
 export { definePermissions, type AttributeSpec, type PermissionDeclarations, type PermissionSpec, type ScopeSource } from "./catalog/permissions";
-export { AccessCatalog, type DeclaredRole, type OwnedPermission, type OwnedReferenceKind } from "./catalog/AccessCatalog";
-export { Access, SubjectAccess, maskFields, type FieldAccess } from "./check/Access";
+export { IAccessCatalog } from "./catalog/IAccessCatalog.service";
+export type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./catalog/AccessCatalog";
+export { IAccess } from "./check/IAccess.service";
+export { SubjectAccess, maskFields, type FieldAccess } from "./check/Access";
 export { accessConfig } from "./check/accessConfig";
 export { can } from "./check/can";
 export { grantsToWhere, type AccessFilter, type ColumnCondition } from "./check/filter";

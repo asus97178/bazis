@@ -1,6 +1,6 @@
 import type { AuthorizeCheck, AuthorizeContext } from "../../http";
 import type { AccessObject } from "../contracts/types";
-import { Access } from "./Access";
+import { IAccess } from "./IAccess.service";
 
 /**
  * A route check by a permission (ACCESS-001 §5): 401 without a subject, 403
@@ -15,7 +15,7 @@ import { Access } from "./Access";
  */
 export function can(permission: string, objectOf?: (ctx: AuthorizeContext) => AccessObject | Promise<AccessObject>): AuthorizeCheck {
   return async (ctx) => {
-    const access = await ctx.services.resolve(Access).for(ctx);
+    const access = await ctx.services.resolve(IAccess).for(ctx);
     return await access.can(permission, objectOf === undefined ? undefined : await objectOf(ctx));
   };
 }

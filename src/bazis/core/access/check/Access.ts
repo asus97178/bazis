@@ -1,14 +1,14 @@
 import type { Class, ServiceResolver } from "../../di";
 import { UnauthorizedError, type AuthorizeContext } from "../../http";
 import { LOGGER, type ConfigView } from "../../kernel";
-import type { AccessCatalog } from "../catalog/AccessCatalog";
+import type { IAccessCatalog } from "../catalog/IAccessCatalog.service";
 import type { PermissionSpec } from "../catalog/permissions";
 import { AccessPolicy, type ScopePrincipals } from "../contracts/AccessPolicy";
 import type { AttributeLookup } from "../contracts/AttributeLookup";
 import type { AccessObject, AccessSubject, Condition, Grant, Grants, Scope } from "../contracts/types";
-import { RolesAccessPolicy } from "../roles/RolesAccessPolicy";
 import { evaluate, grantProblem } from "./conditions";
 import { buildFilter, type AccessFilter } from "./filter";
+import { IAccess } from "./IAccess.service";
 
 const SUBJECT_STATE = "access:subject";
 
@@ -21,33 +21,29 @@ export interface FieldAccess {
 }
 
 /**
- * Checks of access (ACCESS-001 §5): asks the application's `AccessPolicy`
- * (`RolesAccessPolicy` without one) for grants and applies them itself.
- * `for(ctx)` — the subject of a request, cached on it; `as(subject, scope)` —
- * without HTTP: services, agents, background work. The policy and the lookups
- * are resolved in the given scope: they may be scoped.
+ * Asks the application's `AccessPolicy` for grants and applies them itself.
+ * The subject of a request is cached on it. The policy and the lookups are
+ * resolved in the given scope: an application may register them scoped.
  */
-export class Access {
-  constructor(private readonly catalog: AccessCatalog, private readonly roles: RolesAccessPolicy, private readonly config: AccessSettings) {}
-
-  /** The application's rights system in this scope. */
-  policy(scope: ServiceResolver): AccessPolicy {
-    return scope.tryResolve(AccessPolicy) ?? this.roles;
+export class Access extends IAccess {
+  constructor(private readonly catalog: IAccessCatalog, private readonly config: AccessSettings) {
+    super();
   }
 
-  /** Who makes the request, or `undefined`. */
+  policy(scope: ServiceResolver): AccessPolicy {
+    return scope.resolve(AccessPolicy);
+  }
+
   async subject(ctx: AuthorizeContext): Promise<AccessSubject | undefined> {
     return (await this.cached(ctx))?.subject;
   }
 
-  /** Access of the request's subject; without one — 401. */
   async for(ctx: AuthorizeContext): Promise<SubjectAccess> {
     const access = await this.cached(ctx);
     if (access === undefined) throw new UnauthorizedError();
     return access;
   }
 
-  /** Access of a known subject, without a request; `scope` — where to resolve the policy and the lookups. */
   as(subject: AccessSubject, scope: ServiceResolver): SubjectAccess {
     return new SubjectAccess(subject, this.policy(scope), this.catalog, this.config.get("maxInList"), scope);
   }
@@ -69,7 +65,7 @@ export class SubjectAccess {
   constructor(
     readonly subject: AccessSubject,
     private readonly policy: AccessPolicy,
-    private readonly catalog: AccessCatalog,
+    private readonly catalog: IAccessCatalog,
     private readonly maxInList: number,
     private readonly scope: ServiceResolver,
   ) {}

@@ -11,7 +11,7 @@ import { grantProblem } from "../check/conditions";
 import { AccessSetupError } from "../contracts/errors";
 import type { References } from "../contracts/References";
 import { isDeclaredRoles, rolePermission, type RoleDeclarations, type RolePermission } from "../roles/roles";
-import { Access } from "../check/Access";
+import { IAccess } from "../check/IAccess.service";
 import type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./AccessCatalog";
 import { isDeclaredPermissions, isReferenceKind, lookupsOf, permissionProblems, type PermissionDeclarations, type PermissionSpec } from "./permissions";
 
@@ -75,7 +75,7 @@ registerModuleOwnedContributionValidator((snapshot) => {
   const roles = snapshot.getMetadataContributions(ROLE_CHANNEL);
   const first = permissions[0] ?? references[0] ?? roles[0];
   if (first === undefined) return;
-  if (snapshot.countProviders(Access) === 0) {
+  if (snapshot.countProviders(IAccess) === 0) {
     throw new AccessSetupError(`${first.ownerName} declares access (permissions, references or roles), but the application does not import AccessModule (bazis/core/access).`);
   }
 
