@@ -1,6 +1,6 @@
 # Бизнес-процессы из коробки: конструктор
 
-Идентификатор: **WORKFLOW-002**. Версия: **1.6**. Дата: **2026-10-31**.
+Идентификатор: **WORKFLOW-002**. Версия: **1.7**. Дата: **2026-10-31**.
 Статус: **v1.6 (права по [ACCESS-001](ACCESS.md)) — направление согласовано агентами bazis и bazis-cms; ждёт утверждения владельца** (§11: автор записи, готовые экраны).
 Основа: [WORKFLOW-001](WORKFLOW.md) (этапы 1–5, bazis 0.124.0–0.128.0),
 [TOOLS-001](TOOLS.md), прототип дизайнера
@@ -355,18 +355,21 @@ error }`; граничный `boundaryError` важнее `onError`).
 Своей системы прав и своего порта прав у процессов нет. `WorkflowModule`
 объявляет каталог и виды ссылок, как любой модуль с действиями:
 
-| Право | Что даёт | Атрибуты (`on`) |
-| --- | --- | --- |
-| `workflow.processes.read` | Каталог, версии, палитра, `validate` | `process`, `folder` |
-| `workflow.processes.manage` | Черновики, карточка, удаление | `process`, `folder` |
-| `workflow.processes.publish` | Публикация; запуск от системного актора процесса (§3.5) | `process`, `folder` |
-| `workflow.instances.start` | Ручной и массовый запуск | `process`, `folder` |
-| `workflow.instances.read` | Экземпляры и журнал запусков; `owner: startedById` | `process`, `folder`, `test` |
-| `workflow.instances.manage` | Отмена, повтор, перенос | `process`, `folder` |
-| `workflow.events.emit` | `POST /workflow/events` | `event` |
-| `workflow.tasks.work` | Свои задачи: адресованные субъекту или взятые им | `process` |
+| Право | Что даёт | Раздел (`scope`) | Атрибуты (`on`) |
+| --- | --- | --- | --- |
+| `workflow.processes.read` | Каталог, версии, палитра, `validate` | `lookup`: разделы процесса из `WorkflowPartitions` | `process`, `folder` |
+| `workflow.processes.manage` | Черновики, карточка, удаление | `"none"` | `process`, `folder` |
+| `workflow.processes.publish` | Публикация; запуск от системного актора процесса (§3.5) | `"none"` | `process`, `folder` |
+| `workflow.instances.start` | Ручной и массовый запуск | раздел запуска из запроса (`"request"`) | `process`, `folder` |
+| `workflow.instances.read` | Экземпляры и журнал запусков; `owner: startedById` | `column: partition` | `process`, `folder`, `test` |
+| `workflow.instances.manage` | Отмена, повтор, перенос | `column: partition` | `process`, `folder` |
+| `workflow.events.emit` | `POST /workflow/events` | раздел события из запроса (`"request"`) | `event` |
+| `workflow.tasks.work` | Задачи, адресованные субъекту или взятые им | `column: partition` | `process` |
 
-- Раздел экземпляра (`partition`) — раздел (`scope`) гранта.
+- Каталог процессов (`manage`, `publish`) — без раздела: процесс один на
+  приложение, подключение к разделам — через `WorkflowPartitions`.
+- «Свои задачи» — не `own`: адресованные субъекту (по `principals`) или
+  взятые им фреймворк считает сам; `owner` у задач нет.
 - «Только свои экземпляры» — грант с условием `{ own: true }`; списки
   экземпляров и задач по всем разделам сразу фильтрует `Access.filter`.
 - Адресаты задач — `AccessPolicy.principals` по разделам: открытая строка

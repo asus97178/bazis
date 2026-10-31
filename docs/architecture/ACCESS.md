@@ -1,6 +1,6 @@
 # Права: каталог permissions и система прав приложения
 
-Идентификатор: **ACCESS-001**. Версия: **1.0**. Дата: **2026-11-01**.
+Идентификатор: **ACCESS-001**. Версия: **1.1**. Дата: **2026-11-01**.
 Статус: **направление согласовано агентами bazis и bazis-cms; ждёт утверждения владельца**.
 Основа: обсуждение прав процессов в [WORKFLOW-002](WORKFLOW_BUILDER.md) §6.2
 (2026-10-31 — 11-01), проект `bazis/identity` (`docs/design/identity.md`),
@@ -40,6 +40,7 @@ permissions не объявляют и защищают маршруты как 
 export const workflowPermissions = definePermissions({
   "workflow.instances.start": {
     title: { ru: "Запускать процессы", en: "Start processes" },
+    scope: { lookup: ProcessPartitionsLookup },
     on: {
       process: { ref: "workflow.process", column: "processKey" },
       folder: { ref: "workflow.folder", lookup: ProcessFolderLookup },
@@ -47,11 +48,13 @@ export const workflowPermissions = definePermissions({
   },
   "workflow.instances.read": {
     title: { ru: "Видеть экземпляры", en: "See instances" },
+    scope: { column: "partition" },
     on: { process: { ref: "workflow.process", column: "processKey" } },
     owner: "startedById",
   },
   "dm.records.read": {
     title: { ru: "Читать записи", en: "Read records" },
+    scope: "request",
     on: { table: { ref: "dm.table", column: "tableId" } },
     owner: "createdById",
     fields: true,
@@ -74,11 +77,23 @@ export class WorkflowModule {}
     атрибут в условие по колонкам (`folder in [Продажи]` →
     `processKey in [ключи процессов папки]`). Атрибут без источника —
     ошибка каталога при старте.
+- **`scope`** — откуда у объекта раздел:
+  - `{ column }` — колонка строки (экземпляр: `partition`);
+  - `{ lookup }` — класс модуля даёт разделы объекта, их может быть
+    несколько (процесс каталога подключён к нескольким пространствам);
+    объект подходит, если хоть один его раздел есть в гранте;
+  - `"request"` — раздел задаёт вызывающий из запроса
+    (`/spaces/:space/data/…`: запись DM видна во всех пространствах, где
+    подключена таблица); фильтр строк по разделу не накладывается;
+  - `"none"` (по умолчанию) — право без раздела: подходят гранты со
+    `scopes: "all"` или с `null`.
 - **`owner`** — колонка владельца: делает возможным условие «своё» (§4.2).
+- Имена `all`, `any`, `not`, `own` в `on` запрещены (это слова условий) —
+  ошибка старта.
 - **`fields: true`** — право поддерживает списки полей (§4.4).
 
-Раздел (`scope`) у всех прав один и тот же: строка или `null` (без раздела).
-У CMS раздел — пространство. Отдельно в `on` его не объявляют.
+Раздел — строка или `null`; у CMS раздел — пространство. В `on` его не
+объявляют: у него свой источник `scope`.
 
 Каталог собирается при старте из `@Module({ permissions })` всех модулей
 (канал метаданных модуля `access.permission/v1`, как `processes`) и доступен
@@ -100,6 +115,9 @@ export abstract class AccessPolicy {
 
   /** Что субъекту дано по праву. */
   abstract grants(subject: AccessSubject, permission: string): Grants | Promise<Grants>;
+
+  /** Значения колонки владельца, которые считаются «мной»: обычно голый id учётки. */
+  abstract ownerIds(subject: AccessSubject): readonly string[] | Promise<readonly string[]>;
 
   /** Адресаты субъекта по разделам: `user:<id>`, `role:<код>`, свои виды приложения. */
   abstract principals(subject: AccessSubject, scopes: readonly (string | null)[]):
@@ -135,8 +153,12 @@ type Condition =
 
 - Атрибуты — только объявленные в `on` права; другой атрибут — грант
   отклоняется с ошибкой в журнале (права нет).
-- `{ own: true }` — лист дерева: объект принадлежит субъекту (колонка
-  `owner` = `sub` или `act`). Так выражается «своё ИЛИ публичное».
+- `{ own: true }` — лист дерева: колонка `owner` объекта входит в
+  `ownerIds(subject)`. Колонки владельца хранят голый id (`startedById`,
+  `createdBy`), поэтому с `sub` (`<вид>:<id>`) их не сравнивают. «Своё» —
+  только сам субъект; «объекты моей организации» — обычное условие
+  `{ org: { eq: <act> } }`, которое подставляет система прав. Так выражается
+  «своё ИЛИ публичное».
 - Значения готовые. «Моя организация», «моё подразделение», «пространство,
   где выдана роль и ниже» система прав раскрывает сама и отдаёт
   конкретные id и разделы. Фреймворк не знает деревьев и организаций.
@@ -148,9 +170,12 @@ type Condition =
 ### 4.3 Как фреймворк применяет гранты
 
 - **Объект** (`can`): право есть, если хоть один грант подходит: раздел
-  объекта в `scopes` и `where` истинно на атрибутах объекта.
+  объекта (по источнику `scope`, хоть один из нескольких) в `scopes` и
+  `where` истинно на атрибутах объекта.
 - **Список** (`Access.filter`): гранты переводятся в условие запроса —
-  `scope in (…)` и `where` через источники атрибутов. Для ORM —
+  раздел через его источник (`scope in (…)`; при `"request"` раздел
+  запроса проверяется до запроса, строки по нему не фильтруются) и `where`
+  через источники атрибутов. Для ORM —
   `grantsToWhere(filter, Entity)`. `lookup` может дать длинный `in`
   (папка → тысячи процессов): свыше `access.maxInList` (по умолчанию 1000)
   он должен отдавать подзапрос, иначе ошибка `access_filter_too_large`.
@@ -176,6 +201,7 @@ type Condition =
 // код (scoped-сервис)
 await access.can("workflow.instances.read", instance);       // false → 403 решает вызывающий
 const filter = await access.filter("workflow.instances.read"); // для списков
+await access.filter("dm.records.read", { scope: space });     // право с scope: "request"
 await access.as(subject).can(…);                             // без HTTP: сервисы, агенты
 ```
 
@@ -243,6 +269,7 @@ abstract class References {
 ```
 
   `<право>:own` — сокращение для гранта `{ where: { own: true } }`;
+- «я» для `own` — `subject` без вида;
 - адресаты — `user:<id>` и `role:<роль>`;
 - без настройки всё запрещено.
 
