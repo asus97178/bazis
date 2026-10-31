@@ -16,6 +16,12 @@ export async function authorize(ctx: HttpContext, action: WorkflowAction, target
   return actor;
 }
 
+/** Whom the caller's tasks are addressed to, from the application's {@link WorkflowAccess}. */
+export async function assigneesOf(ctx: HttpContext, actor: WorkflowActor): Promise<readonly string[]> {
+  const access = ctx.services.tryResolve(WorkflowAccess);
+  return access === undefined ? [] : await access.assignees(ctx, actor);
+}
+
 /** A route parameter as a string. */
 export function param(ctx: HttpContext, name: string): string {
   return String(ctx.params[name] ?? "");

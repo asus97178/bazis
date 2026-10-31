@@ -4,6 +4,26 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.127.0 — 2026-10-31
+
+Business processes, stage 4 of WORKFLOW-001: tasks for people.
+
+### Added
+
+- `WorkflowTasksModule` (part of `WorkflowModule`) and `IWorkflowTasks`: the
+  inbox of `userTask` steps in the owned store `bazis_wf_task_*`. A task appears
+  when its step starts waiting and is cancelled when the step closes otherwise;
+  `list`, `get`, `claim`, `release`, `complete` (checks the form and moves the
+  process).
+- `/workflow/tasks…` HTTP (right `tasks.work`): a caller sees the tasks addressed
+  to `WorkflowAccess.assignees` and those they claimed; another task is 404.
+- `WORKFLOW_INSTANCES_DELETED`: published by retention after each deleted batch;
+  the tasks of deleted instances are deleted with them.
+
+### Fixed
+
+- `EmitOptions` and `EmitResult` (0.126.0) are exported from `bazis/core/workflow`.
+
 ## 0.126.0 — 2026-10-31
 
 Business processes, stage 3 of WORKFLOW-001: events and schedules. Every node

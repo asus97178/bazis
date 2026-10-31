@@ -1,7 +1,8 @@
 import { BackgroundService, delay } from "../../../background";
 import type { ServiceProvider } from "../../../di";
-import type { ConfigView } from "../../../kernel";
+import { EventBus, type ConfigView } from "../../../kernel";
 import { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
+import { WORKFLOW_INSTANCES_DELETED } from "../events/Runtime.events";
 import { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WorkflowSettings } from "./WorkflowWorker";
 
@@ -11,6 +12,8 @@ const DAY_MS = 86_400_000;
  * Deletes `completed` and `cancelled` instances older than their process's
  * `retentionDays`, with tokens, jobs, subscriptions and history (by cascade),
  * `retention.batchSize` at a time. `failed` instances wait for a person and stay.
+ * Each deleted batch is published as `WORKFLOW_INSTANCES_DELETED`, so parts
+ * with their own data (tasks) drop theirs.
  */
 export class WorkflowRetention extends BackgroundService {
   constructor(
@@ -55,6 +58,7 @@ export class WorkflowRetention extends BackgroundService {
           if (ids.length === 0) break;
           await db.instances.asNoTracking().where((i) => i.id.in(ids)).executeDelete();
           deleted += ids.length;
+          await scope.resolve(EventBus).publishScoped(scope, WORKFLOW_INSTANCES_DELETED, { instanceIds: ids });
           if (ids.length < batchSize) break;
         }
       }

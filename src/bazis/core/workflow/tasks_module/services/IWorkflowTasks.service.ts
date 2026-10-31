@@ -1,0 +1,52 @@
+import type { FormSpec } from "../../../../library/workflow";
+import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
+import type { TaskStatus } from "../model/WfTask.model";
+
+export interface TaskDetails {
+  readonly id: string;
+  readonly instanceId: string;
+  readonly tokenId: string;
+  readonly processKey: string;
+  readonly nodeId: string;
+  readonly partition: string | null;
+  readonly title: string;
+  readonly assignee: string;
+  readonly form: FormSpec | null;
+  readonly dueAt: Date | null;
+  readonly status: TaskStatus;
+  readonly claimedBy: string | null;
+  readonly claimedAt: Date | null;
+  readonly completedBy: string | null;
+  readonly completedAt: Date | null;
+  readonly output: Record<string, unknown> | null;
+  readonly createdAt: Date;
+}
+
+export interface TaskListQuery extends WorkflowPaging {
+  /** Tasks addressed to any of these (`role:support`, `user:42`), plus those the actor claimed. */
+  readonly assignees: readonly string[];
+  /** Whose claimed tasks count as theirs. */
+  readonly actor?: WorkflowActor;
+  /** `open` and `claimed` by default. */
+  readonly status?: readonly TaskStatus[];
+  readonly partition?: string;
+  readonly processKey?: string;
+}
+
+/**
+ * Tasks for people (WORKFLOW-001 §5): the inbox of `userTask` steps. A task
+ * appears when its step starts waiting and is cancelled when the step closes
+ * otherwise. Errors are {@link WorkflowError}: `not_found`, `conflict` (claimed
+ * by another person), `wrong_status`, `invalid_input` with the form issues.
+ */
+export abstract class IWorkflowTasks {
+  /** The tasks of these assignees, oldest first. */
+  abstract list(query: TaskListQuery): Promise<WorkflowPage<TaskDetails>>;
+  abstract get(taskId: string): Promise<TaskDetails>;
+  /** Takes an open task: nobody else can complete it until it is released. */
+  abstract claim(taskId: string, actor: WorkflowActor): Promise<TaskDetails>;
+  /** Gives a claimed task back. */
+  abstract release(taskId: string, actor: WorkflowActor): Promise<TaskDetails>;
+  /** Fills the form: the process moves on. */
+  abstract complete(taskId: string, output: unknown, actor: WorkflowActor): Promise<TaskDetails>;
+}

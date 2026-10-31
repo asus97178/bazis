@@ -1,7 +1,7 @@
 # Бизнес-процессы во фреймворке
 
 Идентификатор: **WORKFLOW-001**. Версия: **1.1**. Дата: **2026-10-31**.
-Статус: **принята; этапы 1–3 реализованы в bazis 0.124.0–0.126.0, этапы 4–5 — §12**.
+Статус: **принята; этапы 1–4 реализованы в bazis 0.124.0–0.127.0, этап 5 — §12**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
 HTTP и фоновое исполнение — без CMS. UI во фреймворк не входит: дизайнер,
@@ -362,30 +362,36 @@ FK), `instanceId`, `processKey`, `nodeId`, `partition`, `title`, `assignee`
 (`user:<id>` или `role:<код>`), `form` (json), `dueAt`, `status` (`open`,
 `claimed`, `completed`, `cancelled`), `claimedById`, `claimedAt`,
 `completedById`, `completedAt`, `output` (json), `createdAt`. Индексы
-`(assignee, status)`, `(partition, status)`.
+`(assignee, status)`, `(partition, status)`, `instanceId`.
 
 ### Сервис `IWorkflowTasks`
 
 ```ts
-list({ assignees: string[], status?, partition?, limit?, offset? })
+list({ assignees: string[], actor?, status?, partition?, processKey?, limit?, offset? })  // + взятые actor
 get(taskId)
 claim(taskId, actor)        // conflict, если взята другим
 release(taskId, actor)
 complete(taskId, output, actor)  // invalid_input по форме; вызывает IWorkflowRuntime.completeToken
 ```
 
-Обработчики событий: `WORKFLOW_TASK_REQUESTED` создаёт задачу,
-`WORKFLOW_TOKEN_CLOSED` отменяет её.
+Обработчики событий: `WORKFLOW_TASK_REQUESTED` создаёт задачу (одну на
+токен), `WORKFLOW_TOKEN_CLOSED` отменяет её, `WORKFLOW_INSTANCES_DELETED`
+(чистка Runtime после каждой пачки) удаляет задачи удалённых экземпляров.
+`complete` сначала завершает шаг через `completeToken` (проверка формы), затем
+отмечает задачу; шаг, закрытый без задачи, при попытке завершения отменяет её.
+
+Задача видна, если её `assignee` — среди `WorkflowAccess.assignees(ctx,
+actor)` или её взял сам вызывающий; чужая отвечает 404.
 
 ### HTTP (`/workflow/tasks`)
 
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
-| `GET /workflow/tasks` | `tasks.work` | задачи для `WorkflowAccess.assignees(ctx)` |
+| `GET /workflow/tasks?status&partition&processKey` | `tasks.work` | задачи для `WorkflowAccess.assignees(ctx)` и взятые вызывающим; по умолчанию `open` и `claimed` |
 | `GET /workflow/tasks/:id` | `tasks.work` | задача с формой |
-| `POST /workflow/tasks/:id/claim` | `tasks.work` | 200 / 409 |
-| `POST /workflow/tasks/:id/release` | `tasks.work` | 200 |
-| `POST /workflow/tasks/:id/complete` | `tasks.work` | 200 / 422 `invalid_input` |
+| `POST /workflow/tasks/:id/claim` | `tasks.work` | 200 / 409 `conflict` (взята другим) |
+| `POST /workflow/tasks/:id/release` | `tasks.work` | 200 / 409 `wrong_status` |
+| `POST /workflow/tasks/:id/complete` `{ output }` | `tasks.work` | 200 / 409 / 422 `invalid_input` |
 
 ## 6. Права: порт `WorkflowAccess`
 
@@ -481,7 +487,7 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
    0.125.0.
 3. События (`eventStart`, `eventWait`, `boundaryEvent`, `emit`, HTTP) и
    расписание — 0.126.0.
-4. Часть Tasks.
+4. Часть Tasks — 0.127.0.
 5. Процессы в коде — **решение позже**: файл `processes/X.process.ts` в
    модуле-владельце и поле `processes` в `@Module` (публикация при старте,
    ошибка конфигурации при неизвестном Tool), помощник тестов

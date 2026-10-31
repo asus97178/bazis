@@ -28,7 +28,7 @@ import { Schedules } from "../runtime_module/internal/Schedules";
 import { RuntimeDbContext } from "../runtime_module/model/Runtime.dbContext";
 
 /**
- * Live check of stages 1–3 of WORKFLOW-001 on PostgreSQL, through HTTP as an
+ * Live check of stages 1–4 of WORKFLOW-001 on PostgreSQL, through HTTP as an
  * application without the CMS would use it. Runs only against a throwaway
  * database whose name starts with `bazis_wf_`: set `BAZIS_WORKFLOW_PG_URL`.
  * The test drops the workflow tables before it starts.
@@ -117,6 +117,10 @@ class HeaderAccess extends WorkflowAccess {
   can(ctx: HttpContext, action: WorkflowAction, target: WorkflowAccessTarget): boolean {
     HeaderAccess.asked.push({ action, target });
     return ctx.header("x-deny") === undefined;
+  }
+
+  override assignees(ctx: HttpContext, actor: WorkflowActor): readonly string[] {
+    return [`user:${actor.id}`, ...(ctx.header("x-roles") ?? "").split(",").filter(Boolean).map((role) => `role:${role}`)];
   }
 }
 
@@ -564,12 +568,73 @@ test.skipIf(!enabled)("stage 3: a scheduled version gets one job; a firing start
   }
 });
 
+test.skipIf(!enabled)("stage 4: a user task appears in the inbox of its assignees; claim, release and complete", async () => {
+  await publish("approval", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Approve: { kind: "userTask", title: "Approve the purchase", config: { assignee: { role: "boss" }, form: { fields: [{ code: "ok", type: "boolean", required: true }] }, dueIn: "P1D" } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "Approve" }, b: { source: "Approve", target: "End" } }));
+  const boss = (user: string) => as(user, { "x-roles": "boss" });
+  const id = (await call("POST", "/workflow/instances", { processKey: "approval" })).body.id;
+  let inbox: { status: number; body: { data: { id: string; instanceId: string; status: string; assignee: string; title: string }[] } } = { status: 0, body: { data: [] } };
+  for (let i = 0; i < 100 && !inbox.body.data.some((t) => t.instanceId === id); i++) {
+    inbox = await call("GET", "/workflow/tasks", undefined, boss("anna"));
+    await Bun.sleep(30);
+  }
+  const task = inbox.body.data.find((t) => t.instanceId === id)!;
+  expect(task).toMatchObject({ status: "open", assignee: "role:boss", title: "Approve the purchase" });
+  expect((await call("GET", "/workflow/tasks", undefined, as("clerk"))).body.data.some((t: { id: string }) => t.id === task.id)).toBe(false);
+  expect((await call("GET", `/workflow/tasks/${task.id}`, undefined, as("clerk"))).status).toBe(404);
+
+  expect((await call("POST", `/workflow/tasks/${task.id}/claim`, {}, boss("anna"))).body).toMatchObject({ status: "claimed", claimedBy: "anna" });
+  expect((await call("POST", `/workflow/tasks/${task.id}/claim`, {}, boss("boris"))).status).toBe(409);
+  expect((await call("POST", `/workflow/tasks/${task.id}/complete`, { output: { ok: true } }, boss("boris"))).status).toBe(409);
+  expect((await call("GET", `/workflow/tasks/${task.id}`, undefined, as("anna"))).body.status).toBe("claimed");
+  expect((await call("POST", `/workflow/tasks/${task.id}/release`, {}, boss("anna"))).body.status).toBe("open");
+
+  const invalid = await call("POST", `/workflow/tasks/${task.id}/complete`, { output: {} }, boss("boris"));
+  expect(invalid.status).toBe(422);
+  expect(invalid.body.details.issues).toEqual([expect.objectContaining({ field: "ok", code: "required" })]);
+  const done = await call("POST", `/workflow/tasks/${task.id}/complete`, { output: { ok: true } }, boss("boris"));
+  expect(done.body).toMatchObject({ status: "completed", completedBy: "boris", output: { ok: true } });
+  expect((await call("GET", `/workflow/instances/${id}`)).body.status).toBe("completed");
+  expect((await call("POST", `/workflow/tasks/${task.id}/complete`, { output: { ok: true } }, boss("boris"))).status).toBe(409);
+});
+
+test.skipIf(!enabled)("stage 4: a cancelled instance cancels its task; a task for a person is theirs only", async () => {
+  await publish("personal", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Sign: { kind: "userTask", title: "Sign", config: { assignee: { user: "clara" } } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "Sign" }, b: { source: "Sign", target: "End" } }));
+  const id = (await call("POST", "/workflow/instances", { processKey: "personal" })).body.id;
+  let mine: { id: string; instanceId: string }[] = [];
+  for (let i = 0; i < 100 && !mine.some((t) => t.instanceId === id); i++) {
+    mine = (await call("GET", "/workflow/tasks", undefined, as("clara"))).body.data;
+    await Bun.sleep(30);
+  }
+  const task = mine.find((t) => t.instanceId === id)!;
+  expect((await call("GET", `/workflow/tasks/${task.id}`, undefined, as("boris", { "x-roles": "boss" }))).status).toBe(404);
+  await call("POST", `/workflow/instances/${id}/cancel`, { reason: "not needed" });
+  let status = "";
+  for (let i = 0; i < 100 && status !== "cancelled"; i++) {
+    status = (await call("GET", `/workflow/tasks/${task.id}`, undefined, as("clara"))).body.status;
+    await Bun.sleep(30);
+  }
+  expect(status).toBe("cancelled");
+  expect((await call("GET", "/workflow/tasks", undefined, as("clara"))).body.data.some((t: { id: string }) => t.id === task.id)).toBe(false);
+});
+
 test.skipIf(!enabled)("retention deletes finished instances older than the process keeps them", async () => {
   const sql = postgres({ url });
   try {
     await sql.execute(`UPDATE "bazis_wf_run_instances" SET "endedAt" = now() - interval '40 days' WHERE "processKey" = 'order' AND status = 'completed'`, []);
     const retention = app.container.resolve(WorkflowRetention);
-    expect(await retention.sweep()).toBe(2);
+    await sql.execute(`UPDATE "bazis_wf_run_instances" SET "endedAt" = now() - interval '40 days' WHERE "processKey" = 'approval'`, []);
+    await call("PATCH", "/workflow/processes/approval", { retentionDays: 30 });
+    expect(await retention.sweep()).toBe(3);
+    // The task of the deleted approval instance went with it.
+    expect(await sql.query(`SELECT 1 FROM "bazis_wf_task_items" WHERE "processKey" = 'approval'`, [])).toEqual([]);
     const left = (await sql.query(`SELECT status FROM "bazis_wf_run_instances" WHERE "processKey" = 'order' ORDER BY status`, [])) as { status: string }[];
     expect(left.map((row) => row.status)).toEqual(["cancelled"]);
     expect(await sql.query(`SELECT 1 FROM "bazis_wf_run_tokens" t LEFT JOIN "bazis_wf_run_instances" i ON i.id = t."instanceId" WHERE i.id IS NULL`, [])).toEqual([]);
