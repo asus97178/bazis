@@ -154,7 +154,7 @@ interface VariableSpec {
   title?: LocalizedText;
   default?: unknown;
   required?: boolean;                   // для in
-  ref?: string;                         // для ref: вид ссылки, например "orm.entity:Order" (§6.2)
+  ref?: string;                         // для ref: вид ссылки, например "orm.entity:Order" (§6.3)
   personal?: boolean;                   // персональные данные: маскируются в истории при log.maskPersonal
   extensions?: Record<string, unknown>; // правила полей приложения и т. п.
 }
@@ -323,7 +323,7 @@ error }`; граничный `boundaryError` важнее `onError`).
 
 | Порт | Что даёт приложение | По умолчанию |
 | --- | --- | --- |
-| `WorkflowAccess` | Личность, права, адресаты задач (как в v1) | `PrincipalWorkflowAccess` (§6.3) |
+| `WorkflowAccess` | Личность, права, адресаты задач (как в v1) | `PrincipalWorkflowAccess` (§6.2) |
 | `WorkflowInputValidator` | Проверка значений по полям и их `extensions` (правила полей приложения) | Типы §3.4 |
 | `WorkflowReferences` | `exists(ref, ctx)` и `describe(ref)` для ссылок `x-ref`; обратный ход — `IWorkflowDefinitions.referencing(ref)` | Ссылки на процессы (`workflow.process`) и сущности `ormEntityTools` (`orm.entity`, `orm.field`) проверяет фреймворк; остальные виды — не проверяются |
 | `WorkflowPartitions` | Разделы процесса (арендаторы, пространства, организации): `of(processKey)` → `{ partition, timezone?, enabled }[]` | Один раздел `null` |
@@ -350,7 +350,7 @@ error }`; граничный `boundaryError` важнее `onError`).
 - `context.metadata` содержит `instanceId`, `processKey`, `nodeId`,
   `partition`, `test` — чтобы Tool мог передать `cause` в свои события.
 
-### 6.3 Права по умолчанию: `PrincipalWorkflowAccess`
+### 6.2 Права по умолчанию: `PrincipalWorkflowAccess`
 
 - Личность — принципал запроса (`@Authorize` фреймворка):
   `{ kind: "user", id: "<вид>:<subject>" }`. Вид принципала — из claim
@@ -364,7 +364,7 @@ error }`; граничный `boundaryError` важнее `onError`).
   — фильтр по себе. Без настройки действие запрещено.
 - Адресаты задач — `user:<id>` и `role:<роль>` из ролей принципала.
 
-### 6.2 Проверка ссылок
+### 6.3 Проверка ссылок
 
 При публикации и в `bazis workflow check`: каждое литеральное значение поля с
 `x-ref` проверяется портом; нет — замечание `broken_ref` с узлом. Выражения
