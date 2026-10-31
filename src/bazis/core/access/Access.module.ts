@@ -1,4 +1,4 @@
-import { Module, SERVICE_PROVIDER, singleton } from "../di";
+import { Module, singleton } from "../di";
 import { AccessCatalog } from "./catalog/AccessCatalog";
 import { IAccessCatalog } from "./catalog/IAccessCatalog.service";
 import { definePermissions } from "./catalog/permissions";
@@ -20,16 +20,15 @@ const accessPermissions = definePermissions({
  * the catalog of the modules' permissions, checks and list filters by the
  * grants of the application's `AccessPolicy`, the default rights system by
  * `@Module({ roles })`, and the catalog over HTTP. An application replaces the
- * rights system by registering its own `AccessPolicy`. Dependencies are
- * explicit: the framework's classes are not covered by the application's codegen.
+ * rights system by registering its own `AccessPolicy`.
  */
 @Module({
   config: [accessConfig],
   permissions: accessPermissions,
   providers: [
-    singleton(IAccessCatalog, AccessCatalog, [SERVICE_PROVIDER]),
-    singleton(AccessPolicy, RolesAccessPolicy, [IAccessCatalog, accessConfig.token]),
-    singleton(IAccess, Access, [IAccessCatalog, accessConfig.token]),
+    singleton(IAccessCatalog, AccessCatalog),
+    singleton(AccessPolicy, RolesAccessPolicy),
+    singleton(IAccess, Access),
   ],
   controllers: [AccessCatalogController],
   exports: [IAccessCatalog, IAccess, AccessPolicy],

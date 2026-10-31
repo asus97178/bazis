@@ -10,6 +10,11 @@ export interface CodegenConfig {
   readonly version: 1;
   readonly defaultTarget: string;
   readonly targets: Readonly<Record<string, TargetConfig>>;
+  /**
+   * The framework's own checkout only: packs whose DI wiring ships inside the
+   * package as `<pack>/generated/deps.ts`, imported by the pack's `index.ts`.
+   */
+  readonly framework?: { readonly packs: readonly string[] };
 }
 
 const TARGET_NAME = /^[a-z][a-z0-9-]*$/;
@@ -34,6 +39,10 @@ export async function readCodegenConfig(): Promise<CodegenConfig> {
     for (const candidate of [...target.entrypoints, ...(target.applicationParts ?? [])]) normalizeConfiguredPath(candidate);
   }
   if (!Object.hasOwn(value.targets, value.defaultTarget)) throw new Error("BAZIS_CODEGEN_CONFIG_INVALID: defaultTarget is undeclared");
+  if (value.framework !== undefined) {
+    if (!value.framework || !Array.isArray(value.framework.packs)) throw new Error("BAZIS_CODEGEN_CONFIG_INVALID: framework.packs must be a list of directories");
+    for (const pack of value.framework.packs) normalizeConfiguredPath(pack);
+  }
   return value as CodegenConfig;
 }
 

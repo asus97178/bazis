@@ -1,6 +1,7 @@
 import type { Class, ServiceResolver } from "../../di";
 import { UnauthorizedError, type AuthorizeContext } from "../../http";
 import { LOGGER, type ConfigView } from "../../kernel";
+import type { AccessConfig } from "./accessConfig";
 import type { IAccessCatalog } from "../catalog/IAccessCatalog.service";
 import type { PermissionSpec } from "../catalog/permissions";
 import { AccessPolicy, type ScopePrincipals } from "../contracts/AccessPolicy";
@@ -11,8 +12,6 @@ import { buildFilter, type AccessFilter } from "./filter";
 import { IAccess } from "./IAccess.service";
 
 const SUBJECT_STATE = "access:subject";
-
-type AccessSettings = ConfigView<{ kindClaim: string; roleClaim: string; maxInList: number }>;
 
 /** The fields the subject may read and write on an object. */
 export interface FieldAccess {
@@ -26,7 +25,7 @@ export interface FieldAccess {
  * resolved in the given scope: an application may register them scoped.
  */
 export class Access extends IAccess {
-  constructor(private readonly catalog: IAccessCatalog, private readonly config: AccessSettings) {
+  constructor(private readonly catalog: IAccessCatalog, private readonly config: ConfigView<AccessConfig>) {
     super();
   }
 

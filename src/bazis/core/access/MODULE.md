@@ -51,9 +51,11 @@ exports: `[IAccessCatalog, IAccess, AccessPolicy]`.
 
 The application imports `AccessModule` once. A module that declares
 permissions, references or roles without it in the graph stops the build.
-Every service is registered as contract → implementation with explicit
-dependencies (the framework's classes are not covered by the application's
-codegen). The rights system is the `AccessPolicy` token: `AccessModule`
+Every service is registered as contract → implementation, like in an
+application: `singleton(IAccess, Access)`. Constructor dependencies come from
+the pack's generated wiring [generated/deps.ts](generated/deps.ts), which
+`index.ts` imports (see "Framework packs" in the [DI passport](../di/MODULE.md)).
+The rights system is the `AccessPolicy` token: `AccessModule`
 registers `RolesAccessPolicy`, and the application's own registration in its
 module replaces it. Lookup and `References` classes are
 registered by the declaring module in its `providers` and resolved in the

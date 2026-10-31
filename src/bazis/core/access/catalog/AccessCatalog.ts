@@ -1,4 +1,5 @@
-import type { Class, ServiceProvider } from "../../di";
+import type { Class } from "../../di";
+import type { ServiceProvider } from "../../di/ServiceProvider";
 import type { References } from "../contracts/References";
 import type { RolePermission } from "../roles/roles";
 import { IAccessCatalog } from "./IAccessCatalog.service";

@@ -31,6 +31,13 @@ const FRAMEWORK_SOURCE = ((): string | null => {
 })();
 const FRAMEWORK_ROOT = FRAMEWORK_SOURCE ?? "src/bazis";
 const isFrameworkSourcePath = (file: string): boolean => FRAMEWORK_SOURCE !== null && file.startsWith(`${FRAMEWORK_SOURCE}/`);
+/**
+ * Packs of the framework's own checkout whose DI wiring ships inside the
+ * package (`framework.packs` of bazis.config.json): an application's codegen
+ * skips node_modules, so the pack carries `<pack>/generated/deps.ts` itself.
+ */
+let frameworkPacks: readonly string[] = [];
+const isFrameworkPackPath = (file: string): boolean => frameworkPacks.some((pack) => file.startsWith(`${pack}/`));
 const APP_GENERATED_DIR = "src/generated/bazis";
 let activeGeneratedDir = APP_GENERATED_DIR;
 const plannedWrites = new Map<string, string>();
@@ -163,8 +170,9 @@ function readRequestedTarget(): string | undefined {
   throw new Error(`BAZIS_CODEGEN_TARGET_UNKNOWN: ${target ?? ""}`);
 }
 
-// Framework internals: their classes are excluded from the auto-deps map (they
-// wire their own services explicitly). Auto-deps magic targets user code only.
+// Framework internals: their classes are excluded from the auto-deps map of a
+// target. Packs listed in `framework.packs` get their own generated wiring
+// (generateFrameworkPack); the rest still wire their services explicitly.
 const FRAMEWORK_INTERNAL_PREFIXES = FRAMEWORK_SOURCE === null ? [] : [
   "core/di/", "core/kernel/", "core/http/", "core/grpc/", "core/http-client/", "core/background/",
   "core/agent/", "core/websocket/", "core/cache/", "library/validation/", "library/boundary/",
@@ -251,7 +259,8 @@ let program: ts.Program;
 let programFiles = new Map<string, ts.SourceFile>();
 // Framework sources outside the scanned project (node_modules/bazis, vendor/bazis).
 // Only their class and token names are read, so app constructor dependencies on
-// framework classes are not discarded as unknown; their own wiring ships with them.
+// framework classes are not discarded as unknown; their own wiring ships with them
+// (`<pack>/generated/deps.ts` of the framework packs).
 let installedFrameworkSources: ts.SourceFile[] = [];
 let sourceFilePathSet = new Set<string>();
 let checker: ts.TypeChecker;
@@ -348,6 +357,7 @@ async function runConfiguredTargets(): Promise<void> {
   const totalStartedAt = performance.now();
   const configStartedAt = performance.now();
   const config = await readCodegenConfig();
+  frameworkPacks = FRAMEWORK_SOURCE === null ? [] : (config.framework?.packs ?? []);
   await planStaleGeneratedTargetRemoval(Object.keys(config.targets));
   // Test sources remain excluded from the broad candidate scan. A test-only
   // target can still opt a single fixture in explicitly through its declared
@@ -434,6 +444,7 @@ async function runConfiguredTargets(): Promise<void> {
     eligible += metrics.eligible;
     candidates += metrics.candidates;
   }
+  for (const pack of frameworkPacks) generateFrameworkPack(pack);
   const targetMs = performance.now() - targetStartedAt;
   const writeStartedAt = performance.now();
   await commitPlannedWrites();
@@ -444,7 +455,7 @@ async function runConfiguredTargets(): Promise<void> {
 
 function createSourceCandidateIndex(files: ReadonlyMap<string, ts.SourceFile>): ReadonlyMap<string, boolean> {
   for (const [file, source] of files) {
-    if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => file.startsWith(prefix))) collectDiClassRegistrations(source);
+    if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => file.startsWith(prefix)) && !isFrameworkPackPath(file)) collectDiClassRegistrations(source);
   }
   return new Map([...files].map(([file, source]) => [file, sourceHasCodegenCandidate(source)]));
 }
@@ -511,14 +522,14 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
   resetTargetAnalysis(reachable, generatedDir);
   for (const { source } of sourceEntries) collectListRequestClasses(source);
   for (const { filePath, source } of sourceEntries) {
-    if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))) collectDiClassRegistrations(source);
+    if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix)) && !isFrameworkPackPath(filePath)) collectDiClassRegistrations(source);
   }
   const prepassMs = performance.now() - startedAt;
   for (const source of installedFrameworkSources) collectTokenDescriptions(source);
   for (const { filePath, source } of sourceEntries) {
     fatalErrors.push(...analyzeOrmPredicates(checker, source));
     collectTokenDescriptions(source);
-    if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix))) {
+    if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix)) && !isFrameworkPackPath(filePath)) {
       collectClassDeps(source);
       collectGrpcBindings(source);
       toolCodegenSources.push({ filePath, sourceFile: source });
@@ -573,6 +584,71 @@ function classifyToolWarnings(toolWarnings: readonly string[]): void {
       warnings.push(warning);
     }
   }
+}
+
+/**
+ * The wiring of one framework pack: constructor dependencies of the classes
+ * its modules register, written to `<pack>/generated/deps.ts`. The pack's
+ * `index.ts` imports that file, so the package carries its own wiring and
+ * framework modules register `singleton(IContract, Implementation)` like an
+ * application does.
+ */
+function generateFrameworkPack(pack: string): void {
+  const files = new Set([...programFiles.keys()].filter((file) => file.startsWith(`${pack}/`)));
+  if (!files.has(`${pack}/index.ts`)) throw new Error(`BAZIS_CODEGEN_CONFIG_INVALID: framework pack ${pack} has no index.ts`);
+  resetTargetAnalysis(files, `${pack}/generated`);
+  // Tokens, configs and classes the pack depends on may live anywhere in the framework.
+  for (const source of programFiles.values()) collectTokenDescriptions(source);
+  for (const { source } of sourceEntries) collectDiClassRegistrations(source);
+  for (const { source } of sourceEntries) collectClassDeps(source);
+  resolveConfigViewDeps();
+  validateDepsAgainstKnownTokens();
+  failOnFatalErrors();
+  stageWrite(`${pack}/generated/deps.ts`, renderFrameworkPackDeps(pack));
+  for (const warning of warnings) reportWarning(warning);
+  reportInfo(`[di:generate] framework pack=${pack} deps=${classDeps.size}`);
+}
+
+function renderFrameworkPackDeps(pack: string): string {
+  const generatedDir = `${pack}/generated`;
+  const entries = [...classDeps.entries()].sort(([left], [right]) =>
+    left.name!.text.localeCompare(right.name!.text)
+    || left.getSourceFile().fileName.localeCompare(right.getSourceFile().fileName)
+    || left.pos - right.pos);
+  const references = new Map<ts.ClassDeclaration, string>();
+  for (const [declaration] of entries) references.set(declaration, declaration.name!.text);
+  for (const [, dependencies] of entries) {
+    for (const dependency of dependencies) {
+      if (dependency.target && !references.has(dependency.target)) references.set(dependency.target, dependency.target.name!.text);
+    }
+  }
+  const di = (file: string) => JSON.stringify(toModuleSpecifierFrom(generatedDir, `${FRAMEWORK_SOURCE}/core/di/${file}`));
+  const lines = ["// This file is auto-generated by `bun run di:generate` (framework.packs of bazis.config.json).", "// Do not edit manually."];
+  const helpers = ["lazyDependency", "optionalDependency"].filter((helper) => entries.some(([, deps]) =>
+    deps.some((dep) => dep.target && (helper === "lazyDependency" ? dep.lazy : dep.optional))));
+  if (helpers.length > 0) lines.push(`import { ${helpers.join(", ")} } from ${di("provider/index.ts")};`);
+  lines.push(`import { registerFrameworkClassDeps } from ${di("module/autoDeps.ts")};`);
+  const byFile = new Map<string, string[]>();
+  for (const [declaration, reference] of references) {
+    const name = dependencyClassExportName(declaration);
+    if (!name) throw new Error(`BAZIS_DI_CLASS_UNIMPORTABLE: ${sourceLocation(declaration)}`);
+    const specifier = toModuleSpecifierFrom(generatedDir, normalizeProjectPath(declaration.getSourceFile().fileName));
+    byFile.set(specifier, [...(byFile.get(specifier) ?? []), name === reference ? name : `${name} as ${reference}`]);
+  }
+  for (const [specifier, names] of [...byFile].sort(([left], [right]) => left.localeCompare(right))) {
+    lines.push(`import { ${names.sort().join(", ")} } from ${JSON.stringify(specifier)};`);
+  }
+  lines.push("", "registerFrameworkClassDeps([");
+  for (const [declaration, dependencies] of entries) {
+    const values = dependencies.map((dependency) => {
+      if (!dependency.target) return JSON.stringify(dependency.optional ? `optional:${dependency.name}` : dependency.name);
+      const reference = references.get(dependency.target)!;
+      return dependency.lazy ? `lazyDependency(${reference})` : dependency.optional ? `optionalDependency(${reference})` : reference;
+    });
+    lines.push(`  [${references.get(declaration)}, [${values.join(", ")}]],`);
+  }
+  lines.push("]);");
+  return `${lines.join("\n")}\n`;
 }
 
 function failOnFatalErrors(): void {

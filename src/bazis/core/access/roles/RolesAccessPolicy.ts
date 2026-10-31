@@ -1,6 +1,7 @@
 import type { ConfigView } from "../../kernel";
 import { PRINCIPAL_STATE_KEY, type AuthorizeContext, type RequestPrincipal } from "../../http";
 import type { IAccessCatalog } from "../catalog/IAccessCatalog.service";
+import type { AccessConfig } from "../check/accessConfig";
 import { AccessPolicy, type ScopePrincipals } from "../contracts/AccessPolicy";
 import type { AccessSubject, Grant, Grants, Scope } from "../contracts/types";
 
@@ -10,8 +11,6 @@ export interface RoleSubject extends AccessSubject {
   readonly roles: readonly string[];
 }
 
-type AccessSettings = ConfigView<{ kindClaim: string; roleClaim: string; maxInList: number }>;
-
 /**
  * The default `AccessPolicy` (ACCESS-001 §8); an application replaces it by
  * registering its own: `singleton(AccessPolicy, AppAccessPolicy)`. The principal of the route check is the subject, its roles come from the
@@ -20,7 +19,7 @@ type AccessSettings = ConfigView<{ kindClaim: string; roleClaim: string; maxInLi
  * until `bazis/identity`.
  */
 export class RolesAccessPolicy extends AccessPolicy {
-  constructor(private readonly catalog: IAccessCatalog, private readonly config: AccessSettings) {
+  constructor(private readonly catalog: IAccessCatalog, private readonly config: ConfigView<AccessConfig>) {
     super();
   }
 

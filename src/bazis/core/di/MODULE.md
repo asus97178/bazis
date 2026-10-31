@@ -347,6 +347,24 @@ start is allowed. A startup error by itself does not call dispose: these low-lev
 helpers keep the caller responsible for cleanup.
 Regressions: [di.hosted-lifecycle.test.ts](test/di.hosted-lifecycle.test.ts).
 
+### Framework packs carry their own wiring (2026-11-01)
+
+An application's codegen skips `node_modules`, so it never writes constructor
+dependencies for the framework's classes. A framework pack listed in
+`framework.packs` of the framework's `bazis.config.json` gets them from the
+framework's own codegen run: `di:generate` writes `<pack>/generated/deps.ts`,
+which calls `registerFrameworkClassDeps` ([autoDeps.ts](module/autoDeps.ts)),
+and the pack's `index.ts` imports it. The file ships in the package; CI fails
+when it is stale. A pack module therefore registers its services the agreed
+way — `singleton(IContract, Implementation)`, configs as
+`defineConfig<Type>("prefix", …)` and `ConfigView<Type>` in the constructor —
+without dependency lists or factories. The framework map is separate from the
+application targets' map: a target rollback keeps it, and a target's own entry
+for the same class wins.
+
+A new pack: add its directory to `framework.packs`, import
+`./generated/deps` in its `index.ts`, run `bun run di:generate`.
+
 ### The built-in ServiceProvider dependency (2026-10-02)
 
 `createContainer` registers the root container itself under the public

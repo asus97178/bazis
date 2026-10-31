@@ -4,6 +4,7 @@
  * framework checks objects and filters lists by them.
  */
 import "./catalog/moduleFields";
+import "./generated/deps";
 
 export { AccessModule } from "./Access.module";
 export { definePermissions, type AttributeSpec, type PermissionDeclarations, type PermissionSpec, type ScopeSource } from "./catalog/permissions";
