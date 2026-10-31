@@ -1,4 +1,6 @@
 import { DI, Module, scoped } from "../../di";
+import { WorkflowClock } from "../contracts/WorkflowClock";
+import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinitions.module";
 import { withEventSubscribers } from "../../kernel";
 import { IWorkflowRuntime } from "../runtime_module/services/IWorkflowRuntime.service";
 import { WorkflowRuntimeModule } from "../runtime_module/WorkflowRuntime.module";
@@ -15,10 +17,10 @@ import { WorkflowTasks } from "./services/WorkflowTasks.service";
  * application's codegen.
  */
 @Module({
-  imports: [WorkflowRuntimeModule],
+  imports: [WorkflowDefinitionsModule, WorkflowRuntimeModule],
   ormBazis: { context: TasksDbContext, entities: [WfTask], ownedStore: tasksStore, registerRepositories: false },
   providers: [
-    scoped(WorkflowTasks, WorkflowTasks, [TasksDbContext, IWorkflowRuntime] as const),
+    scoped(WorkflowTasks, WorkflowTasks, [TasksDbContext, IWorkflowRuntime, WorkflowClock] as const),
     DI.scoped(DI.factoryProviderWithResolver(IWorkflowTasks, [], (resolver) => resolver.resolve(WorkflowTasks))),
     scoped(TaskEvents, TaskEvents, [WorkflowTasks] as const),
     ...withEventSubscribers(TaskEvents),

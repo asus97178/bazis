@@ -32,6 +32,8 @@ const NOUNS_EN = {
   change: ["change", "changes", "changes"],
   part: ["part", "parts", "parts"],
   context: ["database context", "database contexts", "database contexts"],
+  process: ["process", "processes", "processes"],
+  node: ["node", "nodes", "nodes"],
 } as const satisfies Record<string, Forms>;
 
 export type Noun = keyof typeof NOUNS_EN;
@@ -60,6 +62,8 @@ const NOUNS_RU: Record<Noun, Forms> = {
   change: ["изменение", "изменения", "изменений"],
   part: ["часть", "части", "частей"],
   context: ["контекст базы данных", "контекста базы данных", "контекстов базы данных"],
+  process: ["процесс", "процесса", "процессов"],
+  node: ["узел", "узла", "узлов"],
 };
 
 /** Genitive after «из N»: «из 1 подключения», «из 3 подключений», «из 21 подключения». */
@@ -239,6 +243,18 @@ const en = {
     needsCache: "this module caches: pass runApp(AppModule, { cache: memory() })",
     keptOnFailure: "scaffold files were kept — fix the error and run bazis codegen",
   },
+  workflow: {
+    app: "app",
+    section: "PROCESSES IN CODE",
+    none: "no module declares processes — add one with bazis g process <Name> --module <Name>",
+    passed: (count: number) => `${count} ${formEn(count, NOUNS_EN.process)} checked`,
+    failed: (count: number) => `process check failed · ${count} ${formEn(count, NOUNS_EN.error)}`,
+    fix: "fix the documents or the Tools: the application refuses to start with these errors",
+    processKind: "process",
+    processCreated: (name: string) => `process ${name} is generated`,
+    processPlanned: (name: string) => `process ${name} is planned`,
+    processRegistered: (host: string) => `listed in processes of ${host}`,
+  },
   errors: {
     unknown: "Use bazis --help to list commands and options.",
     bunTooOld: (required: string, actual: string) => `bazis needs Bun ${required.startsWith(">=") ? `${required.slice(2).trim()} or newer` : required}; this is Bun ${actual}.`,
@@ -403,6 +419,18 @@ const ru: Messages = {
     needsTable: (moduleFile) => `таблицу шаблон не создаёт: добавьте ensureCreated: true в ormBazis в ${moduleFile} или напишите миграцию`,
     needsCache: "модуль кэширует: передайте runApp(AppModule, { cache: memory() })",
     keptOnFailure: "файлы модуля оставлены — исправьте ошибку и запустите bazis codegen",
+  },
+  workflow: {
+    app: "приложение",
+    section: "ПРОЦЕССЫ В КОДЕ",
+    none: "ни один модуль не объявляет процессы — добавьте процесс: bazis g process <Name> --module <Name>",
+    passed: (count) => `процессы в порядке · ${count} ${formRu(count, NOUNS_RU.process)}`,
+    failed: (count) => `проверка процессов не прошла · ${count} ${formRu(count, NOUNS_RU.error)}`,
+    fix: "исправьте документы или Tools: с этими ошибками приложение не запустится",
+    processKind: "процесс",
+    processCreated: (name) => `процесс ${name} создан`,
+    processPlanned: (name) => `процесс ${name} запланирован`,
+    processRegistered: (host) => `добавлен в processes модуля ${host}`,
   },
   errors: {
     unknown: "Список команд и опций: bazis --help.",

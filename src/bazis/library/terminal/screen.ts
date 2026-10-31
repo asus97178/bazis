@@ -58,6 +58,7 @@ export const MODE = Object.freeze({
   new: ["#ff2ee6", "#7b61ff"] as readonly string[],
   gen: ["#c77dff", "#ff2ee6"] as readonly string[],
   codegen: ["#00f0ff", "#c77dff"] as readonly string[],
+  workflow: ["#3dff7a", "#ffd60a"] as readonly string[],
 });
 
 /**

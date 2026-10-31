@@ -3,8 +3,11 @@ import { UniqueViolationError } from "../../../orm";
 import type { AgentToolContract } from "../../../agent";
 import { emptyProcess, hasErrors, validateProcess, type ProcessDocument, type ProcessIssue } from "../../../../library/workflow";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
+import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
+import type { CodeProcessCatalog } from "../code/CodeProcessCatalog";
+import type { OwnedCodeProcess } from "../code/codeProcesses";
 import type { DefinitionsDbContext } from "../model/Definitions.dbContext";
 import { WfProcess } from "../model/WfProcess.model";
 import { WfVersion } from "../model/WfVersion.model";
@@ -20,11 +23,15 @@ import {
 } from "./IWorkflowDefinitions.service";
 
 const KEY = /^[a-z][a-z0-9_.-]{0,63}$/;
+/** Who publishes the processes declared in code. */
+const CODE_ACTOR: WorkflowActor = { kind: "system", id: "code" };
 
 export class WorkflowDefinitions extends IWorkflowDefinitions {
   constructor(
     private readonly db: DefinitionsDbContext,
     private readonly workflowTools: WorkflowTools,
+    private readonly code: CodeProcessCatalog,
+    private readonly clock: WorkflowClock,
   ) {
     super();
   }
@@ -40,11 +47,11 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     }
     const total = await source.count();
     const rows = await source.orderBy((p) => p.key).skip(offset).take(limit).toList();
-    return { items: rows.map(summaryOf), total };
+    return { items: rows.map((row) => this.summaryOf(row)), total };
   }
 
   async get(key: string): Promise<ProcessDetails> {
-    return detailsOf(await this.process(key, false));
+    return this.detailsOf(await this.process(key, false));
   }
 
   async create(process: CreateProcess, actor: WorkflowActor): Promise<ProcessDetails> {
@@ -55,7 +62,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
       description: description(process.description),
       retentionDays: retention(process.retentionDays),
       draft: emptyProcess(),
-      draftUpdatedAt: new Date(),
+      draftUpdatedAt: this.clock.now(),
       draftUpdatedByKind: actor.kind,
       draftUpdatedById: actor.id,
     });
@@ -66,25 +73,28 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
       if (error instanceof UniqueViolationError) throw new WorkflowError("conflict", `Process ${process.key} already exists`);
       throw error;
     }
-    return detailsOf(row);
+    return this.detailsOf(row);
   }
 
   async update(key: string, changes: UpdateProcess, _actor: WorkflowActor): Promise<ProcessDetails> {
     const row = await this.process(key, true);
+    const { archived, ...fields } = changes;
+    if (Object.values(fields).some((value) => value !== undefined)) this.assertNotCode(key);
     if (changes.title !== undefined) row.title = title(changes.title);
     if (changes.description !== undefined) row.description = description(changes.description);
     if (changes.retentionDays !== undefined) row.retentionDays = retention(changes.retentionDays);
-    if (changes.archived !== undefined) row.archivedAt = changes.archived ? row.archivedAt ?? new Date() : null;
+    if (archived !== undefined) row.archivedAt = archived ? row.archivedAt ?? this.clock.now() : null;
     await this.db.saveChanges();
-    return detailsOf(row);
+    return this.detailsOf(row);
   }
 
   async saveDraft(key: string, document: unknown, actor: WorkflowActor): Promise<{ readonly issues: readonly ProcessIssue[] }> {
     const issues = this.validate(document);
     if (issues.some((issue) => issue.code === "too_large")) throw new WorkflowError("invalid_document", "The document is too large", issues);
     const row = await this.process(key, true);
+    this.assertNotCode(key);
     row.draft = document;
-    row.draftUpdatedAt = new Date();
+    row.draftUpdatedAt = this.clock.now();
     row.draftUpdatedByKind = actor.kind;
     row.draftUpdatedById = actor.id;
     await this.db.saveChanges();
@@ -95,27 +105,71 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     return await this.db.transactionScope(async () => {
       const row = await this.db.processes.where((p) => p.key.eq(key)).forUpdate().firstOrDefault();
       if (!row) throw notFound(key);
+      this.assertNotCode(key);
       if (row.archivedAt !== null) throw new WorkflowError("archived", `Process ${key} is archived`);
       const issues = this.validate(row.draft);
       if (hasErrors(issues)) throw new WorkflowError("invalid_document", `Process ${key} has errors and cannot be published`, issues);
-      const hash = createHash("sha256").update(canonicalJson(row.draft)).digest("hex");
-      if (row.latestVersion !== null) {
-        const latest = await this.db.versions.asNoTracking().firstOrDefault((v) => v.processId.eq(row.id).and(v.version.eq(row.latestVersion!)));
-        if (latest?.documentHash === hash) return versionOf(row.key, latest);
-      }
-      const version = Object.assign(new WfVersion(), {
-        processId: row.id,
-        version: (row.latestVersion ?? 0) + 1,
-        document: row.draft,
-        documentHash: hash,
-        publishedByKind: actor.kind,
-        publishedById: actor.id,
-      });
-      this.db.versions.add(version);
-      row.latestVersion = version.version;
-      await this.db.saveChanges();
-      return versionOf(row.key, version);
+      return (await this.publishDraft(row, actor)).version;
     });
+  }
+
+  /**
+   * Brings the processes declared in code into the catalog (WORKFLOW-001 §14):
+   * creates or updates each, puts its document into the draft and publishes it,
+   * under one lock across application instances. Archived ones stay archived
+   * and unpublished. The caller has checked the documents with the Tools.
+   */
+  async publishCode(entries: readonly OwnedCodeProcess[]): Promise<readonly { readonly key: string; readonly version: number | null; readonly published: boolean }[]> {
+    return await this.db.transactionScope(async () => {
+      await this.db.database.querySqlRaw("SELECT pg_advisory_xact_lock(hashtext('bazis.workflow.code'))");
+      const results: { key: string; version: number | null; published: boolean }[] = [];
+      for (const { process } of [...entries].sort((a, b) => a.process.key.localeCompare(b.process.key))) {
+        let row = await this.db.processes.where((p) => p.key.eq(process.key)).forUpdate().firstOrDefault();
+        if (!row) {
+          row = Object.assign(new WfProcess(), { key: process.key });
+          this.db.processes.add(row);
+        }
+        const fields = { title: title(process.title), description: description(process.description), retentionDays: retention(process.retentionDays) };
+        if (row.title !== fields.title) row.title = fields.title;
+        if (row.description !== fields.description) row.description = fields.description;
+        if (row.retentionDays !== fields.retentionDays) row.retentionDays = fields.retentionDays;
+        if (row.draft === null || canonicalJson(row.draft) !== canonicalJson(process.document)) {
+          row.draft = process.document;
+          row.draftUpdatedAt = this.clock.now();
+          row.draftUpdatedByKind = CODE_ACTOR.kind;
+          row.draftUpdatedById = CODE_ACTOR.id;
+        }
+        await this.db.saveChanges();
+        if (row.archivedAt !== null) {
+          results.push({ key: row.key, version: row.latestVersion, published: false });
+          continue;
+        }
+        const { version, created } = await this.publishDraft(row, CODE_ACTOR);
+        results.push({ key: row.key, version: version.version, published: created });
+      }
+      return results;
+    });
+  }
+
+  /** Stores the draft of a locked row as the next version, unless it is the latest one already. */
+  private async publishDraft(row: WfProcess, actor: WorkflowActor): Promise<{ readonly version: VersionDetails; readonly created: boolean }> {
+    const hash = createHash("sha256").update(canonicalJson(row.draft)).digest("hex");
+    if (row.latestVersion !== null) {
+      const latest = await this.db.versions.asNoTracking().firstOrDefault((v) => v.processId.eq(row.id).and(v.version.eq(row.latestVersion!)));
+      if (latest?.documentHash === hash) return { version: versionOf(row.key, latest), created: false };
+    }
+    const version = Object.assign(new WfVersion(), {
+      processId: row.id,
+      version: (row.latestVersion ?? 0) + 1,
+      document: row.draft,
+      documentHash: hash,
+      publishedByKind: actor.kind,
+      publishedById: actor.id,
+    });
+    this.db.versions.add(version);
+    row.latestVersion = version.version;
+    await this.db.saveChanges();
+    return { version: versionOf(row.key, version), created: true };
   }
 
   async versions(key: string): Promise<readonly VersionSummary[]> {
@@ -168,6 +222,35 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     return this.workflowTools.list();
   }
 
+  /** A process declared in code changes only through the code. */
+  private assertNotCode(key: string): void {
+    const module = this.code.moduleOf(key);
+    if (module !== undefined) throw new WorkflowError("conflict", `Process ${key} is declared in code by ${module} and changes only there`);
+  }
+
+  private summaryOf(row: WfProcess): ProcessSummary {
+    return {
+      key: row.key,
+      title: row.title,
+      description: row.description,
+      latestVersion: row.latestVersion,
+      retentionDays: row.retentionDays,
+      archived: row.archivedAt !== null,
+      module: this.code.moduleOf(row.key) ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  private detailsOf(row: WfProcess): ProcessDetails {
+    return {
+      ...this.summaryOf(row),
+      draft: row.draft,
+      draftUpdatedAt: row.draftUpdatedAt,
+      draftUpdatedBy: row.draftUpdatedById === null ? null : { kind: row.draftUpdatedByKind === "system" ? "system" : "user", id: row.draftUpdatedById },
+    };
+  }
+
   private validate(document: unknown): ProcessIssue[] {
     return validateProcess(document, { tools: (name) => this.workflowTools.has(name) });
   }
@@ -199,28 +282,6 @@ function retention(value: unknown): number | null {
   if (value === undefined || value === null) return null;
   if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > 36_500) throw new WorkflowError("invalid_input", "retentionDays must be an integer 1–36500");
   return value as number;
-}
-
-function summaryOf(row: WfProcess): ProcessSummary {
-  return {
-    key: row.key,
-    title: row.title,
-    description: row.description,
-    latestVersion: row.latestVersion,
-    retentionDays: row.retentionDays,
-    archived: row.archivedAt !== null,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-function detailsOf(row: WfProcess): ProcessDetails {
-  return {
-    ...summaryOf(row),
-    draft: row.draft,
-    draftUpdatedAt: row.draftUpdatedAt,
-    draftUpdatedBy: row.draftUpdatedById === null ? null : { kind: row.draftUpdatedByKind === "system" ? "system" : "user", id: row.draftUpdatedById },
-  };
 }
 
 function versionOf(key: string, row: WfVersion): VersionDetails {

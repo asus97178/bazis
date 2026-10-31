@@ -1,6 +1,6 @@
 # WorkflowRuntimeModule
 
-Passport version: 1.0. Check date: 2026-10-31.
+Passport version: 1.1. Check date: 2026-10-31.
 Status: implemented for stage 1 of WORKFLOW-001; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/runtime_module`.
@@ -24,16 +24,17 @@ retry, `emit`.
 | Component | File | Dependencies | Output |
 | --- | --- | --- | --- |
 | 5 entities, `RuntimeDbContext` | [model](model) | ORM, owned store `bazis.workflow.runtime` | `bazis_wf_run_instances`, `_tokens`, `_jobs`, `_subscriptions`, `_history` |
-| `WorkflowEngine` (scoped) | [internal/WorkflowEngine.ts](internal/WorkflowEngine.ts) | `RuntimeDbContext`, `IWorkflowDefinitions`, `GraphCache`, `EventBus`, the scope | token moves, gateways, finish, cancel, retry; events after commit |
+| `WorkflowEngine` (scoped) | [internal/WorkflowEngine.ts](internal/WorkflowEngine.ts) | `RuntimeDbContext`, `IWorkflowDefinitions`, `GraphCache`, `EventBus`, the scope, `WorkflowClock` | token moves, gateways, finish, cancel, retry; events after commit; due times by the clock |
 | `GraphCache` (singleton) | [internal/GraphCache.ts](internal/GraphCache.ts) | — | graphs of versions, up to 500 |
 | `ToolStep` (scoped) | [internal/ToolStep.ts](internal/ToolStep.ts) | `RuntimeDbContext`, `WorkflowEngine`, `WorkflowTools` | one `tool` job: `ToolRunner.as("workflow").run(tool, input, { actor, idempotencyKey: tokenId, metadata })`; a retry keeps the job with a later `dueAt`; a final failure goes to `WorkflowEngine.failStep` (error boundary or `failed`) |
 | `TimerStep` (scoped) | [internal/TimerStep.ts](internal/TimerStep.ts) | `RuntimeDbContext`, `WorkflowEngine` | one `timer` job: `timerCatch` moves on, `boundaryTimer` takes its flow |
-| `Schedules` (scoped) | [internal/Schedules.ts](internal/Schedules.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions` | one `schedule` job per scheduled latest version (reconciled at start and every minute under an advisory lock); a firing starts instances and plans the next in one transaction |
+| `Schedules` (scoped) | [internal/Schedules.ts](internal/Schedules.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions` | one `schedule` job per scheduled latest version (reconciled at start and every minute under an advisory lock); a firing starts instances and plans the next from now in one transaction: missed firings are not caught up |
 | `EventsController` | [http/Events.controller.ts](http/Events.controller.ts) | `IWorkflowRuntime`, `WorkflowAccess` | `POST /workflow/events/:eventKey` |
 | `IWorkflowRuntime` / `WorkflowRuntime` (scoped) | [services](services) | engine, `IWorkflowDefinitions`, `WorkflowInputValidator` (the application's or the built-in one) | start, cancel, retry, completeToken, lists, history |
 | `InstancesController` | [http/Instances.controller.ts](http/Instances.controller.ts) | `IWorkflowRuntime`, `WorkflowAccess` | `/workflow/instances…` |
-| `WorkflowWorker` | [background/WorkflowWorker.ts](background/WorkflowWorker.ts) | `SERVICE_PROVIDER`, settings | claims due jobs `FOR UPDATE SKIP LOCKED` ordered by id, lease 5 min; a full batch is followed at once |
-| `WorkflowRetention` | [background/WorkflowRetention.ts](background/WorkflowRetention.ts) | `SERVICE_PROVIDER`, settings, `IWorkflowDefinitions` | deletes old `completed`/`cancelled` instances (cascade) |
+| `WorkflowJobs` | [internal/WorkflowJobs.ts](internal/WorkflowJobs.ts) | `SERVICE_PROVIDER` | claims due jobs `FOR UPDATE SKIP LOCKED` ordered by id, lease 5 min, runs each in its own scope; used by the worker and by `testWorkflow`'s `drain` |
+| `WorkflowWorker` | [background/WorkflowWorker.ts](background/WorkflowWorker.ts) | `SERVICE_PROVIDER`, settings | `WorkflowJobs` every `worker.intervalMs`; a full batch is followed at once; idle with a manual `WorkflowClock` |
+| `WorkflowRetention` | [background/WorkflowRetention.ts](background/WorkflowRetention.ts) | `SERVICE_PROVIDER`, settings, `IWorkflowDefinitions`, `WorkflowClock` | deletes old `completed`/`cancelled` instances (cascade); idle with a manual clock |
 | events | [events/Runtime.events.ts](events/Runtime.events.ts) | `EventBus` | `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`, `WORKFLOW_INSTANCE_FINISHED` (after the step commits), `WORKFLOW_INSTANCES_DELETED` (after each retention batch) |
 
 exports: `[IWorkflowRuntime]`. config: `workflowRuntimeConfig`.

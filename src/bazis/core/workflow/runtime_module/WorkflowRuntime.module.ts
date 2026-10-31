@@ -1,5 +1,6 @@
 import { DI, Module, SERVICE_PROVIDER, scoped } from "../../di";
 import { EventBus, LOGGER } from "../../kernel";
+import { WorkflowClock } from "../contracts/WorkflowClock";
 import { DefaultWorkflowInputValidator, WorkflowInputValidator } from "../contracts/WorkflowInputValidator";
 import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinitions.module";
 import { IWorkflowDefinitions } from "../definitions_module/services/IWorkflowDefinitions.service";
@@ -36,6 +37,7 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
       resolver.resolve(EventBus),
       resolver,
       resolver.tryResolve(LOGGER),
+      resolver.resolve(WorkflowClock),
     ))),
     scoped(ToolStep, ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools] as const),
     scoped(TimerStep, TimerStep, [RuntimeDbContext, WorkflowEngine] as const),

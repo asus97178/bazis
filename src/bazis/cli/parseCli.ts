@@ -18,11 +18,24 @@ export interface ParsedGenerateArgs {
   readonly target?: string;
 }
 
+export interface ParsedProcessArgs {
+  readonly name: string;
+  /** The module that owns the process. */
+  readonly module: string;
+  readonly pack?: string;
+  readonly modulesRoot?: string;
+  readonly force: boolean;
+  readonly dryRun: boolean;
+}
+
 export type ParseCliResult =
   | { readonly kind: "help"; readonly help: boolean }
   | { readonly kind: "version" }
   | { readonly kind: "new"; readonly name: string; readonly outputPath?: string; readonly frameworkPath?: string; readonly linkFramework: boolean; readonly vendor: boolean; readonly dryRun: boolean }
   | { readonly kind: "generate"; readonly args: ParsedGenerateArgs }
+  | { readonly kind: "process"; readonly args: ParsedProcessArgs }
+  | { readonly kind: "workflow"; readonly action: "check"; readonly appModule?: string }
+  | { readonly kind: "workflow"; readonly action: "diagram"; readonly key: string; readonly appModule?: string }
   | { readonly kind: "codegen"; readonly target?: string }
   | { readonly kind: "dev"; readonly watch: boolean }
   | { readonly kind: "test"; readonly args: readonly string[] }
@@ -33,7 +46,7 @@ const GENERATOR_ALIASES = new Map<string, "module" | "pack">([
   ["module", "module"], ["m", "module"],
   ["pack", "pack"], ["p", "pack"], ["module-pack", "pack"],
 ]);
-const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--pack", "--parts", "--target", "--path", "--framework", "--outfile", "--platform"]);
+const VALUE_OPTIONS = new Set(["--modules-root", "--app-module", "--pack", "--module", "--parts", "--target", "--path", "--framework", "--outfile", "--platform"]);
 /** Platforms of `bun build --compile --target=bun-<platform>`. */
 export const BINARY_PLATFORM = /^(linux|darwin|windows)-(x64|arm64)(-musl)?(-baseline|-modern)?$/;
 const FLAG_OPTIONS = new Set(["--no-register", "--force", "--full", "--enterprise", "--minimal", "--empty", "--dry-run", "--no-codegen", "--link-framework", "--vendor", "--bin", "--watch", "--dotenv"]);
@@ -114,13 +127,42 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
     }
     return { kind: "codegen", target };
   }
+  if (command === "workflow") {
+    for (const option of options.keys()) {
+      if (option !== "--app-module") return error(`Option ${option} is not supported by workflow.`);
+    }
+    const appModule = options.get("--app-module");
+    if (generatorToken === "check" && positional.length === 2) return { kind: "workflow", action: "check", ...(appModule === undefined ? {} : { appModule }) };
+    if (generatorToken === "diagram" && positional.length === 3) return { kind: "workflow", action: "diagram", key: name!, ...(appModule === undefined ? {} : { appModule }) };
+    return error("Use: bazis workflow check [--app-module <path>] or bazis workflow diagram <key> [--app-module <path>]");
+  }
+  if (options.has("--module") && !((command === "g" || command === "generate") && (generatorToken === "process" || generatorToken === "pr"))) return error("--module is only supported by g process.");
+  if ((command === "g" || command === "generate") && (generatorToken === "process" || generatorToken === "pr")) {
+    for (const option of options.keys()) {
+      if (!["--module", "--pack", "--modules-root", "--force", "--dry-run"].includes(option)) return error(`Option ${option} is not supported by g process.`);
+    }
+    if (name === undefined || positional.length !== 3) return error("Use: bazis g process <Name> --module <Name> [--pack <Name>]");
+    const module = options.get("--module");
+    if (module === undefined) return error("g process needs the module that owns the process: --module <Name>.");
+    try {
+      parseModuleName(name);
+      parseModuleName(module);
+      if (options.has("--pack")) parseModuleName(options.get("--pack")!);
+    } catch (cause) {
+      return error(cause instanceof Error ? cause.message : String(cause));
+    }
+    return {
+      kind: "process",
+      args: { name, module, pack: options.get("--pack"), modulesRoot: options.get("--modules-root"), force: options.has("--force"), dryRun: options.has("--dry-run") },
+    };
+  }
   if (command !== "g" && command !== "generate") {
     return error(`Unknown command: ${command ?? "(missing)"}. Use: bazis --help`);
   }
-  if (generatorToken === undefined) return error("Generator is required: module (m) or pack (p).");
+  if (generatorToken === undefined) return error("Generator is required: module (m), pack (p) or process (pr).");
   if (options.has("--path") || options.has("--framework") || options.has("--link-framework") || options.has("--vendor")) return error("--path, --framework, --link-framework and --vendor are only supported by new.");
   const generator = GENERATOR_ALIASES.get(generatorToken);
-  if (generator === undefined) return error(`Unknown generator: ${generatorToken}. Supported: module (m), pack (p)`);
+  if (generator === undefined) return error(`Unknown generator: ${generatorToken}. Supported: module (m), pack (p), process (pr)`);
   if (name === undefined) return error("Module name is required.");
   if (positional.length !== 3) return error(`Unexpected argument: ${positional[3]}`);
 

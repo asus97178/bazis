@@ -1,7 +1,8 @@
 # bazis CLI
 
-Passport version: 1.10. Check date: 2026-10-06. Type: atomic technical module.
-Scope: command parsing, project and module generation, host registration, codegen,
+Passport version: 1.11. Check date: 2026-10-31. Type: atomic technical module.
+Scope: command parsing, project, module and process generation, host registration, codegen,
+checking and drawing the processes declared in code (`bazis workflow check|diagram`),
 running the application and building (`bazis dev`, `bazis build`, `bazis build --bin`).
 Entry point: [main.ts](main.ts), the `runCli(argv, runtime)` function.
 The CLI runs as a separate process and is not registered in `AppModule`.
@@ -114,7 +115,9 @@ binary check are in the [DI passport](../core/di/MODULE.md).
 | `generateProject` | [generateProject.ts](generateProject.ts) | Name, path, local framework package, dry-run | A separate starter project or a file plan |
 | `parseModuleName` | [naming.ts](naming.ts) | The name string | Names of directories, classes, the route and the table |
 | `generateModule` / `generateModulePack` | [generateModule.ts](generateModule.ts) | Generation options | A file plan; writes it unless dry-run |
-| `registerModuleInSource` | [moduleRegistration.ts](moduleRegistration.ts) | Host source, absolute paths, class | TypeScript with the import and registration |
+| `registerModuleInSource`, `registerInModuleField` | [moduleRegistration.ts](moduleRegistration.ts) | Host source, absolute paths, class or export, the `@Module` field | TypeScript with the import and the entry in `imports` / `processes` |
+| `generateProcess` | [generateProcess.ts](generateProcess.ts), [templates/process.ts](templates/process.ts) | Process name, owner module, pack | `processes/<Name>.process.ts` and the module's `processes` |
+| `runWorkflowCheck`, `runWorkflowDiagram` | [workflow.ts](workflow.ts) | cwd, app module, process key | Imports the app module without starting it; `inspectProcesses` of `core/workflow`; findings and exit code 1, or Mermaid on stdout |
 | Templates | [templates/module.ts](templates/module.ts), [templates/pack.ts](templates/pack.ts), [templates/passport.ts](templates/passport.ts) | The normalized name and profile | Files and `MODULE.md` |
 | `runCodegen` | [codegen.ts](codegen.ts) | cwd and target | Runs the framework generator for the project, the exit code |
 | `runDev`, `runBuild`, `compileBinary` | [build.ts](build.ts) | cwd, `{ bin, outfile, dotenv }`, the codegen function | Runs the application; type check; an executable without `.bun-build` in the project |
@@ -134,6 +137,9 @@ bunx bazis g module Mailer --empty --no-register
 bunx bazis g module Catalog --full --no-codegen
 bunx bazis g pack DataManager --parts tables,fields,validators,records --dry-run
 bunx bazis codegen --target production
+bunx bazis g process OrderApproval --module Orders
+bunx bazis workflow check
+bunx bazis workflow diagram order-approval > order-approval.mmd
 ```
 
 In this repository Bun commands run through `scripts/bazis-bun` with a qualified
@@ -143,13 +149,15 @@ In a created project the `dev`, `build`, `build:bin`, `codegen` scripts wrap
 
 | Field | Type / source | Required / default | Check / behavior |
 | --- | --- | --- | --- |
-| command | positional string | Required | `g` / `generate`, `codegen` |
+| command | positional string | Required | `g` / `generate`, `codegen`, `workflow` |
 | `new <Name>` | positional string | For a new project | Creates a separate folder with a kebab-case name; name rules as for modules |
 | `--path` | path string | Only `new`, default `./<kebab-name>` | The exact path of the new directory; the parent must exist, an existing directory is never overwritten |
 | `--framework` | path string | Only `new`, default `./src/bazis` or the package next to the source CLI | The local `bazis` package: its version sets the npm dependency; `--vendor` copies it, `--link-framework` links it |
 | `--vendor` | flag | Only `new`, false | Copy the package into `vendor/bazis` and depend on `file:./vendor/bazis` instead of npm; for offline projects |
 | `--link-framework` | flag | Only `new`, false | Keep a relative `file:` link to the external checkout; the project needs it when moved. Incompatible with `--vendor` |
-| generator | positional string | For `g` | `module` / `m`; `pack` / `p` / `module-pack` |
+| generator | positional string | For `g` | `module` / `m`; `pack` / `p` / `module-pack`; `process` / `pr` |
+| `--module` | module name | Only `g process`, required | The owner: `{modules-root}/<name>/<Name>.module.ts`, or with `--pack` the part `<pack>_modules/<name>_module`; `g process` accepts `--module`, `--pack`, `--modules-root`, `--force`, `--dry-run` |
+| `workflow check` / `workflow diagram <key>` | positional | — | Only `--app-module` (default `src/app/modules/App.module.ts`, export `AppModule` or the only `@Module` class) |
 | name | positional string | For `g` | A Latin letter, then letters/digits; parts joined by a single hyphen |
 | `--parts` | CSV string | Only pack, required | At least 2 non-empty distinct parts, names as for a module |
 | `--modules-root` | path string, cwd | `src/app/modules` | A non-empty value; an absolute path is allowed |

@@ -44,7 +44,7 @@ export class ToolStep {
     await this.engine.inStep(instance.id, async (step) => {
       const current = step.tokens.find((t) => t.id === token.id);
       const retryAt = current?.status === "waiting" && step.instance.status === "running" && result.status === "error" && reason === undefined
-        ? nextAttempt(node?.config?.retry, job.attempts)
+        ? nextAttempt(node?.config?.retry, job.attempts, this.engine.now())
         : undefined;
       if (retryAt !== undefined) {
         // The same job runs again later: its attempts keep counting.
@@ -87,10 +87,10 @@ function reasonOf(result: AgentToolResult): string | undefined {
  * `undefined` when the attempts are used up. The pause doubles from `backoff`
  * (10 seconds by default) and stops growing at a day.
  */
-export function nextAttempt(policy: unknown, attempts: number): Date | undefined {
+export function nextAttempt(policy: unknown, attempts: number, now: Date): Date | undefined {
   if (typeof policy !== "object" || policy === null) return undefined;
   const { maxAttempts, backoff } = policy as { maxAttempts?: unknown; backoff?: unknown };
   if (typeof maxAttempts !== "number" || attempts >= maxAttempts) return undefined;
   const base = typeof backoff === "string" ? durationMs(backoff) ?? 10_000 : 10_000;
-  return new Date(Date.now() + Math.min(base * 2 ** Math.max(attempts - 1, 0), 86_400_000));
+  return new Date(now.getTime() + Math.min(base * 2 ** Math.max(attempts - 1, 0), 86_400_000));
 }

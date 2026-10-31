@@ -310,6 +310,8 @@ test.skipIf(!enabled)("a declined order waits for a person; the task form is che
   const waiting = await settled(started.body.id);
   expect(waiting.status).toBe("running");
   const token = waiting.tokens.find((t: { nodeId: string; status: string }) => t.nodeId === "Review" && t.status === "waiting");
+  // The event follows the commit: the waiting step can be seen a moment before it.
+  for (let i = 0; i < 40 && !seen.requested.some((r) => r.tokenId === token.id); i++) await Bun.sleep(25);
   const requested = seen.requested.find((r) => r.tokenId === token.id)!;
   expect(requested).toMatchObject({ instanceId: waiting.id, processKey: "order", nodeId: "Review", title: "Call the customer", assignee: { role: "support" } });
   expect(requested.dueAt).toBeInstanceOf(Date);

@@ -69,6 +69,9 @@ def gated(path):
     if 'json-native' in name:
         db = create_database('orm_json_native')
         return db, {'BAZIS_PG_URL': url(db), 'BAZIS_ORM_JSON_NATIVE_LIVE': '1'}
+    if 'workflow.postgres.code' in name:
+        db = create_database(f'bazis_wf_code_{run_id}')
+        return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
     if 'workflow.postgres' in name:
         db = create_database(f'bazis_wf_{run_id}')
         return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
