@@ -34,7 +34,7 @@ retry, `emit`.
 | `InstancesController` | [http/Instances.controller.ts](http/Instances.controller.ts) | `IWorkflowRuntime`, `WorkflowAccess` | `/workflow/instances…` |
 | `WorkflowWorker` | [background/WorkflowWorker.ts](background/WorkflowWorker.ts) | `SERVICE_PROVIDER`, settings | claims due jobs `FOR UPDATE SKIP LOCKED` ordered by id, lease 5 min; a full batch is followed at once |
 | `WorkflowRetention` | [background/WorkflowRetention.ts](background/WorkflowRetention.ts) | `SERVICE_PROVIDER`, settings, `IWorkflowDefinitions` | deletes old `completed`/`cancelled` instances (cascade) |
-| events | [events/Runtime.events.ts](events/Runtime.events.ts) | `EventBus` | `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`, `WORKFLOW_INSTANCE_FINISHED` |
+| events | [events/Runtime.events.ts](events/Runtime.events.ts) | `EventBus` | `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`, `WORKFLOW_INSTANCE_FINISHED` (after the step commits), `WORKFLOW_INSTANCES_DELETED` (after each retention batch) |
 
 exports: `[IWorkflowRuntime]`. config: `workflowRuntimeConfig`.
 
@@ -61,7 +61,7 @@ exports: `[IWorkflowRuntime]`. config: `workflowRuntimeConfig`.
 | `POST /workflow/instances/:id/retry` | `instances.manage` | 200 / 409 `wrong_status` (not `failed`) |
 | `POST /workflow/events/:eventKey` `{ payload?, correlation?, partition? }` | `events.emit` (partition) | 202 `{ started, continued, rejected }` |
 
-The tasks HTTP comes with stage 4.
+The tasks HTTP is the [Tasks part](../tasks_module/MODULE.md).
 
 ## 5. Known limits of stage 1
 

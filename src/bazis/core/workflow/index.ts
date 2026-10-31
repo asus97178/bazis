@@ -6,6 +6,9 @@
 export { WorkflowModule } from "./Workflow.module";
 export { WorkflowDefinitionsModule } from "./definitions_module/WorkflowDefinitions.module";
 export { WorkflowRuntimeModule } from "./runtime_module/WorkflowRuntime.module";
+export { WorkflowTasksModule } from "./tasks_module/WorkflowTasks.module";
+export { IWorkflowTasks, type TaskDetails, type TaskListQuery } from "./tasks_module/services/IWorkflowTasks.service";
+export type { TaskStatus } from "./tasks_module/model/WfTask.model";
 export {
   IWorkflowDefinitions,
   type CreateProcess,
@@ -18,6 +21,8 @@ export {
 } from "./definitions_module/services/IWorkflowDefinitions.service";
 export {
   IWorkflowRuntime,
+  type EmitOptions,
+  type EmitResult,
   type HistoryEntry,
   type InstanceDetails,
   type InstanceListQuery,
@@ -27,9 +32,11 @@ export {
 } from "./runtime_module/services/IWorkflowRuntime.service";
 export {
   WORKFLOW_INSTANCE_FINISHED,
+  WORKFLOW_INSTANCES_DELETED,
   WORKFLOW_TASK_REQUESTED,
   WORKFLOW_TOKEN_CLOSED,
   type WorkflowInstanceFinished,
+  type WorkflowInstancesDeleted,
   type WorkflowTaskRequested,
   type WorkflowTokenClosed,
 } from "./runtime_module/events/Runtime.events";

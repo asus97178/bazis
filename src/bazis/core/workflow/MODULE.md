@@ -1,7 +1,7 @@
 # WorkflowModule
 
 Passport version: 1.0. Check date: 2026-10-31.
-Status: implemented for stages 1–3 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
+Status: implemented for stages 1–4 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.
@@ -30,7 +30,7 @@ covered by the application's codegen; pure document functions in
 | --- | --- | --- | --- |
 | Definitions | [definitions_module](definitions_module/MODULE.md) | `bazis_wf_def_*`: processes, versions | `library/workflow`, `ToolRunner` |
 | Runtime | [runtime_module](runtime_module/MODULE.md) | `bazis_wf_run_*`: instances, tokens, jobs, subscriptions, history | Definitions (`IWorkflowDefinitions`), `ToolRunner`, `EventBus` |
-| Tasks | — | stage 4 of WORKFLOW-001, not implemented | Runtime |
+| Tasks | [tasks_module](tasks_module/MODULE.md) | `bazis_wf_task_*`: tasks | Runtime (`IWorkflowRuntime`, its events) |
 
 Shared contracts of the pack (no providers): `access/WorkflowAccess.ts` (HTTP
 rights port, default: closed), `contracts/WorkflowError.ts`,
@@ -39,9 +39,9 @@ internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
 
 ## 3. Public inputs
 
-`exports: [IWorkflowDefinitions, IWorkflowRuntime]`; the parts' HTTP under
+`exports: [IWorkflowDefinitions, IWorkflowRuntime, IWorkflowTasks]`; the parts' HTTP under
 `/workflow/...`; events `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
-`WORKFLOW_INSTANCE_FINISHED`; settings `workflowRuntimeConfig` (prefix `workflow`).
+`WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED`; settings `workflowRuntimeConfig` (prefix `workflow`).
 
 ## 4. Checks
 
@@ -59,6 +59,10 @@ internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
   correlated `eventWait` through the service and HTTP, `eventStart` with the
   payload checked against the input, an interrupting `boundaryEvent` on a task,
   one schedule job under concurrent reconciles, a firing that starts an instance
-  and plans the next minute, an archived process losing its job.
+  and plans the next minute, an archived process losing its job; stage 4: a role
+  task in the inbox of its assignees only, claim / conflict / release, the form
+  checked on completion, a completed task moving the process, a personal task,
+  a cancelled instance cancelling its task, retention deleting the tasks of
+  deleted instances.
 - Not checked: OpenAPI of the workflow routes (the framework's controllers read
   `HttpContext` directly and do not appear in the application's OpenAPI document).

@@ -32,6 +32,12 @@ export interface WorkflowInstanceFinished {
   readonly status: Extract<InstanceStatus, "completed" | "cancelled">;
 }
 
+/** Retention deleted these finished instances with their tokens and history. */
+export interface WorkflowInstancesDeleted {
+  readonly instanceIds: readonly string[];
+}
+
 export const WORKFLOW_TASK_REQUESTED = createEventToken<WorkflowTaskRequested>("workflow.task-requested");
 export const WORKFLOW_TOKEN_CLOSED = createEventToken<WorkflowTokenClosed>("workflow.token-closed");
 export const WORKFLOW_INSTANCE_FINISHED = createEventToken<WorkflowInstanceFinished>("workflow.instance-finished");
+export const WORKFLOW_INSTANCES_DELETED = createEventToken<WorkflowInstancesDeleted>("workflow.instances-deleted");
