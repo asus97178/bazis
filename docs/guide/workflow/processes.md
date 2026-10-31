@@ -9,8 +9,8 @@
 базе, фоновый воркер, события и HTTP. Интерфейса нет: дизайнер процессов,
 входящие задачи и формы строит приложение поверх сервисов и HTTP модуля.
 
-Все примеры проверены на bazis 0.124.0 и PostgreSQL 17 в приложении «Заказы»
-из этой главы.
+Все примеры проверены на bazis 0.124.0 и 0.125.0 (повторы и таймеры) с
+PostgreSQL 17 в приложении «Заказы» из этой главы.
 
 ## Подключение
 
@@ -137,7 +137,10 @@ export class PaymentsModule {}
 | `exclusiveGateway` | Выбор по условию | 0.124.0 |
 | `parallelGateway` | Параллельные ветви и их слияние | 0.124.0 |
 | `end` | Конец ветви | 0.124.0 |
-| `timerCatch`, `boundaryTimer`, `boundaryError`, `retry` шага | Ожидание времени, контроль срока, обработка ошибки, автоповторы | в плане |
+| `retry` в `serviceTask` | Повторяет упавший вызов | 0.125.0 |
+| `boundaryError` | Ветвь на случай ошибки шага | 0.125.0 |
+| `timerCatch` | Ждёт время или дату | 0.125.0 |
+| `boundaryTimer` | Срок шага: прерывает его или запускает ветвь рядом | 0.125.0 |
 | `eventStart`, `eventWait`, `boundaryEvent`, `scheduleStart` | События и расписание | в плане |
 
 Документ с узлом «в плане» проходит проверку и публикуется, но экземпляр,
@@ -326,6 +329,107 @@ POST /tasks/01a18f25-f649-777c-…/complete  {"comment":"x"}
 Ответ формы попадает в `$nodes.Call` — следующие условия могут его
 читать. Готовые HTTP задач и их таблица во фреймворке — в плане.
 
+## Повторы, ошибки и таймеры
+
+Процесс «Доставка» бронирует курьера, ждёт сборку заказа и, если слотов
+нет, поручает логисту договориться вручную — но не дольше трёх секунд
+(в жизни — суток), потом передаёт заказ менеджеру:
+
+```json
+"Book": { "kind": "serviceTask", "title": "Забронировать доставку", "config": {
+  "tool": "delivery.book",
+  "input": { "orderId": "$input.orderId", "city": "$input.city" },
+  "saveTo": "delivery",
+  "retry": { "maxAttempts": 3, "backoff": "PT1S" }
+} },
+"NoSlots": { "kind": "boundaryError", "title": "Нет слотов", "attachedTo": "Book", "config": { "errorCode": "no_slots" } },
+"Pause": { "kind": "timerCatch", "title": "Ждём сборку", "config": { "duration": "PT2S" } },
+"Arrange": { "kind": "userTask", "title": "Договориться о доставке", "config": { "assignee": { "role": "logistics" } } },
+"Late": { "kind": "boundaryTimer", "title": "Не успели", "attachedTo": "Arrange", "config": { "duration": "PT3S" } },
+"Escalate": { "kind": "serviceTask", "title": "Сообщить менеджеру", "config": {
+  "tool": "notify.manager", "input": { "text": "Доставка не согласована" }
+} }
+```
+
+Переходы: `Start → Book → Pause → Shipped`, `NoSlots → Arrange → Shipped`,
+`Late → Escalate → Escalated`. У граничного узла нет входящих переходов:
+он прикреплён к шагу через `attachedTo` и ведёт своим исходящим.
+
+### Повторы
+
+Служба доставки дважды не ответила, на третий раз бронь прошла:
+
+```text
+tool  Book  {"status":"error","attempt":1,"retryAt":"…:39:07.437Z","error":{"code":"TOOL_EXECUTION_FAILED_OUTCOME_UNKNOWN",…}}
+tool  Book  {"status":"error","attempt":2,"retryAt":"…:39:09.508Z",…}
+tool  Book  {"status":"success","attempt":3}
+timer Pause {"firedAt":"…:39:11.630Z"}
+```
+
+- `maxAttempts` — сколько попыток всего, вместе с первой. Пауза перед
+  следующей удваивается от `backoff` (по умолчанию 10 секунд), но не
+  больше суток.
+- Все попытки идут с одним ключом идемпотентности: инструмент с записью
+  должен узнать повтор по `context.idempotencyKey`.
+- Повторяются только непредвиденные сбои. Отказ подтверждения и ошибка с
+  деловой причиной (ниже) не повторяются.
+
+### Ошибка с причиной
+
+Инструмент, который знает, почему не может выполнить операцию, сообщает
+причину:
+
+```ts
+import { ToolError } from "bazis/core/agent";
+
+if (input.city === "Тикси") throw new ToolError("Нет слотов доставки", { reason: "no_slots" });
+```
+
+Процесс не повторяет такой вызов, а отдаёт токен граничному узлу
+`boundaryError` с подходящим `errorCode`:
+
+```text
+tool  Book {"status":"error","attempt":1,"error":{"code":"TOOL_EXECUTION_FAILED_OUTCOME_UNKNOWN","reason":"no_slots","message":"Нет слотов доставки"}}
+error Book {"code":"TOOL_EXECUTION_FAILED_OUTCOME_UNKNOWN","reason":"no_slots","message":"Нет слотов доставки","boundary":"NoSlots"}
+
+nodes: {"NoSlots":{"code":"TOOL_EXECUTION_FAILED_OUTCOME_UNKNOWN","reason":"no_slots","message":"Нет слотов доставки"},…}
+```
+
+- `errorCode` сравнивается с `reason`, а если причины нет — с кодом
+  ошибки (`TOOL_TIMEOUT`, `TOOL_EXECUTION_FAILED`…). Граничный узел без
+  `errorCode` ловит любую ошибку шага; узел с подходящим кодом важнее.
+- Ошибка ложится в `$nodes.<граничный узел>` — её можно показать логисту
+  или проверить условием.
+- Без подходящего граничного узла экземпляр `failed`, как в
+  [Ошибке шага](#ошибка-шага-и-повтор).
+- В ответе агенту причина тоже приходит — в `error.details.reason`.
+
+### Таймеры
+
+`timerCatch` ждёт `duration` (ISO 8601 без месяцев и лет: `PT2S`, `P1D`,
+`P1DT12H`) или дату из данных: `"at": "$input.deliverAt"`. Дата в прошлом
+срабатывает сразу; неверная дата — экземпляр `failed` с `bad_timer`.
+
+`boundaryTimer` следит за шагом, пока тот ждёт: задачей, вызовом
+инструмента или другим таймером. У «Тикси» логист не успел за три
+секунды:
+
+```text
+task "Договориться о доставке" for {"role":"logistics"}, token 01a18f65-59e0-…
+manager: Доставка не согласована
+
+tokens: Start done · Book done · NoSlots done · Arrange cancelled · Late done · Escalate done · Escalated done
+history: timer Late {"firedAt":"…:39:09.571Z","interrupting":true}
+```
+
+- Прерывающий таймер (по умолчанию) закрывает шаг. Если это задача
+  сотруднику, приходит `WORKFLOW_TOKEN_CLOSED` с `reason: "interrupted"` —
+  задачу пора убрать из входящих.
+- С `"interrupting": false` таймер один раз запускает свою ветвь —
+  напоминание, письмо, — а шаг продолжает ждать. Экземпляр завершится,
+  когда закончатся обе ветви.
+- Шаг завершился раньше — его таймеры снимаются.
+
 ## Отмена
 
 ```text
@@ -334,7 +438,8 @@ POST /workflow/instances/01a18f26-283b-…/cancel  {"reason":"Клиент пе�
 ```
 
 Отмена закрывает все шаги экземпляра. Если он ждал сотрудника, приходит
-`WORKFLOW_TOKEN_CLOSED` — задачу пора убрать из входящих. Завершённый или
+`WORKFLOW_TOKEN_CLOSED` с `reason: "cancelled"` — задачу пора убрать из
+входящих. Завершённый или
 отменённый экземпляр — `WORKFLOW_INSTANCE_FINISHED`:
 
 ```text
@@ -430,6 +535,9 @@ export class OrdersService {
 экземпляра, а задания воркер берёт через `FOR UPDATE SKIP LOCKED` с арендой
 на 5 минут. Несколько экземпляров приложения не возьмут одно задание
 дважды, а задание упавшего экземпляра через 5 минут возьмёт другой.
+Задание, которое падает не в инструменте, а, например, из-за недоступной
+базы, повторяется через минуту × номер попытки; после пятой шаг падает с
+`job_failed` и ждёт [повтора](#ошибка-шага-и-повтор).
 
 | Настройка | По умолчанию | Переменная |
 | --- | --- | --- |
