@@ -1,7 +1,7 @@
 # `bazis/library/workflow`
 
 Формат документа процесса `bazis.workflow/v1`: чистые функции без DI и
-базы — для дизайнера, CLI, браузера. Список — по пакету 0.125.0.
+базы — для дизайнера, CLI, браузера. Список — по пакету 0.126.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -12,9 +12,10 @@
 | `evaluateCondition` | Условие перехода | — |
 | `checkFormSpec`, `formFieldCodes`, `validateForm` | Поля входа и форм, проверка значения | — |
 | `durationMs` | Миллисекунды длительности `P1D`, `PT2H` | — |
+| `parseCron` | Разбор cron из пяти полей в UTC: `matches(date)`, `next(after)` | [Расписание](../../workflow/processes.md#расписание) |
 
 Типы: `ProcessDocument`, `ProcessNode`, `ProcessFlow`, `ProcessDiagram`,
 `Bounds`, `Point`, `NodeKind`, `NodeRole`, `NodeKindDefinition`,
 `Condition`, `ConditionOp`, `ProcessIssue`, `ProcessIssueCode`,
 `ValidateProcessOptions`, `InstanceData`, `FormSpec`, `FormField`,
-`FormFieldType`, `FormIssue`.
+`FormFieldType`, `FormIssue`, `CronSchedule`.

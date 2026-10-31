@@ -9,8 +9,8 @@
 базе, фоновый воркер, события и HTTP. Интерфейса нет: дизайнер процессов,
 входящие задачи и формы строит приложение поверх сервисов и HTTP модуля.
 
-Все примеры проверены на bazis 0.124.0 и 0.125.0 (повторы и таймеры) с
-PostgreSQL 17 в приложении «Заказы» из этой главы.
+Все примеры проверены на bazis 0.124.0–0.126.0 с PostgreSQL 17 в приложении
+«Заказы» из этой главы.
 
 ## Подключение
 
@@ -141,10 +141,10 @@ export class PaymentsModule {}
 | `boundaryError` | Ветвь на случай ошибки шага | 0.125.0 |
 | `timerCatch` | Ждёт время или дату | 0.125.0 |
 | `boundaryTimer` | Срок шага: прерывает его или запускает ветвь рядом | 0.125.0 |
-| `eventStart`, `eventWait`, `boundaryEvent`, `scheduleStart` | События и расписание | в плане |
-
-Документ с узлом «в плане» проходит проверку и публикуется, но экземпляр,
-дошедший до такого узла, падает с `not_supported`.
+| `eventWait` | Ждёт событие | 0.126.0 |
+| `boundaryEvent` | Событие во время шага: прерывает его или запускает ветвь рядом | 0.126.0 |
+| `eventStart` | Запуск по событию | 0.126.0 |
+| `scheduleStart` | Запуск по расписанию cron | 0.126.0 |
 
 ## Каталог и публикация
 
@@ -430,6 +430,113 @@ history: timer Late {"firedAt":"…:39:09.571Z","interrupting":true}
   когда закончатся обе ветви.
 - Шаг завершился раньше — его таймеры снимаются.
 
+## События
+
+Процесс ждёт событие извне — оплату, отмену, письмо — узлом `eventWait`.
+Процесс «Ожидание оплаты» ждёт оплату своего заказа, а если клиент отменил
+заказ раньше, уходит в `Dropped`:
+
+```json
+"WaitPay": { "kind": "eventWait", "title": "Ждём оплату", "config": {
+  "event": "payments.received", "correlation": "$input.orderId", "saveTo": "payment"
+} },
+"Cancelled": { "kind": "boundaryEvent", "title": "Клиент отменил", "attachedTo": "WaitPay", "config": {
+  "event": "orders.cancelled", "correlation": "$input.orderId"
+} }
+```
+
+Событие приходит по HTTP — от платёжного шлюза, другого сервиса — или из
+кода:
+
+```text
+POST /workflow/events/payments.received  {"payload":{"amount":500,"method":"card"},"correlation":"50"}
+→ 202 {"started":[],"continued":["01a18f8a-07e2-…"],"rejected":[]}
+
+POST /workflow/events/orders.cancelled   {"payload":{"by":"client"},"correlation":"51"}
+→ 202 {"started":[],"continued":["01a18f8a-0835-…"],"rejected":[]}
+
+POST /workflow/events/payments.received  {"payload":{"amount":1},"correlation":"999"}
+→ 202 {"started":[],"continued":[],"rejected":[]}
+```
+
+```text
+заказ 50: vars {"payment":{"amount":500,"method":"card"}}   Start done · WaitPay done · Cancelled cancelled · Book …
+заказ 51: nodes {"Cancelled":{"by":"client"}}                 Start done · WaitPay cancelled · Cancelled done · Dropped done
+```
+
+- **Корреляция** — какое именно событие ждёт экземпляр. `correlation` узла
+  — путь к значению в данных экземпляра (здесь номер заказа); событие с
+  `"correlation":"50"` берёт только ожидания заказа 50. Ожидание без
+  `correlation` берёт любое событие своего ключа.
+- **Данные события** — результат шага: `$nodes.WaitPay` и переменная
+  `saveTo`.
+- `boundaryEvent` работает как [граничный таймер](#таймеры): по умолчанию
+  прерывает шаг, с `"interrupting": false` запускает ветвь рядом.
+- `partition` в запросе ограничивает ожидания своей областью.
+- Право — `events.emit` в `WorkflowAccess`; без него `403`.
+
+Из кода — тот же вызов. Удобно связать событие приложения с процессами:
+
+```ts
+export class PaymentsBridge {
+  constructor(private readonly workflow: IWorkflowRuntime) {}
+
+  @OnEvent(PAYMENT_RECEIVED)
+  async received(payment: PaymentReceived) {
+    await this.workflow.emit("payments.received", { amount: payment.amount }, { correlation: payment.orderId });
+  }
+}
+```
+
+### Запуск по событию
+
+Узел `eventStart` запускает новый экземпляр на каждое событие своего ключа:
+
+```json
+"Start": { "kind": "eventStart", "title": "Клиент зарегистрировался", "config": { "event": "customers.registered" } }
+```
+
+```text
+POST /workflow/events/customers.registered  {"payload":{"name":"Иван","phone":"+7900"},"partition":"shop-1"}
+→ 202 {"started":["01a18f8a-08d7-…"],"continued":[],"rejected":[]}
+manager: Иван
+
+POST /workflow/events/customers.registered  {"payload":{"phone":"+7900"}}
+→ 202 {"started":[],"continued":[],"rejected":[{"processKey":"welcome",
+       "issues":[{"field":"name","code":"required","message":"field name is required"}]}]}
+```
+
+Данные события проверяются по `input` процесса; поля, которых там нет
+(`phone`), отбрасываются. Экземпляр получает `partition` события,
+`businessKey` — его корреляцию, а выполняется от имени того, кто прислал
+событие, или `{"kind":"system","id":"event:customers.registered"}` при
+вызове из кода без `actor`.
+
+## Расписание
+
+`scheduleStart` запускает процесс по cron — пять полей, время UTC:
+
+```json
+"Start": { "kind": "scheduleStart", "title": "Каждую минуту", "config": { "cron": "* * * * *" } }
+```
+
+```text
+GET /workflow/instances?processKey=report
+→ {"data":[{"status":"completed","startedVia":"schedule","startedBy":{"kind":"system","id":"schedule"},
+            "createdAt":"2026-10-31T01:21:00.028Z",…}],"meta":{"total":1}}
+manager: Отчёт за минуту
+```
+
+- Поля: минута, час, день месяца, месяц, день недели (0 и 7 — воскресенье);
+  `*`, числа, диапазоны `9-17`, шаг `*/15`, списки `1,15`: `0 9 * * 1-5` —
+  по будням в 9:00 UTC.
+- Экземпляр стартует без входа, от имени `system` `schedule`.
+- Воркер сверяет расписания с каталогом при старте и раз в минуту: новая
+  версия или архивный процесс вступают в силу в течение минуты.
+- Запуски, пропущенные, пока приложение не работало, не догоняются:
+  следующий — по расписанию от текущего момента.
+- На нескольких экземплярах приложения срабатывание одно.
+
 ## Отмена
 
 ```text
@@ -490,7 +597,8 @@ POST /workflow/instances/…/cancel   (Bearer t-oleg)                  → 403 {
 | `instances.start` | запуск |
 | `instances.read` | список экземпляров, карточка, история |
 | `instances.manage` | отмена, повтор |
-| `events.emit`, `tasks.work` | для событий и задач — в плане |
+| `events.emit` | `POST /workflow/events/:eventKey` |
+| `tasks.work` | для задач — в плане |
 
 `target` — то, что известно о цели: `processKey`, `partition`,
 `instanceId`. Для карточки экземпляра это его `partition`, для списка — из
@@ -522,8 +630,8 @@ export class OrdersService {
 
 | Сервис | Методы |
 | --- | --- |
-| `IWorkflowDefinitions` | `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `tools` |
-| `IWorkflowRuntime` | `start`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` |
+| `IWorkflowDefinitions` | `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `tools` |
+| `IWorkflowRuntime` | `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` |
 
 Ошибки — `WorkflowError` с `code` и HTTP-статусом: `not_found` (404),
 `conflict`, `wrong_status`, `archived` (409), `invalid_document`,

@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.125.0.
+Список — по пакету 0.126.0.
 
 ## Модули
 
@@ -15,8 +15,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `IWorkflowDefinitions` | Каталог: `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
-| `IWorkflowRuntime` | Исполнение: `start`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowDefinitions` | Каталог: `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowRuntime` | Исполнение: `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
 | `workflowRuntimeConfig` | Настройки `workflow.worker.*` и `workflow.retention.*` | [Несколько экземпляров](../../workflow/processes.md#несколько-экземпляров-приложения) |
 | `WorkflowError` | Ошибка с `code` и HTTP-статусом | [Из кода](../../workflow/processes.md#из-кода) |
 
@@ -37,7 +37,7 @@
 
 - **Каталог:** `ProcessSummary`, `ProcessDetails`, `VersionSummary`,
   `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`.
-- **Исполнение:** `StartInstance`, `InstanceSummary`, `InstanceDetails`,
+- **Исполнение:** `StartInstance`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
   `TokenDetails`, `HistoryEntry`, `InstanceListQuery`, `InstanceStatus`,
   `TokenStatus`, `StartedVia`, `HistoryType`.
 - **События:** `WorkflowTaskRequested`, `WorkflowTokenClosed`,
