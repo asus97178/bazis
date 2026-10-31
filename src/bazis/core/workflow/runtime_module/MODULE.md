@@ -13,10 +13,11 @@ where execution is. No state lives in memory: one engine step is one
 transaction holding the instance row `FOR UPDATE` over the five tables of the
 part, which is why they have one owner.
 
-Stage 1 executes: manual start, end, `serviceTask`, `userTask` as a wait,
-exclusive and parallel gateways, cancel, retry. `timerCatch` and `eventWait`
-fail the instance with `not_supported` until stages 2–3; boundary nodes and
-`config.retry` are validated but not executed yet.
+Executes (stages 1–2): manual start, end, `serviceTask` with `config.retry`,
+`boundaryError`, `userTask` as a wait, `timerCatch`, `boundaryTimer`
+(interrupting or not), exclusive and parallel gateways, cancel, retry.
+`eventWait` fails the instance with `not_supported` until stage 3;
+`boundaryEvent` is validated but not armed yet.
 
 ## 2. Components
 
@@ -25,7 +26,8 @@ fail the instance with `not_supported` until stages 2–3; boundary nodes and
 | 5 entities, `RuntimeDbContext` | [model](model) | ORM, owned store `bazis.workflow.runtime` | `bazis_wf_run_instances`, `_tokens`, `_jobs`, `_subscriptions`, `_history` |
 | `WorkflowEngine` (scoped) | [internal/WorkflowEngine.ts](internal/WorkflowEngine.ts) | `RuntimeDbContext`, `IWorkflowDefinitions`, `GraphCache`, `EventBus`, the scope | token moves, gateways, finish, cancel, retry; events after commit |
 | `GraphCache` (singleton) | [internal/GraphCache.ts](internal/GraphCache.ts) | — | graphs of versions, up to 500 |
-| `ToolStep` (scoped) | [internal/ToolStep.ts](internal/ToolStep.ts) | `RuntimeDbContext`, `WorkflowEngine`, `WorkflowTools` | one `tool` job: `ToolRunner.as("workflow").run(tool, input, { actor, idempotencyKey: tokenId, metadata })` |
+| `ToolStep` (scoped) | [internal/ToolStep.ts](internal/ToolStep.ts) | `RuntimeDbContext`, `WorkflowEngine`, `WorkflowTools` | one `tool` job: `ToolRunner.as("workflow").run(tool, input, { actor, idempotencyKey: tokenId, metadata })`; a retry keeps the job with a later `dueAt`; a final failure goes to `WorkflowEngine.failStep` (error boundary or `failed`) |
+| `TimerStep` (scoped) | [internal/TimerStep.ts](internal/TimerStep.ts) | `RuntimeDbContext`, `WorkflowEngine` | one `timer` job: `timerCatch` moves on, `boundaryTimer` takes its flow |
 | `IWorkflowRuntime` / `WorkflowRuntime` (scoped) | [services](services) | engine, `IWorkflowDefinitions`, `WorkflowInputValidator` (the application's or the built-in one) | start, cancel, retry, completeToken, lists, history |
 | `InstancesController` | [http/Instances.controller.ts](http/Instances.controller.ts) | `IWorkflowRuntime`, `WorkflowAccess` | `/workflow/instances…` |
 | `WorkflowWorker` | [background/WorkflowWorker.ts](background/WorkflowWorker.ts) | `SERVICE_PROVIDER`, settings | claims due jobs `FOR UPDATE SKIP LOCKED` ordered by id, lease 5 min; a full batch is followed at once |
@@ -60,7 +62,9 @@ Events and the tasks HTTP come with stages 3 and 4.
 
 ## 5. Known limits of stage 1
 
-- A job that fails outside the Tool (for example the database is down) is taken
-  again after its lease, with no attempt limit; bounded retries come with stage 2.
+- A job that fails outside the Tool (for example the database is down) waits a
+  minute per attempt and fails its step with `job_failed` after 5 attempts.
+- Boundary tokens find their step by its node: two live tokens on one step node
+  (possible only in a loop) share its boundary timers.
 - The read routes load the instance before asking `WorkflowAccess`, so an
   unknown id answers 404 before 403.

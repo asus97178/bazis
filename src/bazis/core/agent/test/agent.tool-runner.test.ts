@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Module, createContainer } from "@/core/di";
 import { Validator } from "@/library/validation";
-import { AgentSetupError, Tool, ToolRunner, type AgentToolApprovalRequest, type AgentToolAuditEntry, type AgentToolExecutionContext } from "../index";
+import { AgentSetupError, Tool, ToolError, ToolRunner, type AgentToolApprovalRequest, type AgentToolAuditEntry, type AgentToolExecutionContext } from "../index";
 import { withToolExecution } from "./toolExecution.fixture";
 
 // 0.123.0 (TOOLS-001): the framework registers ToolRunner for any module with
@@ -40,7 +40,13 @@ class AdminTool {
   execute(): object { return {}; }
 }
 
-@Module({ tools: [GreetTool, WriteTool, AdminTool] })
+// 0.125.0: a ToolError may carry a business reason for the caller.
+@Tool({ name: "runner.decline", description: "Declines.", sideEffect: "read", callers: ["workflow"] })
+class DeclineTool {
+  execute(): object { throw new ToolError("The card is declined", { reason: "card_declined" }); }
+}
+
+@Module({ tools: [GreetTool, WriteTool, AdminTool, DeclineTool] })
 class ToolsModule {}
 
 describe("ToolRunner", () => {
@@ -49,7 +55,7 @@ describe("ToolRunner", () => {
     try {
       const workflow = container.resolve(ToolRunner).as("workflow");
       expect(workflow.caller).toBe("workflow");
-      expect(workflow.listTools().map((tool) => tool.metadata.name).sort()).toEqual(["runner.greet", "runner.write"]);
+      expect(workflow.listTools().map((tool) => tool.metadata.name).sort()).toEqual(["runner.decline", "runner.greet", "runner.write"]);
       expect(workflow.listTools(["data"]).map((tool) => tool.metadata.name)).toEqual(["runner.write"]);
       expect(workflow.getTool("runner.admin")).toBeUndefined();
       expect(workflow.describe("runner.admin")).toBeUndefined();
@@ -117,5 +123,15 @@ describe("ToolRunner", () => {
     @Module({ tools: [OrphanTool] })
     class OrphanModule {}
     expect(() => createContainer(OrphanModule)).toThrow('Tool "runner.orphan" (OrphanTool) declares no callers: list who may call it, for example callers: ["agent"] for LLM agents or ["workflow"] for a process engine.');
+  });
+
+  test("a ToolError reason comes back in the error details", async () => {
+    const container = createContainer(ToolsModule);
+    try {
+      const result = await container.resolve(ToolRunner).as("workflow").run("runner.decline", {});
+      expect(result.status).toBe("error");
+      expect(result.error).toMatchObject({ code: "TOOL_EXECUTION_FAILED", message: "The card is declined", details: { reason: "card_declined" } });
+      expect(() => new ToolError("x", { reason: "has space" })).toThrow("ToolError reason must match");
+    } finally { await container.dispose(); }
   });
 });

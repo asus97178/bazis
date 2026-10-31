@@ -29,9 +29,20 @@ export class AgentToolExecutionError extends Error {
  * goes to the application log with its stack.
  */
 export class ToolError extends Error {
-  constructor(message: string) {
+  /**
+   * A business reason the caller can act on, such as `card_declined`: it comes
+   * back as `error.details.reason`. A process routes it to an error boundary
+   * and does not retry it (WORKFLOW-001).
+   */
+  readonly reason?: string;
+
+  constructor(message: string, options: { readonly reason?: string } = {}) {
     super(message);
     this.name = "ToolError";
+    if (options.reason !== undefined) {
+      if (!/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(options.reason)) throw new TypeError("ToolError reason must match ^[A-Za-z][A-Za-z0-9_.-]{0,63}$");
+      this.reason = options.reason;
+    }
   }
 }
 
@@ -41,8 +52,8 @@ export class ToolError extends Error {
  * for an idempotency-gated retry. Its message reaches the model like a ToolError.
  */
 export class AgentToolPreCommitError extends ToolError {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options: { readonly reason?: string } = {}) {
+    super(message, options);
     this.name = "AgentToolPreCommitError";
   }
 }

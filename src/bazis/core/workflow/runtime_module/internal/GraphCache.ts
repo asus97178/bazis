@@ -1,4 +1,4 @@
-import type { ProcessDocument, ProcessFlow } from "../../../../library/workflow";
+import type { ProcessDocument, ProcessFlow, ProcessNode } from "../../../../library/workflow";
 
 /** A version's graph with flows indexed by node. Built once per version. */
 export interface ProcessGraph {
@@ -8,6 +8,8 @@ export interface ProcessGraph {
   readonly document: ProcessDocument;
   readonly outgoing: ReadonlyMap<string, readonly (readonly [string, ProcessFlow])[]>;
   readonly incoming: ReadonlyMap<string, readonly (readonly [string, ProcessFlow])[]>;
+  /** Boundary nodes by the step they are attached to. */
+  readonly boundaries: ReadonlyMap<string, readonly (readonly [string, ProcessNode])[]>;
 }
 
 export function buildGraph(versionId: string, processKey: string, version: number, document: ProcessDocument): ProcessGraph {
@@ -17,7 +19,11 @@ export function buildGraph(versionId: string, processKey: string, version: numbe
     outgoing.set(flow.source, [...outgoing.get(flow.source) ?? [], [id, flow]]);
     incoming.set(flow.target, [...incoming.get(flow.target) ?? [], [id, flow]]);
   }
-  return { versionId, processKey, version, document, outgoing, incoming };
+  const boundaries = new Map<string, (readonly [string, ProcessNode])[]>();
+  for (const [id, node] of Object.entries(document.nodes)) {
+    if (node.attachedTo !== undefined) boundaries.set(node.attachedTo, [...boundaries.get(node.attachedTo) ?? [], [id, node]]);
+  }
+  return { versionId, processKey, version, document, outgoing, incoming, boundaries };
 }
 
 /** Graphs of versions in memory. Versions are immutable, so entries never go stale; the oldest go first past the limit. */

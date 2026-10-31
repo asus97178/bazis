@@ -2146,7 +2146,7 @@ export class AgentToolExecutor {
     details?: JsonObject,
   ): AgentToolResult {
     if (error instanceof ToolError) {
-      return this.errorResult(call, code, error.message, metadata, startedAt, details);
+      return this.errorResult(call, code, error.message, metadata, startedAt, error.reason === undefined ? details : { ...details, reason: error.reason });
     }
     this.logger?.error("Agent tool failed", { agent: agentName ?? null, tool: call.name, callId: call.id, code, error: redactSensitive(error) });
     return this.errorResult(call, code, fallback, metadata, startedAt, details);

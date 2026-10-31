@@ -1,5 +1,5 @@
 import type { AgentToolResult } from "../../../agent";
-import { resolveInput } from "../../../../library/workflow";
+import { durationMs, resolveInput } from "../../../../library/workflow";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
@@ -40,21 +40,57 @@ export class ToolStep {
         signal,
       });
 
+    const reason = reasonOf(result);
     await this.engine.inStep(instance.id, async (step) => {
-      await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
       const current = step.tokens.find((t) => t.id === token.id);
+      const retryAt = current?.status === "waiting" && step.instance.status === "running" && result.status === "error" && reason === undefined
+        ? nextAttempt(node?.config?.retry, job.attempts)
+        : undefined;
+      if (retryAt !== undefined) {
+        // The same job runs again later: its attempts keep counting.
+        await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeUpdate({ dueAt: retryAt, lockedUntil: null, lastError: result.error?.message ?? null });
+      } else {
+        await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
+      }
       if (!current || current.status !== "waiting" || step.instance.status !== "running") return;
       this.engine.history(step, current, current.nodeId, "tool", {
         tool: name,
         status: result.status,
+        attempt: job.attempts,
         durationMs: result.durationMs ?? null,
-        ...(result.error ? { error: { code: result.error.code ?? null, message: result.error.message } } : {}),
+        ...(result.error ? { error: { code: result.error.code ?? null, message: result.error.message, ...(reason === undefined ? {} : { reason }) } } : {}),
+        ...(retryAt === undefined ? {} : { retryAt: retryAt.toISOString() }),
       });
+      if (retryAt !== undefined) return;
       if (result.status === "success") {
         await this.engine.complete(step, current.id, result.output ?? null);
       } else {
-        this.engine.fail(step, current, result.error?.code ?? "TOOL_FAILED", result.error?.message ?? `Tool ${name} failed`);
+        await this.engine.failStep(step, current, {
+          code: result.error?.code ?? "TOOL_FAILED",
+          message: result.error?.message ?? `Tool ${name} failed`,
+          ...(reason === undefined ? {} : { reason }),
+        });
       }
     });
   }
+}
+
+/** The business reason of a `ToolError`, if the Tool gave one. */
+function reasonOf(result: AgentToolResult): string | undefined {
+  const details = result.error?.details;
+  const reason = typeof details === "object" && details !== null && !Array.isArray(details) ? (details as Record<string, unknown>).reason : undefined;
+  return typeof reason === "string" ? reason : undefined;
+}
+
+/**
+ * When to try a failed call again under the node's `retry` policy, or
+ * `undefined` when the attempts are used up. The pause doubles from `backoff`
+ * (10 seconds by default) and stops growing at a day.
+ */
+export function nextAttempt(policy: unknown, attempts: number): Date | undefined {
+  if (typeof policy !== "object" || policy === null) return undefined;
+  const { maxAttempts, backoff } = policy as { maxAttempts?: unknown; backoff?: unknown };
+  if (typeof maxAttempts !== "number" || attempts >= maxAttempts) return undefined;
+  const base = typeof backoff === "string" ? durationMs(backoff) ?? 10_000 : 10_000;
+  return new Date(Date.now() + Math.min(base * 2 ** Math.max(attempts - 1, 0), 86_400_000));
 }
