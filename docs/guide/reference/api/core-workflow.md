@@ -1,15 +1,16 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.126.0.
+Список — по пакету 0.127.0.
 
 ## Модули
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `WorkflowModule` | Пак: каталог и исполнение | [Подключение](../../workflow/processes.md#подключение) |
+| `WorkflowModule` | Пак: каталог, исполнение и задачи | [Подключение](../../workflow/processes.md#подключение) |
 | `WorkflowDefinitionsModule` | Часть «каталог процессов и версии»: таблицы `bazis_wf_def_*`, `/workflow/processes`, `/workflow/tools` | [Каталог и публикация](../../workflow/processes.md#каталог-и-публикация) |
-| `WorkflowRuntimeModule` | Часть «исполнение»: таблицы `bazis_wf_run_*`, воркер, чистка, `/workflow/instances` | [Запуск](../../workflow/processes.md#запуск) |
+| `WorkflowRuntimeModule` | Часть «исполнение»: таблицы `bazis_wf_run_*`, воркер, чистка, `/workflow/instances`, `/workflow/events` | [Запуск](../../workflow/processes.md#запуск) |
+| `WorkflowTasksModule` | Часть «задачи сотрудникам»: таблица `bazis_wf_task_items`, `/workflow/tasks` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
 
 ## Сервисы и настройки
 
@@ -17,6 +18,7 @@
 | --- | --- | --- |
 | `IWorkflowDefinitions` | Каталог: `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowRuntime` | Исполнение: `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowTasks` | Входящие задачи: `list`, `get`, `claim`, `release`, `complete` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
 | `workflowRuntimeConfig` | Настройки `workflow.worker.*` и `workflow.retention.*` | [Несколько экземпляров](../../workflow/processes.md#несколько-экземпляров-приложения) |
 | `WorkflowError` | Ошибка с `code` и HTTP-статусом | [Из кода](../../workflow/processes.md#из-кода) |
 
@@ -31,7 +33,8 @@
 ## События
 
 `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED` (`reason`: `cancelled`, `interrupted`),
-`WORKFLOW_INSTANCE_FINISHED` ([Задача сотруднику](../../workflow/processes.md#задача-сотруднику)).
+`WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED` (чистка удалила
+экземпляры) ([Задача сотруднику](../../workflow/processes.md#задача-сотруднику)).
 
 ## Типы
 
@@ -40,8 +43,9 @@
 - **Исполнение:** `StartInstance`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
   `TokenDetails`, `HistoryEntry`, `InstanceListQuery`, `InstanceStatus`,
   `TokenStatus`, `StartedVia`, `HistoryType`.
+- **Задачи:** `TaskDetails`, `TaskListQuery`, `TaskStatus`.
 - **События:** `WorkflowTaskRequested`, `WorkflowTokenClosed`,
-  `WorkflowInstanceFinished`.
+  `WorkflowInstanceFinished`, `WorkflowInstancesDeleted`.
 - **Прочее:** `WorkflowActor`, `WorkflowPage`, `WorkflowPaging`,
   `WorkflowAction`, `WorkflowAccessTarget`, `WorkflowInputContext`,
   `WorkflowErrorCode`.
