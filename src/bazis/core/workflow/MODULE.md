@@ -1,7 +1,7 @@
 # WorkflowModule
 
 Passport version: 1.0. Check date: 2026-10-31.
-Status: implemented for stage 1 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
+Status: implemented for stages 1–2 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.
@@ -52,6 +52,9 @@ internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
   per document, start with an invalid input, Tools on behalf of the starter with the token
   as idempotency key and `caller: "workflow"` in the approval request, exclusive and
   parallel gateways, user task event and form check, cancel with `WORKFLOW_TOKEN_CLOSED`,
-  failure and retry, retention, a second start over the existing stores.
+  failure and retry, retention, a second start over the existing stores; stage 2:
+  `config.retry` with one idempotency key over three attempts, a `ToolError` reason
+  routed to `boundaryError` without retries, `timerCatch` by duration and by date,
+  interrupting and non-interrupting `boundaryTimer` on a user task.
 - Not checked: OpenAPI of the workflow routes (the framework's controllers read
   `HttpContext` directly and do not appear in the application's OpenAPI document).

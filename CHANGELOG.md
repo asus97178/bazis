@@ -4,6 +4,31 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.125.0 — 2026-10-31
+
+Business processes, stage 2 of WORKFLOW-001: retries, error handling and timers.
+
+### Added
+
+- `serviceTask` `config.retry` (`maxAttempts`, `backoff`): an unexpected Tool
+  failure is retried with the same idempotency key, the pause doubling from
+  `backoff` (10 s by default, at most a day). The history records each attempt.
+- `boundaryError`: a step's final failure takes the error boundary whose
+  `errorCode` equals the Tool's reason or error code, or the one without
+  `errorCode`; the error is kept in `$nodes.<boundary>`.
+- `ToolError(message, { reason })`: a business reason such as `card_declined`,
+  returned as `error.details.reason`. A process does not retry it and routes
+  it to a matching error boundary.
+- Timers: `timerCatch` (`duration` or a date at `at`) and `boundaryTimer` on any
+  waiting step, interrupting (closes the step; `WORKFLOW_TOKEN_CLOSED` with
+  `reason: "interrupted"` for a user task) or not (`interrupting: false`).
+
+### Fixed
+
+- A workflow job that keeps failing outside its Tool is no longer retried
+  forever: it waits a minute per attempt and fails its step with `job_failed`
+  after 5 attempts.
+
 ## 0.124.1 — 2026-10-31
 
 ### Fixed

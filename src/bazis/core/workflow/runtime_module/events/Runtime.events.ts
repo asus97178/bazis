@@ -20,7 +20,8 @@ export interface WorkflowTaskRequested {
 export interface WorkflowTokenClosed {
   readonly instanceId: string;
   readonly tokenId: string;
-  readonly reason: "cancelled";
+  /** `cancelled` — the instance was cancelled; `interrupted` — a boundary timer took over the step. */
+  readonly reason: "cancelled" | "interrupted";
 }
 
 /** An instance finished: completed or cancelled. */

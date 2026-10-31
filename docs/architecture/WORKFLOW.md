@@ -1,7 +1,7 @@
 # Бизнес-процессы во фреймворке
 
 Идентификатор: **WORKFLOW-001**. Версия: **1.1**. Дата: **2026-10-31**.
-Статус: **принята; этап 1 реализован в bazis 0.124.0, этапы 2–5 — §12**.
+Статус: **принята; этап 1 реализован в bazis 0.124.0, этап 2 — в 0.125.0, этапы 3–5 — §12**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
 HTTP и фоновое исполнение — без CMS. UI во фреймворк не входит: дизайнер,
@@ -260,13 +260,33 @@ history(instanceId): Promise<readonly HistoryEntry[]>
   `actor` — кто запустил экземпляр (`system` для запусков по событию и
   расписанию). Подтверждение и аудит — по `TOOL_EXECUTION_OPTIONS`, без
   скрытого обхода; ход вызова пишется в историю (`tool`).
-- **Повторы:** `config.retry` (`maxAttempts`, `backoff` ISO 8601) узла; затем
-  `boundaryError` с подходящим `errorCode`, иначе экземпляр `failed` и ждёт
-  `retry` или `cancel`.
+- **Повторы:** `config.retry` (`maxAttempts` — всего попыток, `backoff` ISO
+  8601, по умолчанию 10 секунд) повторяет вызов, который упал непредвиденно
+  (`status: "error"` без `reason`). Повтор — то же задание с новым `dueAt`:
+  пауза удваивается от `backoff` и не больше суток, ключ идемпотентности тот же.
+  Отказ подтверждения (`denied`) и ошибка с деловой причиной не повторяются.
+- **Ошибка шага:** Tool сообщает деловую причину через
+  `ToolError(message, { reason })` (в результате — `error.details.reason`).
+  Когда попытки кончились или пришла причина, токен забирает `boundaryError`
+  шага: сначала тот, чей `errorCode` равен `reason` или коду ошибки, иначе
+  тот, что без `errorCode`; ошибка (`code`, `message`, `reason`) ложится в
+  `$nodes.<граничный узел>`. Без подходящего граничного узла экземпляр
+  `failed` и ждёт `retry` или `cancel`.
 - **Шлюзы:** выбор — первое истинное условие в порядке документа, иначе
   `isDefault`, иначе `failed` (`no_branch`); параллельный — разделение и
   слияние.
-- **Таймеры** (`timerCatch`, `boundaryTimer`) — задания с `dueAt`.
+- **Таймеры:** `timerCatch` ждёт `duration` от входа в узел или дату по пути
+  `at`, затем идёт дальше. `boundaryTimer` взводится, когда шаг начинает
+  ждать: ждущий токен на граничном узле и задание `timer`. Прерывающий (по
+  умолчанию) закрывает шаг — у задачи сотруднику приходит
+  `WORKFLOW_TOKEN_CLOSED` с `reason: "interrupted"` — и идёт своим переходом;
+  непрерывающий (`interrupting: false`) запускает свою ветвь один раз, шаг
+  продолжает ждать. Когда шаг завершился или упал, его граничные токены
+  закрываются. Неверная дата — `failed` с `bad_timer`.
+- **Сбой задания вне Tool** (база недоступна, версия не найдена): задание
+  повторяется через минуту × номер попытки, после 5 попыток шаг падает с
+  `job_failed` и ждёт `retry`. Вид задания `retry` не используется: повтор
+  вызова — то же задание `tool`.
 - **События:** `emit` стартует процессы с `eventStart`, продолжает токены в
   `eventWait` и запускает `boundaryEvent`; сопоставление — по `WfSubscription` в
   той же транзакции.
@@ -304,7 +324,7 @@ export const workflowRuntimeConfig = defineConfig("workflow", {
 | Событие | Когда | Данные |
 | --- | --- | --- |
 | `WORKFLOW_TASK_REQUESTED` | токен дошёл до `userTask` | `instanceId`, `tokenId`, `processKey`, `nodeId`, `partition`, `title`, `assignee`, `form`, `dueAt` |
-| `WORKFLOW_TOKEN_CLOSED` | ждущий токен закрыт не завершением задачи | `instanceId`, `tokenId`, `reason` |
+| `WORKFLOW_TOKEN_CLOSED` | ждущий токен закрыт не завершением задачи | `instanceId`, `tokenId`, `reason` (`cancelled`, `interrupted`) |
 | `WORKFLOW_INSTANCE_FINISHED` | экземпляр завершён | `instanceId`, `processKey`, `partition`, `status` |
 
 События публикуются в транзакции шага (`afterCommit`).
@@ -394,7 +414,9 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
 не регистрирует, а вызывает через `ToolRunner.as("workflow")`. Каталог для
 дизайнера — `GET /workflow/tools` (`listTools` и `describe`). `write`-Tools
 обязаны соблюдать `idempotencyKey`: после сбоя между вызовом и транзакцией
-шага вызов может повториться (TOOLS-001 §7).
+шага, а также при повторе по `config.retry` вызов повторяется с тем же ключом
+(TOOLS-001 §7). Деловой отказ Tool сообщает `ToolError` с `reason`: он не
+повторяется и ведёт к `boundaryError`.
 
 ## 8. Хранилища
 
@@ -439,7 +461,8 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
    `serviceTask`, оба шлюза, `userTask` как ожидание с событиями и
    `completeToken`, отмена и повтор, история, воркер, чистка, HTTP;
    `WorkflowAccess`.
-2. Повторы и `boundaryError`; таймеры (`timerCatch`, `boundaryTimer`).
+2. Повторы и `boundaryError`; таймеры (`timerCatch`, `boundaryTimer`) —
+   0.125.0.
 3. События (`eventStart`, `eventWait`, `boundaryEvent`, `emit`, HTTP) и
    расписание.
 4. Часть Tasks.

@@ -2,12 +2,16 @@ import { BackgroundService, delay } from "../../../background";
 import type { ServiceProvider } from "../../../di";
 import type { ConfigView } from "../../../kernel";
 import type { workflowRuntimeConfig } from "../config/Runtime.config";
+import { TimerStep } from "../internal/TimerStep";
 import { ToolStep } from "../internal/ToolStep";
+import { WorkflowEngine } from "../internal/WorkflowEngine";
 import { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
 
 /** How long a claimed job belongs to this worker; if it dies, another one takes the job after that. */
 const LEASE_MS = 5 * 60_000;
+/** A job that keeps failing outside its Tool (the database, a lost version) fails its step after this many tries. */
+const MAX_JOB_ATTEMPTS = 5;
 
 
 /**
@@ -48,9 +52,32 @@ export class WorkflowWorker extends BackgroundService {
   private async run(job: WfJob, signal: AbortSignal): Promise<void> {
     const scope = this.services.createScope();
     try {
-      await scope.resolve(ToolStep).run(job, signal);
+      if (job.kind === "timer") await scope.resolve(TimerStep).run(job);
+      else await scope.resolve(ToolStep).run(job, signal);
     } catch (error) {
-      this.reportFailure("job failed", error, { job: job.id, instance: job.instanceId });
+      this.reportFailure("job failed", error, { job: job.id, instance: job.instanceId, attempts: job.attempts });
+      await this.giveUpOrDelay(job, error).catch((failure: unknown) => this.reportFailure("job failure handling failed", failure, { job: job.id }));
+    } finally {
+      await scope.dispose();
+    }
+  }
+
+  /** A job that failed outside its Tool waits a minute per try, then fails its step for a person to retry. */
+  private async giveUpOrDelay(job: WfJob, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    const scope = this.services.createScope();
+    try {
+      const db = scope.resolve(RuntimeDbContext);
+      if (job.attempts < MAX_JOB_ATTEMPTS || job.instanceId === null || job.tokenId === null) {
+        await db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeUpdate({ dueAt: new Date(Date.now() + job.attempts * 60_000), lockedUntil: null, lastError: message.slice(0, 1000) });
+        return;
+      }
+      const engine = scope.resolve(WorkflowEngine);
+      await engine.inStep(job.instanceId, async (step) => {
+        await db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
+        const token = step.tokens.find((t) => t.id === job.tokenId);
+        if (token && token.status === "waiting" && step.instance.status === "running") engine.fail(step, token, "job_failed", message.slice(0, 1000));
+      });
     } finally {
       await scope.dispose();
     }
@@ -63,7 +90,7 @@ export class WorkflowWorker extends BackgroundService {
       return await db.transactionScope(async () => {
         const now = new Date();
         const jobs = await db.jobs
-          .where((j) => j.kind.eq("tool").and(j.dueAt.lte(now)).and(j.lockedUntil.isNull().or(j.lockedUntil.lt(now))))
+          .where((j) => j.kind.in(["tool", "timer"]).and(j.dueAt.lte(now)).and(j.lockedUntil.isNull().or(j.lockedUntil.lt(now))))
           .orderBy((j) => j.id)
           .take(batchSize)
           .forUpdate({ skipLocked: true })

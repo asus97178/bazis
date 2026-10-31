@@ -6,7 +6,7 @@ import { Infra } from "@/core/infra";
 import { defineConfig, eventsModule, OnEvent, secret } from "@/core/kernel";
 import { ormBazisConnect } from "@/core/orm";
 import { startTestApp, type TestApp } from "@/core/testing";
-import { Tool, TOOL_EXECUTION_OPTIONS, type AgentToolApprovalRequest, type AgentToolExecutionContext } from "@/core/agent";
+import { Tool, ToolError, TOOL_EXECUTION_OPTIONS, type AgentToolApprovalRequest, type AgentToolExecutionContext } from "@/core/agent";
 import type { HttpContext } from "@/core/http";
 import { postgres } from "@/library/orm";
 import {
@@ -26,7 +26,7 @@ import {
 import { WorkflowRetention } from "../runtime_module/background/WorkflowRetention";
 
 /**
- * Live check of stage 1 of WORKFLOW-001 on PostgreSQL, through HTTP as an
+ * Live check of stages 1 and 2 of WORKFLOW-001 on PostgreSQL, through HTTP as an
  * application without the CMS would use it. Runs only against a throwaway
  * database whose name starts with `bazis_wf_`: set `BAZIS_WORKFLOW_PG_URL`.
  * The test drops the workflow tables before it starts.
@@ -76,6 +76,26 @@ class FlakyTool {
   }
 }
 
+let twiceFailures = 0;
+
+@Tool({ name: "flaky.twice", description: "Fails twice.", sideEffect: "write", callers: ["workflow"] })
+class TwiceTool {
+  execute(input: unknown, context: AgentToolExecutionContext) {
+    record("flaky.twice", input, context);
+    if (twiceFailures++ < 2) throw new Error("timeout upstream");
+    return { ok: true };
+  }
+}
+
+@Tool({ name: "cards.charge", description: "Charges a card.", sideEffect: "write", callers: ["workflow"] })
+class CardTool {
+  execute(input: { amount: number }, context: AgentToolExecutionContext) {
+    record("cards.charge", input, context);
+    if (input.amount > 1000) throw new ToolError("The card is declined", { reason: "card_declined" });
+    return { charged: input.amount };
+  }
+}
+
 @Tool({ name: "agents.only", description: "Agents only.", sideEffect: "read", callers: ["agent"] })
 class AgentOnlyTool {
   execute() {
@@ -121,7 +141,7 @@ function root(dsn: string) {
   const parsed = new URL(dsn);
   const dbConfig = defineConfig("wfdb", { default: { host: parsed.hostname, port: Number(parsed.port || "5432"), database: parsed.pathname.slice(1), username: decodeURIComponent(parsed.username), password: secret(decodeURIComponent(parsed.password)) } });
   @Infra({ db: ormBazisConnect(dbConfig) }) class TestInfra {}
-  @Module({ tools: [ChargeTool, EmailTool, SmsTool, FlakyTool, AgentOnlyTool] }) class ToolsModule {}
+  @Module({ tools: [ChargeTool, EmailTool, SmsTool, FlakyTool, AgentOnlyTool, TwiceTool, CardTool] }) class ToolsModule {}
   @Module({
     imports: [TestInfra, WorkflowModule, ToolsModule, eventsModule({ subscribers: [Inbox] })],
     providers: [
@@ -226,7 +246,7 @@ test.skipIf(!enabled)("a process is created, drafted, checked against the Tools 
   expect((await call("POST", "/workflow/processes", { key: "order", title: "Again" })).status).toBe(409);
 
   const tools = await call("GET", "/workflow/tools");
-  expect(tools.body.data.map((tool: { name: string }) => tool.name)).toEqual(["flaky.step", "notify.email", "notify.sms", "payments.charge"]);
+  expect(tools.body.data.map((tool: { name: string }) => tool.name)).toEqual(["cards.charge", "flaky.step", "flaky.twice", "notify.email", "notify.sms", "payments.charge"]);
 
   const wrong = structuredClone(ORDER) as { nodes: Record<string, { config?: Record<string, unknown> }> };
   wrong.nodes.Sms!.config = { tool: "agents.only" };
@@ -323,6 +343,126 @@ test.skipIf(!enabled)("a failed step waits for a retry", async () => {
   expect((await call("POST", `/workflow/instances/${failed.id}/retry`)).status).toBe(200);
   expect((await settled(failed.id)).status).toBe("completed");
   expect((await call("POST", `/workflow/instances/${failed.id}/retry`)).status).toBe(409);
+});
+
+async function publish(key: string, document: unknown) {
+  await call("POST", "/workflow/processes", { key, title: key });
+  expect((await call("PUT", `/workflow/processes/${key}/draft`, { document })).body.issues).toEqual([]);
+  expect((await call("POST", `/workflow/processes/${key}/publish`)).status).toBe(201);
+}
+
+const doc = (nodes: Record<string, unknown>, flows: Record<string, unknown>, input?: unknown) => ({ schemaVersion: "bazis.workflow/v1", ...(input === undefined ? {} : { input }), nodes, flows });
+
+interface Snapshot {
+  readonly id: string;
+  readonly status: string;
+  readonly nodes: Record<string, unknown>;
+  readonly tokens: readonly { readonly nodeId: string; readonly status: string; readonly id: string }[];
+}
+
+async function until(id: string, test: (instance: Snapshot) => boolean): Promise<Snapshot> {
+  for (let i = 0; i < 200; i++) {
+    const instance = (await call("GET", `/workflow/instances/${id}`)).body as Snapshot;
+    if (test(instance)) return instance;
+    await Bun.sleep(50);
+  }
+  throw new Error(`instance ${id} did not reach the state`);
+}
+
+test.skipIf(!enabled)("stage 2: a failed call is retried by the node's policy with the same idempotency key", async () => {
+  await publish("retrying", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Step: { kind: "serviceTask", title: "Step", config: { tool: "flaky.twice", retry: { maxAttempts: 3, backoff: "PT0S" } } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "Step" }, b: { source: "Step", target: "End" } }));
+  calls.length = 0;
+  const started = await call("POST", "/workflow/instances", { processKey: "retrying" });
+  const done = await until(started.body.id, (i) => i.status !== "running");
+  expect(done.status).toBe("completed");
+  const keys = calls.filter((c) => c.name === "flaky.twice").map((c) => c.key);
+  expect(keys).toHaveLength(3);
+  expect(new Set(keys).size).toBe(1);
+  const tools = (await call("GET", `/workflow/instances/${done.id}/history`)).body.data.filter((h: { type: string }) => h.type === "tool");
+  expect(tools.map((h: { data: { attempt: number; status: string; retryAt?: string } }) => [h.data.attempt, h.data.status, h.data.retryAt !== undefined])).toEqual([[1, "error", true], [2, "error", true], [3, "success", false]]);
+});
+
+test.skipIf(!enabled)("stage 2: a business reason goes to the error boundary without retries", async () => {
+  await publish("declines", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Charge: { kind: "serviceTask", title: "Charge", config: { tool: "cards.charge", input: { amount: "$input.amount" }, retry: { maxAttempts: 3, backoff: "PT0S" } } },
+    Declined: { kind: "boundaryError", title: "Declined", attachedTo: "Charge", config: { errorCode: "card_declined" } },
+    Email: { kind: "serviceTask", title: "Email", config: { tool: "notify.email" } },
+    End: { kind: "end", title: "End" },
+    Sorry: { kind: "end", title: "Sorry" },
+  }, {
+    a: { source: "Start", target: "Charge" },
+    b: { source: "Charge", target: "End" },
+    c: { source: "Declined", target: "Email" },
+    d: { source: "Email", target: "Sorry" },
+  }, { fields: [{ code: "amount", type: "number", required: true }] }));
+  calls.length = 0;
+  const declined = await until((await call("POST", "/workflow/instances", { processKey: "declines", input: { amount: 5000 } })).body.id, (i) => i.status !== "running");
+  expect(declined.status).toBe("completed");
+  expect(calls.filter((c) => c.name === "cards.charge")).toHaveLength(1);
+  expect(calls.map((c) => c.name)).toContain("notify.email");
+  expect(declined.nodes.Declined).toMatchObject({ reason: "card_declined", message: "The card is declined" });
+  expect(declined.tokens.map((t) => t.nodeId)).toEqual(["Start", "Charge", "Declined", "Email", "Sorry"]);
+
+  const paid = await until((await call("POST", "/workflow/instances", { processKey: "declines", input: { amount: 10 } })).body.id, (i) => i.status !== "running");
+  expect(paid.tokens.map((t) => t.nodeId)).toEqual(["Start", "Charge", "End"]);
+});
+
+test.skipIf(!enabled)("stage 2: timers wait for a duration or a date from the data", async () => {
+  await publish("waits", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Wait: { kind: "timerCatch", title: "Wait", config: { duration: "PT1S" } },
+    Until: { kind: "timerCatch", title: "Until", config: { at: "$input.at" } },
+    End: { kind: "end", title: "End" },
+  }, { a: { source: "Start", target: "Wait" }, b: { source: "Wait", target: "Until" }, c: { source: "Until", target: "End" } },
+  { fields: [{ code: "at", type: "datetime", required: true }] }));
+  const startedAt = Date.now();
+  const started = await call("POST", "/workflow/instances", { processKey: "waits", input: { at: new Date(Date.now() - 60_000).toISOString() } });
+  expect(started.body.tokens.find((t: { nodeId: string }) => t.nodeId === "Wait").status).toBe("waiting");
+  const done = await until(started.body.id, (i) => i.status !== "running");
+  expect(done.status).toBe("completed");
+  expect(Date.now() - startedAt).toBeGreaterThanOrEqual(1000);
+});
+
+test.skipIf(!enabled)("stage 2: an interrupting boundary timer takes over a task, a non-interrupting one runs beside it", async () => {
+  const task = { kind: "userTask", title: "Approve", config: { assignee: { role: "boss" } } };
+  await publish("escalates", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Approve: task,
+    Late: { kind: "boundaryTimer", title: "Late", attachedTo: "Approve", config: { duration: "PT1S" } },
+    Sms: { kind: "serviceTask", title: "Sms", config: { tool: "notify.sms" } },
+    End: { kind: "end", title: "End" },
+    Escalated: { kind: "end", title: "Escalated" },
+  }, { a: { source: "Start", target: "Approve" }, b: { source: "Approve", target: "End" }, c: { source: "Late", target: "Sms" }, d: { source: "Sms", target: "Escalated" } }));
+  const escalated = await until((await call("POST", "/workflow/instances", { processKey: "escalates" })).body.id, (i) => i.status !== "running");
+  expect(escalated.status).toBe("completed");
+  const approve = escalated.tokens.find((t) => t.nodeId === "Approve")!;
+  expect(approve.status).toBe("cancelled");
+  expect(seen.closed).toContainEqual({ instanceId: escalated.id, tokenId: approve.id, reason: "interrupted" });
+
+  await publish("reminds", doc({
+    Start: { kind: "manualStart", title: "Start" },
+    Approve: task,
+    Remind: { kind: "boundaryTimer", title: "Remind", attachedTo: "Approve", config: { duration: "PT1S", interrupting: false } },
+    Email: { kind: "serviceTask", title: "Email", config: { tool: "notify.email" } },
+    End: { kind: "end", title: "End" },
+    Reminded: { kind: "end", title: "Reminded" },
+  }, { a: { source: "Start", target: "Approve" }, b: { source: "Approve", target: "End" }, c: { source: "Remind", target: "Email" }, d: { source: "Email", target: "Reminded" } }));
+  const reminded = await until((await call("POST", "/workflow/instances", { processKey: "reminds" })).body.id, (i) => i.tokens.some((t) => t.nodeId === "Reminded"));
+  expect(reminded.status).toBe("running");
+  const waiting = reminded.tokens.find((t) => t.nodeId === "Approve")!;
+  expect(waiting.status).toBe("waiting");
+  const scope = app.container.createScope();
+  try {
+    const done = await scope.resolve(IWorkflowRuntime).completeToken(waiting.id, {}, { kind: "user", id: "boss" });
+    expect(done.status).toBe("completed");
+  } finally {
+    await scope.dispose();
+  }
 });
 
 test.skipIf(!enabled)("retention deletes finished instances older than the process keeps them", async () => {

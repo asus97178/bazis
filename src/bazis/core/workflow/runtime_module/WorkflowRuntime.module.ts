@@ -9,6 +9,7 @@ import { WorkflowWorker } from "./background/WorkflowWorker";
 import { workflowRuntimeConfig } from "./config/Runtime.config";
 import { InstancesController } from "./http/Instances.controller";
 import { GraphCache } from "./internal/GraphCache";
+import { TimerStep } from "./internal/TimerStep";
 import { ToolStep } from "./internal/ToolStep";
 import { WorkflowEngine } from "./internal/WorkflowEngine";
 import { RUNTIME_ENTITIES, RuntimeDbContext, runtimeStore } from "./model/Runtime.dbContext";
@@ -35,6 +36,7 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
       resolver.tryResolve(LOGGER),
     ))),
     scoped(ToolStep, ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools] as const),
+    scoped(TimerStep, TimerStep, [RuntimeDbContext, WorkflowEngine] as const),
     // The application's input validator, if it registered one anywhere; the built-in one otherwise.
     DI.scoped(DI.factoryProviderWithResolver(IWorkflowRuntime, [], (resolver) => new WorkflowRuntime(
       resolver.resolve(RuntimeDbContext),

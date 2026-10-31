@@ -1,6 +1,6 @@
 import type { ServiceResolver } from "../../../di";
 import { EventBus, type EventToken, type Logger } from "../../../kernel";
-import { durationMs, evaluateCondition, nodeKindOf, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
+import { durationMs, evaluateCondition, nodeKindOf, readPath, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
 import type { WorkflowActor } from "../../contracts/types";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import { WORKFLOW_INSTANCE_FINISHED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED } from "../events/Runtime.events";
@@ -37,7 +37,7 @@ export interface BeginOptions {
 }
 
 /** Node kinds that come with later stages: an instance reaching one fails with a clear reason. */
-const NOT_YET = new Set(["timerCatch", "eventWait"]);
+const NOT_YET = new Set(["eventWait"]);
 const LIVE = new Set(["active", "waiting", "failed"]);
 
 /**
@@ -132,12 +132,68 @@ export class WorkflowEngine {
     const saveTo = node.config?.saveTo;
     if (typeof saveTo === "string") step.instance.vars = { ...step.instance.vars, [saveTo]: output ?? null };
     if (actor !== undefined) this.history(step, token, token.nodeId, "completed", null, actor);
+    this.disarm(step, token.nodeId);
+    await this.advance(step, this.leave(step, token, this.single(step, token.nodeId)));
+    return true;
+  }
+
+  /**
+   * A step's Tool failed for good. An error boundary attached to the step takes
+   * the token (first one whose `errorCode` equals the Tool's `reason` or error
+   * code, else one without `errorCode`); otherwise the instance fails.
+   */
+  async failStep(step: Step, token: WfToken, error: { readonly code: string; readonly message: string; readonly reason?: string }): Promise<void> {
+    const boundaries = (step.graph.boundaries.get(token.nodeId) ?? []).filter(([, node]) => node.kind === "boundaryError");
+    const matching = boundaries.find(([, node]) => node.config?.errorCode !== undefined && (node.config.errorCode === error.reason || node.config.errorCode === error.code))
+      ?? boundaries.find(([, node]) => node.config?.errorCode === undefined);
+    if (!matching) {
+      this.fail(step, token, error.code, error.message);
+      return;
+    }
+    const [boundaryId] = matching;
+    const caught = { code: error.code, message: error.message, ...(error.reason === undefined ? {} : { reason: error.reason }) };
+    token.output = { error: caught };
+    this.close(token, "done");
+    this.disarm(step, token.nodeId);
+    this.history(step, token, token.nodeId, "error", { ...caught, boundary: boundaryId });
+    step.instance.nodes = { ...step.instance.nodes, [boundaryId]: caught };
+    await this.advance(step, [this.spawn(step, boundaryId, null)]);
+  }
+
+  /**
+   * A timer job is due. A `timerCatch` step moves on. A `boundaryTimer` takes
+   * its own flow; an interrupting one (the default) first closes the step it
+   * watches. `false` when the token no longer waits.
+   */
+  async timerFired(step: Step, tokenId: string): Promise<boolean> {
+    const token = step.tokens.find((t) => t.id === tokenId);
+    if (!token || token.status !== "waiting" || step.instance.status !== "running") return false;
+    const node = step.graph.document.nodes[token.nodeId];
+    const firedAt = new Date().toISOString();
+    if (node?.kind === "timerCatch") {
+      this.history(step, token, token.nodeId, "timer", { firedAt });
+      return await this.complete(step, tokenId, { firedAt });
+    }
+    if (node?.kind !== "boundaryTimer" || node.attachedTo === undefined) return false;
+    const interrupting = node.config?.interrupting !== false;
+    this.history(step, token, token.nodeId, "timer", { firedAt, interrupting });
+    if (interrupting) {
+      for (const host of step.tokens.filter((t) => t.nodeId === node.attachedTo && LIVE.has(t.status))) {
+        this.close(host, "cancelled");
+        if (step.graph.document.nodes[host.nodeId]?.kind === "userTask") {
+          step.events.push({ event: WORKFLOW_TOKEN_CLOSED as EventToken<unknown>, payload: { instanceId: step.instance.id, tokenId: host.id, reason: "interrupted" } });
+        }
+      }
+      this.disarm(step, node.attachedTo, token.id);
+    }
+    step.instance.nodes = { ...step.instance.nodes, [token.nodeId]: { firedAt } };
     await this.advance(step, this.leave(step, token, this.single(step, token.nodeId)));
     return true;
   }
 
   /** A step failed: the token waits for a retry, the instance is `failed` with the reason. */
   fail(step: Step, token: WfToken, code: string, message: string): void {
+    this.disarm(step, token.nodeId);
     token.status = "failed";
     step.instance.status = "failed";
     step.instance.error = { node: token.nodeId, code, message };
@@ -219,15 +275,19 @@ export class WorkflowEngine {
       this.close(token, "done");
       return [];
     }
+    // An error boundary that caught a step's failure: it only leads on.
+    if (role === "boundary") return this.leave(step, token, this.single(step, token.nodeId));
     if (NOT_YET.has(node.kind)) {
       this.fail(step, token, "not_supported", `${node.kind} steps are not supported yet`);
       return [];
     }
     switch (node.kind) {
       case "serviceTask":
-        return this.waitForTool(step, token);
+        return this.arm(step, token, this.waitForTool(step, token));
       case "userTask":
-        return this.waitForTask(step, token, node);
+        return this.arm(step, token, this.waitForTask(step, token, node));
+      case "timerCatch":
+        return this.arm(step, token, this.waitForTimer(step, token, node));
       case "exclusiveGateway":
         return this.choose(step, token);
       case "parallelGateway":
@@ -235,6 +295,46 @@ export class WorkflowEngine {
       default:
         this.fail(step, token, "not_supported", `${node.kind} cannot be entered by a flow`);
         return [];
+    }
+  }
+
+  private waitForTimer(step: Step, token: WfToken, node: ProcessNode): WfToken[] {
+    const dueAt = timerDue(node.config ?? {}, dataOf(step.instance));
+    if (dueAt === undefined) {
+      this.fail(step, token, "bad_timer", `the timer of ${token.nodeId} has no valid date`);
+      return [];
+    }
+    token.status = "waiting";
+    this.db.jobs.add(Object.assign(new WfJob(), { id: Bun.randomUUIDv7(), kind: "timer" as const, instanceId: step.instance.id, tokenId: token.id, dueAt }));
+    return [];
+  }
+
+  /**
+   * A step started waiting: its boundary timers start too, each as a waiting
+   * token on the boundary node with a timer job.
+   */
+  private arm(step: Step, host: WfToken, next: WfToken[]): WfToken[] {
+    if (host.status !== "waiting") return next;
+    for (const [id, node] of step.graph.boundaries.get(host.nodeId) ?? []) {
+      if (node.kind !== "boundaryTimer") continue;
+      const dueAt = timerDue(node.config ?? {}, dataOf(step.instance));
+      if (dueAt === undefined) {
+        this.fail(step, host, "bad_timer", `the timer of ${id} has no valid date`);
+        return [];
+      }
+      const watcher = this.spawn(step, id, null);
+      watcher.status = "waiting";
+      this.db.jobs.add(Object.assign(new WfJob(), { id: Bun.randomUUIDv7(), kind: "timer" as const, instanceId: step.instance.id, tokenId: watcher.id, dueAt }));
+    }
+    return next;
+  }
+
+  /** The step left or failed: its boundary tokens close; their jobs find the tokens closed and drop. */
+  private disarm(step: Step, hostNodeId: string, except?: string): void {
+    const boundaries = new Set((step.graph.boundaries.get(hostNodeId) ?? []).map(([id]) => id));
+    if (boundaries.size === 0) return;
+    for (const token of step.tokens) {
+      if (token.id !== except && boundaries.has(token.nodeId) && LIVE.has(token.status)) this.close(token, "cancelled");
     }
   }
 
@@ -349,6 +449,20 @@ export class WorkflowEngine {
       }
     });
   }
+}
+
+/** When a timer fires: `duration` from now, or the date at the `at` path; `undefined` if neither is valid. */
+export function timerDue(config: Readonly<Record<string, unknown>>, data: InstanceData): Date | undefined {
+  if (typeof config.duration === "string") {
+    const ms = durationMs(config.duration);
+    return ms === undefined ? undefined : new Date(Date.now() + ms);
+  }
+  if (typeof config.at === "string") {
+    const value = readPath(data, config.at);
+    const date = value instanceof Date ? value : typeof value === "string" || typeof value === "number" ? new Date(value) : undefined;
+    return date === undefined || Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  return undefined;
 }
 
 export function dataOf(instance: WfInstance): InstanceData {
