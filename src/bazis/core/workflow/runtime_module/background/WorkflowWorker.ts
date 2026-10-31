@@ -2,6 +2,7 @@ import { BackgroundService, delay } from "../../../background";
 import type { ServiceProvider } from "../../../di";
 import type { ConfigView } from "../../../kernel";
 import type { workflowRuntimeConfig } from "../config/Runtime.config";
+import { Schedules } from "../internal/Schedules";
 import { TimerStep } from "../internal/TimerStep";
 import { ToolStep } from "../internal/ToolStep";
 import { WorkflowEngine } from "../internal/WorkflowEngine";
@@ -12,6 +13,8 @@ import type { WfJob } from "../model/WfJob.model";
 const LEASE_MS = 5 * 60_000;
 /** A job that keeps failing outside its Tool (the database, a lost version) fails its step after this many tries. */
 const MAX_JOB_ATTEMPTS = 5;
+/** How often the scheduled starts are matched against the published versions. */
+const RECONCILE_MS = 60_000;
 
 
 /**
@@ -32,7 +35,12 @@ export class WorkflowWorker extends BackgroundService {
     if (!this.config.get("worker.enabled")) return;
     const intervalMs = this.config.get("worker.intervalMs");
     const batchSize = this.config.get("worker.batchSize");
+    let reconciledAt = 0;
     while (!signal.aborted) {
+      if (Date.now() - reconciledAt >= RECONCILE_MS) {
+        reconciledAt = Date.now();
+        await this.reconcile();
+      }
       let claimed = 0;
       try {
         const jobs = await this.claim(batchSize);
@@ -53,10 +61,22 @@ export class WorkflowWorker extends BackgroundService {
     const scope = this.services.createScope();
     try {
       if (job.kind === "timer") await scope.resolve(TimerStep).run(job);
+      else if (job.kind === "schedule") await scope.resolve(Schedules).fire(job);
       else await scope.resolve(ToolStep).run(job, signal);
     } catch (error) {
       this.reportFailure("job failed", error, { job: job.id, instance: job.instanceId, attempts: job.attempts });
       await this.giveUpOrDelay(job, error).catch((failure: unknown) => this.reportFailure("job failure handling failed", failure, { job: job.id }));
+    } finally {
+      await scope.dispose();
+    }
+  }
+
+  private async reconcile(): Promise<void> {
+    const scope = this.services.createScope();
+    try {
+      await scope.resolve(Schedules).reconcile();
+    } catch (error) {
+      this.reportFailure("scheduled starts could not be planned", error);
     } finally {
       await scope.dispose();
     }
@@ -90,7 +110,7 @@ export class WorkflowWorker extends BackgroundService {
       return await db.transactionScope(async () => {
         const now = new Date();
         const jobs = await db.jobs
-          .where((j) => j.kind.in(["tool", "timer"]).and(j.dueAt.lte(now)).and(j.lockedUntil.isNull().or(j.lockedUntil.lt(now))))
+          .where((j) => j.kind.in(["tool", "timer", "schedule"]).and(j.dueAt.lte(now)).and(j.lockedUntil.isNull().or(j.lockedUntil.lt(now))))
           .orderBy((j) => j.id)
           .take(batchSize)
           .forUpdate({ skipLocked: true })

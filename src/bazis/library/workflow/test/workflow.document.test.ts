@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { durationMs, emptyProcess, evaluateCondition, hasErrors, readPath, resolveInput, validateForm, validateProcess } from "@/library/workflow";
+import { durationMs, emptyProcess, parseCron, evaluateCondition, hasErrors, readPath, resolveInput, validateForm, validateProcess } from "@/library/workflow";
 
 const DOCUMENT = {
   schemaVersion: "bazis.workflow/v1",
@@ -89,4 +89,14 @@ test("durations", () => {
   expect(durationMs("P1DT2H")).toBe(26 * 3_600_000);
   expect(durationMs("PT45S")).toBe(45_000);
   expect(durationMs("P1M")).toBeUndefined();
+});
+
+test("cron: next and matches in UTC", () => {
+  const at = (iso: string) => new Date(iso);
+  expect(parseCron("*/15 9-17 * * 1-5")!.next(at("2026-10-30T17:50:00Z"))?.toISOString()).toBe("2026-11-02T09:00:00.000Z");
+  expect(parseCron("0 0 1 * *")!.next(at("2026-12-15T00:00:00Z"))?.toISOString()).toBe("2027-01-01T00:00:00.000Z");
+  expect(parseCron("30 8 13 * 5")!.next(at("2026-11-01T00:00:00Z"))?.toISOString()).toBe("2026-11-06T08:30:00.000Z");
+  expect(parseCron("0 12 * * 7")!.matches(at("2026-11-01T12:00:00Z"))).toBe(true);
+  expect(parseCron("0 0 30 2 *")!.next(at("2026-01-01T00:00:00Z"))).toBeUndefined();
+  for (const bad of ["* * * *", "60 * * * *", "* * 0 * *", "5-1 * * * *", "*/0 * * * *", "a * * * *"]) expect(parseCron(bad)).toBeUndefined();
 });

@@ -15,7 +15,7 @@ export class WfToken {
   @UUID({ version: "v7" })
   id = "";
 
-  @Column({ type: "uuid" })
+  @Column({ type: "text" })
   instanceId = "";
 
   @Column({ type: "text" })

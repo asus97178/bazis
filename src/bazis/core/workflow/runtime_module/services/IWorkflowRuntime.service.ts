@@ -1,3 +1,4 @@
+import type { FormIssue } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { HistoryType } from "../model/WfHistory.model";
 import type { InstanceStatus, StartedVia } from "../model/WfInstance.model";
@@ -55,6 +56,24 @@ export interface HistoryEntry {
   readonly at: Date;
 }
 
+export interface EmitOptions {
+  /** Which waits it is for: `order:42`. Waits without a correlation take any event of the key. */
+  readonly correlation?: string | null;
+  /** Only the waits of this partition; it is also the partition of instances the event starts. */
+  readonly partition?: string | null;
+  /** On whose behalf started instances run; `{ kind: "system", id: "event:<key>" }` by default. */
+  readonly actor?: WorkflowActor;
+}
+
+export interface EmitResult {
+  /** Instances started by an `eventStart`. */
+  readonly started: readonly string[];
+  /** Instances whose `eventWait` or `boundaryEvent` took the event. */
+  readonly continued: readonly string[];
+  /** Processes with an `eventStart` whose input the payload did not pass. */
+  readonly rejected: readonly { readonly processKey: string; readonly issues: readonly FormIssue[] }[];
+}
+
 export interface InstanceListQuery extends WorkflowPaging {
   readonly partition?: string;
   readonly status?: InstanceStatus;
@@ -75,6 +94,11 @@ export abstract class IWorkflowRuntime {
   abstract retry(instanceId: string, options: { readonly actor: WorkflowActor }): Promise<InstanceDetails>;
   /** Finishes a user task's wait with the form output and moves on; `wrong_status` when the token no longer waits. */
   abstract completeToken(tokenId: string, output: unknown, actor: WorkflowActor): Promise<InstanceDetails>;
+  /**
+   * Delivers an event: starts processes whose latest version has an
+   * `eventStart` for the key, and moves the instances waiting for it.
+   */
+  abstract emit(eventKey: string, payload?: unknown, options?: EmitOptions): Promise<EmitResult>;
   /** Instances, newest first. */
   abstract instances(query?: InstanceListQuery): Promise<WorkflowPage<InstanceSummary>>;
   abstract instance(instanceId: string): Promise<InstanceDetails>;

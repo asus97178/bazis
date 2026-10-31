@@ -8,6 +8,7 @@ import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import { WfHistory, type HistoryType } from "../model/WfHistory.model";
 import { WfInstance, type StartedVia } from "../model/WfInstance.model";
 import { WfJob } from "../model/WfJob.model";
+import { WfSubscription } from "../model/WfSubscription.model";
 import { WfToken } from "../model/WfToken.model";
 import { buildGraph, type GraphCache, type ProcessGraph } from "./GraphCache";
 
@@ -36,8 +37,6 @@ export interface BeginOptions {
   readonly actor: WorkflowActor;
 }
 
-/** Node kinds that come with later stages: an instance reaching one fails with a clear reason. */
-const NOT_YET = new Set(["eventWait"]);
 const LIVE = new Set(["active", "waiting", "failed"]);
 
 /**
@@ -174,9 +173,32 @@ export class WorkflowEngine {
       this.history(step, token, token.nodeId, "timer", { firedAt });
       return await this.complete(step, tokenId, { firedAt });
     }
-    if (node?.kind !== "boundaryTimer" || node.attachedTo === undefined) return false;
+    if (node?.kind !== "boundaryTimer") return false;
+    return await this.fireBoundary(step, token, node, { firedAt }, "timer");
+  }
+
+  /**
+   * An event the token waits for arrived. An `eventWait` step moves on with
+   * the payload (and `saveTo`); a `boundaryEvent` takes its flow like a
+   * boundary timer. `false` when the token no longer waits.
+   */
+  async eventReceived(step: Step, tokenId: string, eventKey: string, payload: Record<string, unknown>): Promise<boolean> {
+    const token = step.tokens.find((t) => t.id === tokenId);
+    if (!token || token.status !== "waiting" || step.instance.status !== "running") return false;
+    const node = step.graph.document.nodes[token.nodeId];
+    if (node?.kind === "eventWait") {
+      this.history(step, token, token.nodeId, "event", { event: eventKey });
+      return await this.complete(step, tokenId, payload);
+    }
+    if (node?.kind !== "boundaryEvent") return false;
+    return await this.fireBoundary(step, token, node, payload, "event", { event: eventKey });
+  }
+
+  /** A boundary timer or event fired: an interrupting one closes the watched step first, then the boundary takes its flow. */
+  private async fireBoundary(step: Step, token: WfToken, node: ProcessNode, output: Record<string, unknown>, type: "timer" | "event", details: Record<string, unknown> = {}): Promise<boolean> {
+    if (node.attachedTo === undefined) return false;
     const interrupting = node.config?.interrupting !== false;
-    this.history(step, token, token.nodeId, "timer", { firedAt, interrupting });
+    this.history(step, token, token.nodeId, type, { ...details, ...(type === "timer" ? output : {}), interrupting });
     if (interrupting) {
       for (const host of step.tokens.filter((t) => t.nodeId === node.attachedTo && LIVE.has(t.status))) {
         this.close(host, "cancelled");
@@ -186,7 +208,7 @@ export class WorkflowEngine {
       }
       this.disarm(step, node.attachedTo, token.id);
     }
-    step.instance.nodes = { ...step.instance.nodes, [token.nodeId]: { firedAt } };
+    step.instance.nodes = { ...step.instance.nodes, [token.nodeId]: output };
     await this.advance(step, this.leave(step, token, this.single(step, token.nodeId)));
     return true;
   }
@@ -277,10 +299,6 @@ export class WorkflowEngine {
     }
     // An error boundary that caught a step's failure: it only leads on.
     if (role === "boundary") return this.leave(step, token, this.single(step, token.nodeId));
-    if (NOT_YET.has(node.kind)) {
-      this.fail(step, token, "not_supported", `${node.kind} steps are not supported yet`);
-      return [];
-    }
     switch (node.kind) {
       case "serviceTask":
         return this.arm(step, token, this.waitForTool(step, token));
@@ -288,6 +306,8 @@ export class WorkflowEngine {
         return this.arm(step, token, this.waitForTask(step, token, node));
       case "timerCatch":
         return this.arm(step, token, this.waitForTimer(step, token, node));
+      case "eventWait":
+        return this.arm(step, token, this.waitForEvent(step, token, node));
       case "exclusiveGateway":
         return this.choose(step, token);
       case "parallelGateway":
@@ -316,6 +336,17 @@ export class WorkflowEngine {
   private arm(step: Step, host: WfToken, next: WfToken[]): WfToken[] {
     if (host.status !== "waiting") return next;
     for (const [id, node] of step.graph.boundaries.get(host.nodeId) ?? []) {
+      if (node.kind === "boundaryEvent") {
+        const correlation = correlationOf(node.config ?? {}, dataOf(step.instance));
+        if (correlation === undefined) {
+          this.fail(step, host, "bad_correlation", `the correlation of ${id} has no value`);
+          return [];
+        }
+        const watcher = this.spawn(step, id, null);
+        watcher.status = "waiting";
+        this.subscribe(step, watcher, String(node.config?.event), correlation);
+        continue;
+      }
       if (node.kind !== "boundaryTimer") continue;
       const dueAt = timerDue(node.config ?? {}, dataOf(step.instance));
       if (dueAt === undefined) {
@@ -336,6 +367,28 @@ export class WorkflowEngine {
     for (const token of step.tokens) {
       if (token.id !== except && boundaries.has(token.nodeId) && LIVE.has(token.status)) this.close(token, "cancelled");
     }
+  }
+
+  private waitForEvent(step: Step, token: WfToken, node: ProcessNode): WfToken[] {
+    const correlation = correlationOf(node.config ?? {}, dataOf(step.instance));
+    if (correlation === undefined) {
+      this.fail(step, token, "bad_correlation", `the correlation of ${token.nodeId} has no value`);
+      return [];
+    }
+    token.status = "waiting";
+    this.subscribe(step, token, String(node.config?.event), correlation);
+    return [];
+  }
+
+  private subscribe(step: Step, token: WfToken, eventKey: string, correlation: string | null): void {
+    this.db.subscriptions.add(Object.assign(new WfSubscription(), {
+      id: Bun.randomUUIDv7(),
+      instanceId: step.instance.id,
+      tokenId: token.id,
+      eventKey,
+      correlation,
+      partition: step.instance.partition,
+    }));
   }
 
   private waitForTool(step: Step, token: WfToken): WfToken[] {
@@ -463,6 +516,17 @@ export function timerDue(config: Readonly<Record<string, unknown>>, data: Instan
     return date === undefined || Number.isNaN(date.getTime()) ? undefined : date;
   }
   return undefined;
+}
+
+/**
+ * The correlation a wait matches: the value at `config.correlation` as a
+ * string, `null` without a path (any event of the key), `undefined` when the
+ * path has no value.
+ */
+export function correlationOf(config: Readonly<Record<string, unknown>>, data: InstanceData): string | null | undefined {
+  if (typeof config.correlation !== "string") return null;
+  const value = readPath(data, config.correlation);
+  return value === undefined || value === null || value === "" || typeof value === "object" ? undefined : String(value);
 }
 
 export function dataOf(instance: WfInstance): InstanceData {

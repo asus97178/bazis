@@ -19,7 +19,7 @@ export class WfInstance {
   id = "";
 
   /** The version (a Definitions row: a reference without a foreign key). */
-  @Column({ type: "uuid" })
+  @Column({ type: "text" })
   versionId = "";
 
   @Column({ type: "text" })

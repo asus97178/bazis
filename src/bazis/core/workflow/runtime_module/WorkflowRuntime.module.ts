@@ -7,8 +7,10 @@ import { WorkflowTools } from "../internal/WorkflowTools";
 import { WorkflowRetention } from "./background/WorkflowRetention";
 import { WorkflowWorker } from "./background/WorkflowWorker";
 import { workflowRuntimeConfig } from "./config/Runtime.config";
+import { EventsController } from "./http/Events.controller";
 import { InstancesController } from "./http/Instances.controller";
 import { GraphCache } from "./internal/GraphCache";
+import { Schedules } from "./internal/Schedules";
 import { TimerStep } from "./internal/TimerStep";
 import { ToolStep } from "./internal/ToolStep";
 import { WorkflowEngine } from "./internal/WorkflowEngine";
@@ -37,6 +39,7 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
     ))),
     scoped(ToolStep, ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools] as const),
     scoped(TimerStep, TimerStep, [RuntimeDbContext, WorkflowEngine] as const),
+    scoped(Schedules, Schedules, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions] as const),
     // The application's input validator, if it registered one anywhere; the built-in one otherwise.
     DI.scoped(DI.factoryProviderWithResolver(IWorkflowRuntime, [], (resolver) => new WorkflowRuntime(
       resolver.resolve(RuntimeDbContext),
@@ -45,7 +48,7 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
       resolver.resolve(SERVICE_PROVIDER).tryResolve(WorkflowInputValidator) ?? new DefaultWorkflowInputValidator(),
     ))),
   ],
-  controllers: [DI.bindDeps(InstancesController, IWorkflowRuntime)],
+  controllers: [DI.bindDeps(InstancesController, IWorkflowRuntime), DI.bindDeps(EventsController, IWorkflowRuntime)],
   background: [
     DI.bindDeps(WorkflowWorker, SERVICE_PROVIDER, workflowRuntimeConfig.token),
     DI.bindDeps(WorkflowRetention, SERVICE_PROVIDER, workflowRuntimeConfig.token),
