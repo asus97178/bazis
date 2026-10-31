@@ -7,6 +7,19 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.126.0
+
+- **Чистка истории бизнес-процессов.** В 0.124.0–0.125.0 записи истории
+  экземпляра без шага (`started`, `completed`, `cancelled`) получали
+  случайный `tokenId` вместо `null`. Код менять не нужно, таблицы те же;
+  старые записи исправит один запрос:
+
+  ```sql
+  UPDATE "bazis_wf_run_history" h SET "tokenId" = NULL
+  WHERE "tokenId" IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM "bazis_wf_run_tokens" t WHERE t.id::text = h."tokenId");
+  ```
+
 ## 0.123.0
 
 - **`@Tool` требует `callers`.** Добавьте `callers: ["agent"]` инструментам
