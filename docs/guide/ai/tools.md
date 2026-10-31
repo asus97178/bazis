@@ -175,6 +175,14 @@ throw new Error("db host 10.0.0.5 is down, password=hunter2")
 Так адреса, SQL и прочие подробности не уходят провайдеру модели и не
 попадают в её ответ пользователю.
 
+Причину, по которой вызывающий может выбрать дальнейший путь, передайте в
+`reason`: она придёт в `error.details.reason`. Процесс по ней не повторяет
+вызов и выбирает [ветвь ошибки](../workflow/processes.md#ошибка-с-причиной):
+
+```ts
+throw new ToolError("Нет слотов доставки", { reason: "no_slots" });
+```
+
 | Что случилось | Код | Модель видит |
 | --- | --- | --- |
 | `throw new ToolError(text)` | `TOOL_EXECUTION_FAILED` | `text` |

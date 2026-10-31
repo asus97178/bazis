@@ -1,7 +1,7 @@
 # `bazis/core/infra`
 
 Инфраструктура: манифест `@Infra` и коннекторы — PostgreSQL, Redis,
-OpenSearch, LLM, Codex. Список — по пакету 0.124.1.
+OpenSearch, LLM, Codex. Список — по пакету 0.125.0.
 
 ## Манифест
 

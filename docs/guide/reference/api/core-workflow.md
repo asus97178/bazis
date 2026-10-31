@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.124.1.
+Список — по пакету 0.125.0.
 
 ## Модули
 
@@ -30,7 +30,7 @@
 
 ## События
 
-`WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
+`WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED` (`reason`: `cancelled`, `interrupted`),
 `WORKFLOW_INSTANCE_FINISHED` ([Задача сотруднику](../../workflow/processes.md#задача-сотруднику)).
 
 ## Типы
