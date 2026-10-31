@@ -94,6 +94,10 @@ export class NotesController {
 
 Зритель (`viewer`) читает, а на `POST /notes` получает `403`.
 
+Когда права нужно раздавать в админке, ставить условия («только свои»,
+«только магазин 1») и фильтровать по ним списки, вместо своей таблицы
+подключите [права модулей](access.md) (`bazis/core/access`).
+
 ## «Или»: `anyOf`
 
 `@Authorize(a, b)` требует **обе** проверки. Если подходит любая —
@@ -271,5 +275,6 @@ export class ReportsController { … }
 ## Дальше
 
 - [Авторизация](../overview/authorization.md)
+- [Права модулей](access.md)
 - [Аутентификация через JWT](jwt.md)
 - [Запросы](../database/queries.md)

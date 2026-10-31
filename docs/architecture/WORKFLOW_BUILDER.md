@@ -487,7 +487,7 @@ store («миграций для хранилищ нет»), поэтому пр
 
 0. **Права и эталонное приложение**: `bazis/core/access` (ACCESS-001 §10
    п. 1); процессы переходят на него (§6.2), `WorkflowAccess` удаляется;
-   `examples/workflow` с `ConfigAccessPolicy`. Дальше каждый этап расширяет
+   `examples/workflow` с ролями `@Module({ roles })`. Дальше каждый этап расширяет
    приложение.
 1. **Контракт Tool и HTTP**: `context.actor`, `dryRun`, `x-ref`,
    `x-ref-keys`, `x-ref-scope`, `context.metadata`; списки JSON:API; события

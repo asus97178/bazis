@@ -28,6 +28,8 @@
   "module": "./index.ts",
   "exports": {
     ".": "./index.ts",
+    "./core/access": "./core/access/index.ts",
+    "./core/access/testing": "./core/access/testing/index.ts",
     "./core/agent": "./core/agent/index.ts",
     "./core/app": "./core/app/index.ts",
     "./core/background": "./core/background/index.ts",
