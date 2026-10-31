@@ -9,7 +9,7 @@
 базе, фоновый воркер, события и HTTP. Интерфейса нет: дизайнер процессов,
 входящие задачи и формы строит приложение поверх сервисов и HTTP модуля.
 
-Все примеры проверены на bazis 0.124.0–0.126.0 с PostgreSQL 17 в приложении
+Все примеры проверены на bazis 0.124.0–0.127.0 с PostgreSQL 17 в приложении
 «Заказы» из этой главы.
 
 ## Подключение
@@ -35,7 +35,7 @@ export class AppModule {}
 
 - **Таблицы модуль создаёт сам** при первом старте и проверяет при каждом
   следующем: это [owned stores](../database/owned-stores.md) с префиксами
-  `bazis_wf_def_` и `bazis_wf_run_`. Нужно только подключение к PostgreSQL
+  `bazis_wf_def_`, `bazis_wf_run_` и `bazis_wf_task_`. Нужно только подключение к PostgreSQL
   в `@Infra` (`ormBazisConnect`), миграции не нужны.
 - **`WorkflowAccess`** говорит HTTP модуля, кто делает запрос и что ему
   можно ([Права](#права-workflowaccess)). Без него все маршруты
@@ -45,9 +45,11 @@ export class AppModule {}
   выполнится (`TOOL_AUDIT_REQUIRED`), без политики — тоже
   (`TOOL_APPROVAL_REQUIRED`, пример ниже).
 
-`WorkflowModule` состоит из двух частей, их можно подключать по
+`WorkflowModule` состоит из трёх частей, их можно подключать по
 отдельности: `WorkflowDefinitionsModule` — каталог и версии,
-`WorkflowRuntimeModule` — исполнение (он сам импортирует первую часть).
+`WorkflowRuntimeModule` — исполнение (он сам импортирует первую часть),
+`WorkflowTasksModule` — входящие задачи сотрудников (импортирует
+исполнение).
 
 ## Шаг — это инструмент
 
@@ -172,7 +174,7 @@ POST /workflow/processes/order/publish
 - Повторная публикация того же документа возвращает ту же версию, а не
   создаёт новую.
 - `retentionDays` — сколько дней хранить завершённые и отменённые
-  экземпляры; упавшие не удаляются никогда.
+  экземпляры вместе с их задачами; упавшие не удаляются никогда.
 
 Для дизайнера есть `GET /workflow/tools`: инструменты, доступные процессам,
 со схемами входа и выхода, по которым строится форма настройки шага.
@@ -267,15 +269,54 @@ audit result payments.charge caller=workflow actor=anna
 
 ## Задача сотруднику
 
-Заказ на 5000 не прошёл оплату, процесс ушёл в «Позвонить клиенту» и ждёт:
+Заказ на 5000 не прошёл оплату, процесс ушёл в «Позвонить клиенту» и ждёт.
+Задача сама появляется во входящих тех, кому она адресована: узел
+`"assignee": { "role": "support" }` даёт задачу с `assignee` `role:support`.
+Кто входит в роль, решает приложение: `WorkflowAccess.assignees` перечисляет,
+кому адресованы задачи текущего пользователя ([Права](#права-workflowaccess)).
 
 ```text
-status: running   vars: {"payment":{"status":"declined","paymentId":"pay-43"}}
-Start done · Pay done · Paid done · Call waiting (token 01a18f25-f649-777c-…)
+GET /workflow/tasks                    (Bearer t-oleg, роль support)
+→ {"data":[{"id":"01a18fa9-83e0-…","title":"Позвонить клиенту","assignee":"role:support","status":"open",
+            "partition":"shop-1","dueAt":"2026-11-01T01:53:33.659Z","form":{"fields":[…]},…}],"meta":{"total":1}}
+
+GET /workflow/tasks/01a18fa9-83e0-…    (Bearer t-anna, роль manager)  → 404
+
+POST /workflow/tasks/01a18fa9-83e0-…/claim
+→ 200 {"status":"claimed","claimedBy":"oleg",…}
+
+POST /workflow/tasks/01a18fa9-83e0-…/complete  {"output":{}}
+→ 422 {"error":"The task form is invalid","details":{"code":"invalid_input",
+       "issues":[{"field":"comment","code":"required","message":"field comment is required"}]}}
+
+POST /workflow/tasks/01a18fa9-83e0-…/complete  {"output":{"comment":"Клиент оплатит картой"}}
+→ 200 {"status":"completed","completedBy":"oleg","output":{"comment":"Клиент оплатит картой"},…}
 ```
 
-Модуль не ведёт список задач сам: он публикует событие, а приложение
-показывает задачу исполнителю, как ему удобно.
+- **Кто видит задачу:** тот, кому она адресована, и тот, кто её взял.
+  Чужая задача отвечает 404, как будто её нет. Все маршруты требуют
+  `tasks.work`.
+- **Взять** (`claim`) — необязательно: пока задача открыта, её может
+  завершить любой из адресатов. Взятую другим завершить нельзя — `409`;
+  взявший может её отпустить (`release`).
+- **Форма** проверяется при завершении. Ответ формы попадает в
+  `$nodes.Call` — следующие условия могут его читать — и в `output` задачи.
+- Если шаг закрылся иначе — отмена экземпляра, граничный таймер или
+  событие, — задача становится `cancelled`.
+- Список: `?status=open,claimed` (по умолчанию), `completed`,
+  `cancelled`; `?partition=`, `?processKey=`.
+
+| Маршрут | Ответ |
+| --- | --- |
+| `GET /workflow/tasks` | задачи вызывающего, старые первыми |
+| `GET /workflow/tasks/:id` | задача с формой |
+| `POST /workflow/tasks/:id/claim` | 200 / 409 `conflict` (взята другим) |
+| `POST /workflow/tasks/:id/release` | 200 / 409 `wrong_status` |
+| `POST /workflow/tasks/:id/complete` `{ output }` | 200 / 409 / 422 `invalid_input` |
+
+Из кода — сервис `IWorkflowTasks` (`list`, `get`, `claim`, `release`,
+`complete`). Свой список задач не нужен; если хочется своих уведомлений —
+подпишитесь на событие:
 
 ```ts
 import { OnEvent } from "bazis/core/kernel";
@@ -292,7 +333,7 @@ export class TaskInbox {
 ```
 
 ```text
-task "Позвонить клиенту" for {"role":"support"}, token 01a18f25-f649-777c-…
+task "Позвонить клиенту" for {"role":"support"}, token 01a18fa9-…
 ```
 
 В событии — экземпляр, токен, узел, `partition`, название, исполнитель
@@ -300,34 +341,10 @@ task "Позвонить клиенту" for {"role":"support"}, token 01a18f25-
 уходят после того, как шаг записан в базу: обработчик никогда не увидит шаг,
 который откатился.
 
-Когда сотрудник заполнил форму, приложение передаёт её модулю:
-
-```ts
-@Controller("tasks")
-export class TasksController {
-  constructor(private readonly runtime: IWorkflowRuntime) {}
-
-  @Post(":token/complete")
-  complete(token: FromRoute<string>, body: FromBody<CompleteTaskRequest>, ctx: HttpContext) {
-    return this.runtime.completeToken(token, body, currentActor(ctx));   // кто вошёл: ваша проверка входа
-  }
-}
-```
-
-```text
-POST /tasks/01a18f25-f649-777c-…/complete  {}
-→ 422 {"error":"The task form is invalid","details":{"code":"invalid_input",
-       "issues":[{"field":"comment","code":"required","message":"field comment is required"}]}}
-
-POST /tasks/01a18f25-f649-777c-…/complete  {"comment":"Клиент оплатит картой"}
-→ 200 {"status":"completed","nodes":{…,"Call":{"comment":"Клиент оплатит картой"}},…}
-
-POST /tasks/01a18f25-f649-777c-…/complete  {"comment":"x"}
-→ 409 {"error":"The token does not wait for a task","details":{"code":"wrong_status"}}
-```
-
-Ответ формы попадает в `$nodes.Call` — следующие условия могут его
-читать. Готовые HTTP задач и их таблица во фреймворке — в плане.
+> [!NOTE]
+> Входящие задачи — с версии 0.127.0. Задачи появляются для шагов, которые
+> начали ждать после подключения модуля; шаг, ждавший раньше, можно
+> завершить через `IWorkflowRuntime.completeToken(tokenId, output, actor)`.
 
 ## Повторы, ошибки и таймеры
 
@@ -423,8 +440,8 @@ history: timer Late {"firedAt":"…:39:09.571Z","interrupting":true}
 ```
 
 - Прерывающий таймер (по умолчанию) закрывает шаг. Если это задача
-  сотруднику, приходит `WORKFLOW_TOKEN_CLOSED` с `reason: "interrupted"` —
-  задачу пора убрать из входящих.
+  сотруднику, приходит `WORKFLOW_TOKEN_CLOSED` с `reason: "interrupted"`, а
+  задача во входящих становится `cancelled`.
 - С `"interrupting": false` таймер один раз запускает свою ветвь —
   напоминание, письмо, — а шаг продолжает ждать. Экземпляр завершится,
   когда закончатся обе ветви.
@@ -545,8 +562,8 @@ POST /workflow/instances/01a18f26-283b-…/cancel  {"reason":"Клиент пе�
 ```
 
 Отмена закрывает все шаги экземпляра. Если он ждал сотрудника, приходит
-`WORKFLOW_TOKEN_CLOSED` с `reason: "cancelled"` — задачу пора убрать из
-входящих. Завершённый или
+`WORKFLOW_TOKEN_CLOSED` с `reason: "cancelled"`, а задача во входящих
+становится `cancelled`. Завершённый или
 отменённый экземпляр — `WORKFLOW_INSTANCE_FINISHED`:
 
 ```text
@@ -598,7 +615,7 @@ POST /workflow/instances/…/cancel   (Bearer t-oleg)                  → 403 {
 | `instances.read` | список экземпляров, карточка, история |
 | `instances.manage` | отмена, повтор |
 | `events.emit` | `POST /workflow/events/:eventKey` |
-| `tasks.work` | для задач — в плане |
+| `tasks.work` | входящие задачи `/workflow/tasks` |
 
 `target` — то, что известно о цели: `processKey`, `partition`,
 `instanceId`. Для карточки экземпляра это его `partition`, для списка — из
@@ -632,6 +649,7 @@ export class OrdersService {
 | --- | --- |
 | `IWorkflowDefinitions` | `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `tools` |
 | `IWorkflowRuntime` | `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` |
+| `IWorkflowTasks` | `list`, `get`, `claim`, `release`, `complete` |
 
 Ошибки — `WorkflowError` с `code` и HTTP-статусом: `not_found` (404),
 `conflict`, `wrong_status`, `archived` (409), `invalid_document`,
