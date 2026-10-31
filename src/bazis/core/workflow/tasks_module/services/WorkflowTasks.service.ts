@@ -1,5 +1,6 @@
 import { UniqueViolationError } from "../../../orm";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
+import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import type { WorkflowInstancesDeleted, WorkflowTaskRequested, WorkflowTokenClosed } from "../../runtime_module/events/Runtime.events";
 import type { IWorkflowRuntime } from "../../runtime_module/services/IWorkflowRuntime.service";
@@ -13,6 +14,7 @@ export class WorkflowTasks extends IWorkflowTasks {
   constructor(
     private readonly db: TasksDbContext,
     private readonly runtime: IWorkflowRuntime,
+    private readonly clock: WorkflowClock,
   ) {
     super();
   }
@@ -49,7 +51,7 @@ export class WorkflowTasks extends IWorkflowTasks {
       if (task.status !== "open") throw new WorkflowError("wrong_status", `The task is ${task.status}`);
       task.status = "claimed";
       task.claimedById = actor.id;
-      task.claimedAt = new Date();
+      task.claimedAt = this.clock.now();
       await this.db.saveChanges();
       return detailsOf(task);
     });
@@ -83,7 +85,7 @@ export class WorkflowTasks extends IWorkflowTasks {
     await this.db.tasks.asNoTracking().where((t) => t.id.eq(task.id)).executeUpdate({
       status: "completed",
       completedById: actor.id,
-      completedAt: new Date(),
+      completedAt: this.clock.now(),
       output: typeof saved === "object" && saved !== null && !Array.isArray(saved) ? saved as Record<string, unknown> : null,
     });
     return await this.get(task.id);

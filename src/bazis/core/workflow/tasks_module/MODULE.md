@@ -1,6 +1,6 @@
 # WorkflowTasksModule
 
-Passport version: 1.0. Check date: 2026-10-31.
+Passport version: 1.1. Check date: 2026-10-31.
 Status: implemented (stage 4 of WORKFLOW-001); checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/tasks_module`.
@@ -19,7 +19,7 @@ people stays with the application (`WorkflowAccess.assignees`).
 | Component | File | Dependencies | Output |
 | --- | --- | --- | --- |
 | `WfTask`, `TasksDbContext` | [model](model) | ORM, owned store `bazis.workflow.tasks` | table `bazis_wf_task_items` |
-| `IWorkflowTasks` / `WorkflowTasks` (scoped) | [services](services) | `TasksDbContext`, `IWorkflowRuntime` | `list`, `get`, `claim`, `release`, `complete` |
+| `IWorkflowTasks` / `WorkflowTasks` (scoped) | [services](services) | `TasksDbContext`, `IWorkflowRuntime`, `WorkflowClock` | `list`, `get`, `claim`, `release`, `complete` |
 | `TaskEvents` (scoped subscriber) | [events/TaskEvents.ts](events/TaskEvents.ts) | `WorkflowTasks` | `WORKFLOW_TASK_REQUESTED` creates the task (one per token), `WORKFLOW_TOKEN_CLOSED` cancels it, `WORKFLOW_INSTANCES_DELETED` deletes the tasks of deleted instances |
 | `TasksController` | [http/Tasks.controller.ts](http/Tasks.controller.ts) | `IWorkflowTasks`, `WorkflowAccess` | `/workflow/tasks…` |
 

@@ -10,9 +10,19 @@ export function moduleImportPath(fromFile: string, moduleFile: string): string {
 
 /** Edits only the import and the selected @Module metadata, preserving other source text. */
 export function registerModuleInSource(content: string, appFile: string, moduleFile: string, moduleClass: string): string {
+  return registerInModuleField(content, appFile, moduleFile, moduleClass, { field: "imports", hostClass: "AppModule" });
+}
+
+/**
+ * Adds `moduleClass` (an export of `moduleFile`) to the array `field` of the
+ * `@Module` in `appFile` and imports it: `imports` for a module, `processes`
+ * for a process. The class named `hostClass` is chosen, or the only one.
+ */
+export function registerInModuleField(content: string, appFile: string, moduleFile: string, moduleClass: string, options: { readonly field: string; readonly hostClass?: string }): string {
+  const { field } = options;
   const diagnostics = ts.transpileModule(content, { fileName: appFile, reportDiagnostics: true }).diagnostics ?? [];
   if (diagnostics.some((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error)) {
-    throw new Error(`Cannot register a module in invalid TypeScript: ${appFile}`);
+    throw new Error(`Cannot register in invalid TypeScript: ${appFile}`);
   }
   const source = ts.createSourceFile(appFile, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const importPath = moduleImportPath(appFile, moduleFile);
@@ -75,26 +85,26 @@ export function registerModuleInSource(content: string, appFile: string, moduleF
       candidates.push({ name: statement.name?.text, metadata });
     }
   }
-  const candidate = candidates.find((item) => item.name === "AppModule") ?? (candidates.length === 1 ? candidates[0] : undefined);
-  if (!candidate) throw new Error("Could not select a unique @Module class for registration in App.module.ts.");
+  const candidate = candidates.find((item) => item.name === options.hostClass) ?? (candidates.length === 1 ? candidates[0] : undefined);
+  if (!candidate) throw new Error(`Could not select a unique @Module class for registration in ${path.basename(appFile)}.`);
   const metadata = candidate.metadata;
   if (metadata.properties.some(ts.isSpreadAssignment)) throw new Error("Automatic registration does not support spread @Module metadata; register the module explicitly.");
   if (metadata.properties.some((property) => property.name && ts.isComputedPropertyName(property.name))) throw new Error("Automatic registration does not support computed @Module properties; register the module explicitly.");
-  const importProperties = metadata.properties.filter((property) => property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === "imports");
-  if (importProperties.length > 1) throw new Error("Duplicate imports properties in @Module metadata.");
+  const importProperties = metadata.properties.filter((property) => property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === field);
+  if (importProperties.length > 1) throw new Error(`Duplicate ${field} properties in @Module metadata.`);
   const property = importProperties[0];
   const edits: Edit[] = [];
   if (property) {
     if (!ts.isPropertyAssignment(property) || !ts.isArrayLiteralExpression(property.initializer)) {
-      throw new Error("@Module imports must be an array literal for automatic registration.");
+      throw new Error(`@Module ${field} must be an array literal for automatic registration.`);
     }
     const array = property.initializer;
-    if (array.elements.some(ts.isOmittedExpression)) throw new Error("@Module imports contains an empty element; fix the array before registration.");
+    if (array.elements.some(ts.isOmittedExpression)) throw new Error(`@Module ${field} contains an empty element; fix the array before registration.`);
     if (!array.elements.some((element) => ts.isIdentifier(element) && element.text === binding)) {
       appendMember(content, array, array.elements, binding, edits, eol);
     }
   } else {
-    appendMember(content, metadata, metadata.properties, `imports: [${binding}]`, edits, eol);
+    appendMember(content, metadata, metadata.properties, `${field}: [${binding}]`, edits, eol);
   }
   if (!imported) {
     const lastImport = imports.at(-1);
@@ -110,12 +120,15 @@ export function registerModuleInSource(content: string, appFile: string, moduleF
 function appendMember(content: string, node: ts.Node, members: ts.NodeArray<ts.Node>, member: string, edits: Edit[], eol: string): void {
   const close = node.end - 1;
   const last = members.at(-1);
-  if (last && !members.hasTrailingComma) edits.push({ at: last.end, text: "," });
   const inner = content.slice(node.getStart() + 1, close);
   if (!inner.includes("\n")) {
-    edits.push({ at: close, text: `${last || inner.trim() ? " " : ""}${member}${members.hasTrailingComma ? "," : ""}` });
+    // One line: right after the last member (and its comma), `{ a, b }` → `{ a, b, c }`.
+    if (!last) edits.push({ at: close, text: inner.length > 0 ? `${member} ` : member });
+    else if (members.hasTrailingComma) edits.push({ at: content.indexOf(",", last.end) + 1, text: ` ${member},` });
+    else edits.push({ at: last.end, text: `, ${member}` });
     return;
   }
+  if (last && !members.hasTrailingComma) edits.push({ at: last.end, text: "," });
   const lineStart = content.lastIndexOf("\n", close) + 1;
   const closingIndent = content.slice(lineStart, close);
   if (/^\s*$/.test(closingIndent)) {

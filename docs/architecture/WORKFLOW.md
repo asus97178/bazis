@@ -1,7 +1,7 @@
 # Бизнес-процессы во фреймворке
 
 Идентификатор: **WORKFLOW-001**. Версия: **1.1**. Дата: **2026-10-31**.
-Статус: **принята; этапы 1–4 реализованы в bazis 0.124.0–0.127.0, этап 5 — §12**.
+Статус: **принята; этапы 1–5 реализованы в bazis 0.124.0–0.128.0**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
 HTTP и фоновое исполнение — без CMS. UI во фреймворк не входит: дизайнер,
@@ -488,11 +488,7 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
 3. События (`eventStart`, `eventWait`, `boundaryEvent`, `emit`, HTTP) и
    расписание — 0.126.0.
 4. Часть Tasks — 0.127.0.
-5. Процессы в коде — **решение позже**: файл `processes/X.process.ts` в
-   модуле-владельце и поле `processes` в `@Module` (публикация при старте,
-   ошибка конфигурации при неизвестном Tool), помощник тестов
-   `testWorkflow` (`drain`, управляемое время), команды CLI `g process`,
-   `workflow check`, `workflow diagram`.
+5. Процессы в коде, `testWorkflow`, команды CLI (§14) — 0.128.0.
 
 ## 13. Переход bazis-cms
 
@@ -504,3 +500,90 @@ CMS убирает свои `wf_processes`, `wf_process_versions`, `wf_instances
 «кто запускает» — своей таблицей, которую читает её `WorkflowAccess`.
 Документы переходят с `cms.workflow/v1` на `bazis.workflow/v1` (то же
 содержимое).
+
+## 14. Процессы в коде
+
+Процесс, который приложение не даёт менять пользователям, описывают в коде
+модуля-владельца, рядом с его Tools, и проверяют в CI.
+
+```ts
+// orders_module/processes/OrderApproval.process.ts
+export const OrderApprovalProcess = defineProcess({
+  key: "order-approval",
+  title: "Согласование заказа",
+  retentionDays: 90,
+  document: { schemaVersion: "bazis.workflow/v1", nodes: { … }, flows: { … } },
+});
+
+@Module({ tools: [ChargeTool], processes: [OrderApprovalProcess] })
+export class OrdersModule {}
+```
+
+- `defineProcess` из `bazis/core/workflow` только описывает процесс: ключ,
+  названия, срок хранения и документ `ProcessDocument`. Файл —
+  `processes/<Name>.process.ts`, экспорт — `<Name>Process`.
+- Поле `processes` в `@Module` — канал метаданных модуля (как `tools`).
+  Сборка контейнера проверяет форму описаний и документы без Tools,
+  одинаковые ключи в разных модулях и то, что приложение импортирует
+  `WorkflowModule`; ошибка — ошибка конфигурации с модулем и ключом.
+- При старте служба части Definitions (после создания таблиц) проверяет
+  документы с Tools приложения: неизвестный Tool или Tool без `workflow` в
+  `callers` останавливает старт ошибкой конфигурации со всеми замечаниями
+  всех процессов. Затем публикует каждый процесс под
+  `pg_advisory_xact_lock(hashtext('bazis.workflow.code'))`: создаёт его в
+  каталоге или обновляет названия и срок хранения, кладёт документ в
+  черновик и публикует. Тот же документ новой версии не даёт (хэш §3).
+  Публикует `{ kind: "system", id: "code" }`.
+- Процесс из кода меняется только кодом: `update` (кроме `archived`),
+  `saveDraft` и `publish` такого ключа — `conflict` (409). Архивировать
+  можно: архивный процесс не запускается, а старт его не разархивирует.
+  `ProcessSummary.module` — имя модуля-владельца, `null` у процессов
+  каталога. Схема хранилища не меняется: владение известно из модулей.
+- Процесс, убранный из кода, остаётся в каталоге со своими версиями и
+  становится обычным. Ключ, уже занятый процессом каталога, код забирает:
+  версии продолжаются.
+- Без единого `processes` в модулях служба ничего не делает.
+
+### Время: `WorkflowClock`
+
+Сроки движка — таймеры, повторы, расписание, задержки заданий, чистка, отметки
+задач — берутся из абстрактного `WorkflowClock` (`now(): Date`). По умолчанию —
+системные часы; часть Definitions регистрирует его и экспортирует. Отметки
+записей (`createdAt`, `at` истории) остаются временем базы и процесса.
+
+### Тесты: `bazis/core/workflow/testing`
+
+```ts
+const wf = await testWorkflow(AppModule, { now: "2026-11-02T09:00:00Z" });
+const order = await wf.start("order-approval", { input: { amount: 5000 } });
+await wf.drain();                                // всё, что пора
+await wf.complete(order.id, "approve", { approved: true });
+await wf.advance("PT2H");                        // часы вперёд, затем drain
+expect((await wf.instance(order.id)).status).toBe("completed");
+await wf.stop();
+```
+
+- `testWorkflow(root, options)` запускает приложение как `startTestApp`
+  (опции те же, плюс `now`) с управляемыми часами и выключенным воркером:
+  задания выполняются только в `drain`, поэтому тест детерминирован.
+- `drain()` планирует расписание и выполняет задания, срок которых настал по
+  управляемым часам, пока они есть; возвращает их число. Больше 1000 кругов —
+  ошибка: процесс сам себе создаёт задания.
+- `advance(duration)` — ISO-длительность или миллисекунды; только вперёд.
+- `start`, `emit`, `complete(instanceId, nodeId, output)` (ждущая задача на
+  узле), `instance`, `history`, `now()`, `app`, `stop()`. Действуют от
+  `{ kind: "system", id: "test" }`, если не указано иное.
+- Нужна PostgreSQL, как и самому модулю.
+
+### CLI
+
+- `bazis g process <Name> --module <Name> [--pack <Name>]` создаёт
+  `processes/<Name>.process.ts` в модуле (ручной старт → конец) и добавляет
+  процесс в `processes` его `@Module`.
+- `bazis workflow check [--app-module <path>]` загружает модуль приложения
+  без запуска, собирает `processes` и Tools дерева модулей и проверяет
+  документы с Tools и ключи; замечания с модулем и узлом, код выхода 1 при
+  ошибках. Для CI.
+- `bazis workflow diagram <key> [--app-module <path>]` печатает процесс как
+  Mermaid `flowchart`.
+

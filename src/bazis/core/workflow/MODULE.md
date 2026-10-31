@@ -1,7 +1,7 @@
 # WorkflowModule
 
-Passport version: 1.0. Check date: 2026-10-31.
-Status: implemented for stages 1–4 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
+Passport version: 1.1. Check date: 2026-10-31.
+Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.
@@ -30,17 +30,21 @@ covered by the application's codegen; pure document functions in
 | --- | --- | --- | --- |
 | Definitions | [definitions_module](definitions_module/MODULE.md) | `bazis_wf_def_*`: processes, versions | `library/workflow`, `ToolRunner` |
 | Runtime | [runtime_module](runtime_module/MODULE.md) | `bazis_wf_run_*`: instances, tokens, jobs, subscriptions, history | Definitions (`IWorkflowDefinitions`), `ToolRunner`, `EventBus` |
-| Tasks | [tasks_module](tasks_module/MODULE.md) | `bazis_wf_task_*`: tasks | Runtime (`IWorkflowRuntime`, its events) |
+| Tasks | [tasks_module](tasks_module/MODULE.md) | `bazis_wf_task_*`: tasks | Runtime (`IWorkflowRuntime`, its events), Definitions (`WorkflowClock`) |
 
 Shared contracts of the pack (no providers): `access/WorkflowAccess.ts` (HTTP
 rights port, default: closed), `contracts/WorkflowError.ts`,
-`contracts/WorkflowInputValidator.ts` (field check port), `contracts/types.ts`;
-internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
+`contracts/WorkflowInputValidator.ts` (field check port),
+`contracts/WorkflowClock.ts` (the engine's time; registered by Definitions),
+`contracts/types.ts`; internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
+Tests of processes: the entry `bazis/core/workflow/testing` ([testing/index.ts](testing/index.ts)):
+`testWorkflow` starts the application with a `ManualWorkflowClock` and runs jobs
+only in `drain` / `advance`.
 
 ## 3. Public inputs
 
 `exports: [IWorkflowDefinitions, IWorkflowRuntime, IWorkflowTasks]`; the parts' HTTP under
-`/workflow/...`; events `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
+`/workflow/...`; the `@Module` field `processes` with `defineProcess`; events `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
 `WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED`; settings `workflowRuntimeConfig` (prefix `workflow`).
 
 ## 4. Checks
@@ -64,5 +68,17 @@ internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
   checked on completion, a completed task moving the process, a personal task,
   a cancelled instance cancelling its task, retention deleting the tasks of
   deleted instances.
+- PASS `src/bazis/core/workflow/test/workflow.code.test.ts` — build-time errors of `processes`
+  (document, form, one key per application, `WorkflowModule` missing), `inspectProcesses`,
+  `ManualWorkflowClock`.
+- PASS `src/bazis/core/workflow/test/workflow.postgres.code.live.test.ts` on PostgreSQL 17
+  (stage 5, own database `bazis_wf_code_*`): publication at start once per document,
+  `module` in the catalog, `conflict` on HTTP and service changes of a code process,
+  archive kept over a restart, a changed document as the next version, a process
+  removed from code becoming the catalog's own, an unknown Tool stopping the start;
+  `testWorkflow`: no worker behind the test, `drain`, `complete` through the task,
+  a boundary timer by `advance`, a schedule firing by the clock and no catch-up after
+  three days.
+- PASS `src/bazis/library/workflow/test/workflow.mermaid.test.ts`, `src/bazis/cli/test/workflow.cli.test.ts`.
 - Not checked: OpenAPI of the workflow routes (the framework's controllers read
   `HttpContext` directly and do not appear in the application's OpenAPI document).

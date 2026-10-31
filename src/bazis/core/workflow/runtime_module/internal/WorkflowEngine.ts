@@ -2,6 +2,7 @@ import type { ServiceResolver } from "../../../di";
 import { EventBus, type EventToken, type Logger } from "../../../kernel";
 import { durationMs, evaluateCondition, nodeKindOf, readPath, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
 import type { WorkflowActor } from "../../contracts/types";
+import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import { WORKFLOW_INSTANCE_FINISHED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED } from "../events/Runtime.events";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
@@ -53,7 +54,13 @@ export class WorkflowEngine {
     private readonly events: EventBus,
     private readonly scope: ServiceResolver,
     private readonly logger: Logger | undefined,
+    private readonly clock: WorkflowClock,
   ) {}
+
+  /** The engine's time ({@link WorkflowClock}). */
+  now(): Date {
+    return this.clock.now();
+  }
 
   /** The graph of a version. Versions are immutable, so graphs are cached. */
   async graphOf(versionId: string): Promise<ProcessGraph> {
@@ -168,7 +175,7 @@ export class WorkflowEngine {
     const token = step.tokens.find((t) => t.id === tokenId);
     if (!token || token.status !== "waiting" || step.instance.status !== "running") return false;
     const node = step.graph.document.nodes[token.nodeId];
-    const firedAt = new Date().toISOString();
+    const firedAt = this.now().toISOString();
     if (node?.kind === "timerCatch") {
       this.history(step, token, token.nodeId, "timer", { firedAt });
       return await this.complete(step, tokenId, { firedAt });
@@ -239,12 +246,12 @@ export class WorkflowEngine {
     const open = step.tokens.filter((t) => LIVE.has(t.status));
     for (const token of open) {
       token.status = "cancelled";
-      token.endedAt = new Date();
+      token.endedAt = this.now();
     }
     await this.db.jobs.asNoTracking().where((j) => j.instanceId.eq(step.instance.id)).executeDelete();
     await this.db.subscriptions.asNoTracking().where((s) => s.instanceId.eq(step.instance.id)).executeDelete();
     step.instance.status = "cancelled";
-    step.instance.endedAt = new Date();
+    step.instance.endedAt = this.now();
     this.history(step, null, null, "cancelled", { reason }, actor);
     for (const token of open) {
       if (token.nodeId !== "" && step.graph.document.nodes[token.nodeId]?.kind === "userTask") {
@@ -278,7 +285,7 @@ export class WorkflowEngine {
     }
     if (step.instance.status === "running" && !step.tokens.some((t) => LIVE.has(t.status))) {
       step.instance.status = "completed";
-      step.instance.endedAt = new Date();
+      step.instance.endedAt = this.now();
       this.history(step, null, null, "completed", null);
       this.finished(step, "completed");
     }
@@ -319,7 +326,7 @@ export class WorkflowEngine {
   }
 
   private waitForTimer(step: Step, token: WfToken, node: ProcessNode): WfToken[] {
-    const dueAt = timerDue(node.config ?? {}, dataOf(step.instance));
+    const dueAt = timerDue(node.config ?? {}, dataOf(step.instance), this.now());
     if (dueAt === undefined) {
       this.fail(step, token, "bad_timer", `the timer of ${token.nodeId} has no valid date`);
       return [];
@@ -348,7 +355,7 @@ export class WorkflowEngine {
         continue;
       }
       if (node.kind !== "boundaryTimer") continue;
-      const dueAt = timerDue(node.config ?? {}, dataOf(step.instance));
+      const dueAt = timerDue(node.config ?? {}, dataOf(step.instance), this.now());
       if (dueAt === undefined) {
         this.fail(step, host, "bad_timer", `the timer of ${id} has no valid date`);
         return [];
@@ -393,7 +400,7 @@ export class WorkflowEngine {
 
   private waitForTool(step: Step, token: WfToken): WfToken[] {
     token.status = "waiting";
-    this.db.jobs.add(Object.assign(new WfJob(), { id: Bun.randomUUIDv7(), kind: "tool" as const, instanceId: step.instance.id, tokenId: token.id, dueAt: new Date() }));
+    this.db.jobs.add(Object.assign(new WfJob(), { id: Bun.randomUUIDv7(), kind: "tool" as const, instanceId: step.instance.id, tokenId: token.id, dueAt: this.now() }));
     return [];
   }
 
@@ -412,7 +419,7 @@ export class WorkflowEngine {
         title: node.title,
         assignee: config.assignee as { role: string } | { user: string },
         form: (config.form as FormSpec | undefined) ?? null,
-        dueAt: dueIn === undefined ? null : new Date(Date.now() + dueIn),
+        dueAt: dueIn === undefined ? null : new Date(this.now().getTime() + dueIn),
       },
     });
     return [];
@@ -467,7 +474,7 @@ export class WorkflowEngine {
 
   private close(token: WfToken, status: "done" | "cancelled"): void {
     token.status = status;
-    token.endedAt = new Date();
+    token.endedAt = this.now();
   }
 
   private spawn(step: Step, nodeId: string, viaFlowId: string | null): WfToken {
@@ -505,10 +512,10 @@ export class WorkflowEngine {
 }
 
 /** When a timer fires: `duration` from now, or the date at the `at` path; `undefined` if neither is valid. */
-export function timerDue(config: Readonly<Record<string, unknown>>, data: InstanceData): Date | undefined {
+export function timerDue(config: Readonly<Record<string, unknown>>, data: InstanceData, now: Date): Date | undefined {
   if (typeof config.duration === "string") {
     const ms = durationMs(config.duration);
-    return ms === undefined ? undefined : new Date(Date.now() + ms);
+    return ms === undefined ? undefined : new Date(now.getTime() + ms);
   }
   if (typeof config.at === "string") {
     const value = readPath(data, config.at);

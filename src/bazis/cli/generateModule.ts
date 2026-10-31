@@ -39,7 +39,7 @@ export interface GenerateModuleResult {
   readonly warnings: readonly string[];
 }
 
-interface PlannedWrite {
+export interface PlannedWrite {
   readonly absolute: string;
   readonly content: string;
   readonly original: string | undefined;
@@ -82,7 +82,7 @@ export async function generateModulePack(options: GenerateModulePackOptions): Pr
 }
 
 /** The existing composite module `name` under `modulesRoot`: `Catalog` → `catalog_modules/Catalog.module.ts`. */
-async function findPack(modulesRoot: string, name: string): Promise<{ readonly dir: string; readonly entry: string; readonly moduleClass: string }> {
+export async function findPack(modulesRoot: string, name: string): Promise<{ readonly dir: string; readonly entry: string; readonly moduleClass: string }> {
   const naming = parseModuleName(name);
   const dir = path.join(modulesRoot, `${naming.folder}_modules`);
   const entry = path.join(dir, `${naming.module}.module.ts`);
@@ -150,7 +150,7 @@ async function generateFiles(options: GenerateModuleOptions, naming: ModuleNamin
   };
 }
 
-async function fileInfo(absolute: string) {
+export async function fileInfo(absolute: string) {
   try {
     return await lstat(absolute);
   } catch (error) {
@@ -161,7 +161,7 @@ async function fileInfo(absolute: string) {
 }
 
 /** Relative imports must survive runtime realpath resolution (e.g. /var -> /private/var). */
-async function canonicalDirectory(directory: string): Promise<string> {
+export async function canonicalDirectory(directory: string): Promise<string> {
   try {
     return await realpath(directory);
   } catch (error) {
@@ -172,7 +172,7 @@ async function canonicalDirectory(directory: string): Promise<string> {
   }
 }
 
-async function commitWrites(writes: readonly PlannedWrite[]): Promise<void> {
+export async function commitWrites(writes: readonly PlannedWrite[]): Promise<void> {
   const completed: PlannedWrite[] = [];
   const createdDirectories = new Set<string>();
   try {

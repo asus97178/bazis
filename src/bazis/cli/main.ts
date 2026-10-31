@@ -6,12 +6,18 @@ import { parseCliArgs, type ParsedGenerateArgs } from "./parseCli";
 import { runCodegen, type CodegenOptions } from "./codegen";
 import { generateProject } from "./generateProject";
 import { runBuild, runDev, runTest } from "./build";
+import type { ParsedProcessArgs } from "./parseCli";
 import { bazisVersion, commandFailed, commandHeader, createScreens, lineOutput, requiredBun, type CliOutput } from "./ui";
 
 export const USAGE = `Usage:
   bazis new <Name> [options]                  Create a new application project
   bazis g module <Name> [options]             Atomic module (alias: m)
   bazis g pack <Name> --parts <a,b> [options] Composite module (aliases: p, module-pack)
+  bazis g process <Name> --module <Name>      Process in code: processes/<Name>.process.ts in the module,
+                                             listed in its @Module processes (alias: pr; --pack <Name>
+                                             for a part of a composite module)
+  bazis workflow check [--app-module <path>]  Check the processes of the modules against their Tools
+  bazis workflow diagram <key>                Print a process as a Mermaid flowchart
   bazis codegen [--target <name|all>]         Generate DI wiring into src/generated/bazis
   bazis dev [--watch]                         Codegen, then run the app from source with
                                              BAZIS_ENV=development (unless set);
@@ -58,6 +64,9 @@ Examples (from the project root):
   bunx bazis g module Mailer --empty --no-register
   bunx bazis g pack DataManager --parts tables,fields,validators,records
   bunx bazis g module Prices --empty --pack Catalog
+  bunx bazis g process OrderApproval --module Orders
+  bunx bazis workflow check
+  bunx bazis workflow diagram order-approval > order-approval.mmd
   bunx bazis codegen --target production
   bunx bazis dev --watch
   bunx bazis test
@@ -134,13 +143,38 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
     if (parsed.kind === "test") return await runTest(cwd, parsed.args, codegen, ui);
     if (parsed.kind === "build") return await runBuild(cwd, { bin: parsed.bin, outfile: parsed.outfile, dotenv: parsed.dotenv, platform: parsed.platform }, codegen, ui);
     if (parsed.kind === "new") return await runNew(parsed, ui);
+    if (parsed.kind === "workflow") {
+      const { runWorkflowCheck, runWorkflowDiagram } = await import("./workflow");
+      return parsed.action === "check" ? await runWorkflowCheck(cwd, parsed.appModule, ui) : await runWorkflowDiagram(cwd, parsed.key, parsed.appModule, runtime.log);
+    }
     // Module registration parses the host module with the TypeScript API: load it
     // only after switching TypeScript 7 to @typescript/typescript6.
     useTypeScriptCompilerApi(cwd);
+    if (parsed.kind === "process") return await runGenerateProcess(cwd, parsed.args, ui);
     return await runGenerate(cwd, parsed.args, codegen, ui);
   } catch (error) {
-    return commandFailed(ui.err, ui.err.t.failure.command, [{ tag: "CLI", where: parsed.kind === "generate" ? `g ${parsed.args.generator}` : parsed.kind, cause: error instanceof Error ? error.message : String(error) }], 1);
+    return commandFailed(ui.err, ui.err.t.failure.command, [{ tag: "CLI", where: parsed.kind === "generate" ? `g ${parsed.args.generator}` : parsed.kind === "process" ? "g process" : parsed.kind === "workflow" ? `workflow ${parsed.action}` : parsed.kind, cause: error instanceof Error ? error.message : String(error) }], 1);
   }
+}
+
+async function runGenerateProcess(cwd: string, args: ParsedProcessArgs, ui: CliOutput): Promise<number> {
+  const s = ui.out;
+  const t = s.t;
+  const { generateProcess } = await import("./generateProcess");
+  commandHeader(s, "gen", cwd, [
+    s.kv(t.workflow.processKind, s.strong(args.name)),
+    s.kv(t.noun("module", 1), s.text(args.pack === undefined ? args.module : `${args.pack} / ${args.module}`)),
+    ...(args.dryRun ? [s.fg(PALETTE.yellow, t.common.dryRun)] : []),
+  ]);
+  const result = await generateProcess(args);
+  s.section(t.section.files, s.muted(path.relative(cwd, result.moduleDir) || result.moduleDir));
+  s.step("ok", t.step.files, s.num(result.changes.length, t.noun("change", result.changes.length)));
+  s.tree(result.changes.map((change) => ({ text: `${change.action === "create" ? s.strong("+", PALETTE.lime) : s.strong("~", PALETTE.yellow)} ${s.text(change.path)}` })), s.style.color ? 9 : 4);
+  const host = result.changes.find((change) => change.action === "update")?.path;
+  if (host !== undefined) s.line(`  ${s.strong("↗", PALETTE.export)}  ${s.text(t.workflow.processRegistered(host))}`);
+  s.line();
+  s.banner("success", result.dryRun ? t.workflow.processPlanned(args.name) : t.workflow.processCreated(args.name));
+  return 0;
 }
 
 async function runCodegenCommand(cwd: string, target: string | undefined, codegen: CliRuntime["codegen"], ui: CliOutput): Promise<number> {

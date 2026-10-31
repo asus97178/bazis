@@ -22,7 +22,7 @@ export class Schedules {
   ) {}
 
   /** Adds jobs for new scheduled versions and drops those of replaced or archived ones. */
-  async reconcile(now = new Date()): Promise<void> {
+  async reconcile(now = this.engine.now()): Promise<void> {
     const versions = (await this.definitions.published()).filter((version) => scheduleNodes(version).length > 0);
     const wanted = new Map(versions.map((version) => [version.id, version]));
     const added: WfJob[] = [];
@@ -58,7 +58,9 @@ export class Schedules {
     const due = new Date(Math.floor(job.dueAt.getTime() / 60_000) * 60_000);
     const graph = this.engine.cache(latest);
     await this.db.transactionScope(async () => {
-      const next = nextFiring(latest, due);
+      // Planned from now, not from the missed firing: a stopped worker does not catch up.
+      const now = this.engine.now();
+      const next = nextFiring(latest, now > due ? now : due);
       if (next === undefined) await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
       else await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeUpdate({ dueAt: next, lockedUntil: null, attempts: 0, lastError: null });
       for (const [nodeId, cron] of scheduleNodes(latest)) {

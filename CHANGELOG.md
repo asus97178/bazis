@@ -4,6 +4,44 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.128.0 — 2026-10-31
+
+Business processes, stage 5 of WORKFLOW-001: processes in code, tests of
+processes and CLI commands.
+
+### Added
+
+- `defineProcess({ key, title, description?, retentionDays?, document })` and the
+  `@Module` field `processes`: a module declares its processes next to its Tools.
+  The container build checks the fields and the document, one key per
+  application and that `WorkflowModule` is imported (`WorkflowSetupError`, a
+  configuration error). At start the processes are checked with the Tools (an
+  unknown Tool stops the start with every finding) and published once per
+  document as `{ kind: "system", id: "code" }`.
+- A process declared in code changes only through the code: `update` (except
+  `archived`), `saveDraft` and `publish` answer `conflict` (409).
+  `ProcessSummary.module` names the owner module, `null` for the catalog's own.
+- `WorkflowClock` (`SystemWorkflowClock` by default): the engine's time for
+  timers, retries, schedules, job delays, retention and task marks.
+- `bazis/core/workflow/testing`: `testWorkflow(AppModule, { now })` starts the
+  application with a `ManualWorkflowClock` and no worker; `drain()` runs the due
+  jobs, `advance("PT2H")` moves the clock and drains; `start`, `emit`,
+  `complete(instanceId, nodeId, output)`, `instance`, `history`.
+- `processToMermaid(document)` in `bazis/library/workflow`.
+- CLI: `bazis g process <Name> --module <Name> [--pack <Name>]` creates
+  `processes/<Name>.process.ts` and lists it in the module's `processes`;
+  `bazis workflow check` checks the processes of the module tree against its
+  Tools without starting the application (exit code 1 on errors);
+  `bazis workflow diagram <key>` prints a process as a Mermaid flowchart.
+
+### Fixed
+
+- A schedule whose firings were missed while no worker ran fired once for each
+  missed one; it now fires once and plans the next firing from now, as
+  documented.
+- CLI registration in a one-line `@Module({ … })` put a double space before the
+  new entry and none before `}`.
+
 ## 0.127.0 — 2026-10-31
 
 Business processes, stage 4 of WORKFLOW-001: tasks for people.

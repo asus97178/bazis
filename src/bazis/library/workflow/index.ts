@@ -22,4 +22,5 @@ export { DATA_PATH, isPath, readPath, resolveInput, type InstanceData } from "./
 export { evaluateCondition } from "./conditions";
 export { durationMs } from "./duration";
 export { parseCron, type CronSchedule } from "./cron";
+export { processToMermaid } from "./mermaid";
 export { checkFormSpec, formFieldCodes, validateForm, type FormField, type FormFieldType, type FormIssue, type FormSpec } from "./formFields";

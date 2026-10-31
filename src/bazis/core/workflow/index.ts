@@ -3,7 +3,12 @@
  * with the Definitions and Runtime parts, their services, HTTP, events and
  * extension points. The document format is `bazis/library/workflow`.
  */
+import type { CodeProcess } from "./definitions_module/code/defineProcess";
+
 export { WorkflowModule } from "./Workflow.module";
+export { defineProcess, type CodeProcess, type ProcessDefinition } from "./definitions_module/code/defineProcess";
+export { WorkflowSetupError } from "./definitions_module/code/codeProcesses";
+export { WorkflowClock, SystemWorkflowClock } from "./contracts/WorkflowClock";
 export { WorkflowDefinitionsModule } from "./definitions_module/WorkflowDefinitions.module";
 export { WorkflowRuntimeModule } from "./runtime_module/WorkflowRuntime.module";
 export { WorkflowTasksModule } from "./tasks_module/WorkflowTasks.module";
@@ -48,3 +53,12 @@ export { WorkflowAccess, DenyWorkflowAccess, type WorkflowAccessTarget, type Wor
 export { WorkflowInputValidator, DefaultWorkflowInputValidator, type WorkflowInputContext } from "./contracts/WorkflowInputValidator";
 export { WorkflowError, type WorkflowErrorCode } from "./contracts/WorkflowError";
 export type { WorkflowActor, WorkflowPage, WorkflowPaging } from "./contracts/types";
+
+// Augment the declaring file, not the "../di" re-export: re-export targets
+// depend on program file order and silently stop merging in some projects.
+declare module "../di/module/types/BazisModule" {
+  interface BazisModuleMetadata {
+    /** Processes of the module, from `defineProcess`: published at start (WORKFLOW-001 §14). */
+    readonly processes?: readonly CodeProcess[];
+  }
+}

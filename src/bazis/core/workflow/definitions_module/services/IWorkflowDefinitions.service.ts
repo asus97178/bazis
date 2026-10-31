@@ -9,6 +9,11 @@ export interface ProcessSummary {
   readonly latestVersion: number | null;
   readonly retentionDays: number | null;
   readonly archived: boolean;
+  /**
+   * The module whose `@Module({ processes })` declares it; such a process
+   * changes only through the code (WORKFLOW-001 §14). `null` for the catalog's own.
+   */
+  readonly module: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -61,10 +66,14 @@ export abstract class IWorkflowDefinitions {
   abstract list(query?: ProcessListQuery): Promise<WorkflowPage<ProcessSummary>>;
   abstract get(key: string): Promise<ProcessDetails>;
   abstract create(process: CreateProcess, actor: WorkflowActor): Promise<ProcessDetails>;
+  /** A process declared in code takes only `archived`; other fields give `conflict`. */
   abstract update(key: string, changes: UpdateProcess, actor: WorkflowActor): Promise<ProcessDetails>;
-  /** Stores the draft even with errors and returns every validation finding. */
+  /** Stores the draft even with errors and returns every validation finding; `conflict` for a process declared in code. */
   abstract saveDraft(key: string, document: unknown, actor: WorkflowActor): Promise<{ readonly issues: readonly ProcessIssue[] }>;
-  /** Validates the draft and stores it as the next version; the same document again returns the latest version. */
+  /**
+   * Validates the draft and stores it as the next version; the same document
+   * again returns the latest version. `conflict` for a process declared in code.
+   */
   abstract publish(key: string, actor: WorkflowActor): Promise<VersionDetails>;
   abstract versions(key: string): Promise<readonly VersionSummary[]>;
   abstract version(key: string, version: number): Promise<VersionDetails>;

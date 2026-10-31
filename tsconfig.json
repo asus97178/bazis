@@ -24,6 +24,9 @@
       "bazis/core/workflow": [
         "./src/bazis/core/workflow/index.ts"
       ],
+      "bazis/core/workflow/testing": [
+        "./src/bazis/core/workflow/testing/index.ts"
+      ],
       "bazis/library/workflow": [
         "./src/bazis/library/workflow/index.ts"
       ],

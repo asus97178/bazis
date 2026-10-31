@@ -1,6 +1,7 @@
 import { BackgroundService, delay } from "../../../background";
 import type { ServiceProvider } from "../../../di";
 import { EventBus, type ConfigView } from "../../../kernel";
+import { WorkflowClock } from "../../contracts/WorkflowClock";
 import { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import { WORKFLOW_INSTANCES_DELETED } from "../events/Runtime.events";
 import { RuntimeDbContext } from "../model/Runtime.dbContext";
@@ -24,7 +25,7 @@ export class WorkflowRetention extends BackgroundService {
   }
 
   protected override async execute(signal: AbortSignal): Promise<void> {
-    if (!this.config.get("retention.enabled")) return;
+    if (!this.config.get("retention.enabled") || this.services.resolve(WorkflowClock).manual === true) return;
     const intervalMs = this.config.get("retention.intervalMs");
     while (!signal.aborted) {
       try {
@@ -45,8 +46,9 @@ export class WorkflowRetention extends BackgroundService {
     try {
       const definitions = scope.resolve(IWorkflowDefinitions);
       const db = scope.resolve(RuntimeDbContext);
+      const now = scope.resolve(WorkflowClock).now().getTime();
       for (const policy of await definitions.retentionPolicies()) {
-        const cutoff = new Date(Date.now() - policy.retentionDays * DAY_MS);
+        const cutoff = new Date(now - policy.retentionDays * DAY_MS);
         for (;;) {
           if (signal?.aborted) return deleted;
           const ids = (await db.instances.asNoTracking()

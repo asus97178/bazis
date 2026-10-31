@@ -1,6 +1,6 @@
 # WorkflowDefinitionsModule
 
-Passport version: 1.0. Check date: 2026-10-31.
+Passport version: 1.1. Check date: 2026-10-31.
 Status: implemented; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/definitions_module`.
@@ -11,18 +11,26 @@ Connection point: [WorkflowDefinitions.module.ts](WorkflowDefinitions.module.ts)
 The process catalog: a process by key with names, a draft a designer edits
 and the retention period; publication of the draft as an immutable version.
 Validation is `validateProcess` of `bazis/library/workflow` with the Tools
-whose `callers` list `workflow`.
+whose `callers` list `workflow`. Processes declared in code
+(`@Module({ processes })`, `defineProcess`) are checked when the container is
+built and published at start; they change only through the code.
+The part provides the pack's `WorkflowClock`.
 
 ## 2. Components
 
 | Component | File | Dependencies | Output |
 | --- | --- | --- | --- |
 | `WfProcess`, `WfVersion`, `DefinitionsDbContext` | [model](model) | ORM, owned store `bazis.workflow.definitions` | tables `bazis_wf_def_processes`, `bazis_wf_def_versions` |
-| `IWorkflowDefinitions` / `WorkflowDefinitions` (scoped) | [services](services) | `DefinitionsDbContext`, `WorkflowTools` | catalog operations, `WorkflowError` |
+| `IWorkflowDefinitions` / `WorkflowDefinitions` (scoped) | [services](services) | `DefinitionsDbContext`, `WorkflowTools`, `CodeProcessCatalog`, `WorkflowClock` | catalog operations, `WorkflowError`; `conflict` on changes of a process declared in code; `publishCode` |
+| `defineProcess`, the `processes` channel | [code/defineProcess.ts](code/defineProcess.ts), [code/codeProcesses.ts](code/codeProcesses.ts) | module-owned metadata of DI | build-time check: the fields, the document without Tools, one key per application, `WorkflowModule` imported; `WorkflowSetupError` as a configuration error |
+| `CodeProcessCatalog` (singleton) | [code/CodeProcessCatalog.ts](code/CodeProcessCatalog.ts) | the container's contributions | which module owns a key (`ProcessSummary.module`) |
+| `CodeProcessPublisher` (hosted, phase 0) | [code/CodeProcessPublisher.ts](code/CodeProcessPublisher.ts) | `CodeProcessCatalog`, `WorkflowTools`, `WorkflowDefinitions` | after the schema: checks with the Tools (an unknown Tool stops the start), then publishes under `pg_advisory_xact_lock(hashtext('bazis.workflow.code'))` as `{ kind: "system", id: "code" }` |
+| `inspectProcesses` | [code/inspectProcesses.ts](code/inspectProcesses.ts) | the module tree, `@Tool` metadata | the checks of build and start without the container, for `bazis workflow check` |
+| `WorkflowClock` (singleton) | [../contracts/WorkflowClock.ts](../contracts/WorkflowClock.ts) | — | the engine's time; `SystemWorkflowClock` by default |
 | `WorkflowTools` (singleton) | [../internal/WorkflowTools.ts](../internal/WorkflowTools.ts) | `ToolRunner.as("workflow")` if the application has Tools | which Tools a service task may call, their contracts |
 | `ProcessesController` | [http/Processes.controller.ts](http/Processes.controller.ts) | `IWorkflowDefinitions`, `WorkflowAccess` | `/workflow/processes…`, `/workflow/tools` |
 
-exports: `[IWorkflowDefinitions, WorkflowTools]`.
+exports: `[IWorkflowDefinitions, WorkflowTools, WorkflowClock]`.
 
 ## 3. Data
 
@@ -34,7 +42,8 @@ exports: `[IWorkflowDefinitions, WorkflowTools]`.
 canonical JSON), `publishedAt`, `publishedByKind/ById`.
 
 Publishing holds the process row `FOR UPDATE`; the same document again returns
-the latest version instead of a new one.
+the latest version instead of a new one. Ownership by code is not stored: it is
+known from the modules, so a process removed from code becomes the catalog's own.
 
 ## 4. HTTP
 
