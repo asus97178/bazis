@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.127.0.
+Список — по пакету 0.128.0.
 
 ## Модули
 
@@ -19,6 +19,9 @@
 | `IWorkflowDefinitions` | Каталог: `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowRuntime` | Исполнение: `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowTasks` | Входящие задачи: `list`, `get`, `claim`, `release`, `complete` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
+| `defineProcess({ key, title, description?, retentionDays?, document })` | Процесс в коде модуля: перечисляется в `@Module({ processes })`, публикуется при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
+| `WorkflowSetupError` | Ошибка конфигурации процессов в коде: при сборке и при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
+| `WorkflowClock`, `SystemWorkflowClock` | Часы движка (`now()`): сроки таймеров, повторов, расписания; по умолчанию системные | [Тесты процесса](../../workflow/processes.md#тесты-процесса) |
 | `workflowRuntimeConfig` | Настройки `workflow.worker.*` и `workflow.retention.*` | [Несколько экземпляров](../../workflow/processes.md#несколько-экземпляров-приложения) |
 | `WorkflowError` | Ошибка с `code` и HTTP-статусом | [Из кода](../../workflow/processes.md#из-кода) |
 
@@ -38,7 +41,9 @@
 
 ## Типы
 
-- **Каталог:** `ProcessSummary`, `ProcessDetails`, `VersionSummary`,
+- **Процессы в коде:** `ProcessDefinition`, `CodeProcess`; поле `processes`
+  в метаданных `@Module`.
+- **Каталог:** `ProcessSummary` (с `module` — модулем-владельцем процесса из кода), `ProcessDetails`, `VersionSummary`,
   `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`.
 - **Исполнение:** `StartInstance`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
   `TokenDetails`, `HistoryEntry`, `InstanceListQuery`, `InstanceStatus`,

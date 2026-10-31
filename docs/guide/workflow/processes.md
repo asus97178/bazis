@@ -9,7 +9,7 @@
 базе, фоновый воркер, события и HTTP. Интерфейса нет: дизайнер процессов,
 входящие задачи и формы строит приложение поверх сервисов и HTTP модуля.
 
-Все примеры проверены на bazis 0.124.0–0.127.0 с PostgreSQL 17 в приложении
+Все примеры проверены на bazis 0.124.0–0.128.0 с PostgreSQL 17 в приложении
 «Заказы» из этой главы.
 
 ## Подключение
@@ -175,6 +175,9 @@ POST /workflow/processes/order/publish
   создаёт новую.
 - `retentionDays` — сколько дней хранить завершённые и отменённые
   экземпляры вместе с их задачами; упавшие не удаляются никогда.
+
+Процесс можно описать и в коде модуля — тогда он публикуется при старте и
+меняется только кодом ([Процесс в коде](#процесс-в-коде)).
 
 Для дизайнера есть `GET /workflow/tools`: инструменты, доступные процессам,
 со схемами входа и выхода, по которым строится форма настройки шага.
@@ -655,6 +658,261 @@ export class OrdersService {
 `conflict`, `wrong_status`, `archived` (409), `invalid_document`,
 `invalid_input` (422, с `issues`). Контроллер может просто пробросить её.
 
+## Процесс в коде
+
+Процесс, который пользователи не должны менять, описывают в коде модуля —
+рядом с его инструментами. Он проверяется при сборке и в CI, публикуется при
+старте приложения и попадает в тот же каталог. Заготовку создаёт CLI:
+
+```sh
+bunx bazis g process Delivery --module Delivery
+```
+
+```text
+  ── FILES ─────────────────────────────────────────── src/app/modules/delivery
+  [OK  ]  files           2 changes
+    ├─ + src/app/modules/delivery/processes/Delivery.process.ts
+    └─ ~ src/app/modules/delivery/Delivery.module.ts
+  ↗  listed in processes of src/app/modules/delivery/Delivery.module.ts
+```
+
+В заготовке — ручной старт и конец. Документ — тот же `bazis.workflow/v1`,
+что и в каталоге, только записанный в TypeScript, с подсказками типов:
+
+```ts
+// delivery/processes/Delivery.process.ts
+import { defineProcess } from "bazis/core/workflow";
+
+export const DeliveryProcess = defineProcess({
+  key: "delivery",
+  title: "Доставка",
+  retentionDays: 30,
+  document: {
+    schemaVersion: "bazis.workflow/v1",
+    input: { fields: [
+      { code: "orderId", type: "string", required: true },
+      { code: "city", type: "string", required: true },
+    ] },
+    nodes: {
+      Start: { kind: "manualStart", title: "Заказ оплачен" },
+      Book: { kind: "serviceTask", title: "Забронировать доставку", config: {
+        tool: "delivery.book",
+        input: { orderId: "$input.orderId", city: "$input.city" },
+        saveTo: "delivery",
+        retry: { maxAttempts: 3, backoff: "PT1M" },
+      } },
+      NoSlots: { kind: "boundaryError", title: "Нет слотов", attachedTo: "Book", config: { errorCode: "no_slots" } },
+      Arrange: { kind: "userTask", title: "Договориться о доставке", config: { assignee: { role: "logistics" } } },
+      Late: { kind: "boundaryTimer", title: "Не успели за 4 часа", attachedTo: "Arrange", config: { duration: "PT4H" } },
+      Escalate: { kind: "serviceTask", title: "Сообщить менеджеру", config: {
+        tool: "notify.manager", input: { text: "Доставка не согласована" },
+      } },
+      Shipped: { kind: "end", title: "Передан в доставку" },
+      Escalated: { kind: "end", title: "У менеджера" },
+    },
+    flows: {
+      f1: { source: "Start", target: "Book" },
+      f2: { source: "Book", target: "Shipped" },
+      f3: { source: "NoSlots", target: "Arrange" },
+      f4: { source: "Arrange", target: "Shipped" },
+      f5: { source: "Late", target: "Escalate" },
+      f6: { source: "Escalate", target: "Escalated" },
+    },
+  },
+});
+```
+
+```ts
+// delivery/Delivery.module.ts
+@Module({ tools: [BookTool, NotifyManagerTool], processes: [DeliveryProcess] })
+export class DeliveryModule {}
+```
+
+При старте процесс публикуется от `{ kind: "system", id: "code" }`:
+
+```text
+info: workflow processes from code {"published":["delivery v2"],"unchanged":[]}
+```
+
+- **Проверка в два этапа.** При сборке контейнера — поля и документ без
+  инструментов, один ключ на приложение и подключённый `WorkflowModule`. При
+  старте — документ с инструментами приложения. Ошибка останавливает запуск
+  и перечисляет все замечания всех процессов:
+
+  ```text
+  [bazis] configuration error: Processes declared in code cannot be published:
+  DeliveryModule: process "delivery":
+    - node Book: Tool "delivery.bok" does not exist or does not list "workflow" in its callers (unknown_tool)
+  ```
+
+- **Версии как в каталоге.** Тот же документ при следующем старте новой
+  версии не даёт (`"unchanged":["delivery"]`). Изменили документ — следующий
+  старт публикует новую версию; запущенные экземпляры дорабатывают свою.
+- **Меняется только кодом.** Черновик, публикация и названия такого процесса
+  через HTTP и `IWorkflowDefinitions` — `409`:
+
+  ```text
+  PUT /workflow/processes/delivery/draft  {"document":{…}}
+  → 409 {"error":"Process delivery is declared in code by DeliveryModule and changes only there","details":{"code":"conflict"}}
+  ```
+
+  Архивировать можно (`PATCH … {"archived":true}`): архивный процесс не
+  запускается, и следующий старт его не разархивирует. В каталоге у процесса
+  `"module":"DeliveryModule"`, у процессов каталога — `null`; по этому полю
+  дизайнер показывает процесс только для чтения.
+- **Ключ из каталога код забирает.** В примере `delivery` уже был в каталоге
+  с версией 1 от `anna`; процесс из кода стал версией 2.
+- **Убрали из кода** — процесс остаётся в каталоге со своими версиями и
+  становится обычным: его снова можно править через HTTP.
+
+## Проверка и схема: `bazis workflow`
+
+`bazis workflow check` загружает модуль приложения, не запуская его, и
+делает обе проверки — сборки и старта. Базу не трогает, поэтому подходит для
+CI: при ошибках код выхода 1.
+
+```sh
+bunx bazis workflow check
+```
+
+```text
+  ── PROCESSES IN CODE ──────────────────────────────────── 1 process · 3 tools
+  [FAIL]  delivery        DeliveryModule · 8 nodes
+    └─ node Book: Tool "delivery.bok" does not exist or does not list "workflow" in its callers (unknown_tool)
+
+    ✖  FAILED   process check failed · 1 error
+```
+
+После исправления:
+
+```text
+  [OK  ]  delivery        DeliveryModule · 8 nodes
+
+    ✔  SUCCESS   1 process checked
+```
+
+`bazis workflow diagram <ключ>` печатает процесс как схему
+[Mermaid](https://mermaid.js.org) — её показывают GitHub, GitLab и многие
+редакторы Markdown:
+
+```sh
+bunx bazis workflow diagram delivery > delivery.mmd
+```
+
+```mermaid
+flowchart LR
+  Start(["Заказ оплачен"])
+  Book[["Забронировать доставку<br/><small>delivery.book</small>"]]
+  NoSlots(("Нет слотов<br/><small>no_slots</small>"))
+  Arrange["Договориться о доставке<br/><small>role logistics</small>"]
+  Late(("Не успели за 4 часа<br/><small>PT4H</small>"))
+  Escalate[["Сообщить менеджеру<br/><small>notify.manager</small>"]]
+  Shipped(("Передан в доставку"))
+  Escalated(("У менеджера"))
+  Book -.- NoSlots
+  Arrange -.- Late
+  Start --> Book
+  Book --> Shipped
+  NoSlots --> Arrange
+  Arrange --> Shipped
+  Late --> Escalate
+  Escalate --> Escalated
+```
+
+Старты — овалы, шаги с инструментом — двойные прямоугольники, задачи —
+прямоугольники, ожидания — шестиугольники, шлюзы — ромбы, концы и граничные
+события — круги; граничное событие висит на своём шаге пунктиром. Та же
+функция для любого документа — `processToMermaid` из
+`bazis/library/workflow`.
+
+Обе команды по умолчанию берут `src/app/modules/App.module.ts` (экспорт
+`AppModule`); другой файл — `--app-module <путь>`.
+
+## Тесты процесса
+
+Процесс ждёт минуты, часы и дни, а в тесте ждать нельзя.
+`testWorkflow` из `bazis/core/workflow/testing` запускает приложение как
+[`startTestApp`](../fundamentals/testing.md#http-starttestapp), но со
+своими часами и без фонового воркера: задания выполняются, только когда тест
+скажет.
+
+```ts
+// src/app/test/delivery.process.test.ts
+import { afterAll, beforeAll, expect, test } from "bun:test";
+import { testWorkflow, type TestWorkflow } from "bazis/core/workflow/testing";
+import { AppModule } from "../modules/App.module";
+
+let wf: TestWorkflow;
+beforeAll(async () => {
+  wf = await testWorkflow(AppModule, { now: "2026-11-02T09:00:00Z" });
+});
+afterAll(() => wf?.stop());
+
+test("a silent delivery service is retried in a minute, then in two", async () => {
+  const order = await wf.start("delivery", { input: { orderId: "42", city: "Казань" } });
+  expect(await wf.drain()).toBe(1); // the first try failed; the retry waits a minute
+  expect((await wf.instance(order.id)).status).toBe("running");
+  await wf.advance("PT1M"); // the second try failed; the next one in two minutes
+  await wf.advance("PT2M"); // booked
+  const done = await wf.instance(order.id);
+  expect(done.status).toBe("completed");
+  expect(done.vars.delivery).toEqual({ slot: "2026-11-02 10:00" });
+});
+
+test("no slots: logistics has four hours, then the manager is told", async () => {
+  const order = await wf.start("delivery", { input: { orderId: "43", city: "Тикси" } });
+  await wf.drain();
+  await wf.advance("PT4H");
+  const done = await wf.instance(order.id);
+  expect(done.tokens.map((t) => t.nodeId)).toContain("Escalated");
+});
+
+test("a logistician who arranges it in time ships the order", async () => {
+  const order = await wf.start("delivery", { input: { orderId: "44", city: "Тикси" } });
+  await wf.drain();
+  await wf.advance("PT1H");
+  expect((await wf.complete(order.id, "Arrange", {})).status).toBe("completed");
+});
+```
+
+```text
+$ bunx bazis test src/app/test/delivery.process.test.ts
+book 42: the delivery service does not answer
+…
+book 42: booked
+instance 01a191b7-ccf4-… completed
+manager: Доставка не согласована
+ 3 pass
+ 0 fail
+```
+
+| Метод | Что делает |
+| --- | --- |
+| `start(key, { input, partition?, businessKey?, actor? })` | Запускает процесс; его задания ждут `drain` |
+| `drain()` | Планирует расписание и выполняет все задания, срок которых настал по часам теста; возвращает их число |
+| `advance(duration)` | Переводит часы вперёд (`"PT2H"`, `"P1D"` или миллисекунды), затем `drain` |
+| `complete(instanceId, nodeId, output)` | Завершает задачу, которая ждёт на узле, через входящие, если они подключены |
+| `emit(eventKey, payload, options)` | Доставляет событие |
+| `instance(id)`, `history(id)`, `now()`, `clock` | Состояние экземпляра и часы |
+| `app`, `stop()` | Запущенное приложение (`app.fetch`, `app.container`) и остановка |
+
+- Опции — как у `startTestApp`, плюс `now` (откуда начинаются часы) и
+  `actor` (от чьего имени действует тест; по умолчанию
+  `{ kind: "system", id: "test" }`).
+- Часы теста двигают сроки движка: таймеры, повторы, расписание, задержки
+  заданий, отметки задач. Отметки записей — `createdAt`, время в истории —
+  остаются временем базы.
+- Задание, упавшее не в инструменте, а например из-за базы, `drain`
+  превращает в ошибку теста. Процесс, который бесконечно создаёт себе
+  задания, — тоже: больше 1000 кругов.
+- Нужна PostgreSQL, как и самому модулю: тест запускает приложение с его
+  настройками подключения. Отдельная тестовая база —
+  [Конфигурация в тестах](../fundamentals/testing.md#конфигурация-в-тестах).
+
+Часы движка — порт `WorkflowClock` (`now()`); по умолчанию
+`SystemWorkflowClock`. Тест подставляет `ManualWorkflowClock`, который стоит,
+пока его не сдвинут; с ним воркер и чистка ничего не делают.
+
 ## Несколько экземпляров приложения
 
 Состояния в памяти нет: каждый шаг — одна транзакция с блокировкой строки
@@ -687,6 +945,8 @@ export class OrdersService {
 ## Дальше
 
 - [Инструменты](../ai/tools.md) — как писать шаги
+- [Тестирование](../fundamentals/testing.md) — `startTestApp` и настройки тестов
+- [Команды CLI](../cli/commands.md) — `g process`, `workflow check`, `workflow diagram`
 - [События](../fundamentals/events.md) — подписка на события модуля
 - [Owned stores](../database/owned-stores.md) — как устроены таблицы модуля
 - [API `bazis/core/workflow`](../reference/api/core-workflow.md)

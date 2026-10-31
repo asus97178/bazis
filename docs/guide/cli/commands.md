@@ -10,19 +10,23 @@ bunx bazis <команда> [опции]
 В `package.json` нового проекта уже есть скрипты: `bun run dev`,
 `bun run test`, `bun run build`, `bun run build:bin`, `bun run codegen`.
 
-Все примеры проверены на bazis 0.111.2.
+Все примеры проверены на bazis 0.111.2; `g process` и `workflow` — на 0.128.0.
 
 | Команда | Что делает |
 | --- | --- |
 | `bazis new <Имя>` | Создаёт проект |
 | `bazis g module <Имя>` | Создаёт атомарный модуль и подключает его |
 | `bazis g pack <Имя> --parts a,b` | Создаёт составной модуль из независимых частей |
+| `bazis g process <Имя> --module <Имя>` | Создаёт процесс в коде модуля и добавляет его в `processes` |
+| `bazis workflow check` | Проверяет процессы модулей вместе с инструментами, без запуска |
+| `bazis workflow diagram <ключ>` | Печатает процесс как схему Mermaid |
 | `bazis codegen` | Обновляет сгенерированный код в `src/generated/bazis` |
 | `bazis dev [--watch]` | Кодогенерация, затем запуск приложения из исходников |
 | `bazis test [аргументы]` | Кодогенерация, затем `bun test` |
 | `bazis build [--bin]` | Кодогенерация и проверка типов; с `--bin` — исполняемый файл |
 
-`g` можно писать как `generate`, `module` — как `m`, `pack` — как `p`.
+`g` можно писать как `generate`, `module` — как `m`, `pack` — как `p`,
+`process` — как `pr`.
 Справка — `bazis --help`; `--help` в любом месте команды только печатает
 справку и ничего не меняет. Версия пакета — `bazis --version` (или `-v`).
 
@@ -225,6 +229,45 @@ bunx bazis g module Discounts --empty --pack Catalog   # ещё одна час�
 Частей — не меньше двух, части создаются пустыми. Когда нужен атомарный
 модуль, а когда составной, — в главе
 [Архитектура модулей](../fundamentals/module-architecture.md).
+
+## `bazis g process`
+
+Процесс в коде модуля — файл `processes/<Имя>.process.ts` с
+`defineProcess` и запись в `processes` его `@Module`:
+
+```sh
+bunx bazis g process Delivery --module Delivery
+bunx bazis g process Refund --module Payments --pack Billing   # модуль — часть составного
+```
+
+```text
+  ── FILES ─────────────────────────────────────────── src/app/modules/delivery
+  [OK  ]  files           2 changes
+    ├─ + src/app/modules/delivery/processes/Delivery.process.ts
+    └─ ~ src/app/modules/delivery/Delivery.module.ts
+  ↗  listed in processes of src/app/modules/delivery/Delivery.module.ts
+
+    ✔  SUCCESS   process Delivery is generated
+```
+
+Ключ процесса — имя в kebab-case (`delivery`, `order-approval`). Опции:
+`--module` (обязательна), `--pack`, `--modules-root`, `--force`,
+`--dry-run`. Кодогенерацию команда не запускает: процесс — данные, а не
+класс с зависимостями.
+
+## `bazis workflow`
+
+```sh
+bunx bazis workflow check                          # для CI: код выхода 1 при ошибках
+bunx bazis workflow diagram delivery > delivery.mmd
+```
+
+`check` загружает модуль приложения без запуска и проверяет все процессы
+дерева модулей с его инструментами: то же, что проверят сборка и старт.
+`diagram` печатает процесс как Mermaid `flowchart` и больше ничего — вывод
+можно перенаправить в файл. Обе берут `src/app/modules/App.module.ts`, другой
+файл — `--app-module <путь>`. Подробно — в главе
+[Бизнес-процессы](../workflow/processes.md#проверка-и-схема-bazis-workflow).
 
 ## `bazis codegen`
 

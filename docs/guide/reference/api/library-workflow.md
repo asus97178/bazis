@@ -1,7 +1,7 @@
 # `bazis/library/workflow`
 
 Формат документа процесса `bazis.workflow/v1`: чистые функции без DI и
-базы — для дизайнера, CLI, браузера. Список — по пакету 0.127.0.
+базы — для дизайнера, CLI, браузера. Список — по пакету 0.128.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -12,6 +12,7 @@
 | `evaluateCondition` | Условие перехода | — |
 | `checkFormSpec`, `formFieldCodes`, `validateForm` | Поля входа и форм, проверка значения | — |
 | `durationMs` | Миллисекунды длительности `P1D`, `PT2H` | — |
+| `processToMermaid(document, direction?)` | Процесс как Mermaid `flowchart` | [Проверка и схема](../../workflow/processes.md#проверка-и-схема-bazis-workflow) |
 | `parseCron` | Разбор cron из пяти полей в UTC: `matches(date)`, `next(after)` | [Расписание](../../workflow/processes.md#расписание) |
 
 Типы: `ProcessDocument`, `ProcessNode`, `ProcessFlow`, `ProcessDiagram`,
