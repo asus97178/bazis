@@ -4,7 +4,7 @@
 не экспортировано из них, — внутреннее. На каждой странице — все экспорты
 точки входа по группам, с главой руководства, где о них подробно.
 
-Списки — по пакету 0.127.0.
+Списки — по пакету 0.128.0.
 
 ## Приложение
 
@@ -33,7 +33,8 @@
 | [`bazis/core/websocket`](core-websocket.md) | WebSocket: шлюзы, комнаты, адаптеры |
 | [`bazis/core/grpc`](core-grpc.md) | gRPC: сервер и клиент |
 | [`bazis/core/agent`](core-agent.md) | Агенты и инструменты |
-| [`bazis/core/workflow`](core-workflow.md) | Бизнес-процессы: модуль, сервисы, события |
+| [`bazis/core/workflow`](core-workflow.md) | Бизнес-процессы: модуль, сервисы, события, процессы в коде |
+| [`bazis/core/workflow/testing`](core-workflow-testing.md) | `testWorkflow` — тесты процессов с часами теста |
 
 ## Библиотеки
 
