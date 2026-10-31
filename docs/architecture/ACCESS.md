@@ -199,12 +199,12 @@ type Condition =
 // маршрут, где объект известен из запроса
 @Authorize(can("orders.create", (ctx) => ({ scope: ctx.header("x-shop") ?? null })))
 
-// код (scoped-сервис Access)
+// код (сервис Access)
 const my = await access.for(ctx);                            // субъект запроса; нет — 401
 await my.can("workflow.instances.read", { ...instance, scope: instance.partition }); // false → 403 или 404 решает вызывающий
 const filter = await my.filter("workflow.instances.read");   // для списков → grantsToWhere
 await my.filter("dm.records.read", { scope: space });        // право с scope: "request"
-await access.as(subject).can(…);                             // без HTTP: сервисы, агенты
+await access.as(subject, scope).can(…);                      // без HTTP: сервисы, агенты; scope — своя область DI
 ```
 
 - Субъекта `can` берёт у `AccessPolicy.subject(ctx)`; нет субъекта — 401.
@@ -215,7 +215,7 @@ await access.as(subject).can(…);                             // без HTTP: �
 - **Фон не проверяется.** Задания, расписания, события, шаги процесса:
   право дал тот, кто настроил задание или опубликовал процесс. Tools внутри
   процесса `can` не вызывают; Tool, вызванный агентом от имени
-  пользователя, проверяет `access.as(subject)`.
+  пользователя, проверяет `access.as(subject, scope)`.
 
 ## 6. Виды ссылок
 

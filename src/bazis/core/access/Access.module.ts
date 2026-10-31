@@ -1,6 +1,5 @@
-import { DI, Module, SERVICE_PROVIDER } from "../di";
+import { Module, SERVICE_PROVIDER, singleton } from "../di";
 import { AccessCatalog } from "./catalog/AccessCatalog";
-import { accessCatalogOf } from "./catalog/moduleFields";
 import { definePermissions } from "./catalog/permissions";
 import { Access } from "./check/Access";
 import { accessConfig } from "./check/accessConfig";
@@ -17,17 +16,18 @@ const accessPermissions = definePermissions({
  * Access as a layer of the framework (ACCESS-001, [passport](MODULE.md)):
  * the catalog of the modules' permissions, checks and list filters by the
  * grants of the application's `AccessPolicy`, the default rights system by
- * `@Module({ roles })`, and the catalog over HTTP.
+ * `@Module({ roles })`, and the catalog over HTTP. Dependencies are explicit:
+ * the framework's classes are not covered by the application's codegen.
  */
 @Module({
   config: [accessConfig],
   permissions: accessPermissions,
   providers: [
-    DI.singleton(DI.factoryProviderWithResolver(AccessCatalog, [], (resolver) => accessCatalogOf(resolver.resolve(SERVICE_PROVIDER)))),
-    DI.singleton(DI.factoryProviderWithResolver(RolesAccessPolicy, [], (resolver) => new RolesAccessPolicy(resolver.resolve(AccessCatalog), resolver.resolve(accessConfig.token)))),
-    DI.scoped(DI.factoryProviderWithResolver(Access, [], (resolver) => new Access(resolver, resolver.resolve(AccessCatalog), resolver.resolve(accessConfig.token)))),
+    singleton(AccessCatalog, AccessCatalog, [SERVICE_PROVIDER] as const),
+    singleton(RolesAccessPolicy, RolesAccessPolicy, [AccessCatalog, accessConfig.token] as const),
+    singleton(Access, Access, [AccessCatalog, RolesAccessPolicy, accessConfig.token] as const),
   ],
-  controllers: [DI.bindDeps(AccessCatalogController, AccessCatalog)],
+  controllers: [AccessCatalogController],
   exports: [AccessCatalog, Access, RolesAccessPolicy],
 })
 export class AccessModule {}

@@ -66,7 +66,8 @@ describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
       }
       await ctx.saveChanges();
 
-      const access = (await createTestContainer(AppModule)).createScope().resolve(Access).as({ sub: "user:7" });
+      const scope = (await createTestContainer(AppModule)).createScope();
+      const access = scope.resolve(Access).as({ sub: "user:7" }, scope);
       const where = grantsToWhere(await access.filter("shop.items.read"));
       expect(typeof where).toBe("object");
       const listed = (await db().items.asNoTracking().where(() => where as Exclude<typeof where, string>).orderBy((i) => i.id).toList()).map((item) => item.id);

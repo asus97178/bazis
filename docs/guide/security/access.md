@@ -200,7 +200,12 @@ const app = await startTestApp(AppModule, {
 });
 ```
 
-Без HTTP — `container.createScope().resolve(Access).as({ sub: "user:7" })`.
+Без HTTP — в своей области DI:
+
+```ts
+const scope = app.container.createScope();
+const access = scope.resolve(Access).as({ sub: "user:7" }, scope);
+```
 
 ## Дальше
 

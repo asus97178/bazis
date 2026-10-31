@@ -68,8 +68,8 @@ async function buildError(root: Parameters<typeof createTestContainer>[0]): Prom
 async function accessWith(policy: AccessPolicy) {
   @Module({ imports: [OrdersModule], providers: [DI.singleton(DI.valueProvider(AccessPolicy, policy))] })
   class AppModule {}
-  const container = await createTestContainer(AppModule);
-  return container.createScope().resolve(Access);
+  const scope = (await createTestContainer(AppModule)).createScope();
+  return { as: (subject: { sub: string }) => scope.resolve(Access).as(subject, scope) };
 }
 
 test("declarations are checked when the application is built", async () => {
@@ -256,7 +256,7 @@ test("the default rights system: roles from the token, permissions from @Module(
 
     const scope = app.container.createScope();
     const subject = { sub: "staff:5", id: "5", roles: ["clerk"] };
-    expect(await scope.resolve(Access).as(subject).principals(["s1"])).toEqual([{ scope: "s1", principals: ["user:5", "role:clerk"] }]);
+    expect(await scope.resolve(Access).as(subject, scope).principals(["s1"])).toEqual([{ scope: "s1", principals: ["user:5", "role:clerk"] }]);
   } finally {
     await app.stop();
   }

@@ -34,15 +34,15 @@ error stops the build, not a request.
 | --- | --- | --- | --- |
 | `definePermissions`, `PermissionSpec` | [catalog/permissions.ts](catalog/permissions.ts) | — | frozen declarations; `permissionProblems` |
 | Module fields `permissions`, `references`, `roles` | [catalog/moduleFields.ts](catalog/moduleFields.ts) | DI module-owned metadata channels `access.permission/v1`, `access.reference/v1`, `access.role/v1` | contributions; build-time checks (`AccessSetupError`) |
-| `AccessCatalog` (singleton) | [catalog/AccessCatalog.ts](catalog/AccessCatalog.ts) | the container's contributions | permissions, reference kinds, roles |
+| `AccessCatalog` (singleton) | [catalog/AccessCatalog.ts](catalog/AccessCatalog.ts) | `SERVICE_PROVIDER`: the container's contributions | permissions, reference kinds, roles |
 | `AccessPolicy` (port) | [contracts/AccessPolicy.ts](contracts/AccessPolicy.ts) | — | `subject`, `grants`, `ownerIds`, `principals` |
 | `AttributeLookup`, `References` (ports of declaring modules) | [contracts](contracts) | — | column conditions for lookups; values of reference kinds |
 | Conditions | [check/conditions.ts](check/conditions.ts) | — | `grantProblem` (limits: depth 8, 200 nodes, `maxInList`), `evaluate` |
 | List filter | [check/filter.ts](check/filter.ts) | ORM `Operand` | `AccessFilter`, `grantsToWhere` |
-| `Access` (scoped), `SubjectAccess` | [check/Access.ts](check/Access.ts) | `AccessCatalog`, `AccessPolicy` or `RolesAccessPolicy`, `accessConfig`, the request scope | `for(ctx)`, `as(subject)`, `can`, `filter`, `fields`, `principals`, `ownerIds`; `maskFields` |
+| `Access` (singleton), `SubjectAccess` | [check/Access.ts](check/Access.ts) | `AccessCatalog`, `RolesAccessPolicy`, `accessConfig`; `AccessPolicy` and lookups from the request scope | `for(ctx)`, `as(subject, scope)`, `can`, `filter`, `fields`, `principals`, `ownerIds`; `maskFields` |
 | `can(permission, objectOf?)` | [check/can.ts](check/can.ts) | `Access` | an `AuthorizeCheck` |
 | `defineRoles`, `RolesAccessPolicy` (singleton) | [roles](roles) | `AccessCatalog`, `accessConfig` | the default rights system |
-| `AccessCatalogController` | [http/AccessCatalog.controller.ts](http/AccessCatalog.controller.ts) | `AccessCatalog`, `Access` | `GET /access/catalog`, `GET /access/references/:kind` |
+| `AccessCatalogController` (context only) | [http/AccessCatalog.controller.ts](http/AccessCatalog.controller.ts) | `AccessCatalog`, `Access` from the request scope | `GET /access/catalog`, `GET /access/references/:kind` |
 | `StaticAccessPolicy` | [testing/index.ts](testing/index.ts) | — | grants from a table, for tests |
 
 exports: `[AccessCatalog, Access, RolesAccessPolicy]`.
@@ -81,7 +81,7 @@ kept in its `SubjectAccess` for the request.
   system; `"<key>:own"` is `{ where: { own: true } }`.
 - `@Authorize(can(permission, objectOf?))` — 401 without a subject, 403
   without the right; without `objectOf` the permission anywhere.
-- `Access.for(ctx)` / `Access.as(subject)` → `can`, `filter`, `fields`.
+- `Access.for(ctx)` / `Access.as(subject, scope)` → `can`, `filter`, `fields`.
 - `grantsToWhere(filter)` → ORM `Predicate`, `"all"` or `"none"`.
 
 A grant the permission cannot use (unknown attribute, `own` without `owner`,

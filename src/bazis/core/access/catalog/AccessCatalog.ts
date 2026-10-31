@@ -1,6 +1,7 @@
-import type { Class } from "../../di";
+import type { Class, ServiceProvider } from "../../di";
 import type { References } from "../contracts/References";
 import type { RolePermission } from "../roles/roles";
+import { declarationsOf } from "./moduleFields";
 import type { PermissionSpec } from "./permissions";
 
 /** A permission of `@Module({ permissions })` with the module that declares it. */
@@ -33,7 +34,8 @@ export class AccessCatalog {
   private readonly byKind: ReadonlyMap<string, OwnedReferenceKind>;
   private readonly byName: ReadonlyMap<string, DeclaredRole>;
 
-  constructor(permissions: readonly OwnedPermission[], kinds: readonly OwnedReferenceKind[], roles: readonly DeclaredRole[]) {
+  constructor(services: ServiceProvider) {
+    const { permissions, kinds, roles } = declarationsOf(services);
     this.byKey = new Map([...permissions].sort((a, b) => a.key.localeCompare(b.key)).map((item) => [item.key, item]));
     this.byKind = new Map([...kinds].sort((a, b) => a.kind.localeCompare(b.kind)).map((item) => [item.kind, item]));
     this.byName = new Map(roles.map((item) => [item.name, item]));

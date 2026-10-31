@@ -21,17 +21,18 @@ export interface FieldAccess {
 }
 
 /**
- * Checks of access (ACCESS-001 §5), scoped: asks the application's
- * `AccessPolicy` (the roles of `@Module({ roles })` without one) for grants and
- * applies them itself. `for(ctx)` — the subject of a request, cached on it;
- * `as(subject)` — without HTTP: services, agents.
+ * Checks of access (ACCESS-001 §5): asks the application's `AccessPolicy`
+ * (`RolesAccessPolicy` without one) for grants and applies them itself.
+ * `for(ctx)` — the subject of a request, cached on it; `as(subject, scope)` —
+ * without HTTP: services, agents, background work. The policy and the lookups
+ * are resolved in the given scope: they may be scoped.
  */
 export class Access {
-  constructor(private readonly resolver: ServiceResolver, private readonly catalog: AccessCatalog, private readonly config: AccessSettings) {}
+  constructor(private readonly catalog: AccessCatalog, private readonly roles: RolesAccessPolicy, private readonly config: AccessSettings) {}
 
-  /** The application's rights system. */
-  policy(): AccessPolicy {
-    return this.resolver.tryResolve(AccessPolicy) ?? this.resolver.resolve(RolesAccessPolicy);
+  /** The application's rights system in this scope. */
+  policy(scope: ServiceResolver): AccessPolicy {
+    return scope.tryResolve(AccessPolicy) ?? this.roles;
   }
 
   /** Who makes the request, or `undefined`. */
@@ -46,15 +47,15 @@ export class Access {
     return access;
   }
 
-  /** Access of a known subject, without a request. */
-  as(subject: AccessSubject): SubjectAccess {
-    return new SubjectAccess(subject, this.policy(), this.catalog, this.config.get("maxInList"), (type) => this.resolver.resolve(type), this.resolver);
+  /** Access of a known subject, without a request; `scope` — where to resolve the policy and the lookups. */
+  as(subject: AccessSubject, scope: ServiceResolver): SubjectAccess {
+    return new SubjectAccess(subject, this.policy(scope), this.catalog, this.config.get("maxInList"), scope);
   }
 
   private async cached(ctx: AuthorizeContext): Promise<SubjectAccess | undefined> {
     if (ctx.state.has(SUBJECT_STATE)) return ctx.state.get(SUBJECT_STATE) as SubjectAccess | undefined;
-    const subject = await this.policy().subject(ctx);
-    const access = subject === undefined ? undefined : this.as(subject);
+    const subject = await this.policy(ctx.services).subject(ctx);
+    const access = subject === undefined ? undefined : this.as(subject, ctx.services);
     ctx.state.set(SUBJECT_STATE, access);
     return access;
   }
@@ -70,8 +71,7 @@ export class SubjectAccess {
     private readonly policy: AccessPolicy,
     private readonly catalog: AccessCatalog,
     private readonly maxInList: number,
-    private readonly lookup: (type: Class<AttributeLookup>) => AttributeLookup,
-    private readonly resolver: ServiceResolver,
+    private readonly scope: ServiceResolver,
   ) {}
 
   /** The grants of the permission; a grant the permission cannot use is dropped with a warning. */
@@ -107,7 +107,7 @@ export class SubjectAccess {
       ownerIds: grants === "all" || !usesOwn(grants) ? [] : await this.ownerIds(),
       requestScope: options.scope,
       maxInList: this.maxInList,
-      lookup: this.lookup,
+      lookup: (type: Class<AttributeLookup>) => this.scope.resolve(type),
     });
   }
 
@@ -156,7 +156,7 @@ export class SubjectAccess {
   }
 
   private warn(permission: string, problem: string): void {
-    this.resolver.tryResolve(LOGGER)?.warn("access grant dropped", { permission, subject: this.subject.sub, problem });
+    this.scope.tryResolve(LOGGER)?.warn("access grant dropped", { permission, subject: this.subject.sub, problem });
   }
 }
 

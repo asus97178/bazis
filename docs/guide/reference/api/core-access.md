@@ -21,7 +21,7 @@
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `can(permission, objectOf?)` | Проверка маршрута: `401` без человека, `403` без права; без объекта — право хоть где-нибудь | [Проверить маршрут](../../security/access.md#проверить-маршрут) |
-| `Access` | Scoped-сервис: `for(ctx)` — человек запроса, `as(subject)` — без HTTP, `policy()` | [Проверить маршрут](../../security/access.md#проверить-маршрут) |
+| `Access` | Сервис проверок: `for(ctx)` — человек запроса, `as(subject, scope)` — без HTTP, `policy(scope)` | [Проверить маршрут](../../security/access.md#проверить-маршрут) |
 | `SubjectAccess` | Права одного человека: `can`, `filter`, `fields`, `grants`, `principals`, `ownerIds` | там же |
 | `grantsToWhere(filter)` | Фильтр как условие ORM, `"all"` или `"none"` | [Отфильтровать список](../../security/access.md#отфильтровать-список) |
 | `maskFields(record, read)` | Запись только с разрешёнными полями | — |

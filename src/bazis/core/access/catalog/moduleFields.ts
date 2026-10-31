@@ -11,7 +11,8 @@ import { grantProblem } from "../check/conditions";
 import { AccessSetupError } from "../contracts/errors";
 import type { References } from "../contracts/References";
 import { isDeclaredRoles, rolePermission, type RoleDeclarations, type RolePermission } from "../roles/roles";
-import { AccessCatalog, type DeclaredRole, type OwnedPermission, type OwnedReferenceKind } from "./AccessCatalog";
+import { Access } from "../check/Access";
+import type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./AccessCatalog";
 import { isDeclaredPermissions, isReferenceKind, lookupsOf, permissionProblems, type PermissionDeclarations, type PermissionSpec } from "./permissions";
 
 interface PermissionPayload { readonly key: string; readonly spec: PermissionSpec }
@@ -74,7 +75,7 @@ registerModuleOwnedContributionValidator((snapshot) => {
   const roles = snapshot.getMetadataContributions(ROLE_CHANNEL);
   const first = permissions[0] ?? references[0] ?? roles[0];
   if (first === undefined) return;
-  if (snapshot.countProviders(AccessCatalog) === 0) {
+  if (snapshot.countProviders(Access) === 0) {
     throw new AccessSetupError(`${first.ownerName} declares access (permissions, references or roles), but the application does not import AccessModule (bazis/core/access).`);
   }
 
@@ -121,13 +122,13 @@ registerModuleOwnedContributionValidator((snapshot) => {
   }
 });
 
-/** The access catalog of the application's container. */
-export function accessCatalogOf(services: ServiceProvider): AccessCatalog {
+/** What the modules of the application's container declared. */
+export function declarationsOf(services: ServiceProvider): { permissions: OwnedPermission[]; kinds: OwnedReferenceKind[]; roles: DeclaredRole[] } {
   if (!(services instanceof DiContainer)) throw new AccessSetupError("Access declarations require the framework DiContainer.");
   const permissions: OwnedPermission[] = services.getModuleOwnedMetadataContributions(PERMISSION_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
   const kinds: OwnedReferenceKind[] = services.getModuleOwnedMetadataContributions(REFERENCE_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
   const roles: DeclaredRole[] = services.getModuleOwnedMetadataContributions(ROLE_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
-  return new AccessCatalog(permissions, kinds, roles);
+  return { permissions, kinds, roles };
 }
 
 function setupError(module: string, field: string, problems: readonly string[]): AccessSetupError {
