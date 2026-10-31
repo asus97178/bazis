@@ -1,11 +1,11 @@
 # Бизнес-процессы из коробки: конструктор
 
-Идентификатор: **WORKFLOW-002**. Версия: **1.0**. Дата: **2026-10-31**.
+Идентификатор: **WORKFLOW-002**. Версия: **1.1**. Дата: **2026-10-31**.
 Статус: **черновик на рецензии** (владелец, агент bazis-cms).
 Основа: [WORKFLOW-001](WORKFLOW.md) (этапы 1–5, bazis 0.124.0–0.128.0),
 [TOOLS-001](TOOLS.md), прототип дизайнера
 <https://claude.ai/artifact/SZDPQ1N7xU7qLiyZ4siz5n>, обсуждение агентов
-bazis и bazis-cms 2026-10-31.
+bazis и bazis-cms 2026-10-31, рецензия агента bazis-cms (v1.1).
 
 ## 1. Цель и правило границы
 
@@ -42,7 +42,8 @@ HTTP. Он добавляет свои роли и доступы, свой UI �
 | Задачи сотрудникам | Остаются (`userTask`, часть Tasks) | Убрать как отсутствующие в прототипе: «ждать решения менеджера» и есть задача |
 | Списки HTTP | JSON:API (`bazis/library/jsonapi`) | `limit`/`offset`: второй стиль в одной админке |
 | Аудит | События после успешных действий (§4.4); журнал пишет приложение | Свой журнал аудита во фреймворке |
-| Актор шага | `context.actor` в Tool (§6.1); «от имени» — настройка процесса | Поле `author` в данных процесса |
+| Актор шага | `context.actor` в Tool (§6.1); «от имени» — настройка процесса; поле `author` в Tools CMS — необязательное переопределение (решение владельца, §11) | Только `author` в данных процесса |
+| Данные приложения в документе | `extensions` по пространствам имён в корне, узлах и переменных (§3.1) | Хранить рядом с документом в CMS: дубль вернётся |
 
 ## 3. Документ `bazis.workflow/v2`
 
@@ -59,9 +60,17 @@ interface ProcessDocument {
   nodes: Record<string, ProcessNode>;  // title: LocalizedText
   flows: Record<string, ProcessFlow>;  // title?: LocalizedText, condition?: Expr
   diagram?: ProcessDiagram;
+  extensions?: Record<string, unknown>; // данные приложения по пространствам имён, например "cms"
 }
 type LocalizedText = string | Record<string, string>; // строка — язык по умолчанию
 ```
+
+`extensions` есть и у узлов, и у переменных. Ключ — пространство имён
+приложения; значение проверяет порт `WorkflowExtensions` (§6). Пространство
+имён без зарегистрированной проверки — ошибка документа. Так CMS хранит в
+процессе «где показать кнопку запуска» (карточка записи таблицы, список,
+массовое действие), правила полей Data Manager и т. п., не держа документы
+рядом.
 
 ### 3.2 Новые виды узлов
 
@@ -117,16 +126,18 @@ interface VariableSpec {
   title?: LocalizedText;
   default?: unknown;
   required?: boolean;                   // для in
-  ref?: string;                         // для ref: вид ссылки, например "dm.record:orders" (§6.3)
-  extra?: Record<string, unknown>;      // для порта проверки полей: правила, enumValues и т. п.
+  ref?: string;                         // для ref: вид ссылки, например "dm.record:orders" (§6.2)
+  personal?: boolean;                   // персональные данные: маскируются в истории при log.maskPersonal
+  extensions?: Record<string, unknown>; // правила полей приложения и т. п.
 }
 ```
 
 `in` — вход запуска (форма ручного запуска и тело `start`), `out` — что
 процесс возвращает вызвавшему (`callProcess`, ответ API). Поля форм задач —
 тот же `VariableSpec` без `direction`. Порт `WorkflowInputValidator` получает
-`extra` и проверяет его: так правила Data Manager живут в документе без того,
-чтобы фреймворк их знал.
+`extensions` поля и проверяет значения по ним: так правила Data Manager живут
+в документе без того, чтобы фреймворк их знал. `FormIssue.code` — строка:
+правила приложения дают свои коды (`minLength`, `range`).
 
 ### 3.5 Настройки процесса (в версии документа)
 
@@ -138,6 +149,11 @@ interface ProcessSettings {
   maxConcurrent?: number;               // одновременных running-экземпляров процесса
   sameKey?: "allow" | "skip" | "queue"; // новый запуск с тем же businessKey, пока старый идёт
   errorHandler?: string;                // ключ процесса, который запускается при failed/timedOut с $event = сведения об ошибке
+  log?: {
+    variables?: boolean;                // значения переменных на каждом шаге в истории (по умолчанию false)
+    toolPayloads?: boolean;             // вход и выход Tools целиком, в том числе тела HTTP (по умолчанию false)
+    maskPersonal?: boolean;             // переменные personal: true — "***" в истории и журналах (по умолчанию true)
+  };
 }
 ```
 
@@ -173,7 +189,7 @@ error }`; граничный `boundaryError` важнее `onError`).
 (`Продажи/Заказы`), без сущности «папка»; `owner` — непрозрачный id;
 `retentionDays` — как в v1. Язык по умолчанию — `workflow.language` в
 настройках (`en`). Схема хранилища меняется → новое owned store
-`bazis.workflow.definitions.v2` (префикс `bazis_wf_def2_`) с переносом данных
+`bazis.workflow.definitions.v2` (префикс `bazis_wf2_def_`) с переносом данных
 (§9).
 
 ### 4.2 Палитра как данные
@@ -189,7 +205,9 @@ error }`; граничный `boundaryError` важнее `onError`).
 Маршруты v1 сохраняются; списки — JSON:API (`filter[folder]`, `filter[search]`,
 `page[size]`, `page[number]`, `sort`). Добавляются: `POST /workflow/validate`
 (проверка без сохранения), `GET /workflow/palette`, удаление процесса
-(`DELETE`, только архивный без живых экземпляров). Оптимистичная блокировка
+(`DELETE`, только архивный, без живых экземпляров и без разделов:
+`WorkflowPartitions.of(key)` пуст, иначе `409 in_use` — ничего не теряется
+молча). Оптимистичная блокировка
 черновика: `saveDraft(key, document, actor, { expected? })`, где `expected` —
 `draftUpdatedAt` прочитанного черновика; иначе `409 conflict`.
 
@@ -198,7 +216,8 @@ error }`; граничный `boundaryError` важнее `onError`).
 После успешного действия, после коммита: `WORKFLOW_PROCESS_CHANGED`
 (`created` / `updated` / `draftSaved` / `published` / `archived` /
 `restored` / `deleted`), `WORKFLOW_INSTANCE_STARTED`, `WORKFLOW_INSTANCE_CANCELLED`,
-`WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED` — с актором и целью.
+`WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED` — с актором, целью и
+`request: { ip, userAgent } | null` (из HTTP; `null` для вызова из кода).
 Журнал аудита пишет приложение.
 
 ## 5. Исполнение (Runtime)
@@ -207,7 +226,12 @@ error }`; граничный `boundaryError` важнее `onError`).
 
 - **Ручной**: `start(key, { input, partition, businessKey, actor, test? })`;
   `sameKey` и `maxConcurrent` проверяются в той же транзакции под
-  блокировкой процесса (advisory lock по ключу).
+  блокировкой процесса (advisory lock по ключу). `queue` — экземпляр в
+  статусе `pending`, стартует, когда освободится место.
+- **Массовый**: `startMany(key, items: { input, businessKey }[], options)` —
+  массовое действие над записями; каждый элемент — отдельный экземпляр,
+  `businessKey` обязателен и подчиняется `sameKey`; ответ — по элементу
+  `started | skipped | rejected` с причиной.
 - **Расписание**: `cron`, `timezone` (IANA, по умолчанию UTC), `from?`,
   `until?`, `overlap: "skip" | "queue" | "parallel"`, `catchUp: boolean`
   (по умолчанию `false`, как в 0.128.0). Запуски — по каждому разделу из
@@ -217,10 +241,16 @@ error }`; граничный `boundaryError` важнее `onError`).
   `debounce?: { key: Expr, window }` (частые события одного ключа сливаются в
   последнее), `delay?`, `ignoreOwn?: boolean` (не запускать, если событие
   вызвал экземпляр этого же процесса: `emit(…, { cause: { instanceId } })`).
-- **Надёжная доставка события**: `emitLater(eventKey, payload, options)` пишет
-  задание `event` в `bazis_wf_run_jobs` в текущей транзакции приложения
-  (outbox); воркер доставляет его как `emit`. Условие: общее подключение и
-  общая транзакция ORM — проверить до этапа 4 (§11).
+  Раздел события: `eventStart` запускается только в разделе из
+  `emit(…, { partition })` и только если `WorkflowPartitions` включает
+  процесс в этом разделе; событие без раздела запускает только процессы без
+  разделов. Запись Data Manager несёт раздел своего создания.
+- **Надёжная доставка события**: `emitLater(tx, eventKey, payload, options)`
+  пишет задание `event` в хранилище исполнения в транзакции приложения `tx`
+  через `tx.use(context, work)` (outbox; приложение и owned store на одном
+  `DatabaseProvider`); воркер доставляет его как `emit`. Транзакция явная:
+  неявная «текущая» сломалась бы, когда приложение пишет без
+  `transactionScope`.
 
 ### 5.2 Ожидание
 
@@ -234,7 +264,7 @@ error }`; граничный `boundaryError` важнее `onError`).
 (срок `runTimeout` вышел; `errorHandler` запускается), `failedNode`,
 `durationMs` в ответах. Шаг с `timeout` — ошибка с причиной `timeout`. Список
 экземпляров — JSON:API. Схема меняется → `bazis.workflow.runtime.v2`
-(`bazis_wf_run2_`), задачи → `bazis.workflow.tasks.v2` (`bazis_wf_task2_`).
+(`bazis_wf2_run_`), задачи → `bazis.workflow.tasks.v2` (`bazis_wf2_task_`).
 
 ### 5.4 Пробный запуск
 
@@ -242,7 +272,10 @@ error }`; граничный `boundaryError` важнее `onError`).
 `context.dryRun = true` и сам ничего не меняет; Tool без поддержки не
 вызывается, шаг получает заглушку `{ dryRun: true }` и запись в истории.
 Пробные экземпляры не публикуют события приложения (`WORKFLOW_TASK_REQUESTED`
-и др.), задачи создаются с пометкой `test`, хранятся сутки.
+и др.), задачи создаются с пометкой `test` и адресуются только тому, кто
+запустил, — тест не засыпает входящие исполнителей. Пробные экземпляры
+хранятся сутки; в списках скрыты по умолчанию, `filter[test]=true` их
+показывает.
 
 ## 6. Порты для приложения
 
@@ -252,9 +285,12 @@ error }`; граничный `boundaryError` важнее `onError`).
 | `WorkflowInputValidator` | Проверка значений и `extra` полей (правила Data Manager) | Типы §3.4 |
 | `WorkflowReferences` | `exists(ref, ctx)` и `describe(ref)` для ссылок `x-ref`; обратный ход — `IWorkflowDefinitions.referencing(ref)` | Ссылки не проверяются |
 | `WorkflowPartitions` | Разделы процесса (пространства): `of(processKey)` → `{ partition, timezone?, enabled }[]` | Один раздел `null` |
+| `WorkflowExtensions` | Проверка `extensions` своего пространства имён в корне, узлах, переменных | Пространств имён нет |
 | `SecretStore` (`bazis/core/tools`) | Значения секретов по имени | Из конфигурации `secrets.*` |
 
-Все порты получают контекст `{ partition, language, actor }`.
+Все порты получают контекст `{ partition, language, actor }`. Язык: в HTTP —
+из `Accept-Language` среди языков `workflow.languages`, иначе
+`workflow.language`; в событиях, расписании и фоне — `workflow.language`.
 
 ### 6.1 Контракт Tool (TOOLS-001, дополнение)
 
@@ -262,8 +298,11 @@ error }`; граничный `boundaryError` важнее `onError`).
   `runAs`); поле `author` в данных процесса больше не нужно.
 - `dryRun: "supported" | "unsupported"` в `@Tool` (по умолчанию
   `unsupported`).
-- Ссылки во входе: `x-ref: "<вид>"` в JSON Schema поля (например,
-  `dm.table`, `dm.field` с `x-ref-scope: "table"`).
+- Ссылки во входе: `x-ref: "<вид>"` в JSON Schema поля — значение поля
+  ссылка (`dm.table`); `x-ref-keys: "<вид>"` у объекта — ссылки его ключи
+  (`values` в `data.record-update`: ключи — поля таблицы). `x-ref-scope` —
+  JSON Pointer на соседний вход, задающий область (`"x-ref-scope": "/table"`:
+  поле ищется в таблице из входа `table`).
 - `context.metadata` содержит `instanceId`, `processKey`, `nodeId`,
   `partition`, `test` — чтобы Tool мог передать `cause` в свои события.
 
@@ -310,17 +349,29 @@ IP, частные, loopback и link-local адреса запрещены; ре
 - События записей DM через `emitLater` в транзакции записи, с `cause` из
   `context.metadata`; защита от лавины — `ignoreOwn` и `debounce` процесса.
 - Порты: `CmsWorkflowAccess` (есть), `DmWorkflowInputValidator` (есть,
-  переходит на `extra`), `WorkflowReferences` (таблицы и поля DM),
-  `WorkflowPartitions` (`wf_space_processes`: пространства, часовой пояс,
-  включённость), секреты — своё хранилище или конфигурация.
+  правила DM переходят из ключей поля в `extensions.cms`),
+  `WorkflowReferences` (таблицы и поля DM), `WorkflowPartitions`
+  (`wf_space_processes` переносится на порт; часовой пояс и включённость —
+  колонки связи, пока нет модуля пространств), `WorkflowExtensions`
+  (`cms`: места кнопок запуска, правила полей), секреты — своё хранилище или
+  конфигурация.
+- `RecordsService` пишет в явном `transactionScope` и вызывает
+  `emitLater(tx, …)`; `cause` из `context.metadata` идёт в `RecordsContext`.
+- `dryRun` для DM: `create` и `update` делают только `records.validate` и
+  возвращают запись, которая получилась бы.
+- e2e CMS обновляются на каждом этапе фреймворка.
 - Дизайнер-конструктор по палитре; места кнопок запуска (карточка записи,
   список, массовое действие); свой аудит по событиям §4.4.
-- Убирает: поле `author` в Tools записей.
+- `author` в Tools записей — необязательное переопределение `context.actor`
+  (если владелец так решит, §11).
 
 ## 9. Хранилища и переход
 
 Схемы трёх частей меняются, поэтому три новых owned store (`…definitions.v2`,
-`…runtime.v2`, `…tasks.v2`). Выпуск переносит процессы и версии v1 при
+`…runtime.v2`, `…tasks.v2`, префиксы `bazis_wf2_def_`, `bazis_wf2_run_`,
+`bazis_wf2_task_`). Изменить хранилище на месте нельзя по устройству owned
+store («миграций для хранилищ нет»), поэтому префиксы с номером остаются;
+это цена гарантии, что таблицы модуля никто не меняет. Выпуск переносит процессы и версии v1 при
 старте: документы через `upgradeDocument`, карточки (`title` → язык по
 умолчанию). Экземпляры v1 не переносятся: в проде их нет; живые тестовые
 экземпляры завершают на старом выпуске. Старые таблицы `bazis_wf_def_`,
@@ -334,31 +385,38 @@ IP, частные, loopback и link-local адреса запрещены; ре
 руководства и проверкой в CMS.
 
 1. **Контракт Tool и HTTP**: `context.actor`, `dryRun`, `x-ref`,
-   `context.metadata`; списки JSON:API; события аудита §4.4; блокировка
-   черновика.
+   `x-ref-keys`, `x-ref-scope`, `context.metadata`; списки JSON:API; события
+   аудита §4.4 с `request`; блокировка черновика; `FormIssue.code` — строка.
 2. **Документ v2**: выражения, `LocalizedText`, переменные, `assign`,
-   настройки шага (`timeout`, `growth`, `onError: skip`), `isStructured`,
+   настройки шага (`timeout`, `growth`, `onError: skip`), `extensions` и
+   `WorkflowExtensions`, `log`, `personal`, `isStructured`,
    `upgradeDocument`, палитра, `/workflow/validate`; хранилища v2 и перенос;
-   карточка (`folder`, `owner`).
+   карточка (`folder`, `owner`); язык запроса.
 3. **Цикл и подпроцесс; настройки исполнения**: `loop`, `callProcess`,
-   `runAs`, `runTimeout`, `maxConcurrent`, `sameKey`, `errorHandler`,
-   `timedOut`.
+   `runAs`, `runTimeout`, `maxConcurrent`, `sameKey` (`pending`),
+   `errorHandler`, `timedOut`, `startMany`.
 4. **Запуски и ожидания**: часовой пояс, период, `overlap`, `catchUp`;
    `filter`, `debounce`, `delay`, `ignoreOwn`; `eventWait.until`;
-   `WorkflowPartitions`; `emitLater`.
+   `WorkflowPartitions` (раздел событий, удаление процесса); `emitLater(tx, …)`.
 5. **Пробный запуск и ссылки**: `test`, `WorkflowReferences`, `broken_ref`,
    `referencing`; журнал запусков (длительность, шаг ошибки).
 6. **`bazis/core/tools`**: `http.request`, `SecretStore`, редакция секретов.
 
 bazis-cms идёт следом за каждым этапом (§8); дизайнер — после этапа 2.
 
-## 11. Открытые вопросы
+## 11. Решено на рецензии и открыто
 
-1. `emitLater` в транзакции приложения: работает ли общая транзакция ORM для
-   разных `DbContext` на одном подключении. Если нет — outbox на стороне
-   приложения с повторной доставкой и ключом идемпотентности события.
-2. Часовой пояс раздела против часового пояса узла расписания: что важнее,
-   если заданы оба (предложение: узел, если задан явно).
-3. `queue` у `sameKey` и `overlap`: очередь в заданиях (новый вид `pending`
-   экземпляра) или отказ с причиной — уточнить на этапе 3.
-4. Сколько хранить пробные экземпляры и показывать ли их в общем журнале.
+Решено (v1.1): общая транзакция для `emitLater` — `tx.use` (§5.1); явный
+часовой пояс узла расписания важнее часового пояса раздела; `queue` —
+статус `pending`; пробные запуски хранятся сутки и скрыты в списках по
+умолчанию.
+
+Открыто:
+
+1. **Автор записи (владелец).** `context.actor` по `runAs` — значение по
+   умолчанию; оставить ли в Tools CMS необязательное поле `author` для случая
+   «кто создал — решается переменными процесса»? Предложение агентов: да.
+2. Персональные данные: хватит ли пометки `personal` у переменных или нужна
+   и пометка полей во входе Tools (`x-personal`)?
+3. Проверка `extensions`: один порт `WorkflowExtensions` на все места
+   документа или проверка переменных остаётся в `WorkflowInputValidator`?
