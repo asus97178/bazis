@@ -27,9 +27,9 @@ const accessPermissions = definePermissions({
   config: [accessConfig],
   permissions: accessPermissions,
   providers: [
-    singleton(IAccessCatalog, AccessCatalog, [SERVICE_PROVIDER] as const),
-    singleton(AccessPolicy, RolesAccessPolicy, [IAccessCatalog, accessConfig.token] as const),
-    singleton(IAccess, Access, [IAccessCatalog, accessConfig.token] as const),
+    singleton(IAccessCatalog, AccessCatalog, [SERVICE_PROVIDER]),
+    singleton(AccessPolicy, RolesAccessPolicy, [IAccessCatalog, accessConfig.token]),
+    singleton(IAccess, Access, [IAccessCatalog, accessConfig.token]),
   ],
   controllers: [AccessCatalogController],
   exports: [IAccessCatalog, IAccess, AccessPolicy],
