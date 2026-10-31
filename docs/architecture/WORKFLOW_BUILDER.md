@@ -282,7 +282,7 @@ error }`; граничный `boundaryError` важнее `onError`).
 | Порт | Что даёт приложение | По умолчанию |
 | --- | --- | --- |
 | `WorkflowAccess` | Личность, права, адресаты задач (как в v1) | Всё запрещено |
-| `WorkflowInputValidator` | Проверка значений и `extra` полей (правила Data Manager) | Типы §3.4 |
+| `WorkflowInputValidator` | Проверка значений по полям и их `extensions` (правила Data Manager) | Типы §3.4 |
 | `WorkflowReferences` | `exists(ref, ctx)` и `describe(ref)` для ссылок `x-ref`; обратный ход — `IWorkflowDefinitions.referencing(ref)` | Ссылки не проверяются |
 | `WorkflowPartitions` | Разделы процесса (пространства): `of(processKey)` → `{ partition, timezone?, enabled }[]` | Один раздел `null` |
 | `WorkflowExtensions` | Проверка `extensions` своего пространства имён в корне, узлах, переменных | Пространств имён нет |
