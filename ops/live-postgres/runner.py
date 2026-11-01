@@ -72,6 +72,9 @@ def gated(path):
     if 'workflow.postgres.code' in name:
         db = create_database(f'bazis_wf_code_{run_id}')
         return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
+    if 'workflow.postgres.rights' in name:
+        db = create_database(f'bazis_wf_rights_{run_id}')
+        return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
     if 'workflow.postgres' in name:
         db = create_database(f'bazis_wf_{run_id}')
         return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
