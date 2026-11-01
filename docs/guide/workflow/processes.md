@@ -15,19 +15,19 @@
 ## Подключение
 
 ```ts
-import { DI, Module } from "bazis/core/di";
+import { Module, singleton, singletonValue } from "bazis/core/di";
 import { TOOL_EXECUTION_OPTIONS } from "bazis/core/agent";
 import { WorkflowAccess, WorkflowModule } from "bazis/core/workflow";
 
 @Module({
   imports: [AppInfra, WorkflowModule, PaymentsModule],
   providers: [
-    DI.singleton(DI.classProvider(WorkflowAccess, AppWorkflowAccess, [])),
-    DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
+    singleton(WorkflowAccess, AppWorkflowAccess),
+    singletonValue(TOOL_EXECUTION_OPTIONS, {
       auditSink: (entry) => console.log(`audit ${entry.phase} ${entry.tool?.name} caller=${entry.caller} actor=${entry.actor?.id}`),
       // Опубликованный процесс и есть одобрение его шагов.
       approvalPolicy: (request) => request.caller === "workflow",
-    })),
+    }),
   ],
 })
 export class AppModule {}
@@ -620,6 +620,10 @@ POST /workflow/instances/…/cancel   (Bearer t-oleg)                  → 403 {
 | `events.emit` | `POST /workflow/events/:eventKey` |
 | `tasks.work` | входящие задачи `/workflow/tasks` |
 
+Регистрируется как любая реализация контракта —
+`singleton(WorkflowAccess, AppWorkflowAccess)` в модуле приложения
+([Подключение](#подключение)); без регистрации каждый маршрут отвечает `403`.
+
 `target` — то, что известно о цели: `processKey`, `partition`,
 `instanceId`. Для карточки экземпляра это его `partition`, для списка — из
 строки запроса: так приложение ограничивает пользователя его магазином.
@@ -650,9 +654,14 @@ export class OrdersService {
 
 | Сервис | Методы |
 | --- | --- |
-| `IWorkflowDefinitions` | `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `tools` |
+| `IWorkflowDefinitions` | `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `tools`; `publishCode` вызывает сам фреймворк при старте |
 | `IWorkflowRuntime` | `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` |
 | `IWorkflowTasks` | `list`, `get`, `claim`, `release`, `complete` |
+
+Свою проверку значений полей (`WorkflowInputValidator`) приложение
+подключает так же — регистрацией в своём модуле:
+`singleton(WorkflowInputValidator, AppInputValidator)`; она заменяет
+встроенную `DefaultWorkflowInputValidator`.
 
 Ошибки — `WorkflowError` с `code` и HTTP-статусом: `not_found` (404),
 `conflict`, `wrong_status`, `archived` (409), `invalid_document`,

@@ -37,7 +37,7 @@ const DEFAULT_STOP_TIMEOUT_MS = 5_000;
  *
  * ```ts
  * class Heartbeat extends BackgroundService {
- *   constructor(private readonly api: HttpClient) { super({ stopTimeoutMs: 2000 }); }
+ *   constructor(private readonly api: HttpClientBase) { super({ stopTimeoutMs: 2000 }); }
  *   protected async execute(signal: AbortSignal) {
  *     while (!signal.aborted) {
  *       await this.api.post("/heartbeat");

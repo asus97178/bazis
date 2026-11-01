@@ -1,7 +1,8 @@
 import type { FormIssue, FormSpec } from "../../../../library/workflow";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import { WorkflowError } from "../../contracts/WorkflowError";
-import type { WorkflowInputValidator } from "../../contracts/WorkflowInputValidator";
+import type { ServiceProvider } from "../../../di";
+import { WorkflowInputValidator } from "../../contracts/WorkflowInputValidator";
 import type { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import type { WorkflowEngine } from "../internal/WorkflowEngine";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
@@ -27,7 +28,8 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     private readonly db: RuntimeDbContext,
     private readonly engine: WorkflowEngine,
     private readonly definitions: IWorkflowDefinitions,
-    private readonly validator: WorkflowInputValidator,
+    /** The scope: the input validator is asked here, so that the application's own registration replaces the default. */
+    private readonly services: ServiceProvider,
   ) {
     super();
   }
@@ -39,7 +41,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     const version = await this.definitions.latest(processKey);
     const start = Object.entries(version.document.nodes).find(([, node]) => node.kind === "manualStart");
     if (!start) throw new WorkflowError("wrong_status", `Process ${processKey} has no manual start`);
-    const { value, issues } = await this.validator.validate(version.document.input, options.input, { purpose: "input", processKey, partition });
+    const { value, issues } = await this.validator().validate(version.document.input, options.input, { purpose: "input", processKey, partition });
     if (issues.length > 0) throw new WorkflowError("invalid_input", "The process input is invalid", issues);
     const id = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor });
     return await this.instance(id);
@@ -81,7 +83,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
       if (node?.kind !== "userTask" || !current || current.status !== "waiting" || step.instance.status !== "running") {
         throw new WorkflowError("wrong_status", "The token does not wait for a task");
       }
-      const { value, issues } = await this.validator.validate(node.config?.form as FormSpec | undefined, output, { purpose: "task", processKey: step.instance.processKey, partition: step.instance.partition });
+      const { value, issues } = await this.validator().validate(node.config?.form as FormSpec | undefined, output, { purpose: "task", processKey: step.instance.processKey, partition: step.instance.partition });
       if (issues.length > 0) throw new WorkflowError("invalid_input", "The task form is invalid", issues);
       await this.engine.complete(step, tokenId, value, actor);
       return true;
@@ -117,7 +119,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
       for (const [nodeId, node] of Object.entries(version.document.nodes)) {
         if (node.kind !== "eventStart" || node.config?.event !== eventKey) continue;
         // An event carries more than a process needs: fields the input does not declare are dropped, not refused.
-        const { value, issues: all } = await this.validator.validate(version.document.input, data, { purpose: "input", processKey: version.key, partition });
+        const { value, issues: all } = await this.validator().validate(version.document.input, data, { purpose: "input", processKey: version.key, partition });
         const issues = all.filter((issue) => issue.code !== "unknown");
         if (issues.length > 0) {
           rejected.push({ processKey: version.key, issues });
@@ -157,6 +159,11 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (exists === 0) throw notFound(instanceId);
     const rows = await this.db.history.asNoTracking().where((h) => h.instanceId.eq(instanceId)).orderBy((h) => h.id).toList();
     return rows.map(historyOf);
+  }
+
+  /** The application's `WorkflowInputValidator`, or the module's `DefaultWorkflowInputValidator`. */
+  private validator(): WorkflowInputValidator {
+    return this.services.resolve(WorkflowInputValidator);
   }
 }
 

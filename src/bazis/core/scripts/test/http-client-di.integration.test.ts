@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-// A service takes HttpClient and HttpClientFactory by type (before: "Missing
-// dependency HttpClient" / BAZIS_DI_DEPENDENCY_UNKNOWN), and an unhandled
-// upstream failure answers 504/502 instead of 500.
+// Clients declared with @HttpClient are injected by their class with the base
+// URL and timeout of their config, and an unhandled upstream failure answers
+// 504/502 instead of 500.
 const repository = process.cwd();
 const roots: string[] = [];
 afterAll(async () => { for (const root of roots) await rm(root, { recursive: true, force: true }); });
@@ -16,7 +16,7 @@ async function run(root: string, args: string[]) {
   return { exit, output: out + err, last: out.trim().split("\n").at(-1) ?? "" };
 }
 
-test("HttpClient and HttpClientFactory inject by type; upstream failures answer 502/504", async () => {
+test("@HttpClient clients inject by class with their config; upstream failures answer 502/504", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "bazis-http-client-di-"));
   roots.push(root);
   await mkdir(path.join(root, "node_modules"));
@@ -25,43 +25,58 @@ test("HttpClient and HttpClientFactory inject by type; upstream failures answer 
   await Bun.write(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { target: "ESNext", module: "ESNext", moduleResolution: "Bundler", strict: true, types: ["bun"] }, include: ["src/**/*.ts"] }));
   await Bun.write(path.join(root, "src/index.ts"), `import { Module, scoped } from "bazis/core/di";
 import { Controller, Get } from "bazis/core/http";
-import { HttpClient, HttpClientFactory, httpClientModule } from "bazis/core/http-client";
+import { HttpClient, HttpClientBase } from "bazis/core/http-client";
+import { defineConfig } from "bazis/core/kernel";
+
+export interface WeatherConfig { baseUrl: string; timeoutMs: number }
+export const weatherConfig = defineConfig<WeatherConfig>("weather", { default: { baseUrl: "http://127.0.0.1:1", timeoutMs: 30000 } });
+export interface SlowWeatherConfig { baseUrl: string; timeoutMs: number }
+export const slowWeatherConfig = defineConfig<SlowWeatherConfig>("slowWeather", { default: { baseUrl: "http://127.0.0.1:1", timeoutMs: 100 } });
+
+@HttpClient({ config: weatherConfig })
+export class WeatherClient extends HttpClientBase {}
+
+@HttpClient({ config: slowWeatherConfig })
+export class SlowWeatherClient extends HttpClientBase {}
 
 export class WeatherService {
-  constructor(private readonly http: HttpClient, private readonly clients: HttpClientFactory) {}
-  async ok() { return (await this.http.get("/ok")).data; }
-  async named() { return (await this.clients.createClient("slow").get("/slow")).data; }
-  async missing() { return (await this.http.get("/missing")).data; }
+  constructor(private readonly weather: WeatherClient, private readonly slowWeather: SlowWeatherClient) {}
+  async ok() { return (await this.weather.get("/ok")).data; }
+  async slow() { return (await this.slowWeather.get("/slow")).data; }
+  async missing() { return (await this.weather.get("/missing")).data; }
 }
 
 @Controller("weather")
 export class WeatherController {
   constructor(private readonly weather: WeatherService) {}
   @Get("ok") ok() { return this.weather.ok(); }
-  @Get("slow") slow() { return this.weather.named(); }
+  @Get("slow") slow() { return this.weather.slow(); }
   @Get("missing") missing() { return this.weather.missing(); }
 }
 
-export function appModule(baseUrl: string) {
-  @Module({
-    imports: [httpClientModule({ default: { baseUrl }, clients: { slow: { timeoutMs: 100 } } })],
-    providers: [scoped(WeatherService)],
-    controllers: [WeatherController],
-    exports: [],
-  })
-  class AppModule {}
-  return AppModule;
-}
+@Module({
+  httpClients: [WeatherClient, SlowWeatherClient],
+  providers: [scoped(WeatherService)],
+  controllers: [WeatherController],
+  exports: [],
+})
+export class AppModule {}
 `);
-  await Bun.write(path.join(root, "probe.ts"), `import { startTestApp } from "bazis/core/testing";
-import { appModule } from "./src/index";
+
+  await Bun.write(path.join(root, "probe.ts"), `import { memorySource } from "bazis/core/kernel";
+import { startTestApp } from "bazis/core/testing";
+import { AppModule } from "./src/index";
 const upstream = Bun.serve({ port: 0, hostname: "127.0.0.1", async fetch(req) {
   const { pathname } = new URL(req.url);
   if (pathname === "/ok") return Response.json({ ok: true });
   if (pathname === "/slow") { await Bun.sleep(1000); return Response.json({ slow: true }); }
   return Response.json({ error: "secret upstream detail" }, { status: 404 });
 } });
-const app = await startTestApp(appModule("http://127.0.0.1:" + upstream.port), { kernel: { environment: "production" } });
+const baseUrl = "http://127.0.0.1:" + upstream.port;
+const app = await startTestApp(AppModule, {
+  kernel: { environment: "production" },
+  configure: (builder) => builder.addConfigSource(memorySource({ weather: { baseUrl }, slowWeather: { baseUrl } })),
+});
 const get = async (path: string) => { const r = await app.fetch(path); return [r.status, await r.json()]; };
 console.log(JSON.stringify({ ok: await get("/weather/ok"), slow: await get("/weather/slow"), missing: await get("/weather/missing") }));
 await app.stop();

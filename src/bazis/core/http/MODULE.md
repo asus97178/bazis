@@ -29,7 +29,7 @@ After the pipeline `HttpServer` applies the negotiated representation and passes
 | `inspectableRedirects` | options, boolean | optional; null is forbidden | false | A non-boolean value → `HttpSetupError`; true allows the protocol only on the client's request |
 | `X-bazis-Redirect` | request header, string | optional | absent | Only the exact `manual-v1` enables the negotiated representation; any other value keeps regular HTTP |
 
-Example: `httpModule({ inspectableRedirects: true })`. The client separately enables `new HttpClient({ inspectableRedirects: true, maxRedirects: 2 })`.
+Example: `httpModule({ inspectableRedirects: true })`. The client separately enables `new HttpClientBase({ inspectableRedirects: true, maxRedirects: 2 })`.
 
 On an enabled server responses vary by `Vary: X-bazis-Redirect`. On a negotiated request the response gets `X-bazis-Redirect: manual-v1`, `Cache-Control: no-store` and CORS exposure of the protocol headers. A 301/302/303/307/308 redirect with Location is sent as HTTP 200 with `X-bazis-Redirect-Status` holding the original status and the original Location. The body is neither read nor copied; HEAD keeps this metadata without a body. A regular response keeps its status and body. Without negotiation the server keeps regular HTTP redirects.
 

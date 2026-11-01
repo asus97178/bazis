@@ -11,7 +11,7 @@ test("a raw { provide } object in module providers is an InvalidProviderError wi
   // 0.100.7: TypeError: undefined is not an object (evaluating 'definition.provider.provide')
   expect(() => createContainer(ClockModule)).toThrow(InvalidProviderError);
   expect(() => createContainer(ClockModule)).toThrow(
-    'Module "ClockModule": providers[1] is not a provider registration ({ provide: Clock }). Register it with singleton(Clock), scoped(Clock), transient(Clock), singletonValue(TOKEN, value) or singletonFactory(TOKEN, [deps], factory).',
+    'Module "ClockModule": providers[1] is not a provider registration ({ provide: Clock }). Register it with singleton(Clock), scoped(Clock), transient(Clock), or singletonValue(TOKEN, value).',
   );
 });
 

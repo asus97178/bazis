@@ -1,6 +1,7 @@
 import type { AgentToolContract } from "../../../agent";
 import type { ProcessDocument, ProcessIssue } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
+import type { OwnedCodeProcess } from "../code/codeProcesses";
 
 export interface ProcessSummary {
   readonly key: string;
@@ -87,4 +88,9 @@ export abstract class IWorkflowDefinitions {
   abstract retentionPolicies(): Promise<readonly { readonly key: string; readonly retentionDays: number }[]>;
   /** The Tools a service task may call, with their input and output schemas. */
   abstract tools(): readonly AgentToolContract[];
+  /**
+   * Publishes the processes of `@Module({ processes })` as `{ kind: "system", id: "code" }`
+   * (WORKFLOW-001 §14): called once at start by the framework, not by the application.
+   */
+  abstract publishCode(entries: readonly OwnedCodeProcess[]): Promise<readonly { readonly key: string; readonly version: number | null; readonly published: boolean }[]>;
 }

@@ -1,7 +1,7 @@
 # `bazis/core/grpc`
 
 gRPC: сервер на встроенном HTTP/2 Bun и клиент, без внешних пакетов.
-Список — по пакету 0.128.0.
+Список — по пакету 0.129.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -12,7 +12,8 @@ gRPC: сервер на встроенном HTTP/2 Bun и клиент, без 
 | `GrpcError`, `GrpcStatus` | Ошибка с кодом gRPC и коды статусов | [Ошибки](../../realtime/grpc.md#ошибки) |
 | `GrpcSetupError` | Ошибка описания gRPC-контроллера при запуске (RPC без `@GrpcMethod`, повтор); наследует `KernelError` | [Контроллер](../../realtime/grpc.md#контроллер) |
 | `Metadata` | Метаданные вызова | [Контекст вызова](../../realtime/grpc.md#контекст-вызова) |
-| `GrpcClient`, `grpcClientProvider` | Клиент; регистрация клиента в DI с ленивым подключением | [Клиент](../../realtime/grpc.md#клиент) |
+| `@GrpcClient(service, { config, ...options })`, `GrpcClientBase` | Объявление клиента чужого сервиса (поле модуля `grpcClients`, внедряется по классу) и сам клиент | [Клиент в DI](../../realtime/grpc.md#клиент-в-di) |
+| `GrpcClientConfig`, `GrpcClientDeclaration` | Настройки клиента (`address`, `timeoutMs`) и опции декоратора | там же |
 | `ServerCredentials` | TLS сервера | [Безопасность и пределы](../../realtime/grpc.md#безопасность-и-пределы) |
 | `grpcModule`, `GrpcServer`, `GRPC_REQUEST_BINDINGS` | Модуль и сервер; `runApp({ grpc })` создаёт их сам | — |
 

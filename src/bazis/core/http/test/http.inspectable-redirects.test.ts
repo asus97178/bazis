@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { HOSTED_SERVICE, Module, createContainer } from "@/core/di";
-import { HttpClient, HttpErrorCode, InspectableRedirectProtocol as protocol } from "@/library/http-client";
+import { HttpClientBase, HttpErrorCode, InspectableRedirectProtocol as protocol } from "@/library/http-client";
 import { httpModule } from "../index";
 import { inspectableRedirectResponse } from "../HttpContext/inspectableRedirects";
 import { startRedirectPeer } from "./fixtures/inspectableRedirects";
@@ -24,7 +24,7 @@ describe("inspectable redirects on the real HTTP server", () => {
   });
 
   test.each([0, 1, 2, 19, 20, 100])("enforces the exact cap %s", async maxRedirects => {
-    const client = new HttpClient({ baseUrl: peer.baseUrl, inspectableRedirects: true, maxRedirects, timeoutMs: 2000 });
+    const client = new HttpClientBase({ baseUrl: peer.baseUrl, inspectableRedirects: true, maxRedirects, timeoutMs: 2000 });
     let before = peer.traffic.length;
     expect((await client.get(`/chain/${maxRedirects}`)).status).toBe(200);
     expect(peer.traffic.length - before).toBe(maxRedirects + 1);
@@ -34,7 +34,7 @@ describe("inspectable redirects on the real HTTP server", () => {
   });
 
   test("HEAD negotiates redirects without response bodies", async () => {
-    const response = await new HttpClient({ inspectableRedirects: true, maxRedirects: 1 }).head(`${peer.baseUrl}/chain/1`);
+    const response = await new HttpClientBase({ inspectableRedirects: true, maxRedirects: 1 }).head(`${peer.baseUrl}/chain/1`);
     expect(response.status).toBe(200);
     expect(response.data).toBeUndefined();
     const raw = await fetch(`${peer.baseUrl}/chain/1`, { method: "HEAD", redirect: "manual", headers: { [protocol.header]: protocol.version } });
@@ -43,7 +43,7 @@ describe("inspectable redirects on the real HTTP server", () => {
   });
 
   test("protocol applies to framework 404 and keeps normal error decoding", async () => {
-    const error = await new HttpClient({ inspectableRedirects: true }).get(`${peer.origin}/unmatched`).catch(error => error);
+    const error = await new HttpClientBase({ inspectableRedirects: true }).get(`${peer.origin}/unmatched`).catch(error => error);
     expect(error.code).toBe(HttpErrorCode.BadStatus);
     expect(error.status).toBe(404);
     expect(error.response.data).toEqual({ error: "Not Found" });
@@ -51,7 +51,7 @@ describe("inspectable redirects on the real HTTP server", () => {
 
   test("native raw file Range survives enabled and negotiated transport", async () => {
     for (const inspectableRedirects of [false, true]) {
-      const response = await new HttpClient({ inspectableRedirects, responseType: "text" }).get(`${peer.baseUrl}/file`, { headers: { range: "bytes=0-9" } });
+      const response = await new HttpClientBase({ inspectableRedirects, responseType: "text" }).get(`${peer.baseUrl}/file`, { headers: { range: "bytes=0-9" } });
       expect(response.status).toBe(206);
       expect(response.headers.get("content-range")).toStartWith("bytes 0-9/");
       expect(response.data).toBe("import { H");
@@ -62,7 +62,7 @@ describe("inspectable redirects on the real HTTP server", () => {
     const original = console.error;
     console.error = () => {};
     try {
-      const error = await new HttpClient({ inspectableRedirects: true }).get(`${peer.baseUrl}/missing-file`).catch(error => error);
+      const error = await new HttpClientBase({ inspectableRedirects: true }).get(`${peer.baseUrl}/missing-file`).catch(error => error);
       expect(error.code).toBe(HttpErrorCode.BadStatus);
       expect(error.status).toBe(500);
       expect(error.response.data).toEqual({ error: "Internal Server Error" });

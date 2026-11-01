@@ -4,12 +4,12 @@ import { AllowAnonymous, anyOf, Authorize, bearerToken, Controller, ForbiddenErr
 import type { Logger } from "../../kernel";
 import { startTestApp, type TestApp } from "../../testing";
 import { JwtExpiredError } from "../../../library/jwt";
-import { GrpcClient, GrpcController, GrpcError, GrpcMethod, GrpcServer, GrpcStatus, Metadata, type GrpcContext } from "../index";
+import { GrpcClientBase, GrpcController, GrpcError, GrpcMethod, GrpcServer, GrpcStatus, Metadata, type GrpcContext } from "../index";
 import { HOSTED_SERVICE } from "../../di";
 import { echoService, type EchoMessage } from "./fixtures/contract";
 
 // 0.98.32: @Authorize protects gRPC like HTTP with the same checks, unexpected
-// handler failures are logged, and a failing GrpcClient call in an HTTP
+// handler failures are logged, and a failing GrpcClientBase call in an HTTP
 // request answers 502/504 instead of 500.
 
 class RecordingLogger implements Logger {
@@ -56,10 +56,10 @@ DI.bindDeps(SecureEchoController, Greeter);
 @Module({ providers: [singleton(Greeter)], grpcControllers: [SecureEchoController], exports: [] })
 class SecureModule {}
 
-async function start(logger = new RecordingLogger()): Promise<{ app: TestApp; client: GrpcClient; logger: RecordingLogger; greeter: Greeter }> {
+async function start(logger = new RecordingLogger()): Promise<{ app: TestApp; client: GrpcClientBase; logger: RecordingLogger; greeter: Greeter }> {
   const app = await startTestApp(SecureModule, { http: false, grpc: { address: "127.0.0.1:0" }, configure: (builder) => builder.useLogger(logger) });
   const server = app.container.resolveAll(HOSTED_SERVICE).find((service): service is GrpcServer => service instanceof GrpcServer)!;
-  const client = new GrpcClient(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000 });
+  const client = new GrpcClientBase(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000 });
   return { app, client, logger, greeter: app.container.resolve(Greeter) };
 }
 const token = (value: string): Metadata => { const metadata = new Metadata(); metadata.set("authorization", `Bearer ${value}`); return metadata; };
@@ -106,7 +106,7 @@ describe("unexpected gRPC failures are logged", () => {
   });
 });
 
-describe("a failing GrpcClient call inside an HTTP request", () => {
+describe("a failing GrpcClientBase call inside an HTTP request", () => {
   test("is 502 Bad Gateway, 504 for a deadline, 502 when the service is down", async () => {
     @GrpcController(echoService)
     class SlowEcho {
@@ -123,13 +123,13 @@ describe("a failing GrpcClient call inside an HTTP request", () => {
     class Upstream {}
     const upstream = await startTestApp(Upstream, { http: false, grpc: { address: "127.0.0.1:0" } });
     const port = upstream.container.resolveAll(HOSTED_SERVICE).find((service): service is GrpcServer => service instanceof GrpcServer)!.port;
-    const client = new GrpcClient(echoService, { address: `127.0.0.1:${port}`, timeoutMs: 100 });
+    const client = new GrpcClientBase(echoService, { address: `127.0.0.1:${port}`, timeoutMs: 100 });
 
     @Controller("proxy")
     class ProxyController {
       @Get("missing") async missing() { return (await client.unary("Echo", { text: "missing", count: 0 })).data; }
       @Get("slow") async slow() { return (await client.unary("Echo", { text: "slow", count: 0 })).data; }
-      @Get("down") async down() { return (await new GrpcClient(echoService, { address: "127.0.0.1:1", timeoutMs: 500 }).unary("Echo", { text: "", count: 0 })).data; }
+      @Get("down") async down() { return (await new GrpcClientBase(echoService, { address: "127.0.0.1:1", timeoutMs: 500 }).unary("Echo", { text: "", count: 0 })).data; }
     }
     @Module({ controllers: [ProxyController], exports: [] })
     class Proxy {}

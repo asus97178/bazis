@@ -2,7 +2,7 @@ import { markConfigurationError, type ServiceProvider } from "../../../di";
 import type { HostedService } from "../../../di/extensions/hosted-service";
 import { LOGGER } from "../../../kernel";
 import { WorkflowTools } from "../../internal/WorkflowTools";
-import { WorkflowDefinitions } from "../services/WorkflowDefinitions.service";
+import { IWorkflowDefinitions } from "../services/IWorkflowDefinitions.service";
 import { CodeProcessCatalog } from "./CodeProcessCatalog";
 import { definitionProblems, WorkflowSetupError } from "./codeProcesses";
 
@@ -30,7 +30,7 @@ export class CodeProcessPublisher implements HostedService {
     }
     const scope = this.services.createScope();
     try {
-      const results = await scope.resolve(WorkflowDefinitions).publishCode(entries);
+      const results = await scope.resolve(IWorkflowDefinitions).publishCode(entries);
       this.services.tryResolve(LOGGER)?.info("workflow processes from code", {
         published: results.filter((result) => result.published).map((result) => `${result.key} v${result.version}`),
         unchanged: results.filter((result) => !result.published).map((result) => result.key),

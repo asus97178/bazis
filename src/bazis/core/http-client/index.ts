@@ -2,102 +2,22 @@
  * Core DI/correlation integration for the pure `@/library/http-client`.
  *
  * The HTTP engine lives in the library (framework-agnostic). This module only
- * wires it into the runtime: a module factory that registers the clients for
- * injection by type, and kernel-based correlation propagation. All library
- * symbols are re-exported for convenience.
+ * wires it into the runtime: clients of other services are declared like
+ * controllers — a class with `@HttpClient`, listed in `httpClients` of a
+ * module — and get the kernel's correlation headers. All library symbols are
+ * re-exported for convenience.
  *
  * ```ts
- * import { HttpClient, httpClientModule } from "@/core/http-client";
+ * import { HttpClient, HttpClientBase } from "bazis/core/http-client";
  *
- * @Module({ imports: [httpClientModule({ default: { baseUrl: "https://api" } })], providers: [scoped(WeatherService)] })
+ * @HttpClient({ config: weatherConfig })
+ * export class WeatherClient extends HttpClientBase {}
+ *
+ * @Module({ httpClients: [WeatherClient], providers: [scoped(WeatherService)] })
  * class WeatherModule {}
  *
- * class WeatherService { constructor(private readonly http: HttpClient) {} }
+ * class WeatherService { constructor(private readonly weather: WeatherClient) {} }
  * ```
  */
-import { DI, Module, type BazisModule, type ProviderDefinition } from "../di";
-import { getOutboundCorrelationHeaders } from "../kernel";
-import {
-  HttpClient,
-  HttpClientFactory,
-  HttpClientFactoryBuilder,
-  type HeaderBag,
-  type RequestConfig,
-} from "../../library/http-client";
-
 export * from "../../library/http-client";
-
-export interface HttpClientModuleConfig {
-  /** Named clients: `HttpClientFactory.createClient(name)`. */
-  readonly clients?: Readonly<Record<string, RequestConfig>>;
-  /** Defaults for the injectable `HttpClient` and `createClient()`. */
-  readonly default?: RequestConfig;
-  /** Correlation header source. Default: the kernel async request context. */
-  readonly correlationHeaders?: () => HeaderBag;
-  /** Default per-request timeout in ms (server-side safety). Default: 30000. */
-  readonly timeoutMs?: number;
-  /** Default maximum response body size. Default: 16 MiB. `0` disables it. */
-  readonly maxResponseBytes?: number;
-}
-
-/**
- * Registers the outbound HTTP client in DI with correlation propagation wired
- * to the kernel request context. A service takes it by type:
- * - `HttpClient` — the default client;
- * - `HttpClientFactory` — named clients (fail-fast on unknown names).
- */
-export function httpClientModule(config: HttpClientModuleConfig = {}): BazisModule {
-  const correlationHeaders = config.correlationHeaders ?? getOutboundCorrelationHeaders;
-  const moduleTimeoutMs = resolveLimit(config.timeoutMs, 30_000, "httpClientModule timeoutMs");
-  const moduleMaxResponseBytes = resolveLimit(
-    config.maxResponseBytes,
-    16 * 1024 * 1024,
-    "httpClientModule maxResponseBytes",
-  );
-  const defaultConfig = config.default ?? {};
-  const defaults: RequestConfig = {
-    ...defaultConfig,
-    timeoutMs: resolveLimit(defaultConfig.timeoutMs, moduleTimeoutMs, "httpClientModule default.timeoutMs"),
-    maxResponseBytes: resolveLimit(
-      defaultConfig.maxResponseBytes,
-      moduleMaxResponseBytes,
-      "httpClientModule default.maxResponseBytes",
-    ),
-    correlationHeaders: defaultConfig.correlationHeaders ?? correlationHeaders,
-  };
-
-  const builder = new HttpClientFactoryBuilder();
-  builder.useDefault(defaults);
-  for (const [name, clientConfig] of Object.entries(config.clients ?? {})) {
-    builder.addClient(name, {
-      ...clientConfig,
-      timeoutMs: resolveLimit(clientConfig.timeoutMs, defaults.timeoutMs!, `httpClientModule clients.${name}.timeoutMs`),
-      maxResponseBytes: resolveLimit(
-        clientConfig.maxResponseBytes,
-        defaults.maxResponseBytes!,
-        `httpClientModule clients.${name}.maxResponseBytes`,
-      ),
-    });
-  }
-  const factory = builder.build();
-
-  const client = factory.createClient();
-  // One factory and one default client, injected by type.
-  const providers: ProviderDefinition[] = [
-    DI.singleton(DI.valueProvider(HttpClientFactory, factory)),
-    DI.singleton(DI.valueProvider(HttpClient, client)),
-  ];
-
-  @Module({ providers })
-  class HttpClientModule {}
-
-  return HttpClientModule;
-}
-
-function resolveLimit(value: number | undefined, fallback: number, field: string): number {
-  const resolved = value ?? fallback;
-  if (!Number.isSafeInteger(resolved) || resolved < 0) {
-    throw new TypeError(`${field} must be a non-negative safe integer`);
-  }
-  return resolved;
-}
+export { HttpClient, type HttpClientConfig, type HttpClientDeclaration } from "./httpClients";

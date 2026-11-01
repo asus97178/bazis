@@ -319,22 +319,33 @@ POST /agents/operator/ask {"question":"отмени заказ 7"}
 
 ```ts
 import { AGENT_RUNTIME_OPTIONS, TOOL_EXECUTION_OPTIONS, type ToolExecutionOptions } from "bazis/core/agent";
-import { DI, Module, singleton } from "bazis/core/di";
+import { Module, singleton, singletonValue } from "bazis/core/di";
+
+/** Настройки исполнения — класс: им нужен журнал из DI. Поля задаются в конструкторе. */
+export class AppToolOptions implements ToolExecutionOptions {
+  readonly auditSink: ToolExecutionOptions["auditSink"];
+  readonly approvalPolicy: ToolExecutionOptions["approvalPolicy"];
+
+  constructor(audit: ToolAuditLog) {
+    this.auditSink = (entry) => audit.write(entry);
+    // Чтение разрешено всегда, изменение — только от имени администратора.
+    this.approvalPolicy = (request) => request.tool.metadata.sideEffect === "read" || request.metadata.role === "admin";
+  }
+}
 
 @Module({
   providers: [
     singleton(ToolAuditLog),
-    DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, { maxSteps: 6 })),
-    DI.singleton(DI.factoryProvider(TOOL_EXECUTION_OPTIONS, [ToolAuditLog], (audit: ToolAuditLog): ToolExecutionOptions => ({
-      auditSink: (entry) => audit.write(entry),
-      // Чтение разрешено всегда, изменение — только от имени администратора.
-      approvalPolicy: (request) => request.tool.metadata.sideEffect === "read" || request.metadata.role === "admin",
-    }))),
+    singletonValue(AGENT_RUNTIME_OPTIONS, { maxSteps: 6 }),
+    singleton(TOOL_EXECUTION_OPTIONS, AppToolOptions),
   ],
   exports: [ToolAuditLog],
 })
 export class AgentSettingsModule {}
 ```
+
+Поля, а не методы: исполнитель копирует настройки (`{ ...options }`), а
+методы класса при копировании теряются.
 
 `metadata` передаётся при запуске — например, роль пользователя из запроса:
 

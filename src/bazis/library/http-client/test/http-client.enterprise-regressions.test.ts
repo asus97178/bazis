@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HttpClient, HttpClientError, HttpErrorCode } from "../index";
+import { HttpClientBase, HttpClientError, HttpErrorCode } from "../index";
 import type { RequestConfig } from "../types";
 
 const url = "https://api.test/body";
@@ -11,7 +11,7 @@ describe("normalize transport body errors at the read boundary", () => {
       test(`${mode}, response cap ${limit}`, async () => {
         const cause = new TypeError("connection reset after headers");
         let calls = 0;
-        const client = new HttpClient({
+        const client = new HttpClientBase({
           maxResponseBytes: limit,
           retry: { maxRetries: 3, backoffMs: 0 },
           fetch: (async () => {
@@ -47,7 +47,7 @@ describe("normalize transport body errors at the read boundary", () => {
         start(controller) { controller.enqueue(encoder.encode("ok")); },
         cancel() { canceled++; },
       });
-      const client = new HttpClient({
+      const client = new HttpClientBase({
         fetch: (async () => new Response(body)) as unknown as typeof fetch,
         signal: caller.signal,
         maxResponseBytes: 1024,
@@ -67,7 +67,7 @@ describe("one-shot uploads use the Fetch stream contract", () => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) { controller.enqueue(encoder.encode("stream upload")); controller.close(); },
     });
-    const client = new HttpClient({ fetch: (async (_url: string | Request | URL, init?: RequestInit) => {
+    const client = new HttpClientBase({ fetch: (async (_url: string | Request | URL, init?: RequestInit) => {
       expect(init?.body).toBe(body);
       expect((init as RequestInit & { duplex?: string }).duplex).toBe("half");
       return new Response(await new Response(init!.body).text());
@@ -77,7 +77,7 @@ describe("one-shot uploads use the Fetch stream contract", () => {
 
   test("a stream PUT is not retried after a transport failure", async () => {
     let calls = 0;
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       retry: { maxRetries: 3, backoffMs: 0 },
       fetch: (async () => { calls++; throw new TypeError("connection reset"); }) as unknown as typeof fetch,
     });
@@ -91,13 +91,13 @@ describe("response cap measures bytes exposed by Fetch", () => {
   test("CORS can hide Content-Encoding while exposing the encoded Content-Length", async () => {
     const raw = new Response("ok", { headers: { "content-length": "22" } });
     Object.defineProperty(raw, "type", { value: "cors" });
-    const client = new HttpClient({ maxResponseBytes: 5, fetch: (async () => raw) as unknown as typeof fetch });
+    const client = new HttpClientBase({ maxResponseBytes: 5, fetch: (async () => raw) as unknown as typeof fetch });
     expect((await client.get(url)).data).toBe("ok");
   });
 
   for (const encoding of ["gzip", "br", "gzip, br"]) {
     test(`${encoding}: encoded Content-Length cannot reject a decoded body that fits`, async () => {
-      const client = new HttpClient({ maxResponseBytes: 5, fetch: (async () => new Response("ok", {
+      const client = new HttpClientBase({ maxResponseBytes: 5, fetch: (async () => new Response("ok", {
         headers: { "content-encoding": encoding, "content-length": "22" },
       })) as unknown as typeof fetch });
       const result = await client.get(url);
@@ -107,7 +107,7 @@ describe("response cap measures bytes exposed by Fetch", () => {
   }
 
   test("a small encoded representation does not bypass the decoded stream cap", async () => {
-    const client = new HttpClient({ maxResponseBytes: 5, fetch: (async () => new Response("decoded body is too long", {
+    const client = new HttpClientBase({ maxResponseBytes: 5, fetch: (async () => new Response("decoded body is too long", {
       headers: { "content-encoding": "gzip", "content-length": "2" },
     })) as unknown as typeof fetch });
     await expect(client.get(url)).rejects.toMatchObject({ code: HttpErrorCode.ResponseTooLarge });
@@ -116,7 +116,7 @@ describe("response cap measures bytes exposed by Fetch", () => {
   test("identity Content-Length still fails early and cancels without waiting for cleanup", async () => {
     let canceled = 0;
     const body = new ReadableStream({ cancel() { canceled++; return new Promise(() => {}); } });
-    const client = new HttpClient({ maxResponseBytes: 5, fetch: (async () => new Response(body, {
+    const client = new HttpClientBase({ maxResponseBytes: 5, fetch: (async () => new Response(body, {
       headers: { "content-encoding": " Identity ", "content-length": "22" },
     })) as unknown as typeof fetch });
     await expect(client.get(url)).rejects.toMatchObject({ code: HttpErrorCode.ResponseTooLarge });
@@ -139,7 +139,7 @@ describe("wrappers preserve the original Fetch response", () => {
     ] as const) {
       test(`${name}, ${status}, ${body}`, async () => {
         const raw = new Response(body, { status, headers: { "content-type": "application/json" } });
-        const client = new HttpClient({ ...config, fetch: (async () => raw) as unknown as typeof fetch });
+        const client = new HttpClientBase({ ...config, fetch: (async () => raw) as unknown as typeof fetch });
         const outcome = await client.get(url).catch(error => error);
         if (code) {
           expect(outcome).toBeInstanceOf(HttpClientError);
@@ -161,7 +161,7 @@ describe("wrappers preserve the original Fetch response", () => {
       else if (pulls === 2) controller.enqueue(encoder.encode("bcde"));
       else controller.close();
     } }));
-    const client = new HttpClient({ maxResponseBytes: 3, fetch: (async () => raw) as unknown as typeof fetch });
+    const client = new HttpClientBase({ maxResponseBytes: 3, fetch: (async () => raw) as unknown as typeof fetch });
     const result = await client.get<ReadableStream<Uint8Array>>(url, { responseType: "stream" });
     expect(result.raw).toBe(raw);
     expect(result.data).not.toBe(raw.body);

@@ -1,8 +1,6 @@
-import { DI, Module, scoped } from "../../di";
-import { WorkflowClock } from "../contracts/WorkflowClock";
+import { Module, scoped } from "../../di";
 import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinitions.module";
 import { withEventSubscribers } from "../../kernel";
-import { IWorkflowRuntime } from "../runtime_module/services/IWorkflowRuntime.service";
 import { WorkflowRuntimeModule } from "../runtime_module/WorkflowRuntime.module";
 import { TaskEvents } from "./events/TaskEvents";
 import { TasksController } from "./http/Tasks.controller";
@@ -13,19 +11,16 @@ import { WorkflowTasks } from "./services/WorkflowTasks.service";
 
 /**
  * Tasks for people: the inbox of `userTask` steps ([passport](MODULE.md)).
- * Dependencies are explicit: the framework's classes are not covered by the
- * application's codegen.
  */
 @Module({
   imports: [WorkflowDefinitionsModule, WorkflowRuntimeModule],
   ormBazis: { context: TasksDbContext, entities: [WfTask], ownedStore: tasksStore, registerRepositories: false },
   providers: [
-    scoped(WorkflowTasks, WorkflowTasks, [TasksDbContext, IWorkflowRuntime, WorkflowClock] as const),
-    DI.scoped(DI.factoryProviderWithResolver(IWorkflowTasks, [], (resolver) => resolver.resolve(WorkflowTasks))),
-    scoped(TaskEvents, TaskEvents, [WorkflowTasks] as const),
+    scoped(IWorkflowTasks, WorkflowTasks),
+    scoped(TaskEvents),
     ...withEventSubscribers(TaskEvents),
   ],
-  controllers: [DI.bindDeps(TasksController, IWorkflowTasks)],
+  controllers: [TasksController],
   exports: [IWorkflowTasks],
 })
 export class WorkflowTasksModule {}

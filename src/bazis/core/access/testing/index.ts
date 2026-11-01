@@ -20,9 +20,9 @@ export interface StaticAccessOptions {
  * route check, grants come from the table.
  *
  * ```ts
- * DI.singleton(DI.valueProvider(AccessPolicy, new StaticAccessPolicy({
+ * singletonValue(AccessPolicy, new StaticAccessPolicy({
  *   grants: { "user:1": { "orders.read": [{ scopes: "all", where: { own: true } }] } },
- * })))
+ * }))
  * ```
  */
 export class StaticAccessPolicy extends AccessPolicy {

@@ -531,6 +531,7 @@ async function generateTarget(name: string, reachable: Set<string>, production: 
     collectTokenDescriptions(source);
     if (!FRAMEWORK_INTERNAL_PREFIXES.some((prefix) => filePath.startsWith(prefix)) && !isFrameworkPackPath(filePath)) {
       collectClassDeps(source);
+      collectProviderFormErrors(source);
       collectGrpcBindings(source);
       toolCodegenSources.push({ filePath, sourceFile: source });
     }
@@ -601,6 +602,7 @@ function generateFrameworkPack(pack: string): void {
   for (const source of programFiles.values()) collectTokenDescriptions(source);
   for (const { source } of sourceEntries) collectDiClassRegistrations(source);
   for (const { source } of sourceEntries) collectClassDeps(source);
+  for (const { source } of sourceEntries) collectProviderFormErrors(source);
   resolveConfigViewDeps();
   validateDepsAgainstKnownTokens();
   failOnFatalErrors();
@@ -873,7 +875,7 @@ function resolveConfigViewDeps(): void {
         if (needsInferredDiDeps(declaration)) {
           fatalErrors.push(prefixes.length === 0
             ? `BAZIS_DI_CONFIG_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", but no defineConfig<${typeName}>(...) declaration was found. Declare the configuration with an explicit type argument, for example defineConfig<${typeName}>("name", { default: {...} }).`
-            : `BAZIS_DI_CONFIG_AMBIGUOUS: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", which matches several declarations: ${prefixes.map((prefix) => `"${prefix}"`).join(", ")}. Give each declaration its own type, or pass the token explicitly: scoped(Service, Service, [config.token]).`);
+            : `BAZIS_DI_CONFIG_AMBIGUOUS: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", which matches several declarations: ${prefixes.map((prefix) => `"${prefix}"`).join(", ")}. Give each declaration its own type.`);
         }
         changed = false;
         break;
@@ -909,7 +911,7 @@ function validateDepsAgainstKnownTokens(): void {
       // would fail later, far from the cause. Other classes need no entry.
       if (needsInferredDiDeps(declaration)) {
         fatalErrors.push(declaration.members.some(ts.isConstructorDeclaration)
-          ? `BAZIS_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "${depName}", which is neither a DI token (createToken) nor a class known to codegen. Register it, import it from the framework package, or bind the class with an explicit factory.`
+          ? `BAZIS_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "${depName}", which is neither a DI token (createToken) nor a class known to codegen. Register it in a module or import it from the framework package.`
           : `BAZIS_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(declaration)}: inherited constructor dependency "${depName}" has no known DI token.`);
       }
       break;
@@ -923,7 +925,7 @@ function collectClassDeps(source: ts.SourceFile): void {
       const result = readConstructorTypeNames(node);
       if (result.unsupportedParameter !== undefined && needsInferredDiDeps(node)) {
         const { index, name, type } = result.unsupportedParameter;
-        fatalErrors.push(`BAZIS_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(node)}: constructor parameter ${index + 1} "${name}" of "${node.name.text}" has type "${type}", which cannot be injected: DI resolves dependencies by class, contract or token, and a plain type does not say which value to inject. Declare a token with the same name as a type alias (export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")) and register a value, or pass the deps explicitly: scoped(${node.name.text}, ${node.name.text}, [TOKEN] as const).`);
+        fatalErrors.push(`BAZIS_DI_DEPENDENCY_UNKNOWN: ${sourceLocation(node)}: constructor parameter ${index + 1} "${name}" of "${node.name.text}" has type "${type}", which cannot be injected: DI resolves dependencies by class, contract or token, and a plain type does not say which value to inject. Declare a token with the same name as a type alias (export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")), register a value with singletonValue(Prefix, "…") and type the parameter with it: prefix: Prefix.`);
       }
       if (result.unsupportedInheritedParameter !== undefined && needsInferredDiDeps(node)) {
         fatalErrors.push(`BAZIS_DI_CONSTRUCTOR_UNRESOLVED: ${sourceLocation(node)}: cannot infer inherited constructor parameter "${result.unsupportedInheritedParameter}" for "${node.name.text}". The parameter needs a runtime DI token or an explicit value/factory binding.`);
@@ -1021,6 +1023,96 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
     } else if (ts.isObjectLiteralExpression(node)) {
       if (hasContextualProperty(node, "useClass", "/core/di/provider/types/ClassProvider.ts")) recordProvider(node);
       if (hasContextualProperty(node, "background", "/core/di/module/types/BazisModule.ts")) recordModule(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+/**
+ * A module registers its services only in the agreed forms (docs/guide
+ * fundamentals/dependency-injection.md): a class under its contract, a ready
+ * value, an asynchronously created resource, event subscribers. Constructor dependencies come from codegen, so a
+ * dependency list, a factory or a low-level `DI.*` provider is a fatal error
+ * with the agreed form in the message.
+ */
+function collectProviderFormErrors(source: ts.SourceFile): void {
+  // Inside the function: the script runs before later top-level constants are initialized.
+  const AGREED_PROVIDERS = "scoped(IService, Service), singleton(IService, Service), transient(IService, Service) (or the class alone), singletonValue(TOKEN, value), singletonAsyncFactory(TOKEN, [deps], async factory) or ...withEventSubscribers(Class)";
+  const CLASS_LISTS = ["controllers", "grpcControllers", "gateways", "background", "tools", "grpcClients", "httpClients"];
+  const callee = (call: ts.CallExpression): { file?: string; name?: string } => {
+    let symbol = checker.getSymbolAtLocation(call.expression);
+    if (symbol && (symbol.flags & ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
+    const declaration = symbol?.declarations?.find((entry) => ts.isFunctionDeclaration(entry) || ts.isMethodDeclaration(entry));
+    const name = declaration && "name" in declaration && declaration.name && ts.isIdentifier(declaration.name) ? declaration.name.text : undefined;
+    return { file: declaration?.getSourceFile().fileName.replace(/\\/g, "/"), name };
+  };
+  const resolved = <T extends ts.Node>(expression: ts.Expression, is: (node: ts.Node) => node is T): T | undefined => {
+    let current: ts.Expression = expression;
+    for (let depth = 0; depth < 5; depth++) {
+      if (is(current)) return current;
+      if (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) { current = current.expression; continue; }
+      let symbol = checker.getSymbolAtLocation(current);
+      if (symbol && (symbol.flags & ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
+      const declaration = symbol?.valueDeclaration;
+      if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) return undefined;
+      current = declaration.initializer;
+    }
+    return undefined;
+  };
+  const text = (node: ts.Node): string => {
+    const value = node.getText().replace(/\s+/g, " ");
+    return value.length > 90 ? `${value.slice(0, 87)}...` : value;
+  };
+  const checkProvider = (module: string, element: ts.Expression): void => {
+    if (ts.isSpreadElement(element)) {
+      const call = resolved(element.expression, ts.isCallExpression);
+      const target = call && callee(call);
+      if (target?.name === "withEventSubscribers" && target.file?.endsWith("/core/kernel/events/eventSubscribers.ts")) return;
+      fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: providers of ${module}: "${text(element)}" is not an agreed registration. Agreed forms: ${AGREED_PROVIDERS}.`);
+      return;
+    }
+    const call = ts.isCallExpression(element) ? element : undefined;
+    const target = call && callee(call);
+    if (call && target?.file?.endsWith("/core/di/module/shortcuts.ts")) {
+      if (["scoped", "singleton", "transient"].includes(target.name ?? "")) {
+        if (call.arguments.length <= 2) return;
+        fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: providers of ${module}: "${text(element)}" passes a dependency list. Remove it: codegen reads the constructor. Agreed forms: ${AGREED_PROVIDERS}.`);
+        return;
+      }
+      if (target.name === "singletonValue" && call.arguments.length === 2) return;
+      // A resource that is created asynchronously (a connection): created at startup.
+      if (target.name === "singletonAsyncFactory" && call.arguments.length === 3) return;
+    }
+    fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: providers of ${module}: "${text(element)}" is not an agreed registration. A computed service is a class with a constructor: scoped(IService, Service). Agreed forms: ${AGREED_PROVIDERS}.`);
+  };
+  const checkModule = (module: string, argument: ts.Expression | undefined): void => {
+    const object = argument && resolved(argument, ts.isObjectLiteralExpression);
+    if (!object) return;
+    for (const property of object.properties) {
+      if (!ts.isPropertyAssignment(property)) continue;
+      const field = property.name.getText().replace(/["']/g, "");
+      if (field !== "providers" && !CLASS_LISTS.includes(field)) continue;
+      const list = resolved(property.initializer, ts.isArrayLiteralExpression);
+      if (!list) {
+        fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(property)}: ${field} of ${module} must be an array written in the module.`);
+        continue;
+      }
+      for (const element of list.elements) {
+        if (field === "providers") checkProvider(module, element);
+        else if (!ts.isIdentifier(element) && !ts.isPropertyAccessExpression(element)) {
+          fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: ${field} of ${module}: "${text(element)}" — list the class itself; its constructor dependencies come from codegen.`);
+        }
+      }
+    }
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isClassDeclaration(node)) {
+      for (const decorator of ts.getDecorators(node) ?? []) {
+        if (!ts.isCallExpression(decorator.expression)) continue;
+        const target = callee(decorator.expression);
+        if (target.name === "Module" && target.file?.endsWith("/core/di/module/Module.ts")) checkModule(node.name?.text ?? "<anonymous module>", decorator.expression.arguments[0]);
+      }
     }
     ts.forEachChild(node, visit);
   };

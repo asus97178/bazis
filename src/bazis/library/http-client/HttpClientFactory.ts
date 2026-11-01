@@ -1,4 +1,4 @@
-import { HttpClient } from "./HttpClient";
+import { HttpClientBase } from "./HttpClientBase";
 import { HttpClientConfigError } from "./errors";
 import type { RequestConfig } from "./types";
 
@@ -7,7 +7,7 @@ import type { RequestConfig } from "./types";
  * An abstract class, so a service can take it by type in its constructor.
  */
 export abstract class HttpClientFactory {
-  public abstract createClient(name?: string): HttpClient;
+  public abstract createClient(name?: string): HttpClientBase;
 }
 
 class ConfiguredHttpClientFactory extends HttpClientFactory {
@@ -18,15 +18,15 @@ class ConfiguredHttpClientFactory extends HttpClientFactory {
     super();
   }
 
-  public createClient(name?: string): HttpClient {
+  public createClient(name?: string): HttpClientBase {
     if (name === undefined) {
-      return new HttpClient(this.defaults);
+      return new HttpClientBase(this.defaults);
     }
     const config = this.named.get(name);
     if (config === undefined) {
       throw new HttpClientConfigError(name, [...this.named.keys()]);
     }
-    return new HttpClient(this.defaults).create(config);
+    return new HttpClientBase(this.defaults).create(config);
   }
 }
 

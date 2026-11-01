@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HttpClient, HttpErrorCode, InspectableRedirectProtocol as protocol } from "../index";
+import { HttpClientBase, HttpErrorCode, InspectableRedirectProtocol as protocol } from "../index";
 
 describe("inspectable redirect protocol validation", () => {
   const invalidHeaders: Record<string, string>[] = [
@@ -12,7 +12,7 @@ describe("inspectable redirect protocol validation", () => {
   test.each(invalidHeaders)("rejects invalid or unavailable protocol before following", async headers => {
     let calls = 0;
     let canceled = 0;
-    const client = new HttpClient({ inspectableRedirects: true, retry: { maxRetries: 3, backoffMs: 0 },
+    const client = new HttpClientBase({ inspectableRedirects: true, retry: { maxRetries: 3, backoffMs: 0 },
       fetch: (async () => {
         calls++;
         return new Response(new ReadableStream({ cancel() { canceled++; return new Promise(() => {}); } }), { headers });
@@ -25,7 +25,7 @@ describe("inspectable redirect protocol validation", () => {
 
   test("undefined preserves opt-in and false explicitly disables it", async () => {
     const observed: (string | null)[] = [];
-    const client = new HttpClient({ inspectableRedirects: true, fetch: (async (_url, init) => {
+    const client = new HttpClientBase({ inspectableRedirects: true, fetch: (async (_url, init) => {
       const value = new Headers(init?.headers).get(protocol.header);
       observed.push(value);
       return new Response("ok", { headers: value ? { [protocol.header]: value } : {} });
@@ -37,7 +37,7 @@ describe("inspectable redirect protocol validation", () => {
 
   test("rejects invalid opt-in before a request", async () => {
     let calls = 0;
-    const client = new HttpClient({ fetch: (async () => { calls++; return new Response(); }) as unknown as typeof fetch });
+    const client = new HttpClientBase({ fetch: (async () => { calls++; return new Response(); }) as unknown as typeof fetch });
     for (const value of [null, "true", 1]) {
       await expect(client.get("https://peer.test", { inspectableRedirects: value as unknown as boolean })).rejects.toThrow("must be a boolean");
     }

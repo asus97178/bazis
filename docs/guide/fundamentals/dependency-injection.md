@@ -1,23 +1,38 @@
 # DI подробно
 
 Глава [Провайдеры и DI](../overview/providers.md) покрывает обычный случай:
-класс, время жизни, контракт и реализация. Здесь — всё остальное: значения
-и фабрики, несколько реализаций одного контракта, ключи, ленивые
-зависимости и освобождение ресурсов.
+класс, время жизни, контракт и реализация. Здесь — всё остальное: значения,
+вычисляемые и асинхронные сервисы, несколько реализаций одного контракта,
+ленивые зависимости и освобождение ресурсов.
 
-Все примеры проверены на bazis 0.108.0.
+Все примеры проверены на bazis 0.129.0.
 
 ## Способы регистрации
 
+В `providers` модуля пишут только эти формы:
+
 | Запись | Что регистрирует |
 | --- | --- |
-| `scoped(Service)`, `singleton(...)`, `transient(...)` | Класс — сам себе ключ |
-| `scoped(IContract, Implementation)` | Реализацию под [контрактом](../overview/providers.md#регистрация-по-контракту) |
+| `scoped(IContract, Implementation)`, `singleton(...)`, `transient(...)` | Реализацию под [контрактом](../overview/providers.md#регистрация-по-контракту) |
+| `scoped(Service)`, `singleton(Service)`, `transient(Service)` | Класс — сам себе ключ |
 | `singletonValue(TOKEN, value)` | Готовое значение |
-| `singletonFactory(TOKEN, [deps], factory)` | Результат функции |
-| `singletonFactoryWithResolver(TOKEN, [deps], factory)` | То же, функция получает ещё и контейнер |
 | `singletonAsyncFactory(TOKEN, [deps], async factory)` | Результат асинхронной функции; создаётся при запуске |
-| `DI.keyedSingleton(key, provider)` и др. | Реализацию под ключом |
+| `...withEventSubscribers(Class)` | Подписчиков на [события](events.md) |
+
+Зависимости класса codegen берёт из конструктора, поэтому третьего
+аргумента со списком зависимостей нет. Всё остальное — список
+зависимостей, синхронные фабрики, `DI.*` — codegen отклоняет:
+
+```text
+BAZIS_DI_PROVIDER_FORM: src/app/modules/notes/Notes.module.ts:12: providers of NotesModule:
+"scoped(NotesService, NotesService, [INotesRepository])" passes a dependency list. Remove it:
+codegen reads the constructor. Agreed forms: scoped(IService, Service), singleton(IService, Service),
+transient(IService, Service) (or the class alone), singletonValue(TOKEN, value),
+singletonAsyncFactory(TOKEN, [deps], async factory) or ...withEventSubscribers(Class).
+```
+
+В `controllers`, `background`, `gateways`, `grpcControllers` и `tools`
+перечисляют сами классы.
 
 ## Значения
 
@@ -39,54 +54,43 @@ constructor(private readonly appName: AppName) {}   // "di-lab"
 
 Обычный `string` в конструкторе внедрить нельзя: строк в приложении много, и
 DI не знает, какая нужна. Нужен именованный тип с токеном, как `AppName`.
-Если оставить `string`, codegen остановится и подскажет оба выхода — токен
-или явный список зависимостей:
+Если оставить `string`, codegen остановится и подскажет, как сделать:
 
 ```text
-  ╭─ 1/1 [DI] src/app/modules/Prim.ts:3 ─────────────────────────────────────────────────────────╮
-  │ ✖  constructor parameter 1 "prefix" of "Greeter" has type "string", which cannot be injected:│
-  │    DI resolves dependencies by class, contract or token, and a plain type does not say which │
-  │    value to inject. Declare a token with the same name as a type alias (export type Prefix = │
-  │    string; export const Prefix = createToken<Prefix>("Prefix")) and register a value, or pass│
-  │    the deps explicitly: scoped(Greeter, Greeter, [TOKEN] as const).                          │
-  │                                                                                              │
-  │   3 │ export class Greeter { constructor(private readonly prefix: string) {} }               │
-  │     │                                                             ^^^^^^                     │
-  │    code BAZIS_DI_DEPENDENCY_UNKNOWN                                                          │
-  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+BAZIS_DI_DEPENDENCY_UNKNOWN: src/app/modules/Prim.ts:3: constructor parameter 1 "prefix" of "Greeter"
+has type "string", which cannot be injected: DI resolves dependencies by class, contract or token,
+and a plain type does not say which value to inject. Declare a token with the same name as a type
+alias (export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")), register
+a value with singletonValue(Prefix, "…") and type the parameter with it: prefix: Prefix.
 ```
 
-## Фабрики
+## Вычисляемый сервис — класс
 
-Когда объект надо собрать функцией — клиент внешнего API, обёртка над
-чужой библиотекой, — используйте фабрику:
+Когда объект надо собрать из других — клиент внешнего API, обёртка над
+чужой библиотекой, — это класс с конструктором под своим контрактом:
 
 ```ts
-export interface HttpClient { get(path: string): string }
-export const HttpClient = createToken<HttpClient>("HttpClient");
+export abstract class HttpClient {
+  abstract get(path: string): string;
+}
+
+export class ApiClient extends HttpClient {
+  constructor(private readonly appName: AppName) {
+    super();
+  }
+
+  get(path: string) {
+    return `${this.appName} GET https://api.example.com${path}`;
+  }
+}
 ```
 
 ```ts
-singletonFactory(HttpClient, [AppName] as const, (name) => ({
-  get: (path) => `${name} GET https://api.example.com${path}`,
-})),
+providers: [singletonValue(AppName, "di-lab"), singleton(HttpClient, ApiClient)],
 ```
 
-Зависимости фабрики перечисляются явно, вторым аргументом, — codegen не
-заглядывает внутрь функций. `as const` нужен, чтобы TypeScript вывел типы
-аргументов фабрики: здесь `name` получает тип `AppName`.
-
-## Явный список зависимостей класса
-
-Обычно зависимости класса codegen берёт из конструктора. Список можно
-задать вручную третьим аргументом — это нужно, когда тип параметра не
-говорит, что именно внедрить, например при [ключах](#ключи):
-
-```ts
-scoped(Notifier, Notifier, [keyedDependency(ISender, "sms"), keyedDependency(ISender, "email")] as const),
-```
-
-Явный список полностью заменяет то, что вывел бы codegen.
+Зависимости видны в конструкторе и проверяются codegen до запуска — как у
+любого сервиса.
 
 ## Несколько реализаций одного контракта
 
@@ -115,34 +119,28 @@ export class Plugins {
 }
 ```
 
-## Ключи
+## Конкретная реализация из нескольких
 
-Если реализаций несколько и потребителю нужна конкретная, регистрируйте их
-под ключами:
+Если потребителю нужна конкретная реализация, дайте ей свой контракт:
 
 ```ts
-import { DI, keyedDependency, scoped } from "bazis/core/di";
+export abstract class ISmsSender extends ISender {}
+export abstract class IEmailSender extends ISender {}
 
 providers: [
-  DI.keyedSingleton("sms", DI.classProvider(ISender, SmsSender)),
-  DI.keyedSingleton("email", DI.classProvider(ISender, EmailSender)),
-  scoped(Notifier, Notifier, [keyedDependency(ISender, "sms"), keyedDependency(ISender, "email")] as const),
+  singleton(ISmsSender, SmsSender),
+  singleton(IEmailSender, EmailSender),
 ],
 ```
 
 ```ts
 export class Notifier {
-  constructor(private readonly sms: ISender, private readonly email: ISender) {}
+  constructor(private readonly sms: ISmsSender, private readonly email: IEmailSender) {}
 }
-// notifier.both("hi") → ["sms: hi", "email: hi"]
 ```
 
-По одному типу `ISender` codegen не поймёт, какой ключ нужен, поэтому у
-потребителя ключи указываются в [явном списке
-зависимостей](#явный-список-зависимостей-класса). Вне конструктора —
-`services.resolveKeyed(ISender, "sms")`.
-
-Есть также `DI.keyedScoped` и `DI.keyedTransient`.
+Тип параметра сам говорит, что внедрить, и codegen справляется без
+подсказок.
 
 ## Ленивые зависимости
 
@@ -190,9 +188,7 @@ export class Reporter {
 | `clock: Clock = new FixedClock()` | Внедряется зарегистрированный | Значение по умолчанию |
 | `options: Options = {}` — тип, не известный DI | Не внедряется | Значение по умолчанию |
 
-Так сервис работает и с модулем кэша, и без него. В явном списке
-зависимостей то же самое записывается как `optionalDependency(ICache)`
-из `bazis/core/di`.
+Так сервис работает и с модулем кэша, и без него.
 
 > [!NOTE]
 > Необязательные зависимости — с версии 0.98.10. Раньше `cache?: ICache`
@@ -222,9 +218,8 @@ export class Pool {
 
 | Регистрация | Освобождается контейнером |
 | --- | --- |
-| Класс, фабрика | Да |
+| Класс, асинхронная фабрика | Да |
 | `singletonValue(TOKEN, value)` | Нет — значение создано снаружи |
-| `DI.singleton(DI.externallyOwned(provider))` | Нет — владелец объекта кто-то другой |
 
 ## Контейнер вручную
 
@@ -237,7 +232,6 @@ middleware и проверках доступа он доступен как `ct
 | `tryResolve(Token)` | Сервис или `undefined` |
 | `has(Token)` | Есть ли регистрация |
 | `resolveAll(Token)` | Все реализации |
-| `resolveKeyed(Token, key)` | Реализация под ключом |
 
 Что именно получит конструктор, зависит от того, где живёт сервис:
 
@@ -274,7 +268,7 @@ export interface Db { readonly connectedAt: string }
 export const Db = createToken<Db>("Db");
 
 providers: [
-  singletonAsyncFactory(Db, [] as const, async () => {
+  singletonAsyncFactory(Db, [], async () => {
     const connection = await connect(process.env.DATABASE_URL);
     return connection;
   }),
@@ -306,8 +300,7 @@ export class DbController {
 Это лучше, чем сервер, который стартовал и отвечает `500` на каждый запрос.
 
 Асинхронные фабрики могут зависеть друг от друга: bazis создаст их в нужном
-порядке. Тот же механизм работает для асинхронных фабрик с ключом
-(`DI.keyedSingleton(key, DI.asyncFactoryProvider(...))`).
+порядке.
 
 > [!NOTE]
 > Создание асинхронных singleton при запуске и ошибка codegen для

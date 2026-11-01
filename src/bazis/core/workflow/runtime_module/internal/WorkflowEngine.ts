@@ -1,4 +1,4 @@
-import type { ServiceResolver } from "../../../di";
+import type { ServiceProvider } from "../../../di";
 import { EventBus, type EventToken, type Logger } from "../../../kernel";
 import { durationMs, evaluateCondition, nodeKindOf, readPath, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
 import type { WorkflowActor } from "../../contracts/types";
@@ -52,9 +52,10 @@ export class WorkflowEngine {
     private readonly definitions: IWorkflowDefinitions,
     private readonly graphs: GraphCache,
     private readonly events: EventBus,
-    private readonly scope: ServiceResolver,
-    private readonly logger: Logger | undefined,
+    /** The scope of the engine: event handlers run in it. */
+    private readonly scope: ServiceProvider,
     private readonly clock: WorkflowClock,
+    private readonly logger?: Logger,
   ) {}
 
   /** The engine's time ({@link WorkflowClock}). */

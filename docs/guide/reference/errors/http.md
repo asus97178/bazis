@@ -83,7 +83,7 @@
 
 - В `development` в ответ добавляются `message` и `stack`, в `production` —
   нет. Ошибка пишется в журнал строкой `error: GET /books/1 failed {…}`.
-- Ошибка внешнего вызова через `HttpClient` — `502 Bad Gateway`, тайм-аут —
+- Ошибка внешнего вызова через HTTP-клиент — `502 Bad Gateway`, тайм-аут —
   `504 Gateway Timeout`.
 - Свой статус для класса ошибки — опция `errorHandler.status`, например
   ошибки базы данных → `409`, `503`
@@ -165,7 +165,8 @@ HttpClient "payments" is not configured (known clients: rates)
 ```
 
 Текст из исходников. Запрошен именованный клиент, которого нет в
-`httpClientModule` ([Несколько внешних сервисов](../../http/http-client.md#несколько-внешних-сервисов)).
+`HttpClientFactoryBuilder` (именованные клиенты без DI; в приложении —
+[свой класс на сервис](../../http/http-client.md#несколько-внешних-сервисов)).
 
 ## Дальше
 

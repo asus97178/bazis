@@ -110,36 +110,28 @@ export const IClock = createToken<IClock>("IClock");
 Оба способа можно смешивать даже в одном модуле. Мы рекомендуем абстрактный
 класс: одна сущность вместо двух.
 
-## Значения и фабрики
+## Значения
 
-Готовое значение или результат функции регистрируют под токеном. Тип и токен
-снова называют одинаково — так значение можно внедрить через конструктор:
+Готовое значение регистрируют под токеном. Тип и токен снова называют
+одинаково — так значение можно внедрить через конструктор:
 
 ```ts
 export type AppName = string;
 export const AppName = createToken<AppName>("AppName");
-
-export type GreetingText = string;
-export const GreetingText = createToken<GreetingText>("GreetingText");
 ```
 
 ```ts
-providers: [
-  singletonValue(AppName, "my-app"),
-  singletonFactory(GreetingText, [AppName] as const, (name) => `hello from ${name}`),
-]
+providers: [singletonValue(AppName, "my-app")]
 
 // потребитель
-constructor(private readonly greeting: GreetingText) {}   // "hello from my-app"
+constructor(private readonly appName: AppName) {}   // "my-app"
 ```
 
-| Функция | Что делает |
-| --- | --- |
-| `singletonValue(token, value)` | Регистрирует готовое значение |
-| `singletonFactory(token, [deps], factory)` | Вызывает `factory` один раз с разрешёнными зависимостями |
-
-Асинхронные фабрики (`singletonAsyncFactory`) тоже есть, но работают по
-своим правилам — они разобраны в разделе «DI подробно».
+Что-то, что надо вычислить из других сервисов, — это класс с конструктором,
+как любой сервис. Объект, который создаётся асинхронно (подключение к базе),
+регистрирует `singletonAsyncFactory`. Обе темы — в главе [DI
+подробно](../fundamentals/dependency-injection.md); там же полный список
+форм, которые можно писать в `providers`.
 
 ## Настройки
 

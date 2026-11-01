@@ -13,7 +13,7 @@ empty ReadableStream even for such a status; wrapping it made the Response
 constructor fail on a successful logout. Public parameters do not change.
 Checks: `test/http-client.bodyless.test.ts`, a real logout of the Vue client.
 
-`HttpClient` runs HTTP requests on top of Fetch and is responsible for the URL, redirects, retries, response limits and error representation. It owns the instance configuration and the request attempts. ORM, application authorization and DI registrations are outside the library. No atomic submodules are used: it implements one feature.
+`HttpClientBase` runs HTTP requests on top of Fetch and is responsible for the URL, redirects, retries, response limits and error representation. It owns the instance configuration and the request attempts. ORM, application authorization and DI registrations are outside the library. No atomic submodules are used: it implements one feature.
 
 Addendum 2026-10-09 (0.98.11): `HttpClientFactory` is an abstract class instead of an
 interface, so a service takes it by type; `HttpClientFactoryBuilder.build()` returns an
@@ -28,7 +28,7 @@ a code. Regression: `test/http-client.relative-base.test.ts`.
 
 | Component | Source | Input → result |
 |---|---|---|
-| Sending, redirects, retries, decoding | [HttpClient.ts](HttpClient.ts) | `RequestConfig` → `Promise<HttpResponse>` or an error |
+| Sending, redirects, retries, decoding | [HttpClientBase.ts](HttpClientBase.ts) | `RequestConfig` → `Promise<HttpResponse>` or an error |
 | URL/query | [serialize.ts](serialize.ts) | URL and parameters → a string with the query before the fragment |
 | Contracts | [types.ts](types.ts), [errors.ts](errors.ts) | Configuration, envelope and stable error codes |
 | Checks | [test](test) | Synthetic fetch and local HTTP servers |
@@ -37,7 +37,7 @@ The components already existed; a regression test file was added. HTTP controlle
 
 ## 3. Connection and DI
 
-Call: `new HttpClient(defaults).request(config)` or the `get/post/...` methods.
+Call: `new HttpClientBase(defaults).request(config)` or the `get/post/...` methods.
 The TypeScript exports stay in `index.ts`; `HttpErrorCode.BadResponse`, `HttpErrorCode.RedirectNotInspectable` and the shared wire contract `InspectableRedirectProtocol` were added. Its read-only fields `header`, `statusHeader`, `version` equal `x-bazis-redirect`, `x-bazis-redirect-status`, `manual-v1`; the constant takes no user arguments. DI `imports`, `exports`, providers and lifetime do not apply. The [core/http-client](../../core/http-client/index.ts) integration depends on the library; there is no reverse dependency.
 
 ## 4. Configuration and lifecycle
@@ -111,7 +111,7 @@ In this mode the exact `maxRedirects` 0–100 applies in the browser with the sa
 
 A missing confirmation, invalid metadata or an opaque redirect → `ERR_REDIRECT_NOT_INSPECTABLE`, without an automatic retry. An HTTP error 400–599 without an encoded redirect status is kept even without confirmation: it cannot hide a negotiated redirect with wire status 200. This keeps, for example, an HTTP 500 from a native file-open error after the pipeline. Exceeding the limit available for counting → the existing `ERR_TOO_MANY_REDIRECTS`. The mode needs support from the HTTP recipients in the chain; it is not enabled for a regular external API. In native mode an opaque redirect that the client cannot check also gets the separate `ERR_REDIRECT_NOT_INSPECTABLE` code.
 
-Example: `new HttpClient({ inspectableRedirects: true, maxRedirects: 2 })` together with `httpModule({ inspectableRedirects: true })` on the server. Real Chromium checked the limits 0/1/2/19/20/100, HEAD, POST 301/302/303/307/308, CORS/secrets, timeout, Worker and a non-supporting server. A strict server `cors.allowedHeaders` must allow `X-bazis-Redirect`; responses keep the existing CORS origins/credentials. Redirects without Location are not negotiated hops; the browser may hide such an invalid redirect behind an opaque response.
+Example: `new HttpClientBase({ inspectableRedirects: true, maxRedirects: 2 })` together with `httpModule({ inspectableRedirects: true })` on the server. Real Chromium checked the limits 0/1/2/19/20/100, HEAD, POST 301/302/303/307/308, CORS/secrets, timeout, Worker and a non-supporting server. A strict server `cors.allowedHeaders` must allow `X-bazis-Redirect`; responses keep the existing CORS origins/credentials. Redirects without Location are not negotiated hops; the browser may hide such an invalid redirect behind an opaque response.
 
 ## 8. Body reading and the original Response
 

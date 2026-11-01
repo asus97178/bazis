@@ -273,12 +273,12 @@ export class UsersGrpcController {
 
 ## Клиент
 
-`GrpcClient` вызывает любой gRPC-сервис по тому же описанию:
+`GrpcClientBase` вызывает любой gRPC-сервис по тому же описанию:
 
 ```ts
-import { GrpcClient, Metadata } from "bazis/core/grpc";
+import { GrpcClientBase, Metadata } from "bazis/core/grpc";
 
-const client = new GrpcClient(UsersRpc, { address: "users.internal:50051", timeoutMs: 2000 });
+const client = new GrpcClientBase(UsersRpc, { address: "users.internal:50051", timeoutMs: 2000 });
 const metadata = new Metadata();
 metadata.set("authorization", `Bearer ${token}`);
 
@@ -312,38 +312,70 @@ client.close();
 
 ### Клиент в DI
 
-`grpcClientProvider` регистрирует клиента в модуле, контейнер закроет его
-при остановке:
+В приложении клиента объявляют так же, как контроллер: класс с декоратором
+`@GrpcClient` и поле модуля `grpcClients`. Адрес и тайм-аут — в настройках:
 
 ```ts
-import { GrpcClient, grpcClientProvider, Metadata } from "bazis/core/grpc";
+// reports/config/UsersRpc.config.ts
+import { defineConfig } from "bazis/core/kernel";
+
+export interface UsersRpcConfig {
+  address: string;
+  timeoutMs: number;
+}
+
+export const usersRpcConfig = defineConfig<UsersRpcConfig>("usersRpc", {
+  default: { address: "users.internal:50051", timeoutMs: 2000 },
+});
+```
+
+```ts
+// reports/clients/UsersClient.ts
+import { GrpcClient, GrpcClientBase } from "bazis/core/grpc";
+
+@GrpcClient(UsersRpc, { config: usersRpcConfig })
+export class UsersClient extends GrpcClientBase {}
+```
+
+```ts
+// reports/UsersApi.ts
+import { Metadata } from "bazis/core/grpc";
 
 export class UsersApi {
-  constructor(private readonly rpc: GrpcClient) {}
+  constructor(private readonly users: UsersClient) {}
 
   async getById(id: number, authorization: string | undefined) {
     const metadata = new Metadata();
     if (authorization) metadata.set("authorization", authorization);   // от имени пользователя
-    return (await this.rpc.unary<{ id: number }, User>("GetUser", { id }, { metadata })).data;
+    return (await this.users.unary<{ id: number }, User>("GetUser", { id }, { metadata })).data;
   }
 }
+```
 
+```ts
 @Module({
-  providers: [grpcClientProvider(UsersRpc, { address: "users.internal:50051", timeoutMs: 2000 }), scoped(UsersApi)],
+  grpcClients: [UsersClient],
+  providers: [scoped(UsersApi)],
   controllers: [ReportsController],
 })
 export class ReportsModule {}
 ```
 
-Двум клиентам к разным сервисам нужны разные токены DI: третий аргумент
-`grpcClientProvider(service, options, token)`.
+- `address` и `timeoutMs` берутся из настроек клиента:
+  `BAZIS_USERSRPC__ADDRESS=…` меняет адрес без правки кода. Настройки модуль
+  объявляет сам.
+- Остальное (`tls`, `metadata`, пределы сообщений) — прямо в декораторе:
+  `@GrpcClient(UsersRpc, { config: usersRpcConfig, maxConcurrentCalls: 50 })`.
+- Клиент один на приложение; контейнер закроет его при остановке.
+- Второму сервису — свой класс: `OrdersClient extends GrpcClientBase` с
+  `@GrpcClient(OrdersRpc, …)`.
 
 ### Отказ сервиса в HTTP-запросе
 
 Если вызов из HTTP-контроллера не удался, клиент HTTP получает не `500`,
 а ответ «внешний сервис подвёл», как у [HTTP-клиента](../http/http-client.md#ошибки):
 
-| `GrpcClient` получил | HTTP-ответ |
+| Клиент получил | HTTP-ответ |
 | --- | --- |
 | `DEADLINE_EXCEEDED` | `504 {"error":"Gateway Timeout"}` |
 | Любой другой код, сервис недоступен | `502 {"error":"Bad Gateway"}` |
@@ -361,7 +393,7 @@ try {
 ```
 
 > [!NOTE]
-> `502`/`504` для `GrpcClient` — с версии 0.98.32; раньше был `500`.
+> `502`/`504` для ошибок gRPC-клиента — с версии 0.98.32; раньше был `500`.
 
 ## Безопасность и пределы
 

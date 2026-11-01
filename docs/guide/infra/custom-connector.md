@@ -160,7 +160,7 @@ export class SignupService {
 
 ```ts
 export class WelcomeMessages {
-  constructor(private readonly notify: NotifyClient) {}
+  constructor(private readonly notify: INotify) {}
   welcome(user: string) {
     return this.notify.send(user, `Добро пожаловать, ${user}!`);
   }
@@ -169,7 +169,7 @@ export class WelcomeMessages {
 export function notifyConnect(config: AppConfig<NotifyConfigShape>): InfraConnector<NotifyClient> {
   return {
     // … как выше
-    providers: [DI.singleton(DI.factoryProvider(WelcomeMessages, [INotify], (client: NotifyClient) => new WelcomeMessages(client)))],
+    providers: [singleton(WelcomeMessages)],
     exports: [WelcomeMessages],
   };
 }

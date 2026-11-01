@@ -20,9 +20,9 @@ example bazis-cms); who may do what (the application's `WorkflowAccess`); the
 Tools themselves (the modules that own the operations, TOOLS-001).
 
 Priorities: no state in memory (restarts and several application instances
-are safe); explicit DI dependencies, because the framework's classes are not
-covered by the application's codegen; pure document functions in
-`library/workflow`.
+are safe); services registered the agreed way (`scoped(IContract, Implementation)`)
+with the pack's generated wiring [generated/deps.ts](generated/deps.ts); pure
+document functions in `library/workflow`.
 
 ## 2. Parts and dependencies
 

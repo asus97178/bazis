@@ -16,7 +16,7 @@ import {
   type ReferenceItem,
 } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
-import { DI, Module } from "@/core/di";
+import { Module, singleton, singletonValue } from "@/core/di";
 import { Authorize, Controller, Get, NotFoundError, PRINCIPAL_STATE_KEY, UnauthorizedError, type AuthorizeCheck, type HttpContext } from "@/core/http";
 import { memorySource } from "@/core/kernel";
 import { createTestContainer, startTestApp } from "@/core/testing";
@@ -52,7 +52,7 @@ const orderPermissions = definePermissions({
   imports: [AccessModule],
   permissions: orderPermissions,
   references: { "orders.process": ProcessReferences },
-  providers: [DI.singleton(DI.classProvider(FolderLookup, FolderLookup)), DI.singleton(DI.classProvider(ProcessReferences, ProcessReferences))],
+  providers: [singleton(FolderLookup), singleton(ProcessReferences)],
 })
 class OrdersModule {}
 
@@ -66,7 +66,7 @@ async function buildError(root: Parameters<typeof createTestContainer>[0]): Prom
 }
 
 async function accessWith(policy: AccessPolicy) {
-  @Module({ imports: [OrdersModule], providers: [DI.singleton(DI.valueProvider(AccessPolicy, policy))] })
+  @Module({ imports: [OrdersModule], providers: [singletonValue(AccessPolicy, policy)] })
   class AppModule {}
   const scope = (await createTestContainer(AppModule)).createScope();
   return { as: (subject: { sub: string }) => scope.resolve(IAccess).as(subject, scope) };

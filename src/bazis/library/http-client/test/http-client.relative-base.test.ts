@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { HttpClient, HttpClientError } from "../index";
+import { HttpClientBase, HttpClientError } from "../index";
 
 // A relative baseUrl ("/api") resolves against the page address, as axios's
 // baseURL does in a browser app. Before, it failed with "Invalid base URL".
@@ -19,7 +19,7 @@ describe("relative baseUrl", () => {
   test("resolves against the page and keeps same-origin headers", async () => {
     globals.location = { href: "http://app.test/orders/7", origin: "http://app.test" };
     const { calls, fetch } = recordingFetch();
-    const api = new HttpClient({ baseUrl: "/api", fetch, headers: { authorization: "Bearer t" } });
+    const api = new HttpClientBase({ baseUrl: "/api", fetch, headers: { authorization: "Bearer t" } });
     const response = await api.get<{ ok: boolean }>("/users", { params: { page: 2 } });
     expect(response.data).toEqual({ ok: true });
     expect(calls[0]!.url).toBe("http://app.test/api/users?page=2");
@@ -33,7 +33,7 @@ describe("relative baseUrl", () => {
 
   test("outside a page a relative baseUrl is a clear error", async () => {
     const { fetch } = recordingFetch();
-    const api = new HttpClient({ baseUrl: "/api", fetch });
+    const api = new HttpClientBase({ baseUrl: "/api", fetch });
     const error = await api.get("/users").catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(HttpClientError);
     expect((error as HttpClientError).message).toBe(

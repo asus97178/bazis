@@ -211,7 +211,7 @@ const en = {
     outputs: "generated",
     sqlFix: "inject IPostgres from bazis/core/infra instead of Bun's SQL",
     redisFix: "inject IRedis from bazis/core/infra instead of Bun's RedisClient",
-    unknownDepFix: "register the class in a module, declare a token with createToken, or bind it with an explicit factory",
+    unknownDepFix: "register the class in a module or declare a token with createToken",
     run: "run",
   },
   dev: {
@@ -388,7 +388,7 @@ const ru: Messages = {
     outputs: "сгенерировано",
     sqlFix: "внедряйте IPostgres из bazis/core/infra вместо SQL из Bun",
     redisFix: "внедряйте IRedis из bazis/core/infra вместо RedisClient из Bun",
-    unknownDepFix: "зарегистрируйте класс в модуле, объявите токен через createToken или привяжите явной фабрикой",
+    unknownDepFix: "зарегистрируйте класс в модуле или объявите токен через createToken",
     run: "запуск",
   },
   dev: {

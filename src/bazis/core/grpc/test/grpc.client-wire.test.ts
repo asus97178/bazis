@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { createServer, constants, type ServerHttp2Session, type ServerHttp2Stream, type OutgoingHttpHeaders, type IncomingHttpHeaders } from "node:http2";
 import { createServer as createTcpServer, type AddressInfo, type Socket } from "node:net";
-import { GrpcClient, GrpcStatus as Status, type GrpcClientOptions } from "../index";
+import { GrpcClientBase, GrpcStatus as Status, type GrpcClientOptions } from "../index";
 import { echoService, type EchoMessage } from "./fixtures/contract";
 
 // Fixed protobuf bytes, independent of production and test codec implementations.
@@ -18,7 +18,7 @@ async function mock(handler: (stream: ServerHttp2Stream, headers: IncomingHttpHe
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = `127.0.0.1:${(server.address() as AddressInfo).port}`;
   return { address, sessions, get connected() { return connected; }, get calls() { return calls; },
-    client: (options: Partial<GrpcClientOptions> = {}) => new GrpcClient(echoService, { address, timeoutMs: 2000, ...options }),
+    client: (options: Partial<GrpcClientOptions> = {}) => new GrpcClientBase(echoService, { address, timeoutMs: 2000, ...options }),
     async close() { for (const session of sessions) session.destroy(); await new Promise<void>(resolve => server.close(() => resolve())); },
   };
 }
@@ -184,7 +184,7 @@ test("client wire: RST_STREAM maps to gRPC errors, including after initial heade
     });
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  const client = new GrpcClient(echoService, { address: `127.0.0.1:${(server.address() as AddressInfo).port}`, timeoutMs: 2000 });
+  const client = new GrpcClientBase(echoService, { address: `127.0.0.1:${(server.address() as AddressInfo).port}`, timeoutMs: 2000 });
   try {
     for (const headers of [false, true]) {
       withHeaders = headers;

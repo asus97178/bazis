@@ -1,4 +1,5 @@
 import { DI } from "../../di";
+import "../generated/deps";
 import { startTestApp, type TestApp, type TestAppOptions } from "../../testing";
 import { durationMs } from "../../../library/workflow";
 import { WorkflowClock } from "../contracts/WorkflowClock";

@@ -80,7 +80,7 @@ test("a token registered in two modules names both and says how to fix it", () =
   @Module({ imports: [ClockModule], providers: [DI.singleton(DI.classProvider(IClock, FixedClock))], exports: [] })
   class AppModule {}
   expect(messageOf(() => createContainer(AppModule))).toContain(
-    `Module "ClockModule": "Report" depends on "IClock", but "IClock" is registered in "ClockModule" and "AppModule", and the application uses one implementation per token, the last registered one, from "AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give the implementations different keys (DI.keyedSingleton).`,
+    `Module "ClockModule": "Report" depends on "IClock", but "IClock" is registered in "ClockModule" and "AppModule", and the application uses one implementation per token, the last registered one, from "AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give each implementation its own contract.`,
   );
 });
 

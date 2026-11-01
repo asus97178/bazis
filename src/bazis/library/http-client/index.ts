@@ -4,13 +4,13 @@
  * Bun, browsers and Node 18+.
  *
  * ```ts
- * import { HttpClient } from "@/library/http-client";
+ * import { HttpClientBase } from "@/library/http-client";
  *
- * const api = new HttpClient({ baseUrl: "https://api.example.com", timeoutMs: 5000 });
+ * const api = new HttpClientBase({ baseUrl: "https://api.example.com", timeoutMs: 5000 });
  * const { data } = await api.get<User[]>("/users", { params: { page: 2 } });
  * ```
  */
-export { HttpClient } from "./HttpClient";
+export { HttpClientBase } from "./HttpClientBase";
 export { InspectableRedirectProtocol } from "./redirectProtocol";
 export { HttpClientFactoryBuilder, HttpClientFactory } from "./HttpClientFactory";
 export { HttpClientError, HttpClientConfigError, HttpErrorCode } from "./errors";

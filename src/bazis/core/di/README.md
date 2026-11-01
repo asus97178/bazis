@@ -77,11 +77,11 @@ contracts are described in [MODULE.md](MODULE.md).
 
 ## Style Rule (DI usage)
 
-- By default use only the short shortcuts:
-  - `singleton(...)`
-  - `scoped(...)`
-  - `transient(...)`
-- Use the low-level path (`DI.classProvider(...)`, `DI.factoryProvider(...)`) only for rare cases that really need manual setup.
+- `providers` of a module use only the agreed forms: `scoped/singleton/transient(IService, Service)`
+  (or the class alone), `singletonValue(TOKEN, value)`, `singletonAsyncFactory(TOKEN, [deps], async factory)`
+  and `...withEventSubscribers(Class)`. Codegen refuses anything else (`BAZIS_DI_PROVIDER_FORM`).
+- The low-level path (`DI.classProvider(...)`, `DI.factoryProvider(...)`) stays for the kernel's own
+  plumbing and test `overrides`, never in a module's `providers`.
 
 ## Contributing Checklist
 

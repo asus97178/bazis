@@ -1,23 +1,44 @@
 import { OnEvent } from "../../../kernel";
+import { UniqueViolationError } from "../../../orm";
 import { WORKFLOW_INSTANCES_DELETED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, type WorkflowInstancesDeleted, type WorkflowTaskRequested, type WorkflowTokenClosed } from "../../runtime_module/events/Runtime.events";
-import type { WorkflowTasks } from "../services/WorkflowTasks.service";
+import type { TasksDbContext } from "../model/Tasks.dbContext";
+import { WfTask } from "../model/WfTask.model";
 
 /** Keeps the inbox in line with the steps: a waiting user task gets a task, a closed one cancels it. */
 export class TaskEvents {
-  constructor(private readonly tasks: WorkflowTasks) {}
+  constructor(private readonly db: TasksDbContext) {}
 
+  /** A step started waiting for a person: its task. Repeated events of one token make one task. */
   @OnEvent(WORKFLOW_TASK_REQUESTED)
-  requested(event: WorkflowTaskRequested): Promise<void> {
-    return this.tasks.requested(event);
+  async requested(event: WorkflowTaskRequested): Promise<void> {
+    const assignee = "role" in event.assignee ? `role:${event.assignee.role}` : `user:${event.assignee.user}`;
+    this.db.tasks.add(Object.assign(new WfTask(), {
+      tokenId: event.tokenId,
+      instanceId: event.instanceId,
+      processKey: event.processKey,
+      nodeId: event.nodeId,
+      partition: event.partition,
+      title: event.title,
+      assignee,
+      form: event.form,
+      dueAt: event.dueAt,
+    }));
+    try {
+      await this.db.saveChanges();
+    } catch (error) {
+      if (!(error instanceof UniqueViolationError)) throw error;
+    }
   }
 
+  /** The step closed otherwise than by its task: the task is cancelled. */
   @OnEvent(WORKFLOW_TOKEN_CLOSED)
-  closed(event: WorkflowTokenClosed): Promise<void> {
-    return this.tasks.closed(event);
+  async closed(event: WorkflowTokenClosed): Promise<void> {
+    await this.db.tasks.asNoTracking().where((t) => t.tokenId.eq(event.tokenId).and(t.status.in(["open", "claimed"]))).executeUpdate({ status: "cancelled" });
   }
 
+  /** Retention deleted the instances: their tasks go too. */
   @OnEvent(WORKFLOW_INSTANCES_DELETED)
-  deleted(event: WorkflowInstancesDeleted): Promise<void> {
-    return this.tasks.deleted(event);
+  async deleted(event: WorkflowInstancesDeleted): Promise<void> {
+    if (event.instanceIds.length > 0) await this.db.tasks.asNoTracking().where((t) => t.instanceId.in([...event.instanceIds])).executeDelete();
   }
 }

@@ -95,11 +95,11 @@ test("a failing async factory stops the start instead of failing every request",
   expect(served.output).toContain("exit=1");
 }, 60_000);
 
-test("a constructor parameter of a plain type stops codegen; explicit deps still work", async () => {
-  const greeter = (registration: string) => `import { Module, createToken, scoped, singletonValue } from "bazis/core/di";
+test("a constructor parameter of a plain type stops codegen; a dependency list is refused, a typed token works", async () => {
+  const greeter = (registration: string, parameter = "string") => `import { Module, createToken, scoped, singletonValue } from "bazis/core/di";
 export type Prefix = string;
 export const Prefix = createToken<Prefix>("Prefix");
-export class Greeter { constructor(private readonly prefix: string) {} }
+export class Greeter { constructor(private readonly prefix: ${parameter}) {} }
 @Module({ providers: [singletonValue(Prefix, "Hi"), ${registration}], exports: [] })
 export class AppModule {}
 `;
@@ -110,6 +110,12 @@ export class AppModule {}
   expect(failed.output).toContain('constructor parameter 1 "prefix" of "Greeter" has type "string", which cannot be injected');
 
   const explicit = await project({ "src/index.ts": greeter("scoped(Greeter, Greeter, [Prefix] as const)") });
-  const passed = await run(explicit, [codegen]);
+  const refused = await run(explicit, [codegen]);
+  expect(refused.exit).not.toBe(0);
+  expect(refused.output).toContain('BAZIS_DI_PROVIDER_FORM');
+  expect(refused.output).toContain('passes a dependency list. Remove it: codegen reads the constructor.');
+
+  const typed = await project({ "src/index.ts": greeter("scoped(Greeter)", "Prefix") });
+  const passed = await run(typed, [codegen]);
   expect(passed.exit, passed.output).toBe(0);
 }, 60_000);

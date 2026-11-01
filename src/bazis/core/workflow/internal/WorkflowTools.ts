@@ -1,4 +1,4 @@
-import type { ServiceResolver } from "../../di";
+import type { ServiceProvider } from "../../di";
 import { ToolRunner, type AgentToolContract, type BoundToolRunner } from "../../agent";
 
 /** The workflow caller id of TOOLS-001: processes run only Tools whose `callers` list it. */
@@ -11,7 +11,7 @@ export const WORKFLOW_CALLER = "workflow";
 export class WorkflowTools {
   private readonly runner: BoundToolRunner | undefined;
 
-  constructor(services: ServiceResolver) {
+  constructor(services: ServiceProvider) {
     this.runner = services.tryResolve(ToolRunner)?.as(WORKFLOW_CALLER);
   }
 
