@@ -686,6 +686,15 @@ function applyValidatorOptions(schema: OpenApiCodegenSchema, options: Record<str
     out.type = "string";
     out.pattern = options.pattern;
   }
+  if (typeof options.ref === "string") {
+    out["x-ref"] = options.ref;
+  }
+  if (typeof options.refKeys === "string") {
+    out["x-ref-keys"] = options.refKeys;
+  }
+  if (typeof options.refScope === "string") {
+    out["x-ref-scope"] = options.refScope;
+  }
   return out;
 }
 

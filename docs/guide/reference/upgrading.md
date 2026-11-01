@@ -7,6 +7,28 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.131.0
+
+- **Списки `/workflow/processes`, `/workflow/instances`, `/workflow/tasks` — в
+  стиле JSON:API.** Старые параметры теперь молча игнорируются, замените их:
+  | Было | Стало |
+  | --- | --- |
+  | `?limit=20&offset=40` | `?page[size]=20&page[number]=3` |
+  | `?search=x`, `?archived=true` | `?filter[search]=x`, `?filter[archived]=true` |
+  | `?partition=`, `?processKey=`, `?businessKey=`, `?startedById=`, `?status=` | `?filter[partition]=` и так далее |
+  | `/workflow/tasks?status=open,claimed` | `?filter[status][in]=open,claimed` |
+
+  В `meta` к `total` добавились `page`, `size`, `pageCount`, рядом появились
+  `links`. Методы сервисов по-прежнему принимают `limit` и `offset`.
+- **`FormIssue.code` — строка:** свой `WorkflowInputValidator` может вернуть
+  свой код. Код, перебирающий коды через `switch` с проверкой на полноту, теперь
+  должен обработать и неизвестные.
+- **`AgentToolContract` и `ToolMetadata` получили обязательное поле `dryRun`.**
+  Литерал `ToolMetadata` в коде — допишите `dryRun: "unsupported"`;
+  `agentToolContract()` подставляет его сам.
+- **`saveDraft` возвращает ещё и `draftUpdatedAt`.** Своя реализация
+  `IWorkflowDefinitions` должна его вернуть.
+
 ## 0.130.0
 
 - **Порта `WorkflowAccess` больше нет: права процессов — общий слой

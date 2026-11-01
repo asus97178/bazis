@@ -1,12 +1,15 @@
 import { IAccess, type AccessObject, type SubjectAccess } from "../../access";
 import { ForbiddenError, type HttpContext } from "../../http";
-import type { WorkflowActor } from "../contracts/types";
+import { frameworkBadRequest } from "../../http/Errors/HttpError";
+import { ListQueryError, parseListQuery, type ListQuery, type ListQueryOptions, type ListQueryProblem } from "../../../library/jsonapi";
+import type { WorkflowActor, WorkflowPaging, WorkflowRequest } from "../contracts/types";
 import { WorkflowError } from "../contracts/WorkflowError";
 
 /** Who calls a route: their rights and how they are recorded as an actor. */
 export interface WorkflowCaller {
   readonly access: SubjectAccess;
   readonly actor: WorkflowActor;
+  readonly request: WorkflowRequest;
 }
 
 /**
@@ -20,7 +23,7 @@ export async function callerOf(ctx: HttpContext, permission?: string, object?: A
   if (permission !== undefined && !await access.can(permission, object)) throw new ForbiddenError();
   const sub = access.subject.sub;
   const [id = sub.slice(sub.lastIndexOf(":") + 1)] = await access.ownerIds();
-  return { access, actor: { kind: "user", id } };
+  return { access, actor: { kind: "user", id }, request: { ip: ctx.clientIp ?? null, userAgent: ctx.header("user-agent") ?? null } };
 }
 
 /** A route parameter as a string. */
@@ -64,7 +67,33 @@ export function optionalInteger(value: unknown, name: string): number | undefine
   return number as number;
 }
 
-/** `limit` and `offset` of a list query. */
-export function pagingQuery(ctx: HttpContext): { limit?: number; offset?: number } {
-  return { limit: optionalInteger(ctx.query("limit"), "limit"), offset: optionalInteger(ctx.query("offset"), "offset") };
+/**
+ * The list query of a route: `filter[...]`, `sort`, `page[...]`; anything
+ * `options` does not list is 400. Each filter here names one service option, so
+ * OR groups and a field filtered twice are refused rather than half applied.
+ */
+export function listQuery(ctx: HttpContext, options: Pick<ListQueryOptions, "filter" | "sort">): ListQuery {
+  try {
+    const list = parseListQuery(ctx.url.searchParams, { ...options, page: { defaultSize: 50, maxSize: 200 } });
+    const problems: ListQueryProblem[] = list.or.length > 0 ? [{ parameter: "filter[or]", message: "OR groups are not supported here" }] : [];
+    for (const [index, { field }] of list.filters.entries()) {
+      if (list.filters.findIndex((rule) => rule.field === field) !== index) problems.push({ parameter: `filter[${field}]`, message: "the field is filtered twice" });
+    }
+    if (problems.length > 0) throw new ListQueryError(problems);
+    return list;
+  } catch (error) {
+    if (error instanceof ListQueryError) throw frameworkBadRequest("invalidListQuery", undefined, error.problems);
+    throw error;
+  }
+}
+
+/** The page and order of a list query, for a list operation. */
+export function pagingOfList(list: ListQuery): WorkflowPaging {
+  return { limit: list.page.limit, offset: list.page.offset, ...(list.sort.length === 0 ? {} : { sort: list.sort }) };
+}
+
+/** The value of `filter[field]`. */
+export function filterOf(list: ListQuery, field: string): string | undefined {
+  const value = list.filters.find((rule) => rule.field === field)?.value;
+  return Array.isArray(value) ? value.join(",") : value as string | undefined;
 }

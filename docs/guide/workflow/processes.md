@@ -9,7 +9,7 @@
 базе, фоновый воркер, события и HTTP. Интерфейса нет: дизайнер процессов,
 входящие задачи и формы строит приложение поверх сервисов и HTTP модуля.
 
-Все примеры проверены на bazis 0.124.0–0.130.0 с PostgreSQL 17 в приложении
+Все примеры проверены на bazis 0.124.0–0.131.0 с PostgreSQL 17 в приложении
 «Заказы» из этой главы. Готовое приложение — в
 [examples/workflow](https://github.com/asus97178/bazis/tree/main/examples/workflow).
 
@@ -160,7 +160,7 @@ POST /workflow/processes  {"key":"order","title":"Заказ","retentionDays":90
        "draft":{"schemaVersion":"bazis.workflow/v1","nodes":{"Start":…,"End":…},…},…}
 
 PUT /workflow/processes/order/draft  {"document": {…документ выше…}}
-→ 200 {"issues":[]}
+→ 200 {"issues":[],"draftUpdatedAt":"2026-11-01T12:40:07.311Z"}
 
 POST /workflow/processes/order/publish
 → 201 {"id":"01a18f24-92c3-…","key":"order","version":1,"publishedBy":{"kind":"user","id":"anna"},"document":{…}}
@@ -175,6 +175,27 @@ POST /workflow/processes/order/publish
   создаёт новую.
 - `retentionDays` — сколько дней хранить завершённые и отменённые
   экземпляры вместе с их задачами; упавшие не удаляются никогда.
+- Двое редактируют один черновик — передайте `expected`: `draftUpdatedAt`,
+  который вы прочитали. Если черновик успели сохранить, ответ — `409`
+  `conflict`, и чужая работа не затирается. Ответ на сохранение даёт новое
+  значение для следующего раза. Без `expected` побеждает последнее сохранение.
+
+```text
+PUT /workflow/processes/order/draft  {"document":{…},"expected":"2026-11-01T12:40:07.311Z"}
+→ 409 {"error":"The draft of order was saved by someone else","details":{"code":"conflict"}}
+```
+
+Список — [как у всех списков](../http/lists.md): фильтры `filter[archived]`
+и `filter[search]` (часть ключа или названия), `sort` по `key`, `title`,
+`createdAt`, `updatedAt`, страницы `page[size]` (по умолчанию 50, не больше
+200) и `page[number]`. Что не объявлено — `400`.
+
+```text
+GET /workflow/processes?filter[search]=list-&page[size]=2&sort=-key
+→ {"data":[{"key":"list-c",…},{"key":"list-b",…}],
+   "meta":{"total":3,"page":1,"size":2,"pageCount":2},
+   "links":{"self":"…","first":"…","last":"…","next":"…"}}
+```
 
 Процесс можно описать и в коде модуля — тогда он публикуется при старте и
 меняется только кодом ([Процесс в коде](#процесс-в-коде)).
@@ -188,8 +209,23 @@ GET /workflow/tools
             "input":{"kind":"json-schema","name":"ChargeInput","schema":{"type":"object",
               "properties":{"orderId":{"type":"string","minLength":1},"amount":{"type":"number","minimum":1}},
               "required":["amount","orderId"],"additionalProperties":false},"strict":true},
-            "output":{…},"sideEffect":"write","approval":"required"}]}
+            "output":{…},"sideEffect":"write","approval":"required","dryRun":"unsupported"}]}
 ```
+
+Если значение поля — не любая строка, а ссылка на сущность, скажите это
+дизайнеру в классе входа:
+
+```ts
+export class SetOrderStatusInput {
+  @Validator({ required: true, ref: "orders.order" })
+  orderId!: string;
+}
+```
+
+В схеме появится `"x-ref":"orders.order"`. `refKeys` говорит то же о ключах
+объекта (`x-ref-keys`), `refScope` — где искать: `"/table"` значит «в таблице
+из входа `table`» (`x-ref-scope`). Значения — литералы: схему строит генератор.
+Сам вызов такие ссылки пока не проверяет.
 
 ## Запуск
 
@@ -306,8 +342,10 @@ POST /workflow/tasks/01a18fa9-83e0-…/complete  {"output":{"comment":"Клие�
   `$nodes.Call` — следующие условия могут его читать — и в `output` задачи.
 - Если шаг закрылся иначе — отмена экземпляра, граничный таймер или
   событие, — задача становится `cancelled`.
-- Список: `?status=open,claimed` (по умолчанию), `completed`,
-  `cancelled`; `?partition=`, `?processKey=`.
+- Список: `filter[status]=completed` или `filter[status][in]=open,claimed`
+  (по умолчанию `open` и `claimed`), `filter[partition]`, `filter[processKey]`;
+  `sort` по `createdAt`, `dueAt`, `status`, `processKey`; страницы — как в
+  [каталоге](#каталог-и-публикация).
 
 | Маршрут | Ответ |
 | --- | --- |
@@ -541,9 +579,9 @@ POST /workflow/events/customers.registered  {"payload":{"phone":"+7900"}}
 ```
 
 ```text
-GET /workflow/instances?processKey=report
+GET /workflow/instances?filter[processKey]=report
 → {"data":[{"status":"completed","startedVia":"schedule","startedBy":{"kind":"system","id":"schedule"},
-            "createdAt":"2026-10-31T01:21:00.028Z",…}],"meta":{"total":1}}
+            "createdAt":"2026-10-31T01:21:00.028Z",…}],"meta":{"total":1,"page":1,"size":50,"pageCount":1},"links":{…}}
 manager: Отчёт за минуту
 ```
 
@@ -575,6 +613,45 @@ instance 01a18f26-283b-77e3-85a2-642845bb66ac cancelled
 
 Отменить можно работающий или упавший экземпляр; завершённый — `409`
 `wrong_status`.
+
+## Журнал аудита
+
+Журнал пишет приложение, а фреймворк сообщает, что случилось. События уходят
+после коммита, упавший обработчик только логируется: действие уже сохранено.
+
+| Событие | Когда | Цель |
+| --- | --- | --- |
+| `WORKFLOW_PROCESS_CHANGED` | `change`: `created`, `updated`, `draftSaved`, `published`, `archived`, `restored` | `key`, `version` |
+| `WORKFLOW_INSTANCE_STARTED` | запуск вручную, по событию, по расписанию | `instanceId`, `processKey`, `version`, `partition`, `businessKey`, `startedVia` |
+| `WORKFLOW_INSTANCE_CANCELLED` | отмена | `instanceId`, `processKey`, `partition`, `reason` |
+| `WORKFLOW_INSTANCE_RETRIED` | повтор упавшего | `instanceId`, `processKey`, `partition` |
+| `WORKFLOW_TASK_COMPLETED` | сотрудник заполнил форму | `taskId`, `instanceId`, `processKey`, `nodeId`, `partition` |
+
+В каждом ещё `actor` и `request: { ip, userAgent }`. `request` заполняется,
+если действие пришло по HTTP; для кода, расписания и воркера — `null`. Код,
+который сам вызывает сервисы от имени запроса, передаёт `{ request }`.
+
+```ts
+export class AuditLog {
+  constructor(private readonly db: AuditDbContext) {}
+
+  @OnEvent(WORKFLOW_TASK_COMPLETED)
+  async taskCompleted(event: WorkflowTaskCompleted): Promise<void> {
+    this.db.entries.add(Object.assign(new AuditEntry(), {
+      action: "task.completed",
+      target: event.taskId,
+      actorId: event.actor.id,
+      ip: event.request?.ip ?? null,
+      userAgent: event.request?.userAgent ?? null,
+    }));
+    await this.db.saveChanges();
+  }
+}
+```
+
+Целиком — в [`examples/workflow`](https://github.com/asus97178/bazis/tree/main/examples/workflow),
+`modules/audit`. Процессы из кода тоже попадают в журнал: `created` и
+`published` при старте от актора `{ kind: "system", id: "code" }`.
 
 ## Права
 

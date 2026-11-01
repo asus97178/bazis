@@ -304,7 +304,7 @@ test.skipIf(!enabled)("a paid order runs the Tools on behalf of the starter and 
   expect(history.filter((h: { type: string }) => h.type === "tool")).toHaveLength(3);
   expect(seen.finished).toContainEqual({ instanceId: done.id, processKey: "order", partition: "space-1", status: "completed" });
 
-  const list = await call("GET", "/workflow/instances?partition=space-1&status=completed");
+  const list = await call("GET", "/workflow/instances?filter[partition]=space-1&filter[status]=completed");
   expect(list.body.meta.total).toBe(1);
   expect(list.body.data[0].businessKey).toBe("order:1");
 });

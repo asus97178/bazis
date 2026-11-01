@@ -45,11 +45,13 @@ only in `drain` / `advance`.
 
 `exports: [IWorkflowDefinitions, IWorkflowRuntime, IWorkflowTasks]`; the parts' HTTP under
 `/workflow/...`; the `@Module` field `processes` with `defineProcess`; events `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
-`WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED`; settings `workflowRuntimeConfig` (prefix `workflow`).
+`WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED`, and for the audit `WORKFLOW_PROCESS_CHANGED`, `WORKFLOW_INSTANCE_STARTED`,
+`WORKFLOW_INSTANCE_CANCELLED`, `WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED`; settings `workflowRuntimeConfig` (prefix `workflow`).
 
 ## 4. Checks
 
 - PASS `src/bazis/library/workflow/test/workflow.document.test.ts` — document validation, paths, conditions, forms, durations.
+- PASS `src/bazis/core/workflow/test/workflow.postgres.contract.live.test.ts` on PostgreSQL 17: JSON:API lists, the draft lock, audit events with the request, `context.actor` and `context.metadata`.
 - PASS `src/bazis/core/workflow/test/workflow.postgres.live.test.ts` on PostgreSQL 17
   (`BAZIS_WORKFLOW_PG_URL`, database `bazis_wf_*`; run by `ops/live-postgres`):
   closed HTTP without an access, catalog, draft with `unknown_tool`, publication once

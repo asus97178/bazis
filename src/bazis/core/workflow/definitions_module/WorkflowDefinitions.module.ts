@@ -1,6 +1,7 @@
 import { AccessModule } from "../../access";
 import { HOSTED_SERVICE, Module, scoped, singleton } from "../../di";
 import { SystemWorkflowClock, WorkflowClock } from "../contracts/WorkflowClock";
+import { WorkflowEvents } from "../internal/WorkflowEvents";
 import { WorkflowTools } from "../internal/WorkflowTools";
 import { definitionsPermissions } from "./access/Definitions.permissions";
 import { ProcessReferences } from "./access/Process.references";
@@ -26,11 +27,12 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     singleton(WorkflowClock, SystemWorkflowClock),
     singleton(WorkflowTools),
     singleton(CodeProcessCatalog),
+    scoped(WorkflowEvents),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
     scoped(ProcessReferences),
     singleton(HOSTED_SERVICE, CodeProcessPublisher),
   ],
   controllers: [ProcessesController],
-  exports: [IWorkflowDefinitions, WorkflowTools, WorkflowClock],
+  exports: [IWorkflowDefinitions, WorkflowTools, WorkflowClock, WorkflowEvents],
 })
 export class WorkflowDefinitionsModule {}

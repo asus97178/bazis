@@ -24,6 +24,16 @@ class GreetTool {
   }
 }
 
+const contexts: AgentToolExecutionContext[] = [];
+
+@Tool({ name: "runner.context", description: "Keeps its context.", dryRun: "supported", sideEffect: "read", callers: ["workflow"] })
+class ContextTool {
+  execute(_input: unknown, context: AgentToolExecutionContext): { ok: true } {
+    contexts.push(context);
+    return { ok: true };
+  }
+}
+
 const written: string[] = [];
 
 @Tool({ name: "runner.write", description: "Writes a value.", input: GreetInput, sideEffect: "write", callers: ["workflow"], tags: ["data"] })
@@ -48,6 +58,9 @@ class DeclineTool {
 
 @Module({ tools: [GreetTool, WriteTool, AdminTool, DeclineTool] })
 class ToolsModule {}
+
+@Module({ tools: [GreetTool, ContextTool] })
+class ContextToolsModule {}
 
 describe("ToolRunner", () => {
   test("is registered by the framework; a caller sees only its Tools, tags only narrow the list", async () => {
@@ -104,6 +117,20 @@ describe("ToolRunner", () => {
 
       expect(approvals[0]).toMatchObject({ caller: "workflow", actor: { kind: "user", id: "u-1" }, idempotencyKey: "instance-1:step-2" });
       expect(audit.find((entry) => entry.toolName === "runner.write")).toMatchObject({ caller: "workflow", actor: { kind: "user", id: "u-1" } });
+    } finally { await container.dispose(); }
+  });
+
+  test("the actor and the metadata reach the Tool; the contract says whether it can dry-run", async () => {
+    contexts.length = 0;
+    const container = createContainer(ContextToolsModule);
+    try {
+      const workflow = container.resolve(ToolRunner).as("workflow");
+      expect(workflow.describe("runner.context")?.dryRun).toBe("supported");
+      expect(workflow.describe("runner.greet")?.dryRun).toBe("unsupported");
+      await workflow.run("runner.context", {}, { actor: { kind: "user", id: "u-1" }, metadata: { instanceId: "i-1", test: false } });
+      await workflow.run("runner.context", {});
+      expect(contexts[0]).toMatchObject({ actor: { kind: "user", id: "u-1" }, metadata: { instanceId: "i-1", test: false } });
+      expect(contexts[1]?.actor).toBeUndefined();
     } finally { await container.dispose(); }
   });
 

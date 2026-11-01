@@ -15,6 +15,8 @@ export interface ToolActor {
   readonly id: string;
 }
 export type ToolApproval = "never" | "policy" | "required";
+/** Whether a Tool can run without changing anything, when a process is tried out (WORKFLOW-002 §5.4). */
+export type ToolDryRun = "supported" | "unsupported";
 
 export interface ToolOptions {
   readonly name: string;
@@ -24,6 +26,8 @@ export interface ToolOptions {
   readonly sideEffect?: ToolSideEffect;
   readonly approval?: ToolApproval;
   readonly timeoutMs?: number;
+  /** `"unsupported"` by default. */
+  readonly dryRun?: ToolDryRun;
   /**
    * Who may call the Tool: `"agent"` for LLM agents, any other id for code that
    * runs Tools itself (`ToolRunner.as("workflow")`). Required and non-empty;
@@ -42,6 +46,7 @@ export interface ToolMetadata {
   readonly sideEffect: ToolSideEffect;
   readonly approval: ToolApproval;
   readonly timeoutMs?: number;
+  readonly dryRun: ToolDryRun;
   readonly callers: readonly string[];
   readonly tags: readonly string[];
 }
@@ -103,6 +108,9 @@ export function defineToolMetadata(_target: object, metadata: object, options: T
   if (options.approval !== undefined && options.approval !== "never" && options.approval !== "policy" && options.approval !== "required") {
     throw new AgentSetupError("@Tool.approval must be never, policy or required.");
   }
+  if (options.dryRun !== undefined && options.dryRun !== "supported" && options.dryRun !== "unsupported") {
+    throw new AgentSetupError("@Tool.dryRun must be supported or unsupported.");
+  }
   const normalized: ToolMetadata = Object.freeze({
     name: text(options.name, "@Tool.name"),
     description: text(options.description, "@Tool.description"),
@@ -111,6 +119,7 @@ export function defineToolMetadata(_target: object, metadata: object, options: T
     sideEffect,
     approval: approvalFor(sideEffect, options.approval),
     timeoutMs: positiveInteger(options.timeoutMs, "@Tool.timeoutMs"),
+    dryRun: options.dryRun ?? "unsupported",
     // Checked when the module registers the Tool, so a missing list prints as
     // one configuration-error line at start instead of failing the import.
     callers: Array.isArray(options.callers) ? Object.freeze(options.callers.map((caller) => callerId(caller))) : Object.freeze([]),

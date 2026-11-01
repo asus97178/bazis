@@ -47,9 +47,9 @@ const root = (method: string, path: string, body?: unknown) => send("root", "adm
 interface Task { id: string; instanceId: string; processKey: string; status: string }
 
 async function reviewTask(businessKey: string): Promise<Task> {
-  const instance = (await mila("GET", `/workflow/instances?businessKey=${businessKey}`)).body.data[0];
+  const instance = (await mila("GET", `/workflow/instances?filter[businessKey]=${businessKey}`)).body.data[0];
   for (let attempt = 0; attempt < 200; attempt++) {
-    const tasks = (await mila("GET", "/workflow/tasks?limit=200")).body.data as Task[];
+    const tasks = (await mila("GET", "/workflow/tasks?page[size]=200")).body.data as Task[];
     const found = tasks.find((task) => task.instanceId === instance.id);
     if (found) return found;
     await Bun.sleep(25);
@@ -88,10 +88,10 @@ test.skipIf(!enabled)("a customer sees only their orders and instances, a manage
   const managed = (await mila("GET", "/orders")).body.data as { id: string }[];
   expect(managed.map((order) => order.id)).toEqual(expect.arrayContaining([mine.id, other.id]));
 
-  const instances = (await ann("GET", "/workflow/instances?limit=200")).body.data as { id: string; businessKey: string }[];
+  const instances = (await ann("GET", "/workflow/instances?page[size]=200")).body.data as { id: string; businessKey: string }[];
   expect(instances.map((instance) => instance.businessKey)).toContain(`order:${mine.id}`);
   expect(instances.map((instance) => instance.businessKey)).not.toContain(`order:${other.id}`);
-  const others = (await mila("GET", `/workflow/instances?businessKey=order:${other.id}`)).body.data[0];
+  const others = (await mila("GET", `/workflow/instances?filter[businessKey]=order:${other.id}`)).body.data[0];
   expect((await ann("GET", `/workflow/instances/${others.id}`)).status).toBe(403);
 });
 
@@ -102,6 +102,37 @@ test.skipIf(!enabled)("the task goes to the role of its assignee, and the decisi
 
   expect((await mila("POST", `/workflow/tasks/${task.id}/complete`, { output: { approved: true } })).body.status).toBe("completed");
   expect(await statusOf(order.id, "approved")).toBe("approved");
+});
+
+test.skipIf(!enabled)("a step knows on whose behalf it runs, and its Tool describes what it takes", async () => {
+  const order = (await ann("POST", "/orders", { amount: 10 })).body;
+  // The order changes in the Tool; the instance takes the result right after.
+  let instance = (await mila("GET", `/workflow/instances?filter[businessKey]=order:${order.id}`)).body.data[0];
+  for (let attempt = 0; attempt < 200 && instance.status !== "completed"; attempt++) {
+    await Bun.sleep(25);
+    instance = (await mila("GET", `/workflow/instances/${instance.id}`)).body;
+  }
+  expect((await mila("GET", `/workflow/instances/${instance.id}`)).body.nodes.Approve).toEqual({ status: "approved", by: "ann" });
+
+  const tools = (await mila("GET", "/workflow/tools")).body.data as { name: string; dryRun: string; input: { schema: { properties: Record<string, unknown> } } }[];
+  const tool = tools.find((item) => item.name === "orders.set-status")!;
+  expect(tool.dryRun).toBe("unsupported");
+  expect(tool.input.schema.properties.orderId).toMatchObject({ type: "string", "x-ref": "orders.order" });
+});
+
+test.skipIf(!enabled)("the audit log keeps who did what and from where", async () => {
+  const order = (await ann("POST", "/orders", { amount: 5000 })).body;
+  const task = await reviewTask(`order:${order.id}`);
+  await mila("POST", `/workflow/tasks/${task.id}/complete`, { output: { approved: false } });
+
+  expect((await mila("GET", "/audit")).status).toBe(403);
+  const entries = (await root("GET", `/audit?filter[action]=task.completed&filter[target]=${task.id}`)).body;
+  expect(entries.meta.total).toBe(1);
+  expect(entries.data[0]).toMatchObject({ action: "task.completed", target: task.id, actorId: "mila" });
+  expect(entries.data[0].ip).not.toBeNull();
+
+  const instances = (await root("GET", "/audit?filter[action][startsWith]=instance.&page[size]=1")).body;
+  expect(instances.data[0]).toMatchObject({ action: "instance.started", actorId: "ann" });
 });
 
 test.skipIf(!enabled)("the catalog shows what the modules let an administrator allow", async () => {

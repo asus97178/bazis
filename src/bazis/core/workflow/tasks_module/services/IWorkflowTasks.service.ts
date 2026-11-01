@@ -1,6 +1,6 @@
 import type { FormSpec } from "../../../../library/workflow";
 import type { AccessFilter, ScopePrincipals } from "../../../access";
-import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
+import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { TaskStatus } from "../model/WfTask.model";
 
 export interface TaskDetails {
@@ -53,5 +53,5 @@ export abstract class IWorkflowTasks {
   /** Gives a claimed task back. */
   abstract release(taskId: string, actor: WorkflowActor): Promise<TaskDetails>;
   /** Fills the form: the process moves on. */
-  abstract complete(taskId: string, output: unknown, actor: WorkflowActor): Promise<TaskDetails>;
+  abstract complete(taskId: string, output: unknown, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<TaskDetails>;
 }

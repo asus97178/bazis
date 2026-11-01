@@ -58,6 +58,8 @@ export interface AgentToolExecutionContext {
   readonly maxAttempts: number;
   readonly idempotencyKey?: string;
   readonly approval: AgentToolExecutionApproval;
+  /** On whose behalf the call runs, when the caller says so. */
+  readonly actor?: ToolActor;
   readonly metadata: JsonObject;
   readonly signal: AbortSignal;
 }
@@ -1664,6 +1666,7 @@ export class AgentToolExecutor {
       maxAttempts: attempt.maxAttempts,
       ...(attempt.idempotencyKey !== undefined ? { idempotencyKey: attempt.idempotencyKey } : {}),
       approval,
+      ...(options.actor !== undefined ? { actor: options.actor } : {}),
       metadata,
       signal,
     });

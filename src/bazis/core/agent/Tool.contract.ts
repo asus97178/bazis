@@ -15,6 +15,6 @@ export function describeTool(tool: ToolDefinition) {
     name: tool.metadata.name, description: tool.metadata.description,
     input: tool.metadata.input ? schema(tool.metadata.input) : undefined,
     output: tool.metadata.output ? schema(tool.metadata.output) : undefined,
-    sideEffect: tool.metadata.sideEffect, approval: tool.metadata.approval, timeoutMs: tool.metadata.timeoutMs,
+    sideEffect: tool.metadata.sideEffect, approval: tool.metadata.approval, timeoutMs: tool.metadata.timeoutMs, dryRun: tool.metadata.dryRun,
   });
 }

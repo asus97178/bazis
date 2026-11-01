@@ -1,10 +1,10 @@
-import type { ServiceProvider } from "../../../di";
-import { EventBus, type EventToken, type Logger } from "../../../kernel";
+import type { EventToken } from "../../../kernel";
 import { durationMs, evaluateCondition, nodeKindOf, readPath, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
-import type { WorkflowActor } from "../../contracts/types";
+import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
-import { WORKFLOW_INSTANCE_FINISHED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED } from "../events/Runtime.events";
+import type { WorkflowEvents } from "../../internal/WorkflowEvents";
+import { WORKFLOW_INSTANCE_CANCELLED, WORKFLOW_INSTANCE_FINISHED, WORKFLOW_INSTANCE_RETRIED, WORKFLOW_INSTANCE_STARTED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED } from "../events/Runtime.events";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import { WfHistory, type HistoryType } from "../model/WfHistory.model";
 import { WfInstance, type StartedVia } from "../model/WfInstance.model";
@@ -36,6 +36,8 @@ export interface BeginOptions {
   readonly businessKey: string | null;
   readonly startedVia: StartedVia;
   readonly actor: WorkflowActor;
+  /** Where the start came from; `null` for code, schedules and the worker. */
+  readonly request?: WorkflowRequest | null;
 }
 
 const LIVE = new Set(["active", "waiting", "failed"]);
@@ -51,11 +53,8 @@ export class WorkflowEngine {
     private readonly db: RuntimeDbContext,
     private readonly definitions: IWorkflowDefinitions,
     private readonly graphs: GraphCache,
-    private readonly events: EventBus,
-    /** The scope of the engine: event handlers run in it. */
-    private readonly scope: ServiceProvider,
+    private readonly events: WorkflowEvents,
     private readonly clock: WorkflowClock,
-    private readonly logger?: Logger,
   ) {}
 
   /** The engine's time ({@link WorkflowClock}). */
@@ -97,6 +96,10 @@ export class WorkflowEngine {
       await this.db.saveChanges();
       const step: Step = { instance, tokens: [], graph, events: [] };
       this.history(step, null, null, "started", { via: options.startedVia }, options.actor);
+      step.events.push({
+        event: WORKFLOW_INSTANCE_STARTED as EventToken<unknown>,
+        payload: { instanceId: instance.id, processKey: graph.processKey, version: graph.version, partition: options.partition, businessKey: options.businessKey, startedVia: options.startedVia, actor: options.actor, request: options.request ?? null },
+      });
       await this.advance(step, [this.spawn(step, startNodeId, null)]);
       await this.db.saveChanges();
       this.publishAfter(transaction, step);
@@ -231,8 +234,12 @@ export class WorkflowEngine {
   }
 
   /** Retries the failed steps: their tokens are back on their nodes and the instance runs again. */
-  async retry(step: Step, actor: WorkflowActor): Promise<void> {
+  async retry(step: Step, actor: WorkflowActor, request: WorkflowRequest | null = null): Promise<void> {
     const failed = step.tokens.filter((t) => t.status === "failed");
+    step.events.push({
+      event: WORKFLOW_INSTANCE_RETRIED as EventToken<unknown>,
+      payload: { instanceId: step.instance.id, processKey: step.instance.processKey, partition: step.instance.partition, actor, request },
+    });
     step.instance.status = "running";
     step.instance.error = null;
     for (const token of failed) {
@@ -243,8 +250,12 @@ export class WorkflowEngine {
   }
 
   /** Closes every live token, job and subscription; the application drops the tasks on `WORKFLOW_TOKEN_CLOSED`. */
-  async cancel(step: Step, reason: string | null, actor: WorkflowActor): Promise<void> {
+  async cancel(step: Step, reason: string | null, actor: WorkflowActor, request: WorkflowRequest | null = null): Promise<void> {
     const open = step.tokens.filter((t) => LIVE.has(t.status));
+    step.events.push({
+      event: WORKFLOW_INSTANCE_CANCELLED as EventToken<unknown>,
+      payload: { instanceId: step.instance.id, processKey: step.instance.processKey, partition: step.instance.partition, reason, actor, request },
+    });
     for (const token of open) {
       token.status = "cancelled";
       token.endedAt = this.now();
@@ -493,21 +504,12 @@ export class WorkflowEngine {
     });
   }
 
-  /**
-   * Events go out after the commit, so a handler never sees a step that rolled
-   * back. A failing handler is logged: the step is already saved.
-   */
+  /** Events go out after the commit, so a handler never sees a step that rolled back. */
   private publishAfter(transaction: { afterCommit(callback: () => void | Promise<void>): void }, step: Step): void {
     if (step.events.length === 0) return;
     const events = [...step.events];
     transaction.afterCommit(async () => {
-      for (const { event, payload } of events) {
-        try {
-          await this.events.publishScoped(this.scope, event, payload);
-        } catch (error) {
-          this.logger?.error("workflow event handler failed", { event: event.name, instance: step.instance.id, error: error instanceof Error ? error.message : String(error) });
-        }
-      }
+      for (const { event, payload } of events) await this.events.publish(event, payload);
     });
   }
 }

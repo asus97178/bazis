@@ -1,9 +1,10 @@
 import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
 import { can } from "../../../access";
 import { Authorize, Controller, Get, Post, type HttpContext } from "../../../http";
-import type { WorkflowActor } from "../../contracts/types";
+import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
 import { WorkflowError } from "../../contracts/WorkflowError";
-import { body, callerOf, optionalString, pagingQuery, param } from "../../internal/http";
+import { buildListDocument } from "../../../../library/jsonapi";
+import { body, callerOf, filterOf, listQuery, pagingOfList, param } from "../../internal/http";
 import type { TaskStatus } from "../model/WfTask.model";
 import { IWorkflowTasks, type TaskDetails } from "../services/IWorkflowTasks.service";
 
@@ -19,21 +20,22 @@ export class TasksController {
   @Get()
   @Authorize(can("workflow.tasks.work"))
   async list(ctx: HttpContext) {
-    const partition = optionalString(ctx.query("partition"), "partition");
     const { access, actor } = await callerOf(ctx);
-    const status = ctx.query("status");
+    const list = listQuery(ctx, { filter: { partition: ["eq"], processKey: ["eq"], status: ["eq", "in"] }, sort: ["createdAt", "dueAt", "status", "processKey"] });
+    const partition = filterOf(list, "partition");
+    const status = filterOf(list, "status");
     const statuses = status === undefined ? {} : { status: status.split(",") as TaskStatus[] };
     const page = await this.tasks.list({
-      ...pagingQuery(ctx),
+      ...pagingOfList(list),
       ...statuses,
       // Addressees are per partition and counted now, not when the task was created.
       addressees: await access.principals(partition === undefined ? await this.tasks.partitions(statuses) : [partition]),
       actor,
       access: await access.filter("workflow.tasks.work"),
       partition,
-      processKey: optionalString(ctx.query("processKey"), "processKey"),
+      processKey: filterOf(list, "processKey"),
     });
-    return { data: page.items, meta: { total: page.total } };
+    return buildListDocument(page.items, list, page.total, { basePath: ctx.path });
   }
 
   @Get(":id")
@@ -59,18 +61,18 @@ export class TasksController {
   @Post(":id/complete")
   @Authorize(can("workflow.tasks.work"))
   async complete(ctx: HttpContext) {
-    const { task, actor } = await this.visible(ctx);
+    const { task, actor, request: from } = await this.visible(ctx);
     const request = await body(ctx);
-    return await this.tasks.complete(task.id, request.output ?? {}, actor);
+    return await this.tasks.complete(task.id, request.output ?? {}, actor, { request: from });
   }
 
   /** The task if the caller may see it: addressed to one of their principals or claimed by them. */
-  private async visible(ctx: HttpContext): Promise<{ task: TaskDetails; actor: WorkflowActor }> {
+  private async visible(ctx: HttpContext): Promise<{ task: TaskDetails; actor: WorkflowActor; request: WorkflowRequest }> {
     const task = await this.tasks.get(param(ctx, "id"));
-    const { access, actor } = await callerOf(ctx, "workflow.tasks.work", { scope: task.partition, process: task.processKey });
+    const { access, actor, request } = await callerOf(ctx, "workflow.tasks.work", { scope: task.partition, process: task.processKey });
     const addressees = await access.principals([task.partition]);
     if (!addressees.some(({ principals }) => principals.includes(task.assignee)) && task.claimedBy !== actor.id) throw new WorkflowError("not_found", `Task ${task.id} does not exist`);
-    return { task, actor };
+    return { task, actor, request };
   }
 }
 contextOnlyController(TasksController);

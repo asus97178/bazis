@@ -1,7 +1,7 @@
 import type { AccessFilter } from "../../../access";
 import type { AgentToolContract } from "../../../agent";
 import type { ProcessDocument, ProcessIssue } from "../../../../library/workflow";
-import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
+import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { OwnedCodeProcess } from "../code/codeProcesses";
 
 export interface ProcessSummary {
@@ -61,6 +61,18 @@ export interface ProcessListQuery extends WorkflowPaging {
   readonly search?: string;
 }
 
+export interface SaveDraftOptions extends WorkflowAuditOptions {
+  /** The `draftUpdatedAt` the caller read: another save since then is `conflict`. Without it the last save wins. */
+  readonly expected?: Date;
+}
+
+export interface SavedDraft {
+  /** Every validation finding: a draft is stored with errors too. */
+  readonly issues: readonly ProcessIssue[];
+  /** Goes to `expected` of the next save. */
+  readonly draftUpdatedAt: Date;
+}
+
 /**
  * The process catalog: drafts and immutable published versions
  * (WORKFLOW-001 §3). Errors are {@link WorkflowError}: `not_found`, `conflict`,
@@ -69,16 +81,16 @@ export interface ProcessListQuery extends WorkflowPaging {
 export abstract class IWorkflowDefinitions {
   abstract list(query?: ProcessListQuery): Promise<WorkflowPage<ProcessSummary>>;
   abstract get(key: string): Promise<ProcessDetails>;
-  abstract create(process: CreateProcess, actor: WorkflowActor): Promise<ProcessDetails>;
+  abstract create(process: CreateProcess, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<ProcessDetails>;
   /** A process declared in code takes only `archived`; other fields give `conflict`. */
-  abstract update(key: string, changes: UpdateProcess, actor: WorkflowActor): Promise<ProcessDetails>;
-  /** Stores the draft even with errors and returns every validation finding; `conflict` for a process declared in code. */
-  abstract saveDraft(key: string, document: unknown, actor: WorkflowActor): Promise<{ readonly issues: readonly ProcessIssue[] }>;
+  abstract update(key: string, changes: UpdateProcess, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<ProcessDetails>;
+  /** Stores the draft even with errors; `conflict` for a process declared in code and when `expected` is out of date. */
+  abstract saveDraft(key: string, document: unknown, actor: WorkflowActor, options?: SaveDraftOptions): Promise<SavedDraft>;
   /**
    * Validates the draft and stores it as the next version; the same document
    * again returns the latest version. `conflict` for a process declared in code.
    */
-  abstract publish(key: string, actor: WorkflowActor): Promise<VersionDetails>;
+  abstract publish(key: string, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<VersionDetails>;
   abstract versions(key: string): Promise<readonly VersionSummary[]>;
   abstract version(key: string, version: number): Promise<VersionDetails>;
   /** The latest published version of a process that is not archived. */

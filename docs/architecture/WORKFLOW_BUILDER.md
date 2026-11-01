@@ -1,6 +1,6 @@
 # Бизнес-процессы из коробки: конструктор
 
-Идентификатор: **WORKFLOW-002**. Версия: **1.8**. Дата: **2026-11-01**.
+Идентификатор: **WORKFLOW-002**. Версия: **1.9**. Дата: **2026-11-01**.
 Статус: **утверждено владельцем 2026-11-01** (согласовано агентами bazis и bazis-cms; права — [ACCESS-001](ACCESS.md)).
 Основа: [WORKFLOW-001](WORKFLOW.md) (этапы 1–5, bazis 0.124.0–0.128.0),
 [TOOLS-001](TOOLS.md), прототип дизайнера
@@ -250,7 +250,9 @@ error }`; граничный `boundaryError` важнее `onError`).
 `WorkflowPartitions.of(key)` пуст, иначе `409 in_use` — ничего не теряется
 молча). Оптимистичная блокировка
 черновика: `saveDraft(key, document, actor, { expected? })`, где `expected` —
-`draftUpdatedAt` прочитанного черновика; иначе `409 conflict`.
+`draftUpdatedAt` прочитанного черновика; иначе `409 conflict`. Ответ несёт новое
+`draftUpdatedAt` для следующего сохранения. `filter[folder]` приходит с полем на
+этапе 2, удаление — на этапе 4.
 
 ### 4.4 События для аудита
 
@@ -259,7 +261,7 @@ error }`; граничный `boundaryError` важнее `onError`).
 `restored` / `deleted`), `WORKFLOW_INSTANCE_STARTED`, `WORKFLOW_INSTANCE_CANCELLED`,
 `WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED` — с актором, целью и
 `request: { ip, userAgent } | null` (из HTTP; `null` для вызова из кода).
-Журнал аудита пишет приложение.
+Журнал аудита пишет приложение. `deleted` приходит с удалением процесса (этап 4).
 
 ## 5. Исполнение (Runtime)
 
@@ -346,7 +348,8 @@ error }`; граничный `boundaryError` важнее `onError`).
   ссылка (`dm.table`); `x-ref-keys: "<вид>"` у объекта — ссылки его ключи
   (`values` в `data.record-update`: ключи — поля таблицы). `x-ref-scope` —
   JSON Pointer на соседний вход, задающий область (`"x-ref-scope": "/table"`:
-  поле ищется в таблице из входа `table`).
+  поле ищется в таблице из входа `table`). В классе входа Tool это литералы
+  `@Validator({ ref, refKeys, refScope })`: их читает генератор схем.
 - `context.metadata` содержит `instanceId`, `processKey`, `nodeId`,
   `partition`, `test` — чтобы Tool мог передать `cause` в свои события.
 

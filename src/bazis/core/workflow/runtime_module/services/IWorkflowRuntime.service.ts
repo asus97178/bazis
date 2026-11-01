@@ -1,17 +1,26 @@
 import type { AccessFilter } from "../../../access";
 import type { FormIssue } from "../../../../library/workflow";
-import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
+import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { HistoryType } from "../model/WfHistory.model";
 import type { InstanceStatus, StartedVia } from "../model/WfInstance.model";
 import type { TokenStatus } from "../model/WfToken.model";
 
-export interface StartInstance {
+export interface StartInstance extends WorkflowAuditOptions {
   readonly input?: unknown;
   /** The application's scope: a space, an organization. */
   readonly partition?: string | null;
   /** The application's own key of what the instance is about: `order:42`. */
   readonly businessKey?: string | null;
   /** On whose behalf the steps run. */
+  readonly actor: WorkflowActor;
+}
+
+export interface CancelInstance extends WorkflowAuditOptions {
+  readonly reason?: string | null;
+  readonly actor: WorkflowActor;
+}
+
+export interface RetryInstance extends WorkflowAuditOptions {
   readonly actor: WorkflowActor;
 }
 
@@ -57,7 +66,7 @@ export interface HistoryEntry {
   readonly at: Date;
 }
 
-export interface EmitOptions {
+export interface EmitOptions extends WorkflowAuditOptions {
   /** Which waits it is for: `order:42`. Waits without a correlation take any event of the key. */
   readonly correlation?: string | null;
   /** Only the waits of this partition; it is also the partition of instances the event starts. */
@@ -92,9 +101,9 @@ export interface InstanceListQuery extends WorkflowPaging {
 export abstract class IWorkflowRuntime {
   /** Starts the latest version of a process from its manual start. */
   abstract start(processKey: string, options: StartInstance): Promise<InstanceDetails>;
-  abstract cancel(instanceId: string, options: { readonly reason?: string | null; readonly actor: WorkflowActor }): Promise<InstanceDetails>;
+  abstract cancel(instanceId: string, options: CancelInstance): Promise<InstanceDetails>;
   /** Retries the failed steps of a `failed` instance. */
-  abstract retry(instanceId: string, options: { readonly actor: WorkflowActor }): Promise<InstanceDetails>;
+  abstract retry(instanceId: string, options: RetryInstance): Promise<InstanceDetails>;
   /** Finishes a user task's wait with the form output and moves on; `wrong_status` when the token no longer waits. */
   abstract completeToken(tokenId: string, output: unknown, actor: WorkflowActor): Promise<InstanceDetails>;
   /**
