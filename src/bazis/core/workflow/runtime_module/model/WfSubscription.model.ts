@@ -4,7 +4,7 @@ import { WfInstance } from "./WfInstance.model";
 /** A token waiting for an event: `eventWait` or `boundaryEvent`. Matched by key and correlation. */
 @ForeignKey(() => WfInstance, { properties: ["instanceId"], onDelete: "cascade" })
 @Index(["eventKey", "correlation"])
-@Entity({ table: "bazis_wf_run_subscriptions" })
+@Entity({ table: "bazis_wf2_run_subscriptions" })
 export class WfSubscription {
   @UUID({ version: "v7" })
   id = "";

@@ -14,7 +14,7 @@ export const ${process.module}Process = defineProcess({
   key: "${process.folder}",
   title: "${title}",
   document: {
-    schemaVersion: "bazis.workflow/v1",
+    schemaVersion: "bazis.workflow/v2",
     nodes: {
       Start: { kind: "manualStart", title: "Start" },
       End: { kind: "end", title: "End" },

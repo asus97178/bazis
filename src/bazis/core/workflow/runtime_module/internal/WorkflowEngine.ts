@@ -1,5 +1,5 @@
 import type { EventToken } from "../../../kernel";
-import { durationMs, evaluateCondition, nodeKindOf, readPath, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
+import { durationMs, evaluateExpression, initialVarsOf, isTruthy, masksPersonal, maskByMapping, nodeKindOf, outputOf, personalPaths, personalVariables, PERSONAL_MASK, readPath, type Expr, type FormSpec, type InstanceData, type ProcessFlow, type ProcessNode } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
@@ -38,6 +38,8 @@ export interface BeginOptions {
   readonly actor: WorkflowActor;
   /** Where the start came from; `null` for code, schedules and the worker. */
   readonly request?: WorkflowRequest | null;
+  /** The event that starts it: `$event` and `$trigger.eventKey`. */
+  readonly event?: { readonly key: string; readonly payload: unknown };
 }
 
 const LIVE = new Set(["active", "waiting", "failed"]);
@@ -86,6 +88,14 @@ export class WorkflowEngine {
       version: graph.version,
       partition: options.partition,
       input: options.input,
+      vars: initialVarsOf(graph.document),
+      event: options.event?.payload ?? null,
+      trigger: {
+        via: options.startedVia,
+        at: this.now().toISOString(),
+        actor: options.actor,
+        ...(options.event === undefined ? {} : { eventKey: options.event.key }),
+      },
       businessKey: options.businessKey,
       startedVia: options.startedVia,
       startedByKind: options.actor.kind,
@@ -150,13 +160,20 @@ export class WorkflowEngine {
   /**
    * A step's Tool failed for good. An error boundary attached to the step takes
    * the token (first one whose `errorCode` equals the Tool's `reason` or error
-   * code, else one without `errorCode`); otherwise the instance fails.
+   * code, else one without `errorCode`); otherwise `onError: "skip"` moves on with
+   * `{ skipped: true, error }`; otherwise the instance fails.
    */
   async failStep(step: Step, token: WfToken, error: { readonly code: string; readonly message: string; readonly reason?: string }): Promise<void> {
     const boundaries = (step.graph.boundaries.get(token.nodeId) ?? []).filter(([, node]) => node.kind === "boundaryError");
     const matching = boundaries.find(([, node]) => node.config?.errorCode !== undefined && (node.config.errorCode === error.reason || node.config.errorCode === error.code))
       ?? boundaries.find(([, node]) => node.config?.errorCode === undefined);
     if (!matching) {
+      if (step.graph.document.nodes[token.nodeId]?.config?.onError === "skip") {
+        const skipped = { code: error.code, message: error.message, ...(error.reason === undefined ? {} : { reason: error.reason }) };
+        this.history(step, token, token.nodeId, "skipped", skipped);
+        await this.complete(step, token.id, { skipped: true, error: skipped });
+        return;
+      }
       this.fail(step, token, error.code, error.message);
       return;
     }
@@ -197,6 +214,7 @@ export class WorkflowEngine {
     const token = step.tokens.find((t) => t.id === tokenId);
     if (!token || token.status !== "waiting" || step.instance.status !== "running") return false;
     const node = step.graph.document.nodes[token.nodeId];
+    if (node?.kind === "eventWait" || node?.kind === "boundaryEvent") step.instance.event = payload;
     if (node?.kind === "eventWait") {
       this.history(step, token, token.nodeId, "event", { event: eventKey });
       return await this.complete(step, tokenId, payload);
@@ -298,6 +316,7 @@ export class WorkflowEngine {
     if (step.instance.status === "running" && !step.tokens.some((t) => LIVE.has(t.status))) {
       step.instance.status = "completed";
       step.instance.endedAt = this.now();
+      step.instance.output = outputOf(step.graph.document, step.instance.vars);
       this.history(step, null, null, "completed", null);
       this.finished(step, "completed");
     }
@@ -319,6 +338,8 @@ export class WorkflowEngine {
     // An error boundary that caught a step's failure: it only leads on.
     if (role === "boundary") return this.leave(step, token, this.single(step, token.nodeId));
     switch (node.kind) {
+      case "assign":
+        return this.assign(step, token, node);
       case "serviceTask":
         return this.arm(step, token, this.waitForTool(step, token));
       case "userTask":
@@ -337,8 +358,28 @@ export class WorkflowEngine {
     }
   }
 
+  /**
+   * An `assign` step: each value sees the ones before it. The history names the
+   * variables; their values go there only under `log.variables`, personal ones masked.
+   */
+  private assign(step: Step, token: WfToken, node: ProcessNode): WfToken[] {
+    const { document } = step.graph;
+    const assignments = (node.config?.assignments ?? []) as readonly { readonly var: string; readonly value: Expr }[];
+    const personal = masksPersonal(document) ? personalVariables(document) : new Set<string>();
+    const reads = masksPersonal(document) ? personalPaths(document) : new Set<string>();
+    const logged: Record<string, unknown> = {};
+    for (const { var: name, value } of assignments) {
+      const result = evaluateExpression(value, dataOf(step.instance, this.now())) ?? null;
+      step.instance.vars = { ...step.instance.vars, [name]: result };
+      logged[name] = personal.has(name) ? PERSONAL_MASK : maskByMapping(value, result, reads);
+    }
+    const log = document.settings?.log?.variables === true;
+    this.history(step, token, token.nodeId, "assigned", log ? { values: logged } : { vars: assignments.map((item) => item.var) });
+    return this.leave(step, token, this.single(step, token.nodeId));
+  }
+
   private waitForTimer(step: Step, token: WfToken, node: ProcessNode): WfToken[] {
-    const dueAt = timerDue(node.config ?? {}, dataOf(step.instance), this.now());
+    const dueAt = timerDue(node.config ?? {}, dataOf(step.instance, this.now()), this.now());
     if (dueAt === undefined) {
       this.fail(step, token, "bad_timer", `the timer of ${token.nodeId} has no valid date`);
       return [];
@@ -356,7 +397,7 @@ export class WorkflowEngine {
     if (host.status !== "waiting") return next;
     for (const [id, node] of step.graph.boundaries.get(host.nodeId) ?? []) {
       if (node.kind === "boundaryEvent") {
-        const correlation = correlationOf(node.config ?? {}, dataOf(step.instance));
+        const correlation = correlationOf(node.config ?? {}, dataOf(step.instance, this.now()));
         if (correlation === undefined) {
           this.fail(step, host, "bad_correlation", `the correlation of ${id} has no value`);
           return [];
@@ -367,7 +408,7 @@ export class WorkflowEngine {
         continue;
       }
       if (node.kind !== "boundaryTimer") continue;
-      const dueAt = timerDue(node.config ?? {}, dataOf(step.instance), this.now());
+      const dueAt = timerDue(node.config ?? {}, dataOf(step.instance, this.now()), this.now());
       if (dueAt === undefined) {
         this.fail(step, host, "bad_timer", `the timer of ${id} has no valid date`);
         return [];
@@ -389,7 +430,7 @@ export class WorkflowEngine {
   }
 
   private waitForEvent(step: Step, token: WfToken, node: ProcessNode): WfToken[] {
-    const correlation = correlationOf(node.config ?? {}, dataOf(step.instance));
+    const correlation = correlationOf(node.config ?? {}, dataOf(step.instance, this.now()));
     if (correlation === undefined) {
       this.fail(step, token, "bad_correlation", `the correlation of ${token.nodeId} has no value`);
       return [];
@@ -441,8 +482,8 @@ export class WorkflowEngine {
   private choose(step: Step, token: WfToken): WfToken[] {
     const flows = step.graph.outgoing.get(token.nodeId) ?? [];
     if (flows.length === 1) return this.leave(step, token, flows[0]!);
-    const data = dataOf(step.instance);
-    const chosen = flows.find(([, flow]) => flow.condition !== undefined && evaluateCondition(flow.condition, data))
+    const data = dataOf(step.instance, this.now());
+    const chosen = flows.find(([, flow]) => flow.condition !== undefined && isTruthy(evaluateExpression(flow.condition, data)))
       ?? flows.find(([, flow]) => flow.isDefault === true);
     if (!chosen) {
       this.fail(step, token, "no_branch", "no condition matched and there is no default flow");
@@ -539,6 +580,15 @@ export function correlationOf(config: Readonly<Record<string, unknown>>, data: I
   return value === undefined || value === null || value === "" || typeof value === "object" ? undefined : String(value);
 }
 
-export function dataOf(instance: WfInstance): InstanceData {
-  return { input: instance.input, vars: instance.vars, nodes: instance.nodes };
+/** What expressions read in an instance at this moment of the engine's clock. */
+export function dataOf(instance: WfInstance, now: Date): InstanceData {
+  return {
+    input: instance.input,
+    vars: instance.vars,
+    nodes: instance.nodes,
+    event: instance.event,
+    trigger: instance.trigger,
+    run: { id: instance.id, processKey: instance.processKey, version: instance.version, partition: instance.partition, test: instance.test },
+    now: now.toISOString(),
+  };
 }

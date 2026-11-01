@@ -6,7 +6,7 @@ import {
   type BazisModuleMetadata,
   type ServiceProvider,
 } from "../../../di";
-import { validateProcess, type ProcessIssue } from "../../../../library/workflow";
+import { checkLocalizedText, validateProcess, type ProcessIssue } from "../../../../library/workflow";
 import { IWorkflowDefinitions } from "../services/IWorkflowDefinitions.service";
 import { isCodeProcess, type CodeProcess } from "./defineProcess";
 
@@ -66,8 +66,12 @@ export function codeProcessesOf(services: ServiceProvider): readonly OwnedCodePr
 export function definitionProblems(process: CodeProcess, tools?: (name: string) => boolean): readonly string[] {
   const problems: string[] = [];
   if (typeof process.key !== "string" || !KEY.test(process.key)) problems.push("key must match ^[a-z][a-z0-9_.-]{0,63}$");
-  if (typeof process.title !== "string" || process.title.trim() === "" || process.title.length > 200) problems.push("title must be 1–200 characters");
-  if (process.description != null && (typeof process.description !== "string" || process.description.length > 2000)) problems.push("description must be up to 2000 characters");
+  const title = checkLocalizedText(process.title, 200);
+  if (title) problems.push(`title ${title}`);
+  const description = process.description == null ? null : checkLocalizedText(process.description, 2000, 0);
+  if (description) problems.push(`description ${description}`);
+  if (process.folder != null && (typeof process.folder !== "string" || !/^[^/\s](?:[^/]*[^/\s])?(?:\/[^/\s](?:[^/]*[^/\s])?)*$/.test(process.folder))) problems.push("folder must be a path like Sales/Orders");
+  if (process.owner != null && (typeof process.owner !== "string" || process.owner === "" || process.owner.length > 200)) problems.push("owner must be up to 200 characters");
   if (process.retentionDays != null && (!Number.isSafeInteger(process.retentionDays) || process.retentionDays < 1 || process.retentionDays > 36_500)) problems.push("retentionDays must be an integer 1–36500");
   problems.push(...documentErrors(validateProcess(process.document, tools === undefined ? {} : { tools })));
   return problems;

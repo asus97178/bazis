@@ -47,7 +47,7 @@ export class WorkflowTasks extends IWorkflowTasks {
 
   async partitions(query: { readonly status?: readonly TaskStatus[] } = {}): Promise<readonly (string | null)[]> {
     const statuses = statusesOf(query.status);
-    const rows = await this.db.database.querySqlRaw(`SELECT DISTINCT "partition" FROM "bazis_wf_task_items" WHERE "status" IN (${statuses.map((_, index) => `{${index}}`).join(", ")})`, ...statuses);
+    const rows = await this.db.database.querySqlRaw(`SELECT DISTINCT "partition" FROM "bazis_wf2_task_items" WHERE "status" IN (${statuses.map((_, index) => `{${index}}`).join(", ")})`, ...statuses);
     return rows.map((row) => row.partition as string | null);
   }
 
@@ -81,14 +81,14 @@ export class WorkflowTasks extends IWorkflowTasks {
     });
   }
 
-  async complete(taskId: string, output: unknown, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<TaskDetails> {
+  async complete(taskId: string, output: unknown, actor: WorkflowActor, options: WorkflowAuditOptions & { readonly language?: string } = {}): Promise<TaskDetails> {
     const task = await this.task(taskId, false);
     if (task.status === "claimed" && task.claimedById !== actor.id) throw new WorkflowError("conflict", "The task is taken by someone else");
     if (task.status !== "open" && task.status !== "claimed") throw new WorkflowError("wrong_status", `The task is ${task.status}`);
     let instance;
     try {
       // The form is checked and the process moves on first; the task follows.
-      instance = await this.runtime.completeToken(task.tokenId, output, actor);
+      instance = await this.runtime.completeToken(task.tokenId, output, actor, options.language === undefined ? {} : { language: options.language });
     } catch (error) {
       if (error instanceof WorkflowError && error.code === "wrong_status") await this.close(task.tokenId, "cancelled");
       throw error;

@@ -1,4 +1,4 @@
-import type { ProcessDocument } from "../../../../library/workflow";
+import type { LocalizedText, ProcessDocument } from "../../../../library/workflow";
 
 const CODE_PROCESS = Symbol.for("bazis/core/workflow/code-process");
 
@@ -6,8 +6,12 @@ const CODE_PROCESS = Symbol.for("bazis/core/workflow/code-process");
 export interface ProcessDefinition {
   /** The key it is started by: `^[a-z][a-z0-9_.-]{0,63}$`. */
   readonly key: string;
-  readonly title: string;
-  readonly description?: string | null;
+  readonly title: LocalizedText;
+  readonly description?: LocalizedText | null;
+  /** A path in the catalog: `Sales/Orders`. */
+  readonly folder?: string | null;
+  /** Whose process it is: an opaque id. */
+  readonly owner?: string | null;
   /** Days to keep completed and cancelled instances; omitted keeps them. */
   readonly retentionDays?: number | null;
   readonly document: ProcessDocument;
@@ -27,9 +31,11 @@ export interface CodeProcess extends ProcessDefinition {
  * export const OrderApprovalProcess = defineProcess({
  *   key: "order-approval",
  *   title: "Order approval",
- *   document: { schemaVersion: "bazis.workflow/v1", nodes: { … }, flows: { … } },
+ *   document: { schemaVersion: "bazis.workflow/v2", nodes: { … }, flows: { … } },
  * });
  * ```
+ *
+ * A document of version 1 goes through `upgradeDocument`.
  */
 export function defineProcess(definition: ProcessDefinition): CodeProcess {
   return Object.freeze({ ...definition, [CODE_PROCESS]: true as const });

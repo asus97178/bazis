@@ -1,12 +1,12 @@
 import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
-export type HistoryType = "started" | "entered" | "left" | "tool" | "timer" | "event" | "error" | "retried" | "cancelled" | "completed";
+export type HistoryType = "started" | "entered" | "left" | "tool" | "assigned" | "skipped" | "timer" | "event" | "error" | "retried" | "cancelled" | "completed";
 
 /** The journal of an instance, append only. Its v7 ids give the order. */
 @ForeignKey(() => WfInstance, { properties: ["instanceId"], onDelete: "cascade" })
 @Index(["instanceId", "id"])
-@Entity({ table: "bazis_wf_run_history" })
+@Entity({ table: "bazis_wf2_run_history" })
 export class WfHistory {
   @UUID({ version: "v7" })
   id = "";

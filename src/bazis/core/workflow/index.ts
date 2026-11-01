@@ -1,5 +1,5 @@
 /**
- * Business processes without a UI (WORKFLOW-001): the composite `WorkflowModule`
+ * Business processes without a UI (WORKFLOW-001, WORKFLOW-002): the composite `WorkflowModule`
  * with the Definitions and Runtime parts, their services, HTTP, events and
  * extension points. The document format is `bazis/library/workflow`.
  */
@@ -26,6 +26,7 @@ export {
   type SavedDraft,
   type SaveDraftOptions,
   type UpdateProcess,
+  type ValidateOptions,
   type VersionDetails,
   type VersionSummary,
 } from "./definitions_module/services/IWorkflowDefinitions.service";
@@ -58,11 +59,12 @@ export {
   type WorkflowTaskRequested,
   type WorkflowTokenClosed,
 } from "./runtime_module/events/Runtime.events";
-export { workflowRuntimeConfig } from "./runtime_module/config/Runtime.config";
+export { workflowConfig, type WorkflowSettings } from "./contracts/Workflow.config";
 export type { HistoryType } from "./runtime_module/model/WfHistory.model";
 export type { InstanceStatus, StartedVia } from "./runtime_module/model/WfInstance.model";
 export type { TokenStatus } from "./runtime_module/model/WfToken.model";
 export { WorkflowInputValidator, DefaultWorkflowInputValidator, type WorkflowInputContext } from "./contracts/WorkflowInputValidator";
+export { WorkflowExtensions, DefaultWorkflowExtensions, type ExtensionTarget, type WorkflowPortContext } from "./contracts/WorkflowExtensions";
 export { WorkflowError, type WorkflowErrorCode } from "./contracts/WorkflowError";
 export type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging, WorkflowRequest, WorkflowToolMetadata } from "./contracts/types";
 

@@ -7,13 +7,14 @@ export type StartedVia = "manual" | "event" | "schedule";
 
 /**
  * One run of a process. Bound to the version it started with: a new publication
- * does not touch it. Its data: the input, the variables `saveTo` writes and the
- * result of each step by node id.
+ * does not touch it. Its data: the input, the variables and the result of each
+ * step by node id.
  */
 @Index(["partition", "status"])
 @Index(["processKey", "status"])
 @Index(["status", "endedAt"])
-@Entity({ table: "bazis_wf_run_instances" })
+@Index(["test", "createdAt"])
+@Entity({ table: "bazis_wf2_run_instances" })
 export class WfInstance {
   @UUID({ version: "v7" })
   id = "";
@@ -44,6 +45,30 @@ export class WfInstance {
   /** The result of every passed step by node id: `$nodes.<node>.<field>`. */
   @Column({ type: "json" })
   nodes: Record<string, unknown> = {};
+
+  /** What the process gave back: its `out` variables when it completed. */
+  @Column({ type: "json", nullable: true })
+  output: Record<string, unknown> | null = null;
+
+  /** `$event`: the data of the event that started or last continued it. */
+  @Column({ type: "json", nullable: true })
+  event: unknown = null;
+
+  /** `$trigger`: how it was started. */
+  @Column({ type: "json", nullable: true })
+  trigger: Record<string, unknown> | null = null;
+
+  /** A trial run (WORKFLOW-002 §5.4, stage 5). */
+  @Column({ type: "boolean" })
+  test = false;
+
+  /** The instance whose `callProcess` started this one (stage 3). */
+  @Index()
+  @Column({ type: "text", nullable: true })
+  parentInstanceId: string | null = null;
+
+  @Column({ type: "text", nullable: true })
+  parentTokenId: string | null = null;
 
   @Index()
   @Column({ type: "text", nullable: true })

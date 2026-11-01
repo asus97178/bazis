@@ -12,7 +12,7 @@ let app: ReturnType<typeof Bun.spawn> | undefined;
 beforeAll(async () => {
   if (!enabled) return;
   app = Bun.spawn([process.execPath, "run", "src/index.ts"], {
-    env: { ...process.env, BAZIS_ENV: "development", HOST: "127.0.0.1", PORT: port },
+    env: { ...process.env, BAZIS_ENV: "development", HOST: "127.0.0.1", PORT: port, BAZIS_WORKFLOW__LANGUAGES: "en,ru" },
     stdout: "ignore",
     stderr: "inherit",
   });
@@ -28,11 +28,11 @@ afterAll(async () => {
   await app?.exited;
 });
 
-async function send(user: string | undefined, role: string, method: string, path: string, body?: unknown) {
+async function send(user: string | undefined, role: string, method: string, path: string, body?: unknown, language?: string) {
   const token = user === undefined ? undefined : (await issuer.issue(user, { role })).accessToken;
   const response = await fetch(`${base}${path}`, {
     method,
-    headers: { "content-type": "application/json", ...(token === undefined ? {} : { authorization: `Bearer ${token}` }) },
+    headers: { "content-type": "application/json", ...(language === undefined ? {} : { "accept-language": language }), ...(token === undefined ? {} : { authorization: `Bearer ${token}` }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const text = await response.text();
@@ -141,4 +141,20 @@ test.skipIf(!enabled)("the catalog shows what the modules let an administrator a
   expect(keys).toEqual(expect.arrayContaining(["orders.read", "workflow.tasks.work"]));
   const processes = (await root("GET", "/access/references/workflow.process")).body.data as { id: string }[];
   expect(processes.map((process) => process.id)).toContain("order-approval");
+});
+
+test.skipIf(!enabled)("the card speaks the language of the request, and a designer has what it needs", async () => {
+  const card = (await send("root", "admin", "GET", "/workflow/processes/order-approval", undefined, "ru")).body;
+  expect(card).toMatchObject({ title: { en: "Order approval", ru: "Согласование заказа" }, titleText: "Согласование заказа", folder: "Sales/Orders" });
+  expect((await root("GET", "/workflow/processes/order-approval")).body.titleText).toBe("Order approval");
+  expect((await root("GET", "/workflow/processes?filter[folder]=Sales")).body.data.map((item: { key: string }) => item.key)).toContain("order-approval");
+  expect((await root("GET", "/workflow/processes?filter[folder]=HR")).body.data).toEqual([]);
+
+  const palette = (await root("GET", "/workflow/palette")).body;
+  expect(palette.nodeKinds.map((kind: { kind: string }) => kind.kind)).toContain("assign");
+  expect(palette.tools.map((tool: { name: string }) => tool.name)).toContain("orders.set-status");
+  expect((await root("POST", "/workflow/validate", { document: card.draft })).body.issues.filter((issue: { severity: string }) => issue.severity === "error")).toEqual([]);
+
+  const folders = (await root("GET", "/access/references/workflow.folder")).body.data as { id: string }[];
+  expect(folders.map((folder) => folder.id)).toEqual(expect.arrayContaining(["Sales", "Sales/Orders"]));
 });

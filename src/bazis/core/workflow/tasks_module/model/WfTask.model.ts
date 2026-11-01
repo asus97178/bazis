@@ -1,5 +1,5 @@
 import { Column, Entity, Index, UUID } from "../../../orm";
-import type { FormSpec } from "../../../../library/workflow";
+import type { FormSpec, LocalizedText } from "../../../../library/workflow";
 
 /** `open` waits for someone, `claimed` is taken by one person, `completed` and `cancelled` are done. */
 export type TaskStatus = "open" | "claimed" | "completed" | "cancelled";
@@ -10,7 +10,7 @@ export type TaskStatus = "open" | "claimed" | "completed" | "cancelled";
  */
 @Index(["assignee", "status"])
 @Index(["partition", "status"])
-@Entity({ table: "bazis_wf_task_items" })
+@Entity({ table: "bazis_wf2_task_items" })
 export class WfTask {
   @UUID({ version: "v7" })
   id = "";
@@ -33,8 +33,12 @@ export class WfTask {
   @Column({ type: "text", nullable: true })
   partition: string | null = null;
 
-  @Column({ type: "text" })
-  title = "";
+  @Column({ type: "json" })
+  title: LocalizedText = "";
+
+  /** The task of a trial run (WORKFLOW-002 §5.4, stage 5). */
+  @Column({ type: "boolean" })
+  test = false;
 
   /** `role:<code>` or `user:<id>`. */
   @Column({ type: "text" })

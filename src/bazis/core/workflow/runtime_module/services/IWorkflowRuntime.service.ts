@@ -13,6 +13,8 @@ export interface StartInstance extends WorkflowAuditOptions {
   readonly businessKey?: string | null;
   /** On whose behalf the steps run. */
   readonly actor: WorkflowActor;
+  /** The language of the request, for the application's validator; `workflow.language` by default. */
+  readonly language?: string;
 }
 
 export interface CancelInstance extends WorkflowAuditOptions {
@@ -52,6 +54,8 @@ export interface InstanceDetails extends InstanceSummary {
   readonly input: Record<string, unknown>;
   readonly vars: Record<string, unknown>;
   readonly nodes: Record<string, unknown>;
+  /** What the process gave back: its `out` variables; `null` until it completes. */
+  readonly output: Record<string, unknown> | null;
   /** Every token, oldest first. */
   readonly tokens: readonly TokenDetails[];
 }
@@ -105,7 +109,7 @@ export abstract class IWorkflowRuntime {
   /** Retries the failed steps of a `failed` instance. */
   abstract retry(instanceId: string, options: RetryInstance): Promise<InstanceDetails>;
   /** Finishes a user task's wait with the form output and moves on; `wrong_status` when the token no longer waits. */
-  abstract completeToken(tokenId: string, output: unknown, actor: WorkflowActor): Promise<InstanceDetails>;
+  abstract completeToken(tokenId: string, output: unknown, actor: WorkflowActor, options?: { readonly language?: string }): Promise<InstanceDetails>;
   /**
    * Delivers an event: starts processes whose latest version has an
    * `eventStart` for the key, and moves the instances waiting for it.

@@ -10,7 +10,7 @@ export class DefinitionsDbContext extends DbContext {
 /** The tables of the Definitions part: bazis creates and checks them in the application database. */
 export const definitionsStore = defineOrmOwnedStoreV1({
   contract: "bazis.orm-owned-store/v1",
-  storeKey: "bazis.workflow.definitions",
+  storeKey: "bazis.workflow.definitions.v2",
   formatVersion: 1,
-  ownedScope: { schema: "public", tablePrefix: "bazis_wf_def_" },
+  ownedScope: { schema: "public", tablePrefix: "bazis_wf2_def_" },
 });

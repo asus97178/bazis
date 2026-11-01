@@ -1,7 +1,7 @@
 # WorkflowModule
 
-Passport version: 1.1. Check date: 2026-10-31.
-Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md); checks below.
+Passport version: 1.1. Check date: 2026-11-01.
+Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md) and stages 0–2 of [WORKFLOW-002](../../../../docs/architecture/WORKFLOW_BUILDER.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.
@@ -29,12 +29,14 @@ document functions in `library/workflow`.
 
 | Part | Passport | Owns | Depends on |
 | --- | --- | --- | --- |
-| Definitions | [definitions_module](definitions_module/MODULE.md) | `bazis_wf_def_*`: processes, versions | `library/workflow`, `ToolRunner` |
-| Runtime | [runtime_module](runtime_module/MODULE.md) | `bazis_wf_run_*`: instances, tokens, jobs, subscriptions, history | Definitions (`IWorkflowDefinitions`), `ToolRunner`, `EventBus` |
-| Tasks | [tasks_module](tasks_module/MODULE.md) | `bazis_wf_task_*`: tasks | Runtime (`IWorkflowRuntime`, its events), Definitions (`WorkflowClock`) |
+| Definitions | [definitions_module](definitions_module/MODULE.md) | `bazis_wf2_def_*`: processes, versions | `library/workflow`, `ToolRunner` |
+| Runtime | [runtime_module](runtime_module/MODULE.md) | `bazis_wf2_run_*`: instances, tokens, jobs, subscriptions, history | Definitions (`IWorkflowDefinitions`), `ToolRunner`, `EventBus` |
+| Tasks | [tasks_module](tasks_module/MODULE.md) | `bazis_wf2_task_*`: tasks | Runtime (`IWorkflowRuntime`, its events), Definitions (`WorkflowClock`) |
 
 Shared contracts of the pack (no providers): `contracts/WorkflowError.ts`,
 `contracts/WorkflowInputValidator.ts` (field check port),
+`contracts/WorkflowExtensions.ts` (check of the application's `extensions`),
+`contracts/Workflow.config.ts` (settings, declared by Definitions),
 `contracts/WorkflowClock.ts` (the engine's time; registered by Definitions),
 `contracts/types.ts`; internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
 Tests of processes: the entry `bazis/core/workflow/testing` ([testing/index.ts](testing/index.ts)):
@@ -46,11 +48,13 @@ only in `drain` / `advance`.
 `exports: [IWorkflowDefinitions, IWorkflowRuntime, IWorkflowTasks]`; the parts' HTTP under
 `/workflow/...`; the `@Module` field `processes` with `defineProcess`; events `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`,
 `WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED`, and for the audit `WORKFLOW_PROCESS_CHANGED`, `WORKFLOW_INSTANCE_STARTED`,
-`WORKFLOW_INSTANCE_CANCELLED`, `WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED`; settings `workflowRuntimeConfig` (prefix `workflow`).
+`WORKFLOW_INSTANCE_CANCELLED`, `WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED`; settings `workflowConfig` (prefix `workflow`).
 
 ## 4. Checks
 
 - PASS `src/bazis/library/workflow/test/workflow.document.test.ts` — document validation, paths, conditions, forms, durations.
+- PASS `src/bazis/library/workflow/test/workflow.expressions.test.ts`, `workflow.v2.test.ts` — expressions and their text, variables, settings, `extensions`, `upgradeDocument`, the structure, the palette, masks.
+- PASS `src/bazis/core/workflow/test/workflow.postgres.document.live.test.ts` on PostgreSQL 17: the catalog brought over from the old store, `assign`, paths of the run, `out`, `timeout`, `onError`, the history log, the ports, `/workflow/palette`, `/workflow/validate`, the card, `folder` in grants, the language of a request.
 - PASS `src/bazis/core/workflow/test/workflow.postgres.contract.live.test.ts` on PostgreSQL 17: JSON:API lists, the draft lock, audit events with the request, `context.actor` and `context.metadata`.
 - PASS `src/bazis/core/workflow/test/workflow.postgres.live.test.ts` on PostgreSQL 17
   (`BAZIS_WORKFLOW_PG_URL`, database `bazis_wf_*`; run by `ops/live-postgres`):

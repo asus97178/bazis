@@ -1,4 +1,4 @@
-import { parseCron } from "../../../../library/workflow";
+import { inputSpecOf, parseCron, validateForm } from "../../../../library/workflow";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import { WfJob } from "../model/WfJob.model";
@@ -65,7 +65,7 @@ export class Schedules {
       else await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeUpdate({ dueAt: next, lockedUntil: null, attempts: 0, lastError: null });
       for (const [nodeId, cron] of scheduleNodes(latest)) {
         if (!cron.matches(due)) continue;
-        await this.engine.begin(graph, nodeId, { input: {}, partition: null, businessKey: null, startedVia: "schedule", actor: SCHEDULE_ACTOR });
+        await this.engine.begin(graph, nodeId, { input: validateForm(inputSpecOf(latest.document), {}).value, partition: null, businessKey: null, startedVia: "schedule", actor: SCHEDULE_ACTOR });
       }
     });
   }

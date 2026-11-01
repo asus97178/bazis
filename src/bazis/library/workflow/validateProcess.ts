@@ -1,7 +1,10 @@
-import { checkFormSpec, formFieldCodes, type FormSpec } from "./formFields";
-import { nodeKindOf, type NodeRole } from "./nodeKinds";
-import { DATA_PATH } from "./paths";
-import { PROCESS_SCHEMA_VERSION, type ConditionOp } from "./ProcessDocument";
+import { checkExpression, checkPath, isExpressionNode, type ExpressionScope } from "./expressions";
+import { checkExtensions, variableProblems } from "./formFields";
+import { checkLocalizedText } from "./localized";
+import { ISO_DURATION, nodeKindOf, type NodeRole } from "./nodeKinds";
+import { isPath } from "./paths";
+import { PROCESS_SCHEMA_VERSION, type ProcessDocument } from "./ProcessDocument";
+import { toStructure } from "./structure";
 
 /**
  * One finding of {@link validateProcess}. An `error` blocks publishing, a
@@ -14,12 +17,16 @@ export interface ProcessIssue {
   readonly message: string;
   readonly node?: string;
   readonly flow?: string;
+  readonly variable?: string;
 }
 
 export type ProcessIssueCode =
   | "schema"
   | "too_large"
-  | "input_invalid"
+  | "variable_invalid"
+  | "settings_invalid"
+  | "extension_invalid"
+  | "extension_unknown"
   | "id_invalid"
   | "unknown_kind"
   | "title_invalid"
@@ -47,13 +54,14 @@ export type ProcessIssueCode =
   | "unreachable"
   | "dead_end"
   | "diagram_missing"
-  | "diagram_orphan";
+  | "diagram_orphan"
+  | "not_structured";
 
-export const PROCESS_LIMITS = Object.freeze({ nodes: 500, flows: 1000, bytes: 1_000_000, conditionDepth: 8 });
+export const PROCESS_LIMITS = Object.freeze({ nodes: 500, flows: 1000, bytes: 1_000_000 });
 
 const ID = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
-const OPS = new Set<ConditionOp>(["eq", "ne", "gt", "gte", "lt", "lte", "in", "contains", "empty", "notEmpty"]);
-const UNARY = new Set<ConditionOp>(["empty", "notEmpty"]);
+/** Paths that come with later stages of WORKFLOW-002: until then they are an error, not a silent literal. */
+const NOT_YET = /^\$(secrets|item|index)(\.|$)/;
 
 type Json = Record<string, unknown>;
 
@@ -71,6 +79,8 @@ export interface ValidateProcessOptions {
    * `callers`. Without it Tool names are only checked for their form.
    */
   readonly tools?: (name: string) => boolean;
+  /** Whether an `extensions` namespace has a check. Without it namespaces are only checked for their form. */
+  readonly extensions?: (namespace: string) => boolean;
 }
 
 /**
@@ -80,8 +90,8 @@ export interface ValidateProcessOptions {
  */
 export function validateProcess(document: unknown, options: ValidateProcessOptions = {}): ProcessIssue[] {
   const out: ProcessIssue[] = [];
-  const error = (code: ProcessIssueCode, message: string, at: { node?: string; flow?: string } = {}) => out.push({ severity: "error", code, message, ...at });
-  const warning = (code: ProcessIssueCode, message: string, at: { node?: string; flow?: string } = {}) => out.push({ severity: "warning", code, message, ...at });
+  const error = (code: ProcessIssueCode, message: string, at: IssueTarget = {}) => out.push({ severity: "error", code, message, ...at });
+  const warning = (code: ProcessIssueCode, message: string, at: IssueTarget = {}) => out.push({ severity: "warning", code, message, ...at });
 
   if (!isObject(document)) return [{ severity: "error", code: "schema", message: "document must be an object" }];
   if (JSON.stringify(document).length > PROCESS_LIMITS.bytes) return [{ severity: "error", code: "too_large", message: `document is larger than ${PROCESS_LIMITS.bytes} bytes` }];
@@ -90,10 +100,15 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
   if (!isObject(document.flows)) error("schema", "flows must be an object");
   if (document.diagram !== undefined && !isDiagram(document.diagram)) error("schema", "diagram must have shapes and edges objects with numeric coordinates");
   if (out.length > 0) return out;
-  if (document.input !== undefined) {
-    const problem = checkFormSpec(document.input, "input");
-    if (problem) error("input_invalid", problem);
+  const variables = document.variables === undefined ? [] : variableProblems(document.variables);
+  for (const { message, variable } of variables) error("variable_invalid", message, variable === undefined ? {} : { variable });
+  const declared = variables.length === 0 && Array.isArray(document.variables) ? document.variables as readonly Json[] : [];
+  if (document.settings !== undefined) {
+    const problem = checkSettings(document.settings);
+    if (problem) error("settings_invalid", problem);
   }
+  checkNamespaces(document.extensions, "extensions", {}, options, error);
+  for (const variable of declared) checkNamespaces(variable.extensions, "extensions", { variable: String(variable.name) }, options, error);
 
   const nodes = document.nodes as Json;
   const flows = document.flows as Json;
@@ -117,7 +132,9 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
     }
     roles.set(id, definition.role);
     kinds.set(id, definition.kind);
-    if (typeof raw.title !== "string" || raw.title.trim().length === 0 || raw.title.length > 200) error("title_invalid", "title must be 1–200 characters", { node: id });
+    const titleProblem = checkLocalizedText(raw.title, 200);
+    if (titleProblem) error("title_invalid", `title ${titleProblem}`, { node: id });
+    checkNamespaces(raw.extensions, "extensions", { node: id }, options, error);
     if (raw.config !== undefined && !isObject(raw.config)) {
       error("config_invalid", "config must be an object", { node: id });
     } else {
@@ -140,9 +157,22 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
     else if (kinds.get(id) === "boundaryError" && kinds.get(host) !== "serviceTask") error("boundary_attach", "error boundary attaches only to a service task", { node: id });
   }
 
-  // What conditions may read: declared input fields and existing nodes.
-  const inputSpec = document.input !== undefined && checkFormSpec(document.input, "input") === null ? document.input as FormSpec : undefined;
-  const scope: ConditionScope = { input: inputSpec === undefined ? null : new Set(formFieldCodes(inputSpec)), nodes: roles };
+  // What expressions may read: declared variables, what steps save and existing nodes.
+  const named = (direction: (value: unknown) => boolean) => new Set(declared.filter((variable) => direction(variable.direction)).map((variable) => String(variable.name)));
+  const writable = named((direction) => direction !== "in");
+  const saved = new Set(writable);
+  for (const raw of Object.values(nodes)) {
+    const saveTo = isObject(raw) && isObject(raw.config) ? raw.config.saveTo : undefined;
+    if (typeof saveTo === "string") saved.add(saveTo);
+  }
+  const known = variables.length === 0;
+  const scope: ExpressionScope = { ...(known ? { input: named((direction) => direction === "in"), vars: saved } : {}), nodes: new Set(Object.keys(nodes)) };
+
+  // What steps read: an assign writes declared variables, inputs and waits read what exists.
+  for (const [id, raw] of Object.entries(nodes)) {
+    if (!isObject(raw) || !isObject(raw.config) || definitionProblem(raw)) continue;
+    for (const problem of configExpressionProblems(raw.kind as string, raw.config, scope, known ? writable : undefined)) error("config_invalid", problem, { node: id });
+  }
 
   // Flows: ends, duplicates, conditions.
   const outgoing = new Map<string, string[]>();
@@ -168,13 +198,16 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
     pairs.add(pair);
     outgoing.set(source, [...outgoing.get(source) ?? [], id]);
     incoming.set(target, [...incoming.get(target) ?? [], id]);
-    if (raw.title !== undefined && (typeof raw.title !== "string" || raw.title.length > 200)) error("title_invalid", "flow title must be up to 200 characters", { flow: id });
+    if (raw.title !== undefined) {
+      const problem = checkLocalizedText(raw.title, 200);
+      if (problem) error("title_invalid", `flow title ${problem}`, { flow: id });
+    }
     if (raw.isDefault !== undefined && typeof raw.isDefault !== "boolean") error("default_invalid", "isDefault must be a boolean", { flow: id });
     const fromChoice = kinds.get(source) === "exclusiveGateway";
     if (raw.condition !== undefined) {
       if (!fromChoice) error("condition_not_allowed", "only flows leaving an exclusive gateway have conditions", { flow: id });
       else {
-        const problem = checkCondition(raw.condition, 0, scope);
+        const problem = checkExpression(raw.condition, scope);
         if (problem) error("condition_invalid", problem, { flow: id });
       }
     }
@@ -234,11 +267,14 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
     for (const id of Object.keys(diagram.shapes)) if (!Object.hasOwn(nodes, id)) warning("diagram_orphan", "shape without a node", { node: id });
     for (const id of Object.keys(diagram.edges)) if (!Object.hasOwn(flows, id)) warning("diagram_orphan", "edge without a flow", { flow: id });
   }
+  if (!hasErrors(out) && toStructure(document as unknown as ProcessDocument) === undefined) {
+    warning("not_structured", "the graph cannot be drawn as a list of steps: a designer shows it read only");
+  }
   return out;
 }
 
 /** An exclusive gateway: every outgoing flow has a condition, except at most one default flow. */
-function checkChoice(id: string, outs: readonly string[], flows: Json, error: (code: ProcessIssueCode, message: string, at?: { node?: string; flow?: string }) => void): void {
+function checkChoice(id: string, outs: readonly string[], flows: Json, error: (code: ProcessIssueCode, message: string, at?: IssueTarget) => void): void {
   const defaults = outs.filter((flow) => (flows[flow] as Json).isDefault === true);
   if (defaults.length > 1) error("default_invalid", "exclusive gateway can have only one default flow", { node: id });
   for (const flow of outs) {
@@ -251,37 +287,83 @@ function checkChoice(id: string, outs: readonly string[], flows: Json, error: (c
   }
 }
 
-interface ConditionScope {
-  /** Input field codes; `null` when no input is declared and `$input` is not checked. */
-  readonly input: ReadonlySet<string> | null;
-  readonly nodes: ReadonlyMap<string, unknown>;
+/** The settings this version of the framework runs; a setting that would be stored and ignored is an error. */
+function checkSettings(value: unknown): string | null {
+  if (!isObject(value)) return "settings must be an object";
+  for (const [key, item] of Object.entries(value)) {
+    if (key === "stepTimeout") {
+      if (typeof item !== "string" || !ISO_DURATION.test(item)) return "settings.stepTimeout must be an ISO duration without months and years";
+    } else if (key === "log") {
+      if (!isObject(item)) return "settings.log must be an object";
+      for (const [flag, on] of Object.entries(item)) {
+        if (flag !== "variables" && flag !== "toolPayloads" && flag !== "maskPersonal") return `settings.log.${flag} is unknown`;
+        if (typeof on !== "boolean") return `settings.log.${flag} must be a boolean`;
+      }
+    } else {
+      return `settings.${key} is not supported`;
+    }
+  }
+  return null;
 }
 
-function checkCondition(condition: unknown, depth: number, scope: ConditionScope): string | null {
-  if (depth > PROCESS_LIMITS.conditionDepth) return `condition is nested deeper than ${PROCESS_LIMITS.conditionDepth}`;
-  if (!isObject(condition)) return "condition must be an object";
-  const keys = Object.keys(condition);
-  if (keys.length === 1 && (keys[0] === "all" || keys[0] === "any")) {
-    const list = condition[keys[0]];
-    if (!Array.isArray(list) || list.length === 0) return `${keys[0]} must be a non-empty list`;
-    for (const item of list) {
-      const problem = checkCondition(item, depth + 1, scope);
-      if (problem) return problem;
-    }
-    return null;
+type IssueTarget = { node?: string; flow?: string; variable?: string };
+
+/** `extensions` of the root or a node: its form, then whether its namespaces have a check. */
+function checkNamespaces(value: unknown, at: string, target: IssueTarget, options: ValidateProcessOptions, error: (code: ProcessIssueCode, message: string, at?: IssueTarget) => void): void {
+  if (value === undefined) return;
+  const problem = checkExtensions(value, at);
+  if (problem) {
+    error("extension_invalid", problem, target);
+    return;
   }
-  if (keys.length === 1 && keys[0] === "not") return checkCondition(condition.not, depth + 1, scope);
-  if (typeof condition.path !== "string" || !DATA_PATH.test(condition.path)) return "condition.path must look like $input.field, $vars.name or $nodes.Node.field";
-  const [root, first] = condition.path.split(".");
-  if (root === "$input" && scope.input && !scope.input.has(first!)) return `condition.path ${condition.path}: input has no field ${first}`;
-  if (root === "$nodes" && !scope.nodes.has(first!)) return `condition.path ${condition.path}: no node ${first}`;
-  if (typeof condition.op !== "string" || !OPS.has(condition.op as ConditionOp)) return `condition.op must be one of ${[...OPS].join(", ")}`;
-  const op = condition.op as ConditionOp;
-  if (keys.some((key) => key !== "path" && key !== "op" && key !== "value")) return "condition has unknown keys";
-  if (UNARY.has(op)) return condition.value === undefined ? null : `${op} takes no value`;
-  if (condition.value === undefined) return `${op} needs a value`;
-  if (op === "in" && !Array.isArray(condition.value)) return "in needs a list value";
-  return null;
+  if (options.extensions === undefined) return;
+  for (const namespace of Object.keys(value as Json)) {
+    if (!options.extensions(namespace)) error("extension_unknown", `no check is registered for the extensions namespace ${namespace}`, target);
+  }
+}
+
+function definitionProblem(raw: Json): boolean {
+  const definition = nodeKindOf(raw.kind);
+  return definition === undefined || definition.check(raw.config as Json) !== null;
+}
+
+/** The expressions and paths in a step's `config`, against what the document declares. */
+function configExpressionProblems(kind: string, config: Json, scope: ExpressionScope, writable: ReadonlySet<string> | undefined): string[] {
+  const out: string[] = [];
+  if (kind === "assign") {
+    for (const [index, item] of (config.assignments as readonly Json[]).entries()) {
+      const name = item.var as string;
+      if (writable && !writable.has(name)) out.push(`config.assignments[${index}].var: ${name} is not a declared local or out variable`);
+      const problem = checkExpression(item.value, scope);
+      if (problem) out.push(`config.assignments[${index}].value: ${problem}`);
+    }
+  }
+  if (kind === "serviceTask" && config.input !== undefined) walkInput(config.input, "config.input", scope, out);
+  for (const key of ["at", "correlation"]) {
+    if (typeof config[key] === "string") {
+      const problem = checkPath(config[key], scope);
+      if (problem) out.push(`config.${key}: ${problem}`);
+    }
+  }
+  return out;
+}
+
+function walkInput(value: unknown, at: string, scope: ExpressionScope, out: string[]): void {
+  if (typeof value === "string") {
+    if (NOT_YET.test(value)) out.push(`${at}: ${value} is not supported`);
+    else if (isPath(value)) {
+      const problem = checkPath(value, scope);
+      if (problem) out.push(`${at}: ${problem}`);
+    }
+    return;
+  }
+  if (isExpressionNode(value)) {
+    const problem = checkExpression(value, scope);
+    if (problem) out.push(`${at}: ${problem}`);
+    return;
+  }
+  if (Array.isArray(value)) value.forEach((item, index) => walkInput(item, `${at}[${index}]`, scope, out));
+  else if (isObject(value)) for (const [key, item] of Object.entries(value)) walkInput(item, `${at}.${key}`, scope, out);
 }
 
 function isDiagram(value: unknown): boolean {

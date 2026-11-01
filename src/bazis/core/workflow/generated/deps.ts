@@ -5,7 +5,10 @@ import { DbContextOptions } from "../../../library/orm/DbContextOptions";
 import { ServiceProvider } from "../../di/ServiceProvider";
 import { EventBus } from "../../kernel/events/EventBus";
 import { WorkflowClock } from "../contracts/WorkflowClock";
+import { FolderReferences } from "../definitions_module/access/Folder.references";
 import { ProcessReferences } from "../definitions_module/access/Process.references";
+import { ProcessFolderLookup } from "../definitions_module/access/ProcessFolder.lookup";
+import { CatalogImport } from "../definitions_module/code/CatalogImport";
 import { CodeProcessCatalog } from "../definitions_module/code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "../definitions_module/code/CodeProcessPublisher";
 import { ProcessesController } from "../definitions_module/http/Processes.controller";
@@ -13,6 +16,7 @@ import { DefinitionsDbContext } from "../definitions_module/model/Definitions.db
 import { IWorkflowDefinitions } from "../definitions_module/services/IWorkflowDefinitions.service";
 import { WorkflowDefinitions } from "../definitions_module/services/WorkflowDefinitions.service";
 import { WorkflowEvents } from "../internal/WorkflowEvents";
+import { WorkflowLanguages } from "../internal/WorkflowLanguages";
 import { WorkflowTools } from "../internal/WorkflowTools";
 import { WorkflowRetention } from "../runtime_module/background/WorkflowRetention";
 import { WorkflowWorker } from "../runtime_module/background/WorkflowWorker";
@@ -33,12 +37,15 @@ import { IWorkflowTasks } from "../tasks_module/services/IWorkflowTasks.service"
 import { WorkflowTasks } from "../tasks_module/services/WorkflowTasks.service";
 
 registerFrameworkClassDeps([
+  [CatalogImport, [DefinitionsDbContext, WorkflowLanguages]],
   [CodeProcessCatalog, [ServiceProvider]],
   [CodeProcessPublisher, [ServiceProvider]],
   [DefinitionsDbContext, [DbContextOptions]],
   [EventsController, [IWorkflowRuntime]],
-  [InstancesController, [IWorkflowRuntime]],
+  [FolderReferences, [DefinitionsDbContext]],
+  [InstancesController, [IWorkflowRuntime, IWorkflowDefinitions]],
   [ProcessesController, [IWorkflowDefinitions]],
+  [ProcessFolderLookup, [DefinitionsDbContext]],
   [ProcessReferences, [DefinitionsDbContext]],
   [RuntimeDbContext, [DbContextOptions]],
   [Schedules, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions]],
@@ -47,11 +54,12 @@ registerFrameworkClassDeps([
   [TasksDbContext, [DbContextOptions]],
   [TimerStep, [RuntimeDbContext, WorkflowEngine]],
   [ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools]],
-  [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents]],
+  [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents, WorkflowLanguages, ServiceProvider]],
   [WorkflowEngine, [RuntimeDbContext, IWorkflowDefinitions, GraphCache, WorkflowEvents, WorkflowClock]],
   [WorkflowEvents, [EventBus, ServiceProvider, "optional:Logger"]],
+  [WorkflowLanguages, ["Config:workflow"]],
   [WorkflowRetention, [ServiceProvider, "Config:workflow"]],
-  [WorkflowRuntime, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions, ServiceProvider]],
+  [WorkflowRuntime, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions, ServiceProvider, WorkflowLanguages]],
   [WorkflowTasks, [TasksDbContext, IWorkflowRuntime, WorkflowClock, WorkflowEvents]],
   [WorkflowTools, [ServiceProvider]],
   [WorkflowWorker, [ServiceProvider, "Config:workflow"]],

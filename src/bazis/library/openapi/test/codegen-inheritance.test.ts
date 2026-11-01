@@ -47,6 +47,7 @@ test("references of a Tool input go to the schema as x-ref", () => {
     @Validator({ refKeys: "dm.field", refScope: "/table" }) values: Record<string, unknown> = {};
     /** Whose record. */
     @Validator({ ref: "dm.field", refScope: "/table" }) owner = "";
+    @Validator({ personal: true }) email = "";
   }`;
   const options: ts.CompilerOptions = { noLib: true, target: ts.ScriptTarget.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, module: ts.ModuleKind.ESNext };
   const host = ts.createCompilerHost(options);
@@ -62,6 +63,7 @@ test("references of a Tool input go to the schema as x-ref", () => {
       table: { type: "string", "x-ref": "dm.table" },
       values: { "x-ref-keys": "dm.field", "x-ref-scope": "/table" },
       owner: { "x-ref": "dm.field", "x-ref-scope": "/table" },
+      email: { "x-personal": true },
     },
   });
 });

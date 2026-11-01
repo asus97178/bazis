@@ -1,4 +1,4 @@
-import type { FormSpec } from "../../../../library/workflow";
+import type { FormSpec, LocalizedText } from "../../../../library/workflow";
 import type { AccessFilter, ScopePrincipals } from "../../../access";
 import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { TaskStatus } from "../model/WfTask.model";
@@ -10,7 +10,7 @@ export interface TaskDetails {
   readonly processKey: string;
   readonly nodeId: string;
   readonly partition: string | null;
-  readonly title: string;
+  readonly title: LocalizedText;
   readonly assignee: string;
   readonly form: FormSpec | null;
   readonly dueAt: Date | null;
@@ -53,5 +53,5 @@ export abstract class IWorkflowTasks {
   /** Gives a claimed task back. */
   abstract release(taskId: string, actor: WorkflowActor): Promise<TaskDetails>;
   /** Fills the form: the process moves on. */
-  abstract complete(taskId: string, output: unknown, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<TaskDetails>;
+  abstract complete(taskId: string, output: unknown, actor: WorkflowActor, options?: WorkflowAuditOptions & { readonly language?: string }): Promise<TaskDetails>;
 }

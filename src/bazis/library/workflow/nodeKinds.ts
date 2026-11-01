@@ -1,24 +1,29 @@
 import { parseCron } from "./cron";
-import { checkFormSpec } from "./formFields";
+import { FIELD_NAME, checkFormSpec } from "./formFields";
 import { DATA_PATH } from "./paths";
 import type { NodeKind } from "./ProcessDocument";
 
 /** The role of a node in the graph: it sets the rules of incoming and outgoing flows. */
 export type NodeRole = "start" | "activity" | "gateway" | "boundary" | "end";
 
+/** A JSON Schema, as the palette gives it to a designer. */
+export type JsonSchema = Readonly<Record<string, unknown>>;
+
 export interface NodeKindDefinition {
   readonly kind: NodeKind;
   readonly role: NodeRole;
   /** Checks the node `config`; returns a problem or `null`. */
   readonly check: (config: Record<string, unknown>) => string | null;
+  /** The node `config` as a JSON Schema: what a designer builds the form of a step from. */
+  readonly config: JsonSchema;
 }
 
 /** ISO 8601 duration without months and years: P1D, PT2H30M, PT45S. */
 export const ISO_DURATION = /^P(?!$)(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?$/;
 /** An event key or a Tool name: `payments.received`, `payments.charge`. */
 export const DOTTED_KEY = /^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$/;
-/** A process variable name. */
-export const VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+/** A parameter of a Tool. */
+const PARAMETER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const ROLE = /^[a-z][a-z0-9_.-]{0,63}$/;
 const USER = /^[^\s:][^\s]{0,127}$/;
 
@@ -74,7 +79,7 @@ function inputMapping(config: Record<string, unknown>): string | null {
   const value = config.input;
   if (value === undefined) return null;
   if (typeof value !== "object" || value === null || Array.isArray(value)) return "config.input must be an object";
-  return Object.keys(value).every((key) => VAR_NAME.test(key)) ? null : "config.input has an invalid parameter name";
+  return Object.keys(value).every((key) => PARAMETER.test(key)) ? null : "config.input has an invalid parameter name";
 }
 
 /** Automatic retries of a failed Tool call. */
@@ -84,23 +89,89 @@ function retry(config: Record<string, unknown>): string | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return "config.retry must be an object";
   const policy = value as Record<string, unknown>;
   if (!Number.isSafeInteger(policy.maxAttempts) || (policy.maxAttempts as number) < 1 || (policy.maxAttempts as number) > 10) return "config.retry.maxAttempts must be 1–10";
+  if (policy.growth !== undefined && policy.growth !== "fixed" && policy.growth !== "exponential") return "config.retry.growth must be fixed or exponential";
+  if (policy.factor !== undefined) {
+    if (policy.growth === "fixed") return "config.retry.factor is only for exponential growth";
+    if (typeof policy.factor !== "number" || !(policy.factor >= 1) || policy.factor > 100) return "config.retry.factor must be a number 1–100";
+  }
   return string(policy, "backoff", ISO_DURATION, false)?.replace("config.", "config.retry.") ?? null;
 }
 
+/** What a failed Tool step does when no error boundary takes it. */
+function onError(config: Record<string, unknown>): string | null {
+  return config.onError === undefined || config.onError === "fail" || config.onError === "skip" ? null : "config.onError must be fail or skip";
+}
+
+/** The shape of an `assign` step; its variables and expressions are checked with the whole document. */
+function assignments(config: Record<string, unknown>): string | null {
+  const list = config.assignments;
+  if (!Array.isArray(list) || list.length === 0) return "config.assignments must be a non-empty list";
+  for (const [index, item] of list.entries()) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return `config.assignments[${index}] must be an object`;
+    const { var: name, value } = item as { var?: unknown; value?: unknown };
+    if (typeof name !== "string" || !FIELD_NAME.test(name)) return `config.assignments[${index}].var is invalid`;
+    if (value === undefined) return `config.assignments[${index}].value is required`;
+  }
+  return null;
+}
+
+const duration = { type: "string", format: "duration" };
+const text = { type: "string" };
+const dataPath = { type: "string", pattern: DATA_PATH.source };
+const saveTo = { type: "string", pattern: FIELD_NAME.source };
+const expression = { description: "An expression: a JSON literal, { path } or { op, args }" };
+const flag = { type: "boolean" };
+const object = (properties: Record<string, unknown>, required: readonly string[] = []): JsonSchema => ({ type: "object", properties, ...(required.length === 0 ? {} : { required }) });
+const timerConfig = { duration, at: dataPath };
+const fields = { type: "object", properties: { fields: { type: "array", items: { type: "object" } } }, required: ["fields"] };
+
 export const NODE_KINDS: readonly NodeKindDefinition[] = Object.freeze([
-  { kind: "manualStart", role: "start", check: none },
-  { kind: "scheduleStart", role: "start", check: cron },
-  { kind: "eventStart", role: "start", check: (c) => string(c, "event", DOTTED_KEY) },
-  { kind: "userTask", role: "activity", check: (c) => first(assignee(c), form(c), string(c, "dueIn", ISO_DURATION, false)) },
-  { kind: "serviceTask", role: "activity", check: (c) => first(string(c, "tool", DOTTED_KEY), inputMapping(c), string(c, "saveTo", VAR_NAME, false), retry(c)) },
-  { kind: "timerCatch", role: "activity", check: timer },
-  { kind: "eventWait", role: "activity", check: (c) => first(string(c, "event", DOTTED_KEY), string(c, "correlation", DATA_PATH, false), string(c, "saveTo", VAR_NAME, false)) },
-  { kind: "exclusiveGateway", role: "gateway", check: none },
-  { kind: "parallelGateway", role: "gateway", check: none },
-  { kind: "boundaryError", role: "boundary", check: (c) => string(c, "errorCode", /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/, false) },
-  { kind: "boundaryTimer", role: "boundary", check: (c) => first(timer(c), boolean(c, "interrupting")) },
-  { kind: "boundaryEvent", role: "boundary", check: (c) => first(string(c, "event", DOTTED_KEY), string(c, "correlation", DATA_PATH, false), boolean(c, "interrupting")) },
-  { kind: "end", role: "end", check: none },
+  { kind: "manualStart", role: "start", check: none, config: object({}) },
+  { kind: "scheduleStart", role: "start", check: cron, config: object({ cron: text }, ["cron"]) },
+  { kind: "eventStart", role: "start", check: (c) => string(c, "event", DOTTED_KEY), config: object({ event: text }, ["event"]) },
+  {
+    kind: "userTask",
+    role: "activity",
+    check: (c) => first(assignee(c), form(c), string(c, "dueIn", ISO_DURATION, false), string(c, "saveTo", FIELD_NAME, false)),
+    config: object({ assignee: object({ role: text, user: text }), form: fields, dueIn: duration, saveTo }, ["assignee"]),
+  },
+  {
+    kind: "serviceTask",
+    role: "activity",
+    check: (c) => first(string(c, "tool", DOTTED_KEY), inputMapping(c), string(c, "saveTo", FIELD_NAME, false), retry(c), string(c, "timeout", ISO_DURATION, false), onError(c)),
+    config: object({
+      tool: text,
+      input: { type: "object", description: "Parameter → a literal, a path string or an expression" },
+      saveTo,
+      timeout: duration,
+      retry: object({ maxAttempts: { type: "integer", minimum: 1, maximum: 10 }, backoff: duration, growth: { enum: ["fixed", "exponential"] }, factor: { type: "number", minimum: 1, maximum: 100 } }, ["maxAttempts"]),
+      onError: { enum: ["fail", "skip"] },
+    }, ["tool"]),
+  },
+  {
+    kind: "assign",
+    role: "activity",
+    check: assignments,
+    config: object({ assignments: { type: "array", minItems: 1, items: object({ var: { type: "string", pattern: FIELD_NAME.source }, value: expression }, ["var", "value"]) } }, ["assignments"]),
+  },
+  { kind: "timerCatch", role: "activity", check: timer, config: object(timerConfig) },
+  {
+    kind: "eventWait",
+    role: "activity",
+    check: (c) => first(string(c, "event", DOTTED_KEY), string(c, "correlation", DATA_PATH, false), string(c, "saveTo", FIELD_NAME, false)),
+    config: object({ event: text, correlation: dataPath, saveTo }, ["event"]),
+  },
+  { kind: "exclusiveGateway", role: "gateway", check: none, config: object({}) },
+  { kind: "parallelGateway", role: "gateway", check: none, config: object({}) },
+  { kind: "boundaryError", role: "boundary", check: (c) => string(c, "errorCode", /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/, false), config: object({ errorCode: text }) },
+  { kind: "boundaryTimer", role: "boundary", check: (c) => first(timer(c), boolean(c, "interrupting")), config: object({ ...timerConfig, interrupting: flag }) },
+  {
+    kind: "boundaryEvent",
+    role: "boundary",
+    check: (c) => first(string(c, "event", DOTTED_KEY), string(c, "correlation", DATA_PATH, false), boolean(c, "interrupting")),
+    config: object({ event: text, correlation: dataPath, interrupting: flag }, ["event"]),
+  },
+  { kind: "end", role: "end", check: none, config: object({}) },
 ] satisfies NodeKindDefinition[]);
 
 const BY_KIND = new Map(NODE_KINDS.map((definition) => [definition.kind, definition]));

@@ -19,7 +19,7 @@ export const RUNTIME_ENTITIES = [WfInstance, WfToken, WfJob, WfSubscription, WfH
 /** The tables of the Runtime part: bazis creates and checks them in the application database. */
 export const runtimeStore = defineOrmOwnedStoreV1({
   contract: "bazis.orm-owned-store/v1",
-  storeKey: "bazis.workflow.runtime",
+  storeKey: "bazis.workflow.runtime.v2",
   formatVersion: 1,
-  ownedScope: { schema: "public", tablePrefix: "bazis_wf_run_" },
+  ownedScope: { schema: "public", tablePrefix: "bazis_wf2_run_" },
 });

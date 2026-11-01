@@ -49,6 +49,9 @@ test.skipIf(!enabled)("a small order is approved without a manager", async () =>
     const id = await place(100);
     await wf.drain();
     expect(await status(id)).toBe("approved");
+    const instance = await wf.instance(await instanceOf(wf, id));
+    expect(instance.output).toEqual({ decision: "approved" });
+    expect((await wf.history(instance.id)).find((entry) => entry.nodeId === "Classify" && entry.type === "assigned")?.data).toEqual({ values: { needsReview: false } });
   });
 });
 
@@ -73,5 +76,6 @@ test.skipIf(!enabled)("a big order nobody looked at for two days is rejected", a
     await wf.drain();
     await wf.advance("P2D");
     expect(await status(id)).toBe("rejected");
+    expect((await wf.instance(await instanceOf(wf, id))).output).toEqual({ decision: "rejected" });
   });
 });

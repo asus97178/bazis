@@ -695,6 +695,9 @@ function applyValidatorOptions(schema: OpenApiCodegenSchema, options: Record<str
   if (typeof options.refScope === "string") {
     out["x-ref-scope"] = options.refScope;
   }
+  if (options.personal === true) {
+    out["x-personal"] = true;
+  }
   return out;
 }
 
