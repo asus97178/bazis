@@ -4,6 +4,70 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.129.0 — 2026-11-01
+
+Access as a layer of the framework (stage 1 of ACCESS-001); module providers in
+the agreed forms only; HTTP and gRPC clients declared like controllers. Breaking:
+see [Upgrading](docs/guide/reference/upgrading.md#01290).
+
+### Added
+
+- `bazis/core/access`, `AccessModule`: a module declares what can be allowed with
+  `@Module({ permissions: definePermissions({...}) })` — key, title, where the
+  object's partition comes from (`"none"`, `"request"`, `{ column }`, `{ lookup }`),
+  attributes for conditions (`ref` or `type`, `column` or `lookup`), `owner`,
+  `fields`. Declaration errors stop the build (`AccessSetupError`).
+- `AccessPolicy`: the application's rights system answers with grants — partitions
+  and a condition tree (`all`, `any`, `not`, `own`, `eq`, `in`, `notIn`, `isNull`),
+  optional field lists. The framework applies them: `can(permission, objectOf?)`
+  for routes, `IAccess.for(ctx)` / `IAccess.as(subject, scope)` → `can`, `filter`,
+  `fields`; `grantsToWhere(filter)` turns a list filter into an ORM predicate. A
+  check and a filter follow SQL's three-valued logic; a grant the permission
+  cannot use is dropped with a warning and never widens access.
+- The default rights system `RolesAccessPolicy`: roles from the token claim
+  (`access.roleClaim`), permissions of the roles from
+  `@Module({ roles: defineRoles({...}) })` (`"<permission>:own"`). The
+  application replaces it by registering its own `AccessPolicy`.
+- `@Module({ references })` with `References` (`exists`, `describe`, `search`);
+  `GET /access/catalog` and `GET /access/references/:kind` for the
+  administrator's screens (permission `access.catalog.read`).
+- `bazis/core/access/testing`: `StaticAccessPolicy`.
+- `@GrpcClient(service, { config, ...options })` on a `GrpcClientBase` subclass and
+  the module field `grpcClients`; `@HttpClient({ config, ...defaults })` on an
+  `HttpClientBase` subclass and the module field `httpClients`. The address (base
+  URL) and timeout come from the client's config, which the module declares
+  itself; services take the client by its class.
+- Codegen check `BAZIS_DI_PROVIDER_FORM`: `providers` of a module take only
+  `scoped/singleton/transient(IService, Service)` (or the class alone),
+  `singletonValue(TOKEN, value)`, `singletonAsyncFactory(TOKEN, [deps], async factory)`
+  and `...withEventSubscribers(Class)`; `controllers`, `background`, `gateways`,
+  `grpcControllers`, `tools`, `grpcClients` and `httpClients` list classes.
+- Framework packs carry their own DI wiring (`<pack>/generated/deps.ts`, listed in
+  `framework.packs` of the framework's codegen config), so `AccessModule` and
+  `WorkflowModule` register their services like an application does.
+
+### Changed (breaking)
+
+- A dependency list, a synchronous factory (`singletonFactory`,
+  `DI.factoryProvider`, `…WithResolver`), `DI.classProvider` / `DI.valueProvider`,
+  keyed registrations (`DI.keyedSingleton` with `keyedDependency`) and
+  `DI.bindDeps(...)` in a module stop codegen. A computed service is a class
+  with a constructor; several implementations of one contract get a contract
+  each; a ready value is `singletonValue`. Test `overrides` are not checked.
+- `grpcClientProvider` is removed; the client class `GrpcClient` is renamed to
+  `GrpcClientBase`, and `GrpcClient` is the decorator.
+- `httpClientModule` is removed; the client class `HttpClient` of
+  `bazis/library/http-client` is renamed to `HttpClientBase`, and `HttpClient` of
+  `bazis/core/http-client` is the decorator. `HttpClientFactory` is no longer
+  registered in DI.
+- `IWorkflowDefinitions.publishCode(entries)`: an own implementation of the
+  catalog publishes the processes declared in code with it.
+- `WorkflowInputValidator` is registered by the workflow module
+  (`DefaultWorkflowInputValidator`); the application's own registration, in any
+  of its modules, replaces it.
+- DI and codegen error hints no longer suggest dependency lists or factories; the
+  encapsulation error suggests a contract per implementation instead of keys.
+
 ## 0.128.0 — 2026-10-31
 
 Business processes, stage 5 of WORKFLOW-001: processes in code, tests of
