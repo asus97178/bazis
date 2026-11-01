@@ -50,7 +50,6 @@ export { workflowRuntimeConfig } from "./runtime_module/config/Runtime.config";
 export type { HistoryType } from "./runtime_module/model/WfHistory.model";
 export type { InstanceStatus, StartedVia } from "./runtime_module/model/WfInstance.model";
 export type { TokenStatus } from "./runtime_module/model/WfToken.model";
-export { WorkflowAccess, DenyWorkflowAccess, type WorkflowAccessTarget, type WorkflowAction } from "./access/WorkflowAccess";
 export { WorkflowInputValidator, DefaultWorkflowInputValidator, type WorkflowInputContext } from "./contracts/WorkflowInputValidator";
 export { WorkflowError, type WorkflowErrorCode } from "./contracts/WorkflowError";
 export type { WorkflowActor, WorkflowPage, WorkflowPaging } from "./contracts/types";

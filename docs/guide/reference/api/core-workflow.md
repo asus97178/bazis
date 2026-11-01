@@ -25,12 +25,16 @@
 | `workflowRuntimeConfig` | Настройки `workflow.worker.*` и `workflow.retention.*` | [Несколько экземпляров](../../workflow/processes.md#несколько-экземпляров-приложения) |
 | `WorkflowError` | Ошибка с `code` и HTTP-статусом | [Из кода](../../workflow/processes.md#из-кода) |
 
+## Права
+
+Права `workflow.*` и вид ссылки `workflow.process` объявляет сам модуль, а
+система прав — общая: `AccessPolicy` из [`bazis/core/access`](core-access.md).
+Подробно — [Права](../../workflow/processes.md#права).
+
 ## Точки расширения
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `WorkflowAccess` | Порт прав HTTP: `actor`, `can`, `assignees` | [Права](../../workflow/processes.md#права-workflowaccess) |
-| `DenyWorkflowAccess` | Реализация «всё запрещено» | — |
 | `WorkflowInputValidator`, `DefaultWorkflowInputValidator` | Проверка входа процесса и форм задач; встроенная — по полям документа | — |
 
 ## События
@@ -52,5 +56,5 @@
 - **События:** `WorkflowTaskRequested`, `WorkflowTokenClosed`,
   `WorkflowInstanceFinished`, `WorkflowInstancesDeleted`.
 - **Прочее:** `WorkflowActor`, `WorkflowPage`, `WorkflowPaging`,
-  `WorkflowAction`, `WorkflowAccessTarget`, `WorkflowInputContext`,
+  `WorkflowInputContext`,
   `WorkflowErrorCode`.

@@ -53,13 +53,17 @@ try {
 
 run("package", [bun, "run", "scripts/package-check.ts"]);
 
-// examples/todo as a user would build it (its e2e test needs BAZIS_DB__HOST, else it is skipped).
-const example = join(root, "examples/todo");
-const exampleEnv = { ...process.env, BAZIS_BUN_BIN: bun };
-const exampleCli = join(example, "node_modules/bazis/cli/main.ts");
-run("example install", [bun, "install", "--frozen-lockfile"], example, exampleEnv);
-run("example build", [bun, exampleCli, "build", "--bin"], example, exampleEnv);
-run("example test", [bun, exampleCli, "test"], example, exampleEnv);
+// The examples as a user would build them. Their tests need PostgreSQL, else they
+// are skipped: CI gives one through BAZIS_EXAMPLES_DB_HOST (database bazis_examples).
+const examplesDb = process.env.BAZIS_EXAMPLES_DB_HOST;
+for (const name of ["todo", "workflow"]) {
+  const example = join(root, "examples", name);
+  const exampleEnv = { ...process.env, BAZIS_BUN_BIN: bun, ...(examplesDb === undefined ? {} : { BAZIS_DB__HOST: examplesDb, BAZIS_DB__DATABASE: "bazis_examples" }) };
+  const exampleCli = join(example, "node_modules/bazis/cli/main.ts");
+  run(`${name} install`, [bun, "install", "--frozen-lockfile"], example, exampleEnv);
+  run(`${name} build`, [bun, exampleCli, "build", "--bin"], example, exampleEnv);
+  run(`${name} test`, [bun, exampleCli, "test"], example, exampleEnv);
+}
 
 if (live !== undefined) run("live PostgreSQL", ["python3", "ops/live-postgres/runner.py", resolve(live)]);
 

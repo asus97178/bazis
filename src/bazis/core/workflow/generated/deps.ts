@@ -5,6 +5,7 @@ import { DbContextOptions } from "../../../library/orm/DbContextOptions";
 import { ServiceProvider } from "../../di/ServiceProvider";
 import { EventBus } from "../../kernel/events/EventBus";
 import { WorkflowClock } from "../contracts/WorkflowClock";
+import { ProcessReferences } from "../definitions_module/access/Process.references";
 import { CodeProcessCatalog } from "../definitions_module/code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "../definitions_module/code/CodeProcessPublisher";
 import { ProcessesController } from "../definitions_module/http/Processes.controller";
@@ -37,6 +38,7 @@ registerFrameworkClassDeps([
   [EventsController, [IWorkflowRuntime]],
   [InstancesController, [IWorkflowRuntime]],
   [ProcessesController, [IWorkflowDefinitions]],
+  [ProcessReferences, [DefinitionsDbContext]],
   [RuntimeDbContext, [DbContextOptions]],
   [Schedules, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions]],
   [TaskEvents, [TasksDbContext]],

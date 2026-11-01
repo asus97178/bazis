@@ -1,6 +1,9 @@
+import { AccessModule } from "../../access";
 import { HOSTED_SERVICE, Module, scoped, singleton } from "../../di";
 import { SystemWorkflowClock, WorkflowClock } from "../contracts/WorkflowClock";
 import { WorkflowTools } from "../internal/WorkflowTools";
+import { definitionsPermissions } from "./access/Definitions.permissions";
+import { ProcessReferences } from "./access/Process.references";
 import { CodeProcessCatalog } from "./code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "./code/CodeProcessPublisher";
 import { ProcessesController } from "./http/Processes.controller";
@@ -15,12 +18,16 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
  * declared in code ([passport](MODULE.md)).
  */
 @Module({
+  imports: [AccessModule],
+  permissions: definitionsPermissions,
+  references: { "workflow.process": ProcessReferences },
   ormBazis: { context: DefinitionsDbContext, entities: [WfProcess, WfVersion], ownedStore: definitionsStore, registerRepositories: false },
   providers: [
     singleton(WorkflowClock, SystemWorkflowClock),
     singleton(WorkflowTools),
     singleton(CodeProcessCatalog),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
+    scoped(ProcessReferences),
     singleton(HOSTED_SERVICE, CodeProcessPublisher),
   ],
   controllers: [ProcessesController],

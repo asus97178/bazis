@@ -1,24 +1,21 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 
 setDefaultTimeout(30_000);
-import { DI, Module } from "@/core/di";
+import { AccessPolicy, type AccessSubject, type Grants, type Scope, type ScopePrincipals } from "@/core/access";
+import { DI, Module, singleton } from "@/core/di";
 import { Infra } from "@/core/infra";
 import { defineConfig, eventsModule, OnEvent, secret } from "@/core/kernel";
 import { ormBazisConnect } from "@/core/orm";
 import { startTestApp, type TestApp } from "@/core/testing";
 import { Tool, ToolError, TOOL_EXECUTION_OPTIONS, type AgentToolApprovalRequest, type AgentToolExecutionContext } from "@/core/agent";
-import type { HttpContext } from "@/core/http";
+import type { AuthorizeContext } from "@/core/http";
 import { postgres } from "@/library/orm";
 import {
   IWorkflowRuntime,
   WORKFLOW_INSTANCE_FINISHED,
   WORKFLOW_TASK_REQUESTED,
   WORKFLOW_TOKEN_CLOSED,
-  WorkflowAccess,
   WorkflowModule,
-  type WorkflowAccessTarget,
-  type WorkflowAction,
-  type WorkflowActor,
   type WorkflowInstanceFinished,
   type WorkflowTaskRequested,
   type WorkflowTokenClosed,
@@ -106,21 +103,30 @@ class AgentOnlyTool {
 }
 
 /** Identity from `x-user`, everything allowed except with `x-deny`. */
-class HeaderAccess extends WorkflowAccess {
-  static asked: { action: WorkflowAction; target: WorkflowAccessTarget }[] = [];
+interface HeaderSubject extends AccessSubject {
+  readonly id: string;
+  readonly denied: boolean;
+  readonly roles: readonly string[];
+}
 
-  actor(ctx: HttpContext): WorkflowActor | undefined {
+class HeaderPolicy extends AccessPolicy {
+  subject(ctx: AuthorizeContext): HeaderSubject | undefined {
     const user = ctx.header("x-user");
-    return user === undefined ? undefined : { kind: "user", id: user };
+    if (user === undefined) return undefined;
+    return { sub: `user:${user}`, id: user, denied: ctx.header("x-deny") !== undefined, roles: (ctx.header("x-roles") ?? "").split(",").filter(Boolean) };
   }
 
-  can(ctx: HttpContext, action: WorkflowAction, target: WorkflowAccessTarget): boolean {
-    HeaderAccess.asked.push({ action, target });
-    return ctx.header("x-deny") === undefined;
+  grants(subject: AccessSubject): Grants {
+    return (subject as HeaderSubject).denied ? [] : "all";
   }
 
-  override assignees(ctx: HttpContext, actor: WorkflowActor): readonly string[] {
-    return [`user:${actor.id}`, ...(ctx.header("x-roles") ?? "").split(",").filter(Boolean).map((role) => `role:${role}`)];
+  ownerIds(subject: AccessSubject): readonly string[] {
+    return [(subject as HeaderSubject).id];
+  }
+
+  async principals(subject: AccessSubject, scopes: readonly Scope[]): Promise<readonly ScopePrincipals[]> {
+    const { id, roles } = subject as HeaderSubject;
+    return scopes.map((scope) => ({ scope, principals: [`user:${id}`, ...roles.map((role) => `role:${role}`)] }));
   }
 }
 
@@ -151,7 +157,7 @@ function root(dsn: string) {
   @Module({
     imports: [TestInfra, WorkflowModule, ToolsModule, eventsModule({ subscribers: [Inbox] })],
     providers: [
-      DI.singleton(DI.classProvider(WorkflowAccess, HeaderAccess, [])),
+      singleton(AccessPolicy, HeaderPolicy),
       DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
         auditSink: () => undefined,
         approvalPolicy: (request: AgentToolApprovalRequest) => {
@@ -276,11 +282,9 @@ test.skipIf(!enabled)("a paid order runs the Tools on behalf of the starter and 
   expect(invalid.status).toBe(422);
   expect(invalid.body.details.issues).toEqual([expect.objectContaining({ field: "amount", code: "type" })]);
 
-  HeaderAccess.asked = [];
   calls.length = 0;
   const started = await call("POST", "/workflow/instances", { processKey: "order", input: { amount: 150 }, partition: "space-1", businessKey: "order:1" }, as("u-7"));
   expect(started.status).toBe(201);
-  expect(HeaderAccess.asked[0]).toEqual({ action: "instances.start", target: { processKey: "order", partition: "space-1" } });
   const done = await settled(started.body.id);
   expect(done.status).toBe("completed");
   expect(done.vars.payment).toEqual({ status: "paid", paymentId: "p-150" });

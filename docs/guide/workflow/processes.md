@@ -9,20 +9,21 @@
 базе, фоновый воркер, события и HTTP. Интерфейса нет: дизайнер процессов,
 входящие задачи и формы строит приложение поверх сервисов и HTTP модуля.
 
-Все примеры проверены на bazis 0.124.0–0.128.0 с PostgreSQL 17 в приложении
-«Заказы» из этой главы.
+Все примеры проверены на bazis 0.124.0–0.130.0 с PostgreSQL 17 в приложении
+«Заказы» из этой главы. Готовое приложение — в
+[examples/workflow](https://github.com/asus97178/bazis/tree/main/examples/workflow).
 
 ## Подключение
 
 ```ts
-import { Module, singleton, singletonValue } from "bazis/core/di";
+import { Module, singletonValue } from "bazis/core/di";
 import { TOOL_EXECUTION_OPTIONS } from "bazis/core/agent";
-import { WorkflowAccess, WorkflowModule } from "bazis/core/workflow";
+import { WorkflowModule } from "bazis/core/workflow";
 
 @Module({
   imports: [AppInfra, WorkflowModule, PaymentsModule],
+  roles: appRoles,
   providers: [
-    singleton(WorkflowAccess, AppWorkflowAccess),
     singletonValue(TOOL_EXECUTION_OPTIONS, {
       auditSink: (entry) => console.log(`audit ${entry.phase} ${entry.tool?.name} caller=${entry.caller} actor=${entry.actor?.id}`),
       // Опубликованный процесс и есть одобрение его шагов.
@@ -37,9 +38,8 @@ export class AppModule {}
   следующем: это [owned stores](../database/owned-stores.md) с префиксами
   `bazis_wf_def_`, `bazis_wf_run_` и `bazis_wf_task_`. Нужно только подключение к PostgreSQL
   в `@Infra` (`ormBazisConnect`), миграции не нужны.
-- **`WorkflowAccess`** говорит HTTP модуля, кто делает запрос и что ему
-  можно ([Права](#права-workflowaccess)). Без него все маршруты
-  `/workflow/...` отвечают 403.
+- **`roles`** говорит, кому что можно ([Права](#права)). Без ролей все
+  маршруты `/workflow/...` отвечают 403, а без проверки входа — 401.
 - **`TOOL_EXECUTION_OPTIONS`** — те же настройки, что у агентов: журнал
   вызовов и политика подтверждения. Без журнала инструмент с записью не
   выполнится (`TOOL_AUDIT_REQUIRED`), без политики — тоже
@@ -202,8 +202,8 @@ POST /workflow/instances
 ```
 
 - `partition` — область приложения: магазин, пространство, организация.
-  Модуль её не толкует, только хранит и фильтрует по ней, а `WorkflowAccess`
-  получает её для проверки прав.
+  Модуль её не толкует, только хранит и фильтрует по ней, а права можно
+  выдавать по ней ([Права](#права)).
 - `businessKey` — свой ключ того, о чём экземпляр: по нему ищут экземпляры
   заказа.
 - Вход проверяется по полям документа:
@@ -275,8 +275,8 @@ audit result payments.charge caller=workflow actor=anna
 Заказ на 5000 не прошёл оплату, процесс ушёл в «Позвонить клиенту» и ждёт.
 Задача сама появляется во входящих тех, кому она адресована: узел
 `"assignee": { "role": "support" }` даёт задачу с `assignee` `role:support`.
-Кто входит в роль, решает приложение: `WorkflowAccess.assignees` перечисляет,
-кому адресованы задачи текущего пользователя ([Права](#права-workflowaccess)).
+Кто входит в роль, решает система прав приложения: `AccessPolicy.principals`
+перечисляет адресатов пользователя в разделе задачи ([Права](#права)).
 
 ```text
 GET /workflow/tasks                    (Bearer t-oleg, роль support)
@@ -298,7 +298,7 @@ POST /workflow/tasks/01a18fa9-83e0-…/complete  {"output":{"comment":"Клие�
 
 - **Кто видит задачу:** тот, кому она адресована, и тот, кто её взял.
   Чужая задача отвечает 404, как будто её нет. Все маршруты требуют
-  `tasks.work`.
+  `workflow.tasks.work`.
 - **Взять** (`claim`) — необязательно: пока задача открыта, её может
   завершить любой из адресатов. Взятую другим завершить нельзя — `409`;
   взявший может её отпустить (`release`).
@@ -493,7 +493,7 @@ POST /workflow/events/payments.received  {"payload":{"amount":1},"correlation":"
 - `boundaryEvent` работает как [граничный таймер](#таймеры): по умолчанию
   прерывает шаг, с `"interrupting": false` запускает ветвь рядом.
 - `partition` в запросе ограничивает ожидания своей областью.
-- Право — `events.emit` в `WorkflowAccess`; без него `403`.
+- Право — `workflow.events.emit`; без него `403`.
 
 Из кода — тот же вызов. Удобно связать событие приложения с процессами:
 
@@ -576,59 +576,76 @@ instance 01a18f26-283b-77e3-85a2-642845bb66ac cancelled
 Отменить можно работающий или упавший экземпляр; завершённый — `409`
 `wrong_status`.
 
-## Права: `WorkflowAccess`
+## Права
 
-HTTP модуля не знает, как приложение узнаёт пользователя. Он спрашивает
-порт `WorkflowAccess`, который реализует приложение:
+Отдельного порта прав у процессов нет. Модуль объявляет права `workflow.*` в
+общем [каталоге](../security/access.md), а что дано человеку, говорит система
+прав приложения. Без своей системы работают роли из токена:
 
 ```ts
-import type { HttpContext } from "bazis/core/http";
-import { WorkflowAccess, type WorkflowAccessTarget, type WorkflowAction, type WorkflowActor } from "bazis/core/workflow";
+import { defineRoles } from "bazis/core/access";
 
-export class AppWorkflowAccess extends WorkflowAccess {
-  actor(ctx: HttpContext): WorkflowActor | undefined {
-    const user = userOf(ctx);                         // ваша проверка входа, например JWT
-    return user && { kind: "user", id: user.id };
-  }
+export const appRoles = defineRoles({
+  admin: "all",
+  manager: ["workflow.processes.read", "workflow.instances.read", "workflow.instances.manage", "workflow.tasks.work"],
+  customer: ["workflow.instances.start", "workflow.instances.read:own"],
+});
+```
 
-  can(ctx: HttpContext, action: WorkflowAction, target: WorkflowAccessTarget): boolean {
-    const roles = userOf(ctx)?.roles ?? [];
-    if (roles.includes("manager")) return true;
-    return action === "instances.read" || action === "tasks.work";
-  }
+Проверка входа кладёт принципала, а права проверяет уже сам модуль:
 
-  override assignees(ctx: HttpContext, actor: WorkflowActor): readonly string[] {
-    return [`user:${actor.id}`, ...(userOf(ctx)?.roles ?? []).map((role) => `role:${role}`)];
-  }
-}
+```ts
+import { bearerToken, PRINCIPAL_STATE_KEY, type AuthorizeCheck } from "bazis/core/http";
+
+export const signedIn: AuthorizeCheck = async (ctx) => {
+  const { payload } = await ctx.services.resolve(AuthTokens).issuer.verifyAccess(bearerToken(ctx) ?? "");
+  ctx.state.set(PRINCIPAL_STATE_KEY, {
+    subject: String(payload.sub),
+    // роли — из claim `role`, через пробел или запятую
+    findFirst: (claim: string) => (typeof payload[claim] === "string" ? payload[claim] : undefined),
+  });
+  return true;
+};
+
+await runApp(AppModule, { infra: AppInfra, http: { port: 3000, authorize: signedIn } });
 ```
 
 ```text
-GET /workflow/processes                                 (без токена)  → 401
-POST /workflow/processes            (Bearer t-oleg, роль support)    → 403 {"error":"Forbidden"}
-POST /workflow/instances/…/cancel   (Bearer t-oleg)                  → 403 {"error":"Forbidden"}
+GET /workflow/processes                                  (без токена)     → 401
+POST /workflow/processes              (Bearer, роль customer)             → 403 {"error":"Forbidden"}
+GET /workflow/instances/<чужой>       (Bearer, роль customer)             → 403
+GET /workflow/instances               (Bearer, роль customer)             → только свои
 ```
 
-| Действие | Где |
-| --- | --- |
-| `processes.read` | список и карточка процесса, версии, `/workflow/tools` |
-| `processes.manage` | создание, изменение, черновик |
-| `processes.publish` | публикация |
-| `instances.start` | запуск |
-| `instances.read` | список экземпляров, карточка, история |
-| `instances.manage` | отмена, повтор |
-| `events.emit` | `POST /workflow/events/:eventKey` |
-| `tasks.work` | входящие задачи `/workflow/tasks` |
+| Право | Где | Раздел | Условия |
+| --- | --- | --- | --- |
+| `workflow.processes.read` | список и карточка процесса, версии, `/workflow/tools` | нет | `process` |
+| `workflow.processes.manage` | создание, изменение, черновик | нет | `process` |
+| `workflow.processes.publish` | публикация | нет | `process` |
+| `workflow.instances.start` | запуск | из запроса | `process` |
+| `workflow.instances.read` | список экземпляров, карточка, история | экземпляра | `process`, `own` |
+| `workflow.instances.manage` | отмена, повтор | экземпляра | `process` |
+| `workflow.events.emit` | `POST /workflow/events/:eventKey` | из запроса | `event` |
+| `workflow.tasks.work` | входящие задачи `/workflow/tasks` | задачи | `process` |
 
-Регистрируется как любая реализация контракта —
-`singleton(WorkflowAccess, AppWorkflowAccess)` в модуле приложения
-([Подключение](#подключение)); без регистрации каждый маршрут отвечает `403`.
+- Раздел — это `partition`. Гранты своей системы прав могут ограничить
+  человека магазином и процессом:
+  `{ scopes: ["shop-1"], where: { process: { in: ["order"] } } }`. Списки
+  экземпляров и задач фильтруются по таким грантам сразу по всем разделам.
+- `{ own: true }` (в ролях — `:own`) у экземпляров значит «запущенные мной»: в
+  `startedBy.id` записан первый из `AccessPolicy.ownerIds`.
+- Значения для условий на `process` админка берёт из
+  `GET /access/references/workflow.process`.
+- Адресаты задач считаются при просмотре и по разделам: `AccessPolicy.principals`
+  может сделать человека менеджером только в одном магазине.
+- В фоне права не проверяются: расписания, события и шаги процесса идут от
+  того, кто опубликовал процесс и настроил запуск.
+- Сервисы `IWorkflowDefinitions`, `IWorkflowRuntime` и `IWorkflowTasks` права не
+  спрашивают: их вызывает ваш код, который сам решает, что можно. Их списки
+  принимают готовый фильтр: `runtime.instances({ access: await my.filter("workflow.instances.read") })`.
 
-`target` — то, что известно о цели: `processKey`, `partition`,
-`instanceId`. Для карточки экземпляра это его `partition`, для списка — из
-строки запроса: так приложение ограничивает пользователя его магазином.
-Сервисы `IWorkflowDefinitions` и `IWorkflowRuntime` порт не спрашивают: их
-вызывает ваш код, который сам решает, что можно.
+Своя система прав подключается как в главе [Права модулей](../security/access.md#своя-система-прав):
+`singleton(AccessPolicy, AppAccessPolicy)` в модуле приложения.
 
 ## Из кода
 

@@ -16,7 +16,8 @@ Why composite: the catalog (drafts, immutable versions) and the execution
 (instances, tokens, jobs, history) change for different reasons and have
 separate data; an application may use the catalog alone.
 What is outside: the designer, task inbox and forms UI (the application, for
-example bazis-cms); who may do what (the application's `WorkflowAccess`); the
+example bazis-cms); who may do what (the application's `AccessPolicy`,
+ACCESS-001: the pack only declares permissions); the
 Tools themselves (the modules that own the operations, TOOLS-001).
 
 Priorities: no state in memory (restarts and several application instances
@@ -32,8 +33,7 @@ document functions in `library/workflow`.
 | Runtime | [runtime_module](runtime_module/MODULE.md) | `bazis_wf_run_*`: instances, tokens, jobs, subscriptions, history | Definitions (`IWorkflowDefinitions`), `ToolRunner`, `EventBus` |
 | Tasks | [tasks_module](tasks_module/MODULE.md) | `bazis_wf_task_*`: tasks | Runtime (`IWorkflowRuntime`, its events), Definitions (`WorkflowClock`) |
 
-Shared contracts of the pack (no providers): `access/WorkflowAccess.ts` (HTTP
-rights port, default: closed), `contracts/WorkflowError.ts`,
+Shared contracts of the pack (no providers): `contracts/WorkflowError.ts`,
 `contracts/WorkflowInputValidator.ts` (field check port),
 `contracts/WorkflowClock.ts` (the engine's time; registered by Definitions),
 `contracts/types.ts`; internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
