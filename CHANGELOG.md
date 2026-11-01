@@ -4,6 +4,36 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.131.0 — 2026-11-01
+
+The contract of Tools and of the workflow HTTP API (stage 1 of WORKFLOW-002).
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01310).
+
+### Added
+
+- `context.actor` in a Tool: who runs it, also inside a process step.
+- `@Tool({ dryRun })` and `ToolDryRun`: a Tool declares its dry run support. The
+  default is `unsupported`; dry runs themselves come at stage 5.
+- `@Validator({ ref, refKeys, refScope })` writes `x-ref`, `x-ref-keys` and
+  `x-ref-scope` to the schema. The values are not checked until stage 5.
+- `context.metadata` of a Tool in a process carries `WorkflowToolMetadata`.
+- Audit events with `actor` and `request`: `WORKFLOW_PROCESS_CHANGED`,
+  `WORKFLOW_INSTANCE_STARTED`, `WORKFLOW_INSTANCE_CANCELLED`,
+  `WORKFLOW_INSTANCE_RETRIED`, `WORKFLOW_TASK_COMPLETED`. `examples/workflow`
+  writes them to an audit log.
+- Draft lock: `saveDraft` takes the expected `draftUpdatedAt` and answers with a
+  conflict when the draft has changed since.
+- `sort` in the list methods of the workflow services.
+
+### Changed (breaking)
+
+- Lists of `/workflow/processes`, `/workflow/instances` and `/workflow/tasks`
+  follow JSON:API: `page[size]`, `page[number]`, `filter[...]`, `sort`, with
+  `meta` and `links` in the answer. Old parameters are silently ignored.
+- `FormIssue.code` is a string.
+- `AgentToolContract` and `ToolMetadata` have a required `dryRun`.
+- `saveDraft` returns `{ issues, draftUpdatedAt }`.
+
 ## 0.130.0 — 2026-11-01
 
 Process rights moved to `bazis/core/access` (stage 0 of WORKFLOW-002), and an
