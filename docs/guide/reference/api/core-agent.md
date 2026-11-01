@@ -42,7 +42,7 @@
   `AgentInvocation`, `AgentInvocationOptions`, `AgentUsage`,
   `AgentFinishReason`, `AgentStreamEvent`.
 - **Инструменты:** `ToolOptions`, `ToolActor`, `ToolExecutionOptions`, `ToolRunOptions`, `ToolDefinition`, `ToolMetadata`,
-  `ToolSideEffect`, `ToolApproval`, `AgentExecutableTool`,
+  `ToolSideEffect`, `ToolApproval`, `ToolDryRun`, `AgentExecutableTool`,
   `AgentToolContract`, `AgentToolCall`, `AgentToolResult`,
   `AgentToolResultStatus`, `AgentToolError`, `AgentToolExecutionContext`,
   `AgentToolExecutionOptions`, `AgentToolExecutorOptions`,

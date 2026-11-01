@@ -1,6 +1,6 @@
 # Бизнес-процессы во фреймворке
 
-Идентификатор: **WORKFLOW-001**. Версия: **1.2**. Дата: **2026-11-01**.
+Идентификатор: **WORKFLOW-001**. Версия: **1.3**. Дата: **2026-11-01**.
 Статус: **принята; этапы 1–5 реализованы в bazis 0.124.0–0.128.0**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
@@ -163,11 +163,11 @@ export class AppModule {}
 ### Сервис `IWorkflowDefinitions`
 
 ```ts
-list(query: { archived?: boolean; search?: string; limit?; offset? }): Promise<Page<ProcessSummary>>
+list(query: { access?, archived?: boolean; search?: string; limit?; offset?; sort? }): Promise<Page<ProcessSummary>>
 get(key): Promise<ProcessDetails>                                  // WorkflowError not_found
 create({ key, title, description?, retentionDays? }, actor)        // conflict, если ключ занят
 update(key, { title?, description?, retentionDays?, archived? }, actor)
-saveDraft(key, document, actor): Promise<{ issues: ProcessIssue[] }> // сохраняет и с замечаниями
+saveDraft(key, document, actor, { expected?, request? }): Promise<{ issues: ProcessIssue[]; draftUpdatedAt: Date }> // сохраняет и с замечаниями
 publish(key, actor): Promise<VersionDetails>                       // invalid_document с issues
 version(key, n) / latest(key) / versions(key)
 tools(): readonly WorkflowToolInfo[]                               // каталог Tools для дизайнера
@@ -177,11 +177,11 @@ tools(): readonly WorkflowToolInfo[]                               // катал
 
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
-| `GET /workflow/processes` | `workflow.processes.read` | список |
+| `GET /workflow/processes?filter[archived]&filter[search]&sort&page[size]&page[number]` | `workflow.processes.read` | список JSON:API |
 | `POST /workflow/processes` | `workflow.processes.manage` | 201 / 409 |
 | `GET /workflow/processes/:key` | `workflow.processes.read` | процесс с черновиком |
 | `PATCH /workflow/processes/:key` | `workflow.processes.manage` | 200 |
-| `PUT /workflow/processes/:key/draft` | `workflow.processes.manage` | 200 `{ issues }` |
+| `PUT /workflow/processes/:key/draft` `{ document, expected? }` | `workflow.processes.manage` | 200 `{ issues, draftUpdatedAt }`; `expected` устарел — 409 `conflict` |
 | `POST /workflow/processes/:key/publish` | `workflow.processes.publish` | 201 версия / 422 `invalid_document` |
 | `GET /workflow/processes/:key/versions` | `workflow.processes.read` | список версий |
 | `GET /workflow/processes/:key/versions/:version` | `workflow.processes.read` | версия с документом |
@@ -240,7 +240,7 @@ cancel(instanceId, { reason?, actor })                     // wrong_status, ес
 retry(instanceId, { actor })                               // wrong_status, если не failed
 emit(eventKey, payload, { correlation?, partition? })      // этап 3: старт, продолжение ожидания, граничное событие
 completeToken(tokenId, output, actor)                      // для userTask; проверяет output по форме
-instances(query: { partition?, status?, processKey?, businessKey?, startedById?, limit?, offset? })
+instances(query: { access?, partition?, status?, processKey?, businessKey?, startedById?, limit?, offset?, sort? })
 instance(instanceId): Promise<InstanceDetails>             // с токенами
 history(instanceId): Promise<readonly HistoryEntry[]>
 ```
@@ -257,7 +257,7 @@ history(instanceId): Promise<readonly HistoryEntry[]>
   применяет в транзакции шага; если токен за это время закрыли, результат
   отбрасывается.
 - **`serviceTask`:** `ToolRunner.as("workflow").run(tool, input, { actor,
-  idempotencyKey: tokenId, metadata: { instanceId, partition, processKey, nodeId } })`.
+  idempotencyKey: tokenId, metadata: { instanceId, processKey, nodeId, partition, test } })`; `actor` и `metadata` приходят в `context` Tool.
   `actor` — кто запустил экземпляр (`system` для запусков по событию и
   расписанию). Подтверждение и аудит — по `TOOL_EXECUTION_OPTIONS`, без
   скрытого обхода; ход вызова пишется в историю (`tool`).
@@ -339,6 +339,9 @@ export const workflowRuntimeConfig = defineConfig("workflow", {
 | `WORKFLOW_TASK_REQUESTED` | токен дошёл до `userTask` | `instanceId`, `tokenId`, `processKey`, `nodeId`, `partition`, `title`, `assignee`, `form`, `dueAt` |
 | `WORKFLOW_TOKEN_CLOSED` | ждущий токен закрыт не завершением задачи | `instanceId`, `tokenId`, `reason` (`cancelled`, `interrupted`) |
 | `WORKFLOW_INSTANCE_FINISHED` | экземпляр завершён | `instanceId`, `processKey`, `partition`, `status` |
+| `WORKFLOW_INSTANCE_STARTED` | запуск, для аудита | `instanceId`, `processKey`, `version`, `partition`, `businessKey`, `startedVia`, `actor`, `request` |
+| `WORKFLOW_INSTANCE_CANCELLED` | отмена, для аудита | `instanceId`, `processKey`, `partition`, `reason`, `actor`, `request` |
+| `WORKFLOW_INSTANCE_RETRIED` | повтор, для аудита | `instanceId`, `processKey`, `partition`, `actor`, `request` |
 
 События публикуются в транзакции шага (`afterCommit`).
 
@@ -347,7 +350,7 @@ export const workflowRuntimeConfig = defineConfig("workflow", {
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
 | `POST /workflow/instances` | `workflow.instances.start` | 201 экземпляр / 404 / 422 `invalid_input` |
-| `GET /workflow/instances` | `workflow.instances.read` | список с фильтрами |
+| `GET /workflow/instances?filter[partition\|status\|processKey\|businessKey\|startedById]&sort&page[size]&page[number]` | `workflow.instances.read` | список JSON:API |
 | `GET /workflow/instances/:id` | `workflow.instances.read` | экземпляр с токенами |
 | `GET /workflow/instances/:id/history` | `workflow.instances.read` | история |
 | `POST /workflow/instances/:id/cancel` | `workflow.instances.manage` | 200 / 409 `wrong_status` |
@@ -368,7 +371,7 @@ FK), `instanceId`, `processKey`, `nodeId`, `partition`, `title`, `assignee`
 ### Сервис `IWorkflowTasks`
 
 ```ts
-list({ assignees: string[], actor?, status?, partition?, processKey?, limit?, offset? })  // + взятые actor
+list({ addressees: ScopePrincipals[], actor?, access?, status?, partition?, processKey?, limit?, offset?, sort? })  // + взятые actor
 get(taskId)
 claim(taskId, actor)        // conflict, если взята другим
 release(taskId, actor)
@@ -389,7 +392,7 @@ complete(taskId, output, actor)  // invalid_input по форме; вызыва�
 
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
-| `GET /workflow/tasks?status&partition&processKey` | `workflow.tasks.work` | задачи адресатов субъекта и взятые вызывающим; по умолчанию `open` и `claimed` |
+| `GET /workflow/tasks?filter[status]&filter[partition]&filter[processKey]` | `workflow.tasks.work` | задачи адресатов субъекта и взятые вызывающим; по умолчанию `open` и `claimed` |
 | `GET /workflow/tasks/:id` | `workflow.tasks.work` | задача с формой |
 | `POST /workflow/tasks/:id/claim` | `workflow.tasks.work` | 200 / 409 `conflict` (взята другим) |
 | `POST /workflow/tasks/:id/release` | `workflow.tasks.work` | 200 / 409 `wrong_status` |

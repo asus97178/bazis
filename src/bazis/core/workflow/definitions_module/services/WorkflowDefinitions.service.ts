@@ -1,14 +1,16 @@
 import { grantsToWhere } from "../../../access";
 import { createHash } from "node:crypto";
-import { UniqueViolationError } from "../../../orm";
+import { paginate, UniqueViolationError } from "../../../orm";
 import type { AgentToolContract } from "../../../agent";
 import { emptyProcess, hasErrors, validateProcess, type ProcessDocument, type ProcessIssue } from "../../../../library/workflow";
-import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
+import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowAuditOptions, type WorkflowPage } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
+import type { WorkflowEvents } from "../../internal/WorkflowEvents";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { CodeProcessCatalog } from "../code/CodeProcessCatalog";
 import type { OwnedCodeProcess } from "../code/codeProcesses";
+import { WORKFLOW_PROCESS_CHANGED, type ProcessChange } from "../events/Definitions.events";
 import type { DefinitionsDbContext } from "../model/Definitions.dbContext";
 import { WfProcess } from "../model/WfProcess.model";
 import { WfVersion } from "../model/WfVersion.model";
@@ -18,6 +20,8 @@ import {
   type ProcessDetails,
   type ProcessListQuery,
   type ProcessSummary,
+  type SavedDraft,
+  type SaveDraftOptions,
   type UpdateProcess,
   type VersionDetails,
   type VersionSummary,
@@ -33,12 +37,12 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     private readonly workflowTools: WorkflowTools,
     private readonly code: CodeProcessCatalog,
     private readonly clock: WorkflowClock,
+    private readonly events: WorkflowEvents,
   ) {
     super();
   }
 
   async list(query: ProcessListQuery = {}): Promise<WorkflowPage<ProcessSummary>> {
-    const { limit, offset } = pagingOf(query);
     const where = query.access === undefined ? "all" : grantsToWhere(query.access);
     if (where === "none") return { items: [], total: 0 };
     let source = this.db.processes.asNoTracking();
@@ -49,16 +53,15 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
       const text = query.search.trim();
       source = source.where((p) => p.key.contains(text, { ignoreCase: true }).or(p.title.contains(text, { ignoreCase: true })));
     }
-    const total = await source.count();
-    const rows = await source.orderBy((p) => p.key).skip(offset).take(limit).toList();
-    return { items: rows.map((row) => this.summaryOf(row)), total };
+    const { items, total } = await paginate(source, pageQueryOf(query, { field: "key", dir: "asc" }));
+    return { items: items.map((row) => this.summaryOf(row)), total };
   }
 
   async get(key: string): Promise<ProcessDetails> {
     return this.detailsOf(await this.process(key, false));
   }
 
-  async create(process: CreateProcess, actor: WorkflowActor): Promise<ProcessDetails> {
+  async create(process: CreateProcess, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<ProcessDetails> {
     if (typeof process.key !== "string" || !KEY.test(process.key)) throw new WorkflowError("invalid_input", "key must match ^[a-z][a-z0-9_.-]{0,63}$");
     const row = Object.assign(new WfProcess(), {
       key: process.key,
@@ -77,43 +80,57 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
       if (error instanceof UniqueViolationError) throw new WorkflowError("conflict", `Process ${process.key} already exists`);
       throw error;
     }
+    await this.changed("created", row.key, actor, options);
     return this.detailsOf(row);
   }
 
-  async update(key: string, changes: UpdateProcess, _actor: WorkflowActor): Promise<ProcessDetails> {
+  async update(key: string, changes: UpdateProcess, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<ProcessDetails> {
     const row = await this.process(key, true);
     const { archived, ...fields } = changes;
     if (Object.values(fields).some((value) => value !== undefined)) this.assertNotCode(key);
+    const before = { title: row.title, description: row.description, retentionDays: row.retentionDays, archived: row.archivedAt !== null };
     if (changes.title !== undefined) row.title = title(changes.title);
     if (changes.description !== undefined) row.description = description(changes.description);
     if (changes.retentionDays !== undefined) row.retentionDays = retention(changes.retentionDays);
     if (archived !== undefined) row.archivedAt = archived ? row.archivedAt ?? this.clock.now() : null;
     await this.db.saveChanges();
+    if (row.title !== before.title || row.description !== before.description || row.retentionDays !== before.retentionDays) await this.changed("updated", key, actor, options);
+    if (archived !== undefined && archived !== before.archived) await this.changed(archived ? "archived" : "restored", key, actor, options);
     return this.detailsOf(row);
   }
 
-  async saveDraft(key: string, document: unknown, actor: WorkflowActor): Promise<{ readonly issues: readonly ProcessIssue[] }> {
+  async saveDraft(key: string, document: unknown, actor: WorkflowActor, options: SaveDraftOptions = {}): Promise<SavedDraft> {
     const issues = this.validate(document);
     if (issues.some((issue) => issue.code === "too_large")) throw new WorkflowError("invalid_document", "The document is too large", issues);
-    const row = await this.process(key, true);
-    this.assertNotCode(key);
-    row.draft = document;
-    row.draftUpdatedAt = this.clock.now();
-    row.draftUpdatedByKind = actor.kind;
-    row.draftUpdatedById = actor.id;
-    await this.db.saveChanges();
-    return { issues };
+    return await this.db.transactionScope(async (transaction) => {
+      const row = await this.db.processes.where((p) => p.key.eq(key)).forUpdate().firstOrDefault();
+      if (!row) throw notFound(key);
+      this.assertNotCode(key);
+      const previous = row.draftUpdatedAt?.getTime();
+      if (options.expected !== undefined && previous !== options.expected.getTime()) throw new WorkflowError("conflict", `The draft of ${key} was saved by someone else`);
+      // Later than the last save even within a millisecond: `expected` tells any two saves apart.
+      const draftUpdatedAt = new Date(Math.max(this.clock.now().getTime(), (previous ?? 0) + 1));
+      row.draft = document;
+      row.draftUpdatedAt = draftUpdatedAt;
+      row.draftUpdatedByKind = actor.kind;
+      row.draftUpdatedById = actor.id;
+      await this.db.saveChanges();
+      transaction.afterCommit(() => this.changed("draftSaved", key, actor, options));
+      return { issues, draftUpdatedAt };
+    });
   }
 
-  async publish(key: string, actor: WorkflowActor): Promise<VersionDetails> {
-    return await this.db.transactionScope(async () => {
+  async publish(key: string, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<VersionDetails> {
+    return await this.db.transactionScope(async (transaction) => {
       const row = await this.db.processes.where((p) => p.key.eq(key)).forUpdate().firstOrDefault();
       if (!row) throw notFound(key);
       this.assertNotCode(key);
       if (row.archivedAt !== null) throw new WorkflowError("archived", `Process ${key} is archived`);
       const issues = this.validate(row.draft);
       if (hasErrors(issues)) throw new WorkflowError("invalid_document", `Process ${key} has errors and cannot be published`, issues);
-      return (await this.publishDraft(row, actor)).version;
+      const { version, created } = await this.publishDraft(row, actor);
+      if (created) transaction.afterCommit(() => this.changed("published", key, actor, options, version.version));
+      return version;
     });
   }
 
@@ -124,7 +141,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
    * and unpublished. The caller has checked the documents with the Tools.
    */
   async publishCode(entries: readonly OwnedCodeProcess[]): Promise<readonly { readonly key: string; readonly version: number | null; readonly published: boolean }[]> {
-    return await this.db.transactionScope(async () => {
+    return await this.db.transactionScope(async (transaction) => {
       await this.db.database.querySqlRaw("SELECT pg_advisory_xact_lock(hashtext('bazis.workflow.code'))");
       const results: { key: string; version: number | null; published: boolean }[] = [];
       for (const { process } of [...entries].sort((a, b) => a.process.key.localeCompare(b.process.key))) {
@@ -132,6 +149,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
         if (!row) {
           row = Object.assign(new WfProcess(), { key: process.key });
           this.db.processes.add(row);
+          transaction.afterCommit(() => this.changed("created", process.key, CODE_ACTOR));
         }
         const fields = { title: title(process.title), description: description(process.description), retentionDays: retention(process.retentionDays) };
         if (row.title !== fields.title) row.title = fields.title;
@@ -149,6 +167,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
           continue;
         }
         const { version, created } = await this.publishDraft(row, CODE_ACTOR);
+        if (created) transaction.afterCommit(() => this.changed("published", process.key, CODE_ACTOR, {}, version.version));
         results.push({ key: row.key, version: version.version, published: created });
       }
       return results;
@@ -224,6 +243,10 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
 
   tools(): readonly AgentToolContract[] {
     return this.workflowTools.list();
+  }
+
+  private async changed(change: ProcessChange, key: string, actor: WorkflowActor, options: WorkflowAuditOptions = {}, version: number | null = null): Promise<void> {
+    await this.events.publish(WORKFLOW_PROCESS_CHANGED, { change, key, version, actor, request: options.request ?? null });
   }
 
   /** A process declared in code changes only through the code. */

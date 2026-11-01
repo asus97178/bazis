@@ -1,8 +1,11 @@
 import { grantsToWhere, type ScopePrincipals } from "../../../access";
-import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
+import { paginate } from "../../../orm";
+import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowAuditOptions, type WorkflowPage } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
+import type { WorkflowEvents } from "../../internal/WorkflowEvents";
 import type { IWorkflowRuntime } from "../../runtime_module/services/IWorkflowRuntime.service";
+import { WORKFLOW_TASK_COMPLETED } from "../events/Tasks.events";
 import type { TasksDbContext } from "../model/Tasks.dbContext";
 import { WfTask, type TaskStatus } from "../model/WfTask.model";
 import { IWorkflowTasks, type TaskDetails, type TaskListQuery } from "./IWorkflowTasks.service";
@@ -14,12 +17,12 @@ export class WorkflowTasks extends IWorkflowTasks {
     private readonly db: TasksDbContext,
     private readonly runtime: IWorkflowRuntime,
     private readonly clock: WorkflowClock,
+    private readonly events: WorkflowEvents,
   ) {
     super();
   }
 
   async list(query: TaskListQuery): Promise<WorkflowPage<TaskDetails>> {
-    const { limit, offset } = pagingOf(query);
     const statuses = statusesOf(query.status);
     const groups = groupByPrincipals(query.addressees);
     const mine = query.actor?.id;
@@ -38,9 +41,8 @@ export class WorkflowTasks extends IWorkflowTasks {
     });
     if (query.partition !== undefined) source = source.where((t) => t.partition.eq(query.partition!));
     if (query.processKey !== undefined) source = source.where((t) => t.processKey.eq(query.processKey!));
-    const total = await source.count();
-    const rows = await source.orderBy((t) => t.id).skip(offset).take(limit).toList();
-    return { items: rows.map(detailsOf), total };
+    const { items, total } = await paginate(source, pageQueryOf(query, { field: "id", dir: "asc" }));
+    return { items: items.map(detailsOf), total };
   }
 
   async partitions(query: { readonly status?: readonly TaskStatus[] } = {}): Promise<readonly (string | null)[]> {
@@ -79,7 +81,7 @@ export class WorkflowTasks extends IWorkflowTasks {
     });
   }
 
-  async complete(taskId: string, output: unknown, actor: WorkflowActor): Promise<TaskDetails> {
+  async complete(taskId: string, output: unknown, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<TaskDetails> {
     const task = await this.task(taskId, false);
     if (task.status === "claimed" && task.claimedById !== actor.id) throw new WorkflowError("conflict", "The task is taken by someone else");
     if (task.status !== "open" && task.status !== "claimed") throw new WorkflowError("wrong_status", `The task is ${task.status}`);
@@ -98,6 +100,7 @@ export class WorkflowTasks extends IWorkflowTasks {
       completedAt: this.clock.now(),
       output: typeof saved === "object" && saved !== null && !Array.isArray(saved) ? saved as Record<string, unknown> : null,
     });
+    await this.events.publish(WORKFLOW_TASK_COMPLETED, { taskId: task.id, instanceId: task.instanceId, processKey: task.processKey, nodeId: task.nodeId, partition: task.partition, actor, request: options.request ?? null });
     return await this.get(task.id);
   }
 

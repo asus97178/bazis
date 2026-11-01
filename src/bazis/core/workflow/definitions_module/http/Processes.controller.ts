@@ -1,7 +1,8 @@
 import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
 import { can } from "../../../access";
 import { Authorize, Controller, Created, Get, Patch, Post, Put, type HttpContext } from "../../../http";
-import { body, callerOf, optionalInteger, optionalString, pagingQuery, param, requiredString } from "../../internal/http";
+import { buildListDocument } from "../../../../library/jsonapi";
+import { body, callerOf, filterOf, listQuery, optionalInteger, optionalString, pagingOfList, param, requiredString } from "../../internal/http";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import { IWorkflowDefinitions } from "../services/IWorkflowDefinitions.service";
 
@@ -14,10 +15,11 @@ export class ProcessesController {
   @Authorize(can("workflow.processes.read"))
   async list(ctx: HttpContext) {
     const { access } = await callerOf(ctx);
-    const archived = ctx.query("archived");
+    const list = listQuery(ctx, { filter: { archived: ["eq"], search: ["eq"] }, sort: ["key", "title", "createdAt", "updatedAt"] });
+    const archived = filterOf(list, "archived");
     if (archived !== undefined && archived !== "true" && archived !== "false") throw new WorkflowError("invalid_input", "archived must be true or false");
-    const page = await this.definitions.list({ ...pagingQuery(ctx), access: await access.filter("workflow.processes.read"), archived: archived === undefined ? undefined : archived === "true", search: optionalString(ctx.query("search"), "search") });
-    return { data: page.items, meta: { total: page.total } };
+    const page = await this.definitions.list({ ...pagingOfList(list), access: await access.filter("workflow.processes.read"), archived: archived === undefined ? undefined : archived === "true", search: filterOf(list, "search") });
+    return buildListDocument(page.items, list, page.total, { basePath: ctx.path });
   }
 
   @Post("processes")
@@ -25,13 +27,13 @@ export class ProcessesController {
   async create(ctx: HttpContext) {
     const request = await body(ctx);
     const key = requiredString(request.key, "key", 64);
-    const { actor } = await callerOf(ctx, "workflow.processes.manage", { process: key });
+    const { actor, request: from } = await callerOf(ctx, "workflow.processes.manage", { process: key });
     const process = await this.definitions.create({
       key,
       title: requiredString(request.title, "title"),
       description: optionalString(request.description, "description", 2000) ?? null,
       retentionDays: optionalInteger(request.retentionDays, "retentionDays") ?? null,
-    }, actor);
+    }, actor, { request: from });
     return Created(`${ctx.path}/${process.key}`, process);
   }
 
@@ -48,14 +50,14 @@ export class ProcessesController {
   async update(ctx: HttpContext) {
     const key = param(ctx, "key");
     const request = await body(ctx);
-    const { actor } = await callerOf(ctx, "workflow.processes.manage", { process: key });
+    const { actor, request: from } = await callerOf(ctx, "workflow.processes.manage", { process: key });
     if (request.archived !== undefined && typeof request.archived !== "boolean") throw new WorkflowError("invalid_input", "archived must be a boolean");
     return await this.definitions.update(key, {
       ...(request.title === undefined ? {} : { title: requiredString(request.title, "title") }),
       ...(request.description === undefined ? {} : { description: optionalString(request.description, "description", 2000) ?? null }),
       ...(request.retentionDays === undefined ? {} : { retentionDays: optionalInteger(request.retentionDays, "retentionDays") ?? null }),
       ...(request.archived === undefined ? {} : { archived: request.archived as boolean }),
-    }, actor);
+    }, actor, { request: from });
   }
 
   @Put("processes/:key/draft")
@@ -63,16 +65,19 @@ export class ProcessesController {
   async saveDraft(ctx: HttpContext) {
     const key = param(ctx, "key");
     const request = await body(ctx);
-    const { actor } = await callerOf(ctx, "workflow.processes.manage", { process: key });
-    return await this.definitions.saveDraft(key, request.document, actor);
+    const { actor, request: from } = await callerOf(ctx, "workflow.processes.manage", { process: key });
+    const expected = optionalString(request.expected, "expected");
+    const expectedAt = expected === undefined ? undefined : new Date(expected);
+    if (expectedAt !== undefined && Number.isNaN(expectedAt.getTime())) throw new WorkflowError("invalid_input", "expected must be the draftUpdatedAt that was read");
+    return await this.definitions.saveDraft(key, request.document, actor, { request: from, ...(expectedAt === undefined ? {} : { expected: expectedAt }) });
   }
 
   @Post("processes/:key/publish")
   @Authorize(can("workflow.processes.publish"))
   async publish(ctx: HttpContext) {
     const key = param(ctx, "key");
-    const { actor } = await callerOf(ctx, "workflow.processes.publish", { process: key });
-    const version = await this.definitions.publish(key, actor);
+    const { actor, request } = await callerOf(ctx, "workflow.processes.publish", { process: key });
+    const version = await this.definitions.publish(key, actor, { request });
     return Created(`${ctx.path.replace(/\/publish$/, "")}/versions/${version.version}`, version);
   }
 

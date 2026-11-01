@@ -15,11 +15,12 @@ export class EventsController {
     const eventKey = param(ctx, "eventKey");
     const request = await body(ctx);
     const partition = optionalString(request.partition, "partition") ?? null;
-    const { actor } = await callerOf(ctx, "workflow.events.emit", { scope: partition, event: eventKey });
+    const { actor, request: from } = await callerOf(ctx, "workflow.events.emit", { scope: partition, event: eventKey });
     const result = await this.runtime.emit(eventKey, request.payload ?? {}, {
       correlation: optionalString(request.correlation, "correlation") ?? null,
       partition,
       actor,
+      request: from,
     });
     ctx.res.status(202);
     return result;

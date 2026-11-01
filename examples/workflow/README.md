@@ -11,6 +11,7 @@ do what is the data of `defineRoles`.
 | A step: the module's own operation | `modules/order/tools/SetOrderStatus.tool.ts` |
 | What the module lets an administrator allow | `modules/order/access/Order.permissions.ts` |
 | Roles → permissions | `modules/App.module.ts` |
+| The audit log: the framework's events, kept by the application | `modules/audit/events/AuditLog.ts` |
 | Who makes the request (a JWT) | `auth/signedIn.ts` |
 | Tests: the process on a stopped clock, the rights over HTTP | `test/` |
 
@@ -32,6 +33,9 @@ curl -X POST localhost:3000/orders -H "authorization: Bearer $ANN" -H 'content-t
 curl localhost:3000/workflow/tasks -H "authorization: Bearer $MILA"
 curl -X POST localhost:3000/workflow/tasks/<task id>/complete -H "authorization: Bearer $MILA" -H 'content-type: application/json' -d '{"output":{"approved":true}}'
 curl localhost:3000/orders -H "authorization: Bearer $ANN"
+
+ROOT=$(bun run --silent token root admin)
+curl 'localhost:3000/audit?filter[action][startsWith]=task.' -H "authorization: Bearer $ROOT"
 ```
 
 ## Test

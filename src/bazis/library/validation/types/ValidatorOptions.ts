@@ -150,4 +150,14 @@ export interface ValidatorOptions {
    * enums are ignored).
    */
   enumType?: Record<string, string | number>;
+
+  // ── Schema ───────────────────────────────────────────────────────────────
+  // Literals that go to the generated JSON Schema; they check nothing here.
+
+  /** The value is a reference of this kind (`x-ref`): `dm.table`. */
+  ref?: string;
+  /** The keys of the object are references of this kind (`x-ref-keys`): fields of a table. */
+  refKeys?: string;
+  /** JSON Pointer to the sibling input that sets their area (`x-ref-scope`): `/table`. */
+  refScope?: `/${string}`;
 }

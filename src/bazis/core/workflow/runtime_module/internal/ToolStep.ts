@@ -1,5 +1,6 @@
 import type { AgentToolResult } from "../../../agent";
 import { durationMs, resolveInput } from "../../../../library/workflow";
+import type { WorkflowToolMetadata } from "../../contracts/types";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
@@ -36,7 +37,7 @@ export class ToolStep {
       : await runner.run(name, input, {
         idempotencyKey: token.id,
         actor: { kind: instance.startedByKind, id: instance.startedById },
-        metadata: { instanceId: instance.id, partition: instance.partition, processKey: instance.processKey, nodeId: token.nodeId },
+        metadata: { instanceId: instance.id, processKey: instance.processKey, nodeId: token.nodeId, partition: instance.partition, test: false } satisfies WorkflowToolMetadata,
         signal,
       });
 

@@ -1,6 +1,7 @@
 import { grantsToWhere } from "../../../access";
+import { paginate } from "../../../orm";
 import type { FormIssue, FormSpec } from "../../../../library/workflow";
-import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
+import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import type { ServiceProvider } from "../../../di";
 import { WorkflowInputValidator } from "../../contracts/WorkflowInputValidator";
@@ -12,12 +13,14 @@ import type { WfInstance } from "../model/WfInstance.model";
 import type { WfToken } from "../model/WfToken.model";
 import {
   IWorkflowRuntime,
+  type CancelInstance,
   type EmitOptions,
   type EmitResult,
   type HistoryEntry,
   type InstanceDetails,
   type InstanceListQuery,
   type InstanceSummary,
+  type RetryInstance,
   type StartInstance,
 } from "./IWorkflowRuntime.service";
 
@@ -44,29 +47,29 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (!start) throw new WorkflowError("wrong_status", `Process ${processKey} has no manual start`);
     const { value, issues } = await this.validator().validate(version.document.input, options.input, { purpose: "input", processKey, partition });
     if (issues.length > 0) throw new WorkflowError("invalid_input", "The process input is invalid", issues);
-    const id = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor });
+    const id = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor, request: options.request ?? null });
     return await this.instance(id);
   }
 
-  async cancel(instanceId: string, options: { readonly reason?: string | null; readonly actor: WorkflowActor }): Promise<InstanceDetails> {
+  async cancel(instanceId: string, options: CancelInstance): Promise<InstanceDetails> {
     actorOf(options.actor);
     const reason = optionalText(options.reason, "reason", 1000);
     if (!isUuid(instanceId)) throw notFound(instanceId);
     const done = await this.engine.inStep(instanceId, async (step) => {
       if (step.instance.status !== "running" && step.instance.status !== "failed") throw new WorkflowError("wrong_status", `Instance is ${step.instance.status}`);
-      await this.engine.cancel(step, reason, options.actor);
+      await this.engine.cancel(step, reason, options.actor, options.request ?? null);
       return true;
     });
     if (done === null) throw notFound(instanceId);
     return await this.instance(instanceId);
   }
 
-  async retry(instanceId: string, options: { readonly actor: WorkflowActor }): Promise<InstanceDetails> {
+  async retry(instanceId: string, options: RetryInstance): Promise<InstanceDetails> {
     actorOf(options.actor);
     if (!isUuid(instanceId)) throw notFound(instanceId);
     const done = await this.engine.inStep(instanceId, async (step) => {
       if (step.instance.status !== "failed") throw new WorkflowError("wrong_status", `Only a failed instance is retried; this one is ${step.instance.status}`);
-      await this.engine.retry(step, options.actor);
+      await this.engine.retry(step, options.actor, options.request ?? null);
       return true;
     });
     if (done === null) throw notFound(instanceId);
@@ -126,14 +129,13 @@ export class WorkflowRuntime extends IWorkflowRuntime {
           rejected.push({ processKey: version.key, issues });
           continue;
         }
-        started.push(await this.engine.begin(this.engine.cache(version), nodeId, { input: value, partition, businessKey: correlation, startedVia: "event", actor }));
+        started.push(await this.engine.begin(this.engine.cache(version), nodeId, { input: value, partition, businessKey: correlation, startedVia: "event", actor, request: options.request ?? null }));
       }
     }
     return { started, continued: [...continued], rejected };
   }
 
   async instances(query: InstanceListQuery = {}): Promise<WorkflowPage<InstanceSummary>> {
-    const { limit, offset } = pagingOf(query);
     if (query.status !== undefined && !STATUSES.has(query.status)) throw new WorkflowError("invalid_input", "status must be running, completed, cancelled or failed");
     const where = query.access === undefined ? "all" : grantsToWhere(query.access);
     if (where === "none") return { items: [], total: 0 };
@@ -144,9 +146,8 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (query.processKey !== undefined) source = source.where((i) => i.processKey.eq(query.processKey!));
     if (query.businessKey !== undefined) source = source.where((i) => i.businessKey.eq(query.businessKey!));
     if (query.startedById !== undefined) source = source.where((i) => i.startedById.eq(query.startedById!));
-    const total = await source.count();
-    const rows = await source.orderByDescending((i) => i.id).skip(offset).take(limit).toList();
-    return { items: rows.map(summaryOf), total };
+    const { items, total } = await paginate(source, pageQueryOf(query, { field: "id", dir: "desc" }));
+    return { items: items.map(summaryOf), total };
   }
 
   async instance(instanceId: string): Promise<InstanceDetails> {

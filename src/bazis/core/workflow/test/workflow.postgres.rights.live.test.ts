@@ -117,7 +117,7 @@ const ids = (list: { body: { data: { id: string }[] } }) => list.body.data.map((
 /** Waits for the worker: the task of a started instance appears shortly after. */
 async function taskOf(instanceId: string) {
   for (let attempt = 0; attempt < 200; attempt += 1) {
-    const list = await call("admin", "GET", "/workflow/tasks?limit=200");
+    const list = await call("admin", "GET", "/workflow/tasks?page[size]=200");
     const found = (list.body.data as { id: string; instanceId: string }[]).find((task) => task.instanceId === instanceId);
     if (found) return found;
     await Bun.sleep(25);
@@ -208,18 +208,18 @@ test.skipIf(!enabled)("own instances and the instances of a partition: in the li
   const inA = (await start("admin", "hidden", "space-a")).body;
   const inB = (await start("admin", "hidden", "space-b")).body;
 
-  const annSees = await call("ann", "GET", "/workflow/instances?limit=200");
+  const annSees = await call("ann", "GET", "/workflow/instances?page[size]=200");
   expect(ids(annSees)).toContain(mine.id);
   expect(ids(annSees)).not.toContain(inA.id);
   expect((await call("ann", "GET", `/workflow/instances/${mine.id}`)).status).toBe(200);
   expect((await call("ann", "GET", `/workflow/instances/${mine.id}/history`)).status).toBe(200);
   expect((await call("ann", "GET", `/workflow/instances/${inA.id}`)).status).toBe(403);
 
-  const bobSees = await call("bob", "GET", "/workflow/instances?limit=200");
+  const bobSees = await call("bob", "GET", "/workflow/instances?page[size]=200");
   expect(ids(bobSees)).toEqual(expect.arrayContaining([mine.id, inA.id]));
   expect(ids(bobSees)).not.toContain(inB.id);
   expect((await call("bob", "GET", `/workflow/instances/${inB.id}`)).status).toBe(403);
-  expect((await call("bob", "GET", `/workflow/instances?partition=space-b`)).body.data).toEqual([]);
+  expect((await call("bob", "GET", `/workflow/instances?filter[partition]=space-b`)).body.data).toEqual([]);
 
   expect((await call("ann", "POST", `/workflow/instances/${mine.id}/cancel`, {})).status).toBe(403);
   expect((await call("bob", "POST", `/workflow/instances/${inB.id}/cancel`, {})).status).toBe(403);
@@ -239,22 +239,22 @@ test.skipIf(!enabled)("addressees are counted per partition when the tasks are v
   const hidden = await taskOf((await start("admin", "hidden", "space-a")).body.id);
 
   // Lena is a manager in space-a only.
-  const lena = await call("lena", "GET", "/workflow/tasks?limit=200");
+  const lena = await call("lena", "GET", "/workflow/tasks?page[size]=200");
   expect(ids(lena)).toContain(inA.id);
   expect(ids(lena)).not.toContain(inB.id);
   expect(ids(lena)).not.toContain(noPartition.id);
   expect((await call("lena", "GET", `/workflow/tasks/${inA.id}`)).status).toBe(200);
   expect((await call("lena", "GET", `/workflow/tasks/${inB.id}`)).status).toBe(404);
-  expect((await call("lena", "GET", "/workflow/tasks?partition=space-b")).body.data).toEqual([]);
+  expect((await call("lena", "GET", "/workflow/tasks?filter[partition]=space-b")).body.data).toEqual([]);
 
   // A manager everywhere, the task without a partition included, but only of one process.
-  const kate = await call("kate", "GET", "/workflow/tasks?limit=200");
+  const kate = await call("kate", "GET", "/workflow/tasks?page[size]=200");
   expect(ids(kate)).toEqual(expect.arrayContaining([inA.id, inB.id, noPartition.id]));
   expect(ids(kate)).not.toContain(hidden.id);
   expect((await call("kate", "GET", `/workflow/tasks/${hidden.id}`)).status).toBe(403);
 
   // A right without being addressed gives nothing; a partition without the right gives 403.
-  expect((await call("bob", "GET", "/workflow/tasks?limit=200")).body.data).toEqual([]);
+  expect((await call("bob", "GET", "/workflow/tasks?page[size]=200")).body.data).toEqual([]);
   expect((await call("bob", "GET", `/workflow/tasks/${inA.id}`)).status).toBe(404);
   expect((await call("bob", "GET", `/workflow/tasks/${inB.id}`)).status).toBe(403);
 

@@ -71,6 +71,7 @@ export class CatalogModule {}
 | `sideEffect` | `none`, `read`, `write`, `external` — что инструмент меняет |
 | `approval` | `never`, `policy`, `required` — нужно ли подтверждение, см. [Агенты](agents.md#настройки-аудит-и-подтверждение) |
 | `timeoutMs` | Срок вызова, по умолчанию 30 секунд |
+| `dryRun` | `supported` — инструмент умеет работать вхолостую, `unsupported` (по умолчанию). Попадает в контракт для дизайнера процессов |
 | `callers` | **Обязательно.** Кто может вызывать: `"agent"` — агенты, другой id (`"workflow"`) — код через [`ToolRunner`](#вызов-без-модели) |
 | `tags` | Метки для каталога и поиска; на доступ не влияют |
 
@@ -100,7 +101,7 @@ export class CatalogModule {}
    "required":["sku"],"additionalProperties":false}},
  "output":{"kind":"json-schema","name":"PriceOutput","schema":{"type":"object",
    "properties":{"sku":{"type":"string"},"total":{"type":"number"}},"additionalProperties":false}},
- "sideEffect":"read","approval":"policy"}
+ "sideEffect":"read","approval":"policy","dryRun":"unsupported"}
 ```
 
 Поле со значением по умолчанию (`quantity = 1`) необязательно.
@@ -132,6 +133,7 @@ export class CatalogModule {}
 | --- | --- |
 | `agentName` | Какой агент вызвал |
 | `invocationId` | Номер запуска агента |
+| `actor` | От чьего имени вызов, если вызывающий его назвал: `{ kind, id }` |
 | `metadata` | `metadata` из `run(…, { metadata })` — например, пользователь |
 | `signal` | Отмена: срок вышел или запуск отменён |
 | `idempotencyKey` | Ключ вызова для защиты от повторной записи |
@@ -314,7 +316,11 @@ export class ProcessSteps {
   чужой инструмент не получится — `TOOL_CALLER_NOT_ALLOWED`.
 - `actor` — от чьего имени вызов: `{ kind: "user" | "system", id }`. Для
   `write` и `external` он обязателен (`TOOL_ACTOR_REQUIRED`); политика
-  подтверждения и аудит получают его вместе с `caller`.
+  подтверждения и аудит получают его вместе с `caller`, а инструмент — в
+  `context.actor`.
+- Шаг процесса передаёт в `context.metadata` свой адрес (`WorkflowToolMetadata`):
+  `instanceId`, `processKey`, `nodeId`, `partition`, `test` — чтобы инструмент
+  мог назвать причину в своих событиях.
 - `run` не бросает исключение из-за ошибки инструмента: она приходит
   результатом со `status` и `error.code`.
 - Проверка аргументов, подтверждение, аудит, хуки, повторы и срок — те же,

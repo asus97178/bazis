@@ -1,7 +1,8 @@
 import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
 import { can, type AccessObject } from "../../../access";
 import { Authorize, Controller, Created, Get, Post, type HttpContext } from "../../../http";
-import { body, callerOf, optionalString, pagingQuery, param, requiredString } from "../../internal/http";
+import { buildListDocument } from "../../../../library/jsonapi";
+import { body, callerOf, filterOf, listQuery, optionalString, pagingOfList, param, requiredString } from "../../internal/http";
 import type { InstanceStatus } from "../model/WfInstance.model";
 import { IWorkflowRuntime, type InstanceSummary } from "../services/IWorkflowRuntime.service";
 
@@ -16,12 +17,13 @@ export class InstancesController {
     const request = await body(ctx);
     const processKey = requiredString(request.processKey, "processKey", 64);
     const partition = optionalString(request.partition, "partition") ?? null;
-    const { actor } = await callerOf(ctx, "workflow.instances.start", { scope: partition, process: processKey });
+    const { actor, request: from } = await callerOf(ctx, "workflow.instances.start", { scope: partition, process: processKey });
     const instance = await this.runtime.start(processKey, {
       input: request.input,
       partition,
       businessKey: optionalString(request.businessKey, "businessKey") ?? null,
       actor,
+      request: from,
     });
     return Created(`${ctx.path}/${instance.id}`, instance);
   }
@@ -30,16 +32,20 @@ export class InstancesController {
   @Authorize(can("workflow.instances.read"))
   async list(ctx: HttpContext) {
     const { access } = await callerOf(ctx);
-    const page = await this.runtime.instances({
-      ...pagingQuery(ctx),
-      access: await access.filter("workflow.instances.read"),
-      partition: optionalString(ctx.query("partition"), "partition"),
-      processKey: optionalString(ctx.query("processKey"), "processKey"),
-      status: optionalString(ctx.query("status"), "status") as InstanceStatus | undefined,
-      businessKey: optionalString(ctx.query("businessKey"), "businessKey"),
-      startedById: optionalString(ctx.query("startedById"), "startedById"),
+    const list = listQuery(ctx, {
+      filter: { partition: ["eq"], processKey: ["eq"], status: ["eq"], businessKey: ["eq"], startedById: ["eq"] },
+      sort: ["createdAt", "endedAt", "status", "processKey"],
     });
-    return { data: page.items, meta: { total: page.total } };
+    const page = await this.runtime.instances({
+      ...pagingOfList(list),
+      access: await access.filter("workflow.instances.read"),
+      partition: filterOf(list, "partition"),
+      processKey: filterOf(list, "processKey"),
+      status: filterOf(list, "status") as InstanceStatus | undefined,
+      businessKey: filterOf(list, "businessKey"),
+      startedById: filterOf(list, "startedById"),
+    });
+    return buildListDocument(page.items, list, page.total, { basePath: ctx.path });
   }
 
   @Get(":id")
@@ -63,16 +69,16 @@ export class InstancesController {
   async cancel(ctx: HttpContext) {
     const instance = await this.runtime.instance(param(ctx, "id"));
     const request = await body(ctx);
-    const { actor } = await callerOf(ctx, "workflow.instances.manage", objectOf(instance));
-    return await this.runtime.cancel(instance.id, { reason: optionalString(request.reason, "reason", 1000) ?? null, actor });
+    const { actor, request: from } = await callerOf(ctx, "workflow.instances.manage", objectOf(instance));
+    return await this.runtime.cancel(instance.id, { reason: optionalString(request.reason, "reason", 1000) ?? null, actor, request: from });
   }
 
   @Post(":id/retry")
   @Authorize(can("workflow.instances.manage"))
   async retry(ctx: HttpContext) {
     const instance = await this.runtime.instance(param(ctx, "id"));
-    const { actor } = await callerOf(ctx, "workflow.instances.manage", objectOf(instance));
-    return await this.runtime.retry(instance.id, { actor });
+    const { actor, request } = await callerOf(ctx, "workflow.instances.manage", objectOf(instance));
+    return await this.runtime.retry(instance.id, { actor, request });
   }
 }
 contextOnlyController(InstancesController);

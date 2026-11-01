@@ -4,6 +4,7 @@ import { Module, singleton } from "bazis/core/di";
 import { WorkflowModule } from "bazis/core/workflow";
 import { AuthTokens } from "../auth/AuthTokens";
 import { authConfig } from "../config/auth.config";
+import { AuditModule } from "./audit/Audit.module";
 import { OrderModule } from "./order/Order.module";
 import { ToolOptions } from "./order/tools/ToolOptions";
 
@@ -24,7 +25,7 @@ export const appRoles = defineRoles({
 });
 
 @Module({
-  imports: [AccessModule, WorkflowModule, OrderModule],
+  imports: [AccessModule, WorkflowModule, OrderModule, AuditModule],
   config: [authConfig],
   roles: appRoles,
   providers: [

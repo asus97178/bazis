@@ -1,6 +1,7 @@
 import { createEventToken } from "../../../kernel";
 import type { FormSpec } from "../../../../library/workflow";
-import type { InstanceStatus } from "../model/WfInstance.model";
+import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
+import type { InstanceStatus, StartedVia } from "../model/WfInstance.model";
 
 /** A token reached a user task. Published after the step commits. */
 export interface WorkflowTaskRequested {
@@ -37,7 +38,33 @@ export interface WorkflowInstancesDeleted {
   readonly instanceIds: readonly string[];
 }
 
+/** What the audit events of an instance share. Published after the commit. */
+interface WorkflowInstanceAudit {
+  readonly instanceId: string;
+  readonly processKey: string;
+  readonly partition: string | null;
+  readonly actor: WorkflowActor;
+  readonly request: WorkflowRequest | null;
+}
+
+/** An instance started: by hand, from an event or on schedule. */
+export interface WorkflowInstanceStarted extends WorkflowInstanceAudit {
+  readonly version: number;
+  readonly businessKey: string | null;
+  readonly startedVia: StartedVia;
+}
+
+export interface WorkflowInstanceCancelled extends WorkflowInstanceAudit {
+  readonly reason: string | null;
+}
+
+/** The failed steps of an instance run again. */
+export type WorkflowInstanceRetried = WorkflowInstanceAudit;
+
 export const WORKFLOW_TASK_REQUESTED = createEventToken<WorkflowTaskRequested>("workflow.task-requested");
 export const WORKFLOW_TOKEN_CLOSED = createEventToken<WorkflowTokenClosed>("workflow.token-closed");
 export const WORKFLOW_INSTANCE_FINISHED = createEventToken<WorkflowInstanceFinished>("workflow.instance-finished");
 export const WORKFLOW_INSTANCES_DELETED = createEventToken<WorkflowInstancesDeleted>("workflow.instances-deleted");
+export const WORKFLOW_INSTANCE_STARTED = createEventToken<WorkflowInstanceStarted>("workflow.instance-started");
+export const WORKFLOW_INSTANCE_CANCELLED = createEventToken<WorkflowInstanceCancelled>("workflow.instance-cancelled");
+export const WORKFLOW_INSTANCE_RETRIED = createEventToken<WorkflowInstanceRetried>("workflow.instance-retried");

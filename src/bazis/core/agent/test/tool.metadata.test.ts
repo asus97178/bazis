@@ -16,6 +16,17 @@ class SearchInput { query = ""; }
 class SearchCatalogTool {}
 
 describe("tool metadata", () => {
+  test("@Tool.dryRun takes supported or unsupported", () => {
+    @Tool({ name: "catalog.preview", description: "Shows what would change.", dryRun: "supported", callers: ["workflow"] })
+    class PreviewTool {}
+    expect(toolMetadataOf(PreviewTool)?.dryRun).toBe("supported");
+    expect(() => {
+      @Tool({ name: "catalog.wrong", description: "Wrong.", dryRun: "maybe" as never, callers: ["workflow"] })
+      class WrongTool {}
+      return WrongTool;
+    }).toThrow("@Tool.dryRun must be supported or unsupported.");
+  });
+
   test("@Tool writes normalized class metadata", () => {
     expect(toolMetadataOf(SearchCatalogTool)).toEqual({
       name: "catalog.search",
@@ -25,6 +36,7 @@ describe("tool metadata", () => {
       sideEffect: "read",
       approval: "policy",
       timeoutMs: 500,
+      dryRun: "unsupported",
       callers: ["agent"],
       tags: ["catalog"],
     });

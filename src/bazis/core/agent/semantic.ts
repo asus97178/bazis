@@ -1,5 +1,5 @@
 import { AgentSemanticError } from "./errors";
-import type { ToolApproval, ToolSideEffect } from "./metadata";
+import type { ToolApproval, ToolDryRun, ToolSideEffect } from "./metadata";
 
 const FORBIDDEN_JSON_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -162,6 +162,7 @@ export interface AgentToolContract {
   readonly sideEffect: ToolSideEffect;
   readonly approval: ToolApproval;
   readonly timeoutMs?: number;
+  readonly dryRun: ToolDryRun;
 }
 
 export interface AgentToolContractOptions {
@@ -172,6 +173,7 @@ export interface AgentToolContractOptions {
   readonly sideEffect?: ToolSideEffect;
   readonly approval?: ToolApproval;
   readonly timeoutMs?: number;
+  readonly dryRun?: ToolDryRun;
 }
 
 export interface AgentModelCapabilities {
@@ -533,6 +535,10 @@ export function agentToolContract(options: AgentToolContractOptions): AgentToolC
   if ((sideEffect === "write" || sideEffect === "external") && approval === "never") {
     throw new AgentSemanticError('write/external tools cannot use approval: "never".');
   }
+  const dryRun = options.dryRun ?? "unsupported";
+  if (dryRun !== "supported" && dryRun !== "unsupported") {
+    throw new AgentSemanticError("tool.dryRun must be supported or unsupported.");
+  }
   return freezeWithoutUndefined({
     name: requiredName(options.name, "tool.name"),
     description: requiredContentText(options.description, "tool.description"),
@@ -541,6 +547,7 @@ export function agentToolContract(options: AgentToolContractOptions): AgentToolC
     sideEffect,
     approval,
     timeoutMs: optionalPositiveInteger(options.timeoutMs, "tool.timeoutMs"),
+    dryRun,
   });
 }
 

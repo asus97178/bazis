@@ -19,7 +19,8 @@ export interface FormSpec {
 /** One problem of a value: which field and why. */
 export interface FormIssue {
   readonly field: string;
-  readonly code: "required" | "type" | "enum" | "unknown";
+  /** Built in: `required`, `type`, `enum`, `unknown`; an application's validator adds its own. */
+  readonly code: string;
   readonly message: string;
 }
 

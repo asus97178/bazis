@@ -43,6 +43,10 @@
 `WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED` (чистка удалила
 экземпляры) ([Задача сотруднику](../../workflow/processes.md#задача-сотруднику)).
 
+Для аудита: `WORKFLOW_PROCESS_CHANGED`, `WORKFLOW_INSTANCE_STARTED`,
+`WORKFLOW_INSTANCE_CANCELLED`, `WORKFLOW_INSTANCE_RETRIED`,
+`WORKFLOW_TASK_COMPLETED` ([Журнал аудита](../../workflow/processes.md#журнал-аудита)).
+
 ## Типы
 
 - **Процессы в коде:** `ProcessDefinition`, `CodeProcess`; поле `processes`

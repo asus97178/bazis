@@ -19,7 +19,7 @@ people stays with the application (`AccessPolicy.principals`).
 | Component | File | Dependencies | Output |
 | --- | --- | --- | --- |
 | `WfTask`, `TasksDbContext` | [model](model) | ORM, owned store `bazis.workflow.tasks` | table `bazis_wf_task_items` |
-| `IWorkflowTasks` / `WorkflowTasks` (scoped) | [services](services) | `TasksDbContext`, `IWorkflowRuntime`, `WorkflowClock` | `list`, `get`, `claim`, `release`, `complete` |
+| `IWorkflowTasks` / `WorkflowTasks` (scoped) | [services](services) | `TasksDbContext`, `IWorkflowRuntime`, `WorkflowClock`, `WorkflowEvents` | `list`, `get`, `claim`, `release`, `complete` with `WORKFLOW_TASK_COMPLETED` |
 | `TaskEvents` (scoped subscriber) | [events/TaskEvents.ts](events/TaskEvents.ts) | `TasksDbContext` | `WORKFLOW_TASK_REQUESTED` creates the task (one per token), `WORKFLOW_TOKEN_CLOSED` cancels it, `WORKFLOW_INSTANCES_DELETED` deletes the tasks of deleted instances |
 | `TasksController` | [http/Tasks.controller.ts](http/Tasks.controller.ts) | `IWorkflowTasks`, `IAccess` | `/workflow/tasks…` |
 
@@ -43,7 +43,7 @@ task outside them answers 403 and is not in the list. Every route needs `workflo
 
 | Route | Result |
 | --- | --- |
-| `GET /workflow/tasks?status&partition&processKey&limit&offset` | `{ data, meta: { total } }`, open and claimed by default, oldest first |
+| `GET /workflow/tasks?filter[status\|partition\|processKey]&sort&page[size]&page[number]` | JSON:API list document, open and claimed by default, oldest first |
 | `GET /workflow/tasks/:id` | the task with its form |
 | `POST /workflow/tasks/:id/claim` | 200 / 409 `conflict` (taken by someone else) / 409 `wrong_status` |
 | `POST /workflow/tasks/:id/release` | 200 / 409 `wrong_status` (not taken by the caller) |
