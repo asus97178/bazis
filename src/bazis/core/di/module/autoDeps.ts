@@ -14,10 +14,20 @@ export function registerGeneratedClassDeps(target: Class<unknown>, deps: readonl
   targetClassDeps.set(target, deps);
 }
 
+// The framework's own classes: their wiring ships inside the package
+// (`<pack>/generated/deps.ts`), because an application's codegen skips
+// node_modules. Not part of a target, so target rollbacks keep it.
+const frameworkClassDeps = new Map<Class<unknown>, readonly GeneratedClassDependency[]>();
+
+/** Called by the generated `deps.ts` of a framework pack when the pack is imported. */
+export function registerFrameworkClassDeps(entries: readonly (readonly [Class<unknown>, readonly GeneratedClassDependency[]])[]): void {
+  for (const [target, deps] of entries) frameworkClassDeps.set(target, deps);
+}
+
 export function getGeneratedClassDeps(useClass: Class<unknown>): ProviderDependencyList | undefined {
   // Names are not class identities: package consumers may use the same names
   // as the application that generated the framework's compatibility files.
-  const dependencies = targetClassDeps.get(useClass);
+  const dependencies = targetClassDeps.get(useClass) ?? frameworkClassDeps.get(useClass);
   if (dependencies === undefined) {
     return undefined;
   }

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -26,7 +26,9 @@ function run(step: string, command: string[], cwd = root, env: Record<string, st
 }
 
 function generatedIsCurrent(): void {
-  const status = Bun.spawnSync(["git", "status", "--porcelain", "--", "src/generated"], { cwd: root, stdout: "pipe" });
+  // The application's output and the wiring the framework packs ship inside the package.
+  const packs = (JSON.parse(readFileSync(join(root, "bazis.config.json"), "utf8")) as { framework?: { packs: string[] } }).framework?.packs ?? [];
+  const status = Bun.spawnSync(["git", "status", "--porcelain", "--", "src/generated", ...packs.map((pack) => `${pack}/generated`)], { cwd: root, stdout: "pipe" });
   const changed = status.stdout.toString().trim();
   if (status.exitCode !== 0 || changed) {
     console.error(`[ci] FAIL: committed codegen output is stale\n${changed}`);

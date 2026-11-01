@@ -1,6 +1,6 @@
 # Права: каталог permissions и система прав приложения
 
-Идентификатор: **ACCESS-001**. Версия: **1.1**. Дата: **2026-11-01**.
+Идентификатор: **ACCESS-001**. Версия: **1.2**. Дата: **2026-11-01**.
 Статус: **утверждено владельцем 2026-11-01** (согласовано агентами bazis и bazis-cms).
 Основа: обсуждение прав процессов в [WORKFLOW-002](WORKFLOW_BUILDER.md) §6.2
 (2026-10-31 — 11-01), проект `bazis/identity` (`docs/design/identity.md`),
@@ -25,7 +25,7 @@
 
 | Кто | Что делает | Чего не знает |
 | --- | --- | --- |
-| Модуль с действиями (процессы, DM, файлы, «Заказы») | Объявляет permissions и атрибуты объектов; ставит `can(…)` на маршруты; фильтрует списки через `Access` | Ролей, пространств, организаций, кто админ |
+| Модуль с действиями (процессы, DM, файлы, «Заказы») | Объявляет permissions и атрибуты объектов; ставит `can(…)` на маршруты; фильтрует списки через `IAccess` | Ролей, пространств, организаций, кто админ |
 | Система прав (одна на приложение) | Хранит роли и правила; по субъекту и праву отдаёт гранты; раскрывает деревья и «моё» | Как модуль проверяет объект и строит запрос |
 | Фреймворк (`bazis/core/access`) | Собирает каталог; сопоставляет гранты с объектом; переводит гранты в условие запроса; кэширует на время запроса | Как устроены роли |
 | Проверка маршрутов приложения | Кто сделал запрос: токен, сессия, блокировка; кладёт принципала | Прав на действия |
@@ -97,7 +97,7 @@ export class WorkflowModule {}
 
 Каталог собирается при старте из `@Module({ permissions })` всех модулей
 (канал метаданных модуля `access.permission/v1`, как `processes`) и доступен
-сервису `AccessCatalog` и по HTTP (§7).
+сервису `IAccessCatalog` и по HTTP (§7).
 
 ## 4. Гранты
 
@@ -192,26 +192,30 @@ type Condition =
 ## 5. Проверка
 
 ```ts
-// маршрут
-@Authorize(can("workflow.instances.start", (ctx) => ({
-  scope: ctx.body.partition, process: ctx.body.processKey,
-})))
-@Post("instances") start(…) { … }
+// маршрут: право где-нибудь; объект проверяет обработчик, когда загрузит его
+@Authorize(can("workflow.instances.read"))
+@Get("instances/:id") get(…) { … }
 
-// код (scoped-сервис)
-await access.can("workflow.instances.read", instance);       // false → 403 решает вызывающий
-const filter = await access.filter("workflow.instances.read"); // для списков
-await access.filter("dm.records.read", { scope: space });     // право с scope: "request"
-await access.as(subject).can(…);                             // без HTTP: сервисы, агенты
+// маршрут, где объект известен из запроса
+@Authorize(can("orders.create", (ctx) => ({ scope: ctx.header("x-shop") ?? null })))
+
+// код (сервис IAccess)
+const my = await access.for(ctx);                            // субъект запроса; нет — 401
+await my.can("workflow.instances.read", { ...instance, scope: instance.partition }); // false → 403 или 404 решает вызывающий
+const filter = await my.filter("workflow.instances.read");   // для списков → grantsToWhere
+await my.filter("dm.records.read", { scope: space });        // право с scope: "request"
+await access.as(subject, scope).can(…);                      // без HTTP: сервисы, агенты; scope — своя область DI
 ```
 
 - Субъекта `can` берёт у `AccessPolicy.subject(ctx)`; нет субъекта — 401.
+- `can` без объекта отвечает, есть ли право хоть где-нибудь (хоть один
+  грант): так защищается маршрут до загрузки объекта.
 - Проверка маршрутов приложения (`runApp(…, { http: { authorize } })`)
   стоит на всех маршрутах до `can`: вид токена, живая сессия, блокировка.
 - **Фон не проверяется.** Задания, расписания, события, шаги процесса:
   право дал тот, кто настроил задание или опубликовал процесс. Tools внутри
   процесса `can` не вызывают; Tool, вызванный агентом от имени
-  пользователя, проверяет `access.as(subject)`.
+  пользователя, проверяет `access.as(subject, scope)`.
 
 ## 6. Виды ссылок
 
@@ -247,33 +251,40 @@ abstract class References {
 Только чтение: роли и их правила хранит и редактирует система прав
 приложения своими экранами.
 
-## 8. По умолчанию: `ConfigAccessPolicy`
+## 8. По умолчанию: `RolesAccessPolicy`
 
-Приложение без своей системы прав получает работающий адаптер:
+`AccessModule` регистрирует `singleton(AccessPolicy, RolesAccessPolicy)`;
+приложение со своей системой прав регистрирует свою реализацию
+`AccessPolicy` в своём модуле, и она заменяет эту.
 
-- субъект — принципал `@Authorize`: `sub` = `<вид>:<subject>` (вид из claim
-  `access.kindClaim`), без вида — `subject`;
-- роли — claim `access.roleClaim` (по умолчанию `role`);
-- права — таблица в конфиге:
+Приложение без своей системы прав получает работающую:
 
-```json
-{
-  "access": {
-    "roles": {
-      "admin": "all",
-      "manager": ["workflow.instances.start", "workflow.instances.read", "workflow.tasks.work"],
-      "user": ["workflow.instances.read:own", "workflow.tasks.work"]
-    }
-  }
-}
+- субъект — принципал проверки маршрутов: `sub` = `<вид>:<subject>` (вид из
+  claim `access.kindClaim`), без вида — `subject`;
+- роли — claim `access.roleClaim` (по умолчанию `role`), через пробел или
+  запятую;
+- права ролей — декларативно, полем модуля (конфиг фреймворка хранит только
+  простые значения, таблицу ролей туда не положить):
+
+```ts
+export const appRoles = defineRoles({
+  admin: "all",
+  manager: ["workflow.instances.start", "workflow.instances.read", "workflow.tasks.work"],
+  user: ["workflow.instances.read:own", "workflow.tasks.work"],
+});
+
+@Module({ imports: [AccessModule, …], roles: appRoles })
+export class AppModule {}
 ```
 
-  `<право>:own` — сокращение для гранта `{ where: { own: true } }`;
+  `<право>:own` — сокращение для гранта `{ where: { own: true } }`; вместо
+  строки можно дать грант с условиями `{ permission, scopes, where, fields }`.
+  Роль с несуществующим правом или неверным условием останавливает старт;
 - «я» для `own` — `subject` без вида;
 - адресаты — `user:<id>` и `role:<роль>`;
-- без настройки всё запрещено.
+- без ролей всё запрещено; роль, которой нет в `roles`, ничего не даёт.
 
-Раздел у `ConfigAccessPolicy` — любой (`scopes: "all"`). Это ступень до
+Раздел у ролей по умолчанию — любой (`scopes: "all"`). Это ступень до
 `bazis/identity`: когда он появится, он станет системой прав по умолчанию.
 
 Для тестов — `StaticAccessPolicy` в `bazis/core/access/testing`: гранты по
@@ -301,8 +312,8 @@ abstract class References {
 
 1. **`bazis/core/access`**: `definePermissions`, `@Module({ permissions,
    references })`, каталог и его проверки при старте, `AccessPolicy`,
-   условия и их пределы, `can`, `Access` (`can`, `filter`, `fields`, `as`),
-   `grantsToWhere`, `maskFields`, `ConfigAccessPolicy`,
+   условия и их пределы, `can`, `IAccess` (`can`, `filter`, `fields`, `as`),
+   `grantsToWhere`, `maskFields`, `RolesAccessPolicy` и `@Module({ roles })`,
    `StaticAccessPolicy`, HTTP каталога. Эталонное приложение
    `examples/workflow` (WORKFLOW-002 §1.1) получает права через него.
 2. **Процессы на ACCESS-001** — этап 0 WORKFLOW-002.

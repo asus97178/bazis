@@ -14,5 +14,10 @@
         "src/bazis/core/http/test/fixtures/sourceControllers.ts"
       ]
     }
+  },
+  "framework": {
+    "packs": [
+      "src/bazis/core/access"
+    ]
   }
 }
