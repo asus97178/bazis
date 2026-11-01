@@ -12,6 +12,8 @@ export type JsonSchema = Readonly<Record<string, unknown>>;
 export interface NodeKindDefinition {
   readonly kind: NodeKind;
   readonly role: NodeRole;
+  /** A container: other nodes name it as their `parent`. */
+  readonly container?: boolean;
   /** Checks the node `config`; returns a problem or `null`. */
   readonly check: (config: Record<string, unknown>) => string | null;
   /** The node `config` as a JSON Schema: what a designer builds the form of a step from. */
@@ -22,6 +24,12 @@ export interface NodeKindDefinition {
 export const ISO_DURATION = /^P(?!$)(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?$/;
 /** An event key or a Tool name: `payments.received`, `payments.charge`. */
 export const DOTTED_KEY = /^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$/;
+/** A process key. */
+export const PROCESS_KEY = /^[a-z][a-z0-9_.-]{0,63}$/;
+/** The most iterations a loop may have. */
+export const MAX_ITERATIONS = 10_000;
+/** The most iterations of a loop that run at once. */
+export const MAX_LOOP_PARALLEL = 100;
 /** A parameter of a Tool. */
 const PARAMETER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const ROLE = /^[a-z][a-z0-9_.-]{0,63}$/;
@@ -115,6 +123,29 @@ function assignments(config: Record<string, unknown>): string | null {
   return null;
 }
 
+/** What a loop runs over and how; its expressions are checked with the whole document. */
+function loop(config: Record<string, unknown>): string | null {
+  const sources = ["over", "while", "times"].filter((key) => config[key] !== undefined);
+  if (sources.length !== 1) return "config needs exactly one of over, while or times";
+  const { maxIterations, times, parallel, onItemError: onItem, collect } = config;
+  if (!Number.isSafeInteger(maxIterations) || (maxIterations as number) < 1 || (maxIterations as number) > MAX_ITERATIONS) return `config.maxIterations must be 1–${MAX_ITERATIONS}`;
+  if (times !== undefined && (!Number.isSafeInteger(times) || (times as number) < 1 || (times as number) > (maxIterations as number))) return "config.times must be an integer from 1 to maxIterations";
+  if (parallel !== undefined) {
+    if (typeof parallel !== "object" || parallel === null || Array.isArray(parallel)) return "config.parallel must be an object";
+    const { limit } = parallel as { limit?: unknown };
+    if (!Number.isSafeInteger(limit) || (limit as number) < 1 || (limit as number) > MAX_LOOP_PARALLEL) return `config.parallel.limit must be 1–${MAX_LOOP_PARALLEL}`;
+    if (config.while !== undefined) return "config.parallel does not go with while: its condition depends on the iteration before";
+  }
+  if (onItem !== undefined && onItem !== "stop" && onItem !== "skip") return "config.onItemError must be stop or skip";
+  if (collect !== undefined) {
+    if (typeof collect !== "object" || collect === null || Array.isArray(collect)) return "config.collect must be an object";
+    const { from, to } = collect as { from?: unknown; to?: unknown };
+    if (from === undefined) return "config.collect.from is required";
+    if (typeof to !== "string" || !FIELD_NAME.test(to)) return "config.collect.to is invalid";
+  }
+  return first(string(config, "item", FIELD_NAME, false), string(config, "index", FIELD_NAME, false));
+}
+
 const duration = { type: "string", format: "duration" };
 const text = { type: "string" };
 const dataPath = { type: "string", pattern: DATA_PATH.source };
@@ -153,6 +184,34 @@ export const NODE_KINDS: readonly NodeKindDefinition[] = Object.freeze([
     role: "activity",
     check: assignments,
     config: object({ assignments: { type: "array", minItems: 1, items: object({ var: { type: "string", pattern: FIELD_NAME.source }, value: expression }, ["var", "value"]) } }, ["assignments"]),
+  },
+  {
+    kind: "loop",
+    role: "activity",
+    container: true,
+    check: loop,
+    config: object({
+      over: expression,
+      while: expression,
+      times: { type: "integer", minimum: 1, maximum: MAX_ITERATIONS },
+      item: saveTo,
+      index: saveTo,
+      maxIterations: { type: "integer", minimum: 1, maximum: MAX_ITERATIONS },
+      parallel: object({ limit: { type: "integer", minimum: 1, maximum: MAX_LOOP_PARALLEL } }, ["limit"]),
+      onItemError: { enum: ["stop", "skip"] },
+      collect: object({ from: expression, to: saveTo }, ["from", "to"]),
+    }, ["maxIterations"]),
+  },
+  {
+    kind: "callProcess",
+    role: "activity",
+    check: (c) => first(string(c, "process", PROCESS_KEY), inputMapping(c), string(c, "saveTo", FIELD_NAME, false), onError(c)),
+    config: object({
+      process: { type: "string", pattern: PROCESS_KEY.source },
+      input: { type: "object", description: "Parameter → a literal, a path string or an expression" },
+      saveTo,
+      onError: { enum: ["fail", "skip"] },
+    }, ["process"]),
   },
   { kind: "timerCatch", role: "activity", check: timer, config: object(timerConfig) },
   {

@@ -1,12 +1,21 @@
 import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
-/** `tool` calls a service task's Tool; `timer`, `retry` and `schedule` come with their stages. */
-export type JobKind = "tool" | "timer" | "retry" | "schedule";
+/**
+ * `tool` calls a service task's Tool, `timer` fires a timer, `schedule` starts a
+ * scheduled process, `loop` goes on with a loop after a batch of iterations.
+ * `call` starts a called process, `returned` tells the caller it ended,
+ * `cancelChildren` closes what a closed step called. `runTimeout` ends a run that
+ * took too long, `release` starts instances that wait for a place, `errorHandler`
+ * starts the process that handles a failure.
+ */
+export type JobKind = "tool" | "timer" | "schedule" | "loop" | "call" | "returned" | "cancelChildren" | "runTimeout" | "release" | "errorHandler";
 
 /**
  * Deferred work of the worker, created in the same transaction as the waiting
- * token. Application instances claim it with `FOR UPDATE SKIP LOCKED`.
+ * token. Application instances claim it with `FOR UPDATE SKIP LOCKED`. A
+ * transaction holds the row of one instance only: what another instance must do
+ * goes through a job, so that two instances never wait for each other.
  */
 @ForeignKey(() => WfInstance, { properties: ["instanceId"], onDelete: "cascade" })
 @Entity({ table: "bazis_wf2_run_jobs" })
@@ -34,7 +43,7 @@ export class WfJob {
   @Column({ type: "datetime" })
   dueAt = new Date(0);
 
-  /** What a job carries besides its token: an event to deliver (stage 4). */
+  /** What a job carries besides its token: the caller to tell, the process to release. */
   @Column({ type: "json", nullable: true })
   payload: unknown = null;
 

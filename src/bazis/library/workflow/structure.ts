@@ -30,8 +30,20 @@ export interface StructureBoundary {
   readonly exitTitle?: LocalizedText;
 }
 
-/** A step of the list: a single node, an exclusive fork or a parallel block. */
+/** A step of the list: a single node, a loop around a list, an exclusive fork or a parallel block. */
 export type StructureStep =
+  | {
+    readonly type: "loop";
+    readonly id: string;
+    readonly node: ProcessNode;
+    /** The steps of an iteration. */
+    readonly body: readonly StructureStep[];
+    /** The end of the body. */
+    readonly bodyEnd: { readonly id: string; readonly node: ProcessNode };
+    readonly boundaries?: readonly StructureBoundary[];
+    readonly next: string;
+    readonly nextTitle?: LocalizedText;
+  }
   | {
     readonly type: "step";
     readonly id: string;
@@ -141,7 +153,8 @@ class Reader {
         this.visit(current);
         const [flowId, flow] = this.single(current);
         const boundaries = (this.boundaries.get(current) ?? []).map(([id, boundary]) => this.boundary(id, boundary, flow.target));
-        steps.push({ type: "step", id: current, node, ...(boundaries.length === 0 ? {} : { boundaries }), next: flowId, ...(flow.title === undefined ? {} : { nextTitle: flow.title }) });
+        const common = { id: current, node, ...(boundaries.length === 0 ? {} : { boundaries }), next: flowId, ...(flow.title === undefined ? {} : { nextTitle: flow.title }) };
+        steps.push(node.kind === "loop" ? { type: "loop", ...common, ...this.body(current) } : { type: "step", ...common });
         exit = { flow: flowId, ...(flow.title === undefined ? {} : { title: flow.title }) };
         current = flow.target;
         continue;
@@ -156,6 +169,18 @@ class Reader {
       exit = { flow: step.merge.next, ...(step.merge.nextTitle === undefined ? {} : { title: step.merge.nextTitle }) };
       current = this.document.flows[step.merge.next]!.target;
     }
+  }
+
+  /** The body of a loop: a list from its one entry to its one end. */
+  private body(loop: string): { readonly body: StructureStep[]; readonly bodyEnd: { readonly id: string; readonly node: ProcessNode } } {
+    const members = Object.entries(this.document.nodes).filter(([, node]) => node.parent === loop && node.attachedTo === undefined);
+    const entries = members.filter(([id]) => (this.incoming.get(id)?.length ?? 0) === 0);
+    if (entries.length !== 1) throw new NotStructured();
+    const { steps, stop } = this.sequence(entries[0]![0]);
+    const end = this.node(stop);
+    if (nodeKindOf(end.kind)?.role !== "end" || end.parent !== loop || steps.length === 0) throw new NotStructured();
+    this.visited.add(stop);
+    return { body: steps, bodyEnd: { id: stop, node: end } };
   }
 
   private fork(id: string, node: ProcessNode, outs: readonly (readonly [string, ProcessFlow])[]): { readonly step: Extract<StructureStep, { type: "choice" | "parallel" }>; readonly stop: string } {
@@ -207,7 +232,7 @@ class Reader {
 /**
  * A graph as a tree of steps, or `undefined` when it is outside the subset a
  * list can draw (WORKFLOW-002 §3.6): sequences, an exclusive gateway with one
- * merge, a parallel gateway with a join, boundary events on steps.
+ * merge, a parallel gateway with a join, a loop, boundary events on steps.
  */
 export function toStructure(document: ProcessDocument): ProcessStructure | undefined {
   try {
@@ -242,9 +267,13 @@ export function fromStructure(structure: ProcessStructure): ProcessDocument {
       const target = index + 1 < list.length ? list[index + 1]!.id : after;
       const last = index + 1 === list.length && leave !== undefined;
       nodes[step.id] = step.node;
-      if (step.type === "step") {
+      if (step.type === "step" || step.type === "loop") {
         flow(last ? leave.flow : step.next, step.id, target, titled(last ? leave.title : step.nextTitle));
         for (const boundary of step.boundaries ?? []) writeBoundary(boundary, step, target);
+        if (step.type === "loop") {
+          write(step.body, step.bodyEnd.id);
+          nodes[step.bodyEnd.id] = step.bodyEnd.node;
+        }
         return;
       }
       const meet = step.merge?.id ?? target;

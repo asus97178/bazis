@@ -14,9 +14,23 @@ export function masksPersonal(document: Pick<ProcessDocument, "settings">): bool
   return document.settings?.log?.maskPersonal !== false;
 }
 
-/** The paths of the personal variables: `$input.email`, `$vars.email`. */
-export function personalPaths(document: Pick<ProcessDocument, "variables">): ReadonlySet<string> {
-  return new Set((document.variables ?? []).filter((variable) => variable.personal === true).map((variable) => `${variable.direction === "in" ? "$input" : "$vars"}.${variable.name}`));
+/**
+ * The paths of the personal variables: `$input.email`, `$vars.email`. A loop over
+ * personal data adds its element: `$item` and the name the loop gives it.
+ */
+export function personalPaths(document: Pick<ProcessDocument, "variables"> & Partial<Pick<ProcessDocument, "nodes">>): ReadonlySet<string> {
+  const paths = new Set((document.variables ?? []).filter((variable) => variable.personal === true).map((variable) => `${variable.direction === "in" ? "$input" : "$vars"}.${variable.name}`));
+  const loops = Object.values(document.nodes ?? {}).filter((node) => node.kind === "loop" && node.config?.over !== undefined);
+  // A loop over the element of another loop: as many passes as it takes.
+  for (let size = -1; size !== paths.size;) {
+    size = paths.size;
+    for (const { config } of loops) {
+      if (!readsPersonal(config!.over, paths)) continue;
+      paths.add("$item");
+      if (typeof config!.item === "string") paths.add(`$vars.${config!.item}`);
+    }
+  }
+  return paths;
 }
 
 /** The names of the personal `local` and `out` variables. */

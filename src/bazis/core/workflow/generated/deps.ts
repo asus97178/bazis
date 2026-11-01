@@ -22,7 +22,9 @@ import { WorkflowRetention } from "../runtime_module/background/WorkflowRetentio
 import { WorkflowWorker } from "../runtime_module/background/WorkflowWorker";
 import { EventsController } from "../runtime_module/http/Events.controller";
 import { InstancesController } from "../runtime_module/http/Instances.controller";
+import { ChildCalls } from "../runtime_module/internal/ChildCalls";
 import { GraphCache } from "../runtime_module/internal/GraphCache";
+import { RunLimits } from "../runtime_module/internal/RunLimits";
 import { Schedules } from "../runtime_module/internal/Schedules";
 import { TimerStep } from "../runtime_module/internal/TimerStep";
 import { ToolStep } from "../runtime_module/internal/ToolStep";
@@ -38,6 +40,7 @@ import { WorkflowTasks } from "../tasks_module/services/WorkflowTasks.service";
 
 registerFrameworkClassDeps([
   [CatalogImport, [DefinitionsDbContext, WorkflowLanguages]],
+  [ChildCalls, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions, ServiceProvider, WorkflowLanguages]],
   [CodeProcessCatalog, [ServiceProvider]],
   [CodeProcessPublisher, [ServiceProvider]],
   [DefinitionsDbContext, [DbContextOptions]],
@@ -47,6 +50,7 @@ registerFrameworkClassDeps([
   [ProcessesController, [IWorkflowDefinitions]],
   [ProcessFolderLookup, [DefinitionsDbContext]],
   [ProcessReferences, [DefinitionsDbContext]],
+  [RunLimits, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions]],
   [RuntimeDbContext, [DbContextOptions]],
   [Schedules, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions]],
   [TaskEvents, [TasksDbContext]],

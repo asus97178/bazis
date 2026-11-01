@@ -10,8 +10,8 @@ import { definitionProblems, WorkflowSetupError } from "./codeProcesses";
 /**
  * At start, after the tables exist: brings over the catalog of the old store
  * (WORKFLOW-002 §9), then publishes the processes of `@Module({ processes })`
- * (WORKFLOW-001 §14). A document with an unknown Tool or an `extensions` namespace
- * nobody checks stops the start with every finding of every process; the same
+ * (WORKFLOW-001 §14). A document with an unknown Tool or process, or an `extensions`
+ * namespace nobody checks, stops the start with every finding of every process; the same
  * document again gives no new version.
  */
 export class CodeProcessPublisher implements HostedService {
@@ -30,10 +30,11 @@ export class CodeProcessPublisher implements HostedService {
       const tools = this.services.resolve(WorkflowTools);
       const definitions = scope.resolve(IWorkflowDefinitions);
       const problems: string[] = [];
+      const processes = entries.map(({ process }) => process.key);
       for (const { process, module } of entries) {
         const found = [...definitionProblems(process, (name) => tools.has(name))];
-        for (const issue of await definitions.validate(process.document)) {
-          if (issue.severity === "error" && (issue.code === "extension_unknown" || issue.code === "extension_invalid")) found.push(`${issue.message} (${issue.code})`);
+        for (const issue of await definitions.validate(process.document, { processes })) {
+          if (issue.severity === "error" && (issue.code === "extension_unknown" || issue.code === "extension_invalid" || issue.code === "unknown_process")) found.push(`${issue.message} (${issue.code})`);
         }
         if (found.length > 0) problems.push(`${module}: process "${process.key}":\n${found.map((line) => `  - ${line}`).join("\n")}`);
       }

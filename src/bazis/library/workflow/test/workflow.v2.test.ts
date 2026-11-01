@@ -74,7 +74,13 @@ describe("validateProcess: version 2", () => {
     expect(codes(base({ settings: { stepTimeout: "soon" } }))).toEqual(["settings_invalid"]);
     expect(codes(base({ settings: { log: { all: true } as never } }))).toEqual(["settings_invalid"]);
     expect(codes(base({ settings: { log: { variables: 1 } as never } }))).toEqual(["settings_invalid"]);
-    expect(codes(base({ settings: { runAs: "process" } as never }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { retries: 3 } as never }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { runAs: "robot" } as never }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { runTimeout: "soon" } }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { maxConcurrent: 0 } }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { sameKey: "wait" } as never }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { errorHandler: "Bad Key" } }))).toEqual(["settings_invalid"]);
+    expect(codes(base({ settings: { runAs: "process", runTimeout: "P1D", maxConcurrent: 2, sameKey: "queue", errorHandler: "on-error" } }))).toEqual([]);
     expect(codes(base({ settings: 1 as never }))).toEqual(["settings_invalid"]);
   });
 
@@ -394,7 +400,8 @@ describe("the palette", () => {
     expect(palette.functions.map((item) => item.name)).toContain("dateDiff");
     expect(palette.paths.map((item) => item.path)).toContain("$run");
     expect(palette.tools).toEqual([tool]);
-    expect(JSON.parse(JSON.stringify(palette)).nodeKinds).toHaveLength(14);
+    expect(JSON.parse(JSON.stringify(palette)).nodeKinds).toHaveLength(16);
+    expect(palette.nodeKinds.find((kind) => kind.kind === "loop")!.container).toBe(true);
   });
 
   test("formOf describes a node kind", () => {

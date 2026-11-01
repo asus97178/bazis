@@ -7,7 +7,9 @@ import { WorkflowRetention } from "./background/WorkflowRetention";
 import { WorkflowWorker } from "./background/WorkflowWorker";
 import { EventsController } from "./http/Events.controller";
 import { InstancesController } from "./http/Instances.controller";
+import { ChildCalls } from "./internal/ChildCalls";
 import { GraphCache } from "./internal/GraphCache";
+import { RunLimits } from "./internal/RunLimits";
 import { Schedules } from "./internal/Schedules";
 import { TimerStep } from "./internal/TimerStep";
 import { ToolStep } from "./internal/ToolStep";
@@ -31,6 +33,8 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
     scoped(ToolStep),
     scoped(TimerStep),
     scoped(Schedules),
+    scoped(ChildCalls),
+    scoped(RunLimits),
     singleton(WorkflowInputValidator, DefaultWorkflowInputValidator),
     scoped(IWorkflowRuntime, WorkflowRuntime),
   ],

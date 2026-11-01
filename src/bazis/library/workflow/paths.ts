@@ -16,10 +16,14 @@ export interface InstanceData {
   readonly run?: unknown;
   /** The engine's time as an ISO string. */
   readonly now?: string;
+  /** Inside a loop body: the element of this iteration. */
+  readonly item?: unknown;
+  /** Inside a loop body: the number of this iteration, from 0. */
+  readonly index?: number;
 }
 
-/** `$input.amount`, `$vars.payment.id`, `$nodes.Pay.paymentId`, `$event.record.id`, `$run.partition`, `$now`. */
-export const DATA_PATH = /^\$(input|vars|nodes|event|trigger|run|now)((\.[A-Za-z_][A-Za-z0-9_]*)*)$/;
+/** `$input.amount`, `$vars.payment.id`, `$nodes.Pay.paymentId`, `$event.record.id`, `$run.partition`, `$now`, `$item.id`, `$index`. */
+export const DATA_PATH = /^\$(input|vars|nodes|event|trigger|run|now|item|index)((\.[A-Za-z_][A-Za-z0-9_]*)*)$/;
 
 /** The roots of `$` paths, for a designer. */
 export const DATA_PATHS: readonly { readonly path: string; readonly description: string }[] = Object.freeze([
@@ -30,6 +34,8 @@ export const DATA_PATHS: readonly { readonly path: string; readonly description:
   { path: "$trigger", description: "How it was started: { via, at, actor, eventKey?, cause? }" },
   { path: "$run", description: "This run: { id, processKey, version, partition, test }" },
   { path: "$now", description: "The engine's time" },
+  { path: "$item", description: "Inside a loop body: the element of this iteration" },
+  { path: "$index", description: "Inside a loop body: the number of this iteration, from 0" },
 ]);
 
 /** `true` if the value is a path to instance data. */

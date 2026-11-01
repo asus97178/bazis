@@ -21,16 +21,16 @@ export interface WorkflowTaskRequested {
 export interface WorkflowTokenClosed {
   readonly instanceId: string;
   readonly tokenId: string;
-  /** `cancelled` — the instance was cancelled; `interrupted` — a boundary timer took over the step. */
-  readonly reason: "cancelled" | "interrupted";
+  /** `cancelled` — the instance was cancelled; `interrupted` — a boundary event or a skipped iteration closed the step; `timedOut` — the run took too long. */
+  readonly reason: "cancelled" | "interrupted" | "timedOut";
 }
 
-/** An instance finished: completed or cancelled. */
+/** An instance finished: completed, cancelled or out of time. */
 export interface WorkflowInstanceFinished {
   readonly instanceId: string;
   readonly processKey: string;
   readonly partition: string | null;
-  readonly status: Extract<InstanceStatus, "completed" | "cancelled">;
+  readonly status: Extract<InstanceStatus, "completed" | "cancelled" | "timedOut">;
 }
 
 /** Retention deleted these finished instances with their tokens and history. */

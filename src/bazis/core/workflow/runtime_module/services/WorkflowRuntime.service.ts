@@ -23,9 +23,12 @@ import {
   type InstanceSummary,
   type RetryInstance,
   type StartInstance,
+  type StartMany,
+  type StartManyResult,
 } from "./IWorkflowRuntime.service";
 
-const STATUSES = new Set(["running", "completed", "cancelled", "failed"]);
+const STATUSES = new Set(["pending", "running", "completed", "cancelled", "failed", "timedOut"]);
+const MAX_START_MANY = 1000;
 const EVENT_KEY = /^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)+$/;
 
 export class WorkflowRuntime extends IWorkflowRuntime {
@@ -49,8 +52,40 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (!start) throw new WorkflowError("wrong_status", `Process ${processKey} has no manual start`);
     const { value, issues } = await this.validator().validate(inputSpecOf(version.document), options.input, { purpose: "input", processKey, partition, language: options.language ?? this.languages.default, actor: options.actor });
     if (issues.length > 0) throw new WorkflowError("invalid_input", "The process input is invalid", issues);
-    const id = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor, request: options.request ?? null });
+    const { id, skipped } = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor, request: options.request ?? null });
+    if (skipped) throw new WorkflowError("conflict", `Instance ${id} with this businessKey is not finished`);
     return await this.instance(id);
+  }
+
+  async startMany(processKey: string, options: StartMany): Promise<readonly StartManyResult[]> {
+    actorOf(options.actor);
+    const partition = optionalText(options.partition, "partition");
+    if (!Array.isArray(options.items) || options.items.length === 0 || options.items.length > MAX_START_MANY) throw new WorkflowError("invalid_input", `items must be a list of 1–${MAX_START_MANY}`);
+    const version = await this.definitions.latest(processKey);
+    const start = Object.entries(version.document.nodes).find(([, node]) => node.kind === "manualStart");
+    if (!start) throw new WorkflowError("wrong_status", `Process ${processKey} has no manual start`);
+    const graph = this.engine.cache(version);
+    const results: StartManyResult[] = [];
+    for (const item of options.items) {
+      const businessKey = typeof item?.businessKey === "string" && item.businessKey !== "" && item.businessKey.length <= 200 ? item.businessKey : null;
+      if (businessKey === null) {
+        results.push({ status: "rejected", businessKey: null, reason: "business_key_required" });
+        continue;
+      }
+      const { value, issues } = await this.validator().validate(inputSpecOf(version.document), item.input, { purpose: "input", processKey, partition, language: options.language ?? this.languages.default, actor: options.actor });
+      if (issues.length > 0) {
+        results.push({ status: "rejected", businessKey, reason: "invalid_input", issues });
+        continue;
+      }
+      const { id, skipped } = await this.engine.begin(graph, start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor, request: options.request ?? null });
+      if (skipped) {
+        results.push({ status: "skipped", businessKey, instanceId: id, reason: "same_key" });
+        continue;
+      }
+      const row = await this.db.instances.asNoTracking().firstOrDefault((i) => i.id.eq(id));
+      results.push({ status: "started", businessKey, instanceId: id, instanceStatus: row?.status ?? "running" });
+    }
+    return results;
   }
 
   async cancel(instanceId: string, options: CancelInstance): Promise<InstanceDetails> {
@@ -58,7 +93,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     const reason = optionalText(options.reason, "reason", 1000);
     if (!isUuid(instanceId)) throw notFound(instanceId);
     const done = await this.engine.inStep(instanceId, async (step) => {
-      if (step.instance.status !== "running" && step.instance.status !== "failed") throw new WorkflowError("wrong_status", `Instance is ${step.instance.status}`);
+      if (step.instance.status !== "pending" && step.instance.status !== "running" && step.instance.status !== "failed") throw new WorkflowError("wrong_status", `Instance is ${step.instance.status}`);
       await this.engine.cancel(step, reason, options.actor, options.request ?? null);
       return true;
     });
@@ -71,6 +106,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (!isUuid(instanceId)) throw notFound(instanceId);
     const done = await this.engine.inStep(instanceId, async (step) => {
       if (step.instance.status !== "failed") throw new WorkflowError("wrong_status", `Only a failed instance is retried; this one is ${step.instance.status}`);
+      if (step.instance.parentInstanceId !== null) throw new WorkflowError("wrong_status", `This instance was called by ${step.instance.parentInstanceId}: retry that one`);
       await this.engine.retry(step, options.actor, options.request ?? null);
       return true;
     });
@@ -120,6 +156,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     }
 
     const started: string[] = [];
+    const skipped: { processKey: string; instanceId: string }[] = [];
     const rejected: { processKey: string; issues: readonly FormIssue[] }[] = [];
     for (const version of await this.definitions.published()) {
       for (const [nodeId, node] of Object.entries(version.document.nodes)) {
@@ -131,14 +168,16 @@ export class WorkflowRuntime extends IWorkflowRuntime {
           rejected.push({ processKey: version.key, issues });
           continue;
         }
-        started.push(await this.engine.begin(this.engine.cache(version), nodeId, { input: value, partition, businessKey: correlation, startedVia: "event", actor, request: options.request ?? null, event: { key: eventKey, payload: data } }));
+        const begun = await this.engine.begin(this.engine.cache(version), nodeId, { input: value, partition, businessKey: correlation, startedVia: "event", actor, request: options.request ?? null, event: { key: eventKey, payload: data } });
+        if (begun.skipped) skipped.push({ processKey: version.key, instanceId: begun.id });
+        else started.push(begun.id);
       }
     }
-    return { started, continued: [...continued], rejected };
+    return { started, skipped, continued: [...continued], rejected };
   }
 
   async instances(query: InstanceListQuery = {}): Promise<WorkflowPage<InstanceSummary>> {
-    if (query.status !== undefined && !STATUSES.has(query.status)) throw new WorkflowError("invalid_input", "status must be running, completed, cancelled or failed");
+    if (query.status !== undefined && !STATUSES.has(query.status)) throw new WorkflowError("invalid_input", "status must be pending, running, completed, cancelled, failed or timedOut");
     const where = query.access === undefined ? "all" : grantsToWhere(query.access);
     if (where === "none") return { items: [], total: 0 };
     let source = this.db.instances.asNoTracking();
@@ -148,6 +187,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (query.processKey !== undefined) source = source.where((i) => i.processKey.eq(query.processKey!));
     if (query.businessKey !== undefined) source = source.where((i) => i.businessKey.eq(query.businessKey!));
     if (query.startedById !== undefined) source = source.where((i) => i.startedById.eq(query.startedById!));
+    if (query.parentInstanceId !== undefined) source = source.where((i) => i.parentInstanceId.eq(query.parentInstanceId!));
     const { items, total } = await paginate(source, pageQueryOf(query, { field: "id", dir: "desc" }));
     return { items: items.map(summaryOf), total };
   }
@@ -200,6 +240,7 @@ function summaryOf(row: WfInstance): InstanceSummary {
     businessKey: row.businessKey,
     startedVia: row.startedVia,
     startedBy: { kind: row.startedByKind, id: row.startedById },
+    parentInstanceId: row.parentInstanceId,
     error: row.error,
     createdAt: row.createdAt,
     endedAt: row.endedAt,
@@ -207,7 +248,7 @@ function summaryOf(row: WfInstance): InstanceSummary {
 }
 
 function tokenOf(row: WfToken) {
-  return { id: row.id, nodeId: row.nodeId, viaFlowId: row.viaFlowId, status: row.status, output: row.output, createdAt: row.createdAt, endedAt: row.endedAt };
+  return { id: row.id, nodeId: row.nodeId, viaFlowId: row.viaFlowId, parentTokenId: row.parentTokenId, iteration: row.iteration, status: row.status, output: row.output, createdAt: row.createdAt, endedAt: row.endedAt };
 }
 
 function historyOf(row: WfHistory): HistoryEntry {

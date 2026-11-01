@@ -86,7 +86,9 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
   async validate(document: unknown, options: ValidateOptions = {}): Promise<readonly ProcessIssue[]> {
     const port = this.services.resolve(WorkflowExtensions);
     const namespaces = new Set(port.namespaces());
-    const issues = validateProcess(document, { tools: (name) => this.workflowTools.has(name), extensions: (namespace) => namespaces.has(namespace) });
+    const published = await this.db.processes.asNoTracking().where((p) => p.archivedAt.isNull().and(p.latestVersion.isNotNull())).select((p) => ({ key: p.key })).toList();
+    const processes = new Set([...published.map((row) => row.key), ...options.processes ?? []]);
+    const issues = validateProcess(document, { tools: (name) => this.workflowTools.has(name), processes: (key) => processes.has(key), extensions: (namespace) => namespaces.has(namespace) });
     if (namespaces.size === 0 || issues.some((issue) => issue.code === "too_large" || issue.code === "schema")) return issues;
     const context: WorkflowPortContext = { partition: null, language: options.language ?? this.languages.default, actor: options.actor ?? null };
     const found: ProcessIssue[] = [...issues];
@@ -178,7 +180,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
       if (!row) throw notFound(key);
       this.assertNotCode(key);
       if (row.archivedAt !== null) throw new WorkflowError("archived", `Process ${key} is archived`);
-      const issues = await this.validate(row.draft, { actor, ...(options.language === undefined ? {} : { language: options.language }) });
+      const issues = await this.validate(row.draft, { actor, processes: [key], ...(options.language === undefined ? {} : { language: options.language }) });
       if (hasErrors(issues)) throw new WorkflowError("invalid_document", `Process ${key} has errors and cannot be published`, issues);
       const { version, created } = await this.publishDraft(row, actor);
       if (created) transaction.afterCommit(() => this.changed("published", key, actor, options, version.version));

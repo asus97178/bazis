@@ -4,13 +4,13 @@ import type { WorkflowToolMetadata } from "../../contracts/types";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
-import { dataOf, type WorkflowEngine } from "./WorkflowEngine";
+import { dataOf, runActorOf, type WorkflowEngine } from "./WorkflowEngine";
 
 /**
  * One `tool` job: call the service task's Tool and apply the result. The Tool
  * runs outside a transaction, the result is applied in a step transaction; a
  * token closed meanwhile (a cancel) drops it. The Tool runs on behalf of who
- * started the instance, with the token id as its idempotency key: after a crash
+ * started the instance or of the process (`runAs`), with the token id as its idempotency key: after a crash
  * between the call and the step the call may repeat (TOOLS-001 §7).
  */
 /** How long a claimed job belongs to its worker; if it dies, another one takes the job after that. */
@@ -35,7 +35,7 @@ export class ToolStep {
     const graph = await this.engine.graphOf(instance.versionId);
     const node = graph.document.nodes[token.nodeId];
     const name = String(node?.config?.tool ?? "");
-    const input = resolveInput(node?.config?.input ?? {}, dataOf(instance, this.engine.now()));
+    const input = resolveInput(node?.config?.input ?? {}, dataOf(instance, this.engine.now(), token));
     const timeoutMs = stepTimeoutMs(node?.config?.timeout, graph.document);
     // A step may run longer than the lease: another worker must not take the job and call the Tool again meanwhile.
     if (timeoutMs !== undefined && timeoutMs >= LEASE_MS) {
@@ -46,7 +46,7 @@ export class ToolStep {
       ? { callId: token.id, name, status: "error", error: { code: "TOOL_NOT_FOUND", message: `Tool ${name} is not available to processes` }, metadata: {} } as AgentToolResult
       : await runner.run(name, input, {
         idempotencyKey: token.id,
-        actor: { kind: instance.startedByKind, id: instance.startedById },
+        actor: runActorOf(graph.document, instance),
         metadata: { instanceId: instance.id, processKey: instance.processKey, nodeId: token.nodeId, partition: instance.partition, test: false } satisfies WorkflowToolMetadata,
         signal,
         ...(timeoutMs === undefined ? {} : { timeoutMs }),

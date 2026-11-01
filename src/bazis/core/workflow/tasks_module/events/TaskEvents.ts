@@ -1,5 +1,4 @@
 import { OnEvent } from "../../../kernel";
-import { UniqueViolationError } from "../../../orm";
 import { WORKFLOW_INSTANCES_DELETED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, type WorkflowInstancesDeleted, type WorkflowTaskRequested, type WorkflowTokenClosed } from "../../runtime_module/events/Runtime.events";
 import type { TasksDbContext } from "../model/Tasks.dbContext";
 import { WfTask } from "../model/WfTask.model";
@@ -12,7 +11,8 @@ export class TaskEvents {
   @OnEvent(WORKFLOW_TASK_REQUESTED)
   async requested(event: WorkflowTaskRequested): Promise<void> {
     const assignee = "role" in event.assignee ? `role:${event.assignee.role}` : `user:${event.assignee.user}`;
-    this.db.tasks.add(Object.assign(new WfTask(), {
+    // Past the change tracker: the scope may go on to update tasks directly, which a context holding one would refuse.
+    await this.db.tasks.insertIfAbsent(Object.assign(new WfTask(), {
       tokenId: event.tokenId,
       instanceId: event.instanceId,
       processKey: event.processKey,
@@ -22,12 +22,8 @@ export class TaskEvents {
       assignee,
       form: event.form,
       dueAt: event.dueAt,
-    }));
-    try {
-      await this.db.saveChanges();
-    } catch (error) {
-      if (!(error instanceof UniqueViolationError)) throw error;
-    }
+      createdAt: new Date(),
+    }), { conflictBy: (t) => [t.tokenId] });
   }
 
   /** The step closed otherwise than by its task: the task is cancelled. */

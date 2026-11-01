@@ -18,6 +18,8 @@ export type NodeKind =
   | "userTask"
   | "serviceTask"
   | "assign"
+  | "loop"
+  | "callProcess"
   | "timerCatch"
   | "eventWait"
   | "exclusiveGateway"
@@ -32,6 +34,8 @@ export interface ProcessNode {
   readonly title: LocalizedText;
   /** Boundary nodes only: the step the node is attached to. */
   readonly attachedTo?: string;
+  /** The `loop` whose body the node belongs to. */
+  readonly parent?: string;
   readonly config?: Readonly<Record<string, unknown>>;
   /** The application's data by namespace; the engine does not read it. */
   readonly extensions?: Readonly<Record<string, unknown>>;
@@ -77,8 +81,18 @@ export interface ProcessLogSettings {
 
 /** Settings of a process: they are part of the version. */
 export interface ProcessSettings {
+  /** On whose behalf steps run: who started the instance (the default) or the process's own system actor. */
+  readonly runAs?: "starter" | "process";
+  /** How long the whole run may take, waits included: an ISO duration. */
+  readonly runTimeout?: string;
   /** The default `timeout` of steps with a Tool: an ISO duration. */
   readonly stepTimeout?: string;
+  /** How many instances of the process run at once; the rest wait as `pending`. */
+  readonly maxConcurrent?: number;
+  /** A new start with the `businessKey` of an unfinished instance: run as well, do not start, or wait for it. */
+  readonly sameKey?: "allow" | "skip" | "queue";
+  /** The key of the process to start when an instance fails or times out. */
+  readonly errorHandler?: string;
   readonly log?: ProcessLogSettings;
 }
 

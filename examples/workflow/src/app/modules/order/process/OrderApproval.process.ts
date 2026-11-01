@@ -17,7 +17,8 @@ export const orderApproval = defineProcess({
       { name: "needsReview", type: "boolean", direction: "local", default: false },
       { name: "decision", type: "enum", values: ["approved", "rejected"], direction: "out" },
     ],
-    settings: { stepTimeout: "PT30S", log: { variables: true } },
+    // A second start for an order that is still being approved does not begin.
+    settings: { stepTimeout: "PT30S", sameKey: "skip", log: { variables: true } },
     nodes: {
       Start: { kind: "manualStart", title: { en: "Start", ru: "Старт" } },
       Classify: { kind: "assign", title: { en: "Classify", ru: "Оценить" }, config: { assignments: [{ var: "needsReview", value: { op: "gt", args: [{ path: "$input.amount" }, 1000] } }] } },

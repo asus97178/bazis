@@ -1,7 +1,7 @@
 import { checkExpression, checkPath, isExpressionNode, type ExpressionScope } from "./expressions";
 import { checkExtensions, variableProblems } from "./formFields";
 import { checkLocalizedText } from "./localized";
-import { ISO_DURATION, nodeKindOf, type NodeRole } from "./nodeKinds";
+import { ISO_DURATION, nodeKindOf, PROCESS_KEY, type NodeRole } from "./nodeKinds";
 import { isPath } from "./paths";
 import { PROCESS_SCHEMA_VERSION, type ProcessDocument } from "./ProcessDocument";
 import { toStructure } from "./structure";
@@ -32,6 +32,10 @@ export type ProcessIssueCode =
   | "title_invalid"
   | "config_invalid"
   | "unknown_tool"
+  | "unknown_process"
+  | "container_invalid"
+  | "flow_across_container"
+  | "loop_body"
   | "flow_dangling"
   | "flow_self"
   | "flow_duplicate"
@@ -61,7 +65,9 @@ export const PROCESS_LIMITS = Object.freeze({ nodes: 500, flows: 1000, bytes: 1_
 
 const ID = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 /** Paths that come with later stages of WORKFLOW-002: until then they are an error, not a silent literal. */
-const NOT_YET = /^\$(secrets|item|index)(\.|$)/;
+const NOT_YET = /^\$secrets(\.|$)/;
+/** Who a boundary error may hang on: the steps that fail by an error of their own. */
+const CAN_FAIL: ReadonlySet<string | undefined> = new Set(["serviceTask", "callProcess", "loop"]);
 
 type Json = Record<string, unknown>;
 
@@ -79,6 +85,8 @@ export interface ValidateProcessOptions {
    * `callers`. Without it Tool names are only checked for their form.
    */
   readonly tools?: (name: string) => boolean;
+  /** Whether a process may be called or handle errors. Without it process keys are only checked for their form. */
+  readonly processes?: (key: string) => boolean;
   /** Whether an `extensions` namespace has a check. Without it namespaces are only checked for their form. */
   readonly extensions?: (namespace: string) => boolean;
 }
@@ -106,6 +114,10 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
   if (document.settings !== undefined) {
     const problem = checkSettings(document.settings);
     if (problem) error("settings_invalid", problem);
+    else {
+      const handler = (document.settings as Json).errorHandler;
+      if (typeof handler === "string" && options.processes && !options.processes(handler)) error("unknown_process", `Process ${JSON.stringify(handler)} of settings.errorHandler is not published`);
+    }
   }
   checkNamespaces(document.extensions, "extensions", {}, options, error);
   for (const variable of declared) checkNamespaces(variable.extensions, "extensions", { variable: String(variable.name) }, options, error);
@@ -143,6 +155,8 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
       if (problem) error("config_invalid", problem, { node: id });
       else if (definition.kind === "serviceTask" && options.tools && !options.tools(config.tool as string)) {
         error("unknown_tool", `Tool ${JSON.stringify(config.tool)} does not exist or does not list "workflow" in its callers`, { node: id });
+      } else if (definition.kind === "callProcess" && options.processes && !options.processes(config.process as string)) {
+        error("unknown_process", `Process ${JSON.stringify(config.process)} is not published`, { node: id });
       }
     }
     if (definition.role === "boundary") {
@@ -154,24 +168,95 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
   }
   for (const [id, host] of attached) {
     if (roles.get(host) !== "activity") error("boundary_attach", `attachedTo ${JSON.stringify(host)} is not a step`, { node: id });
-    else if (kinds.get(id) === "boundaryError" && kinds.get(host) !== "serviceTask") error("boundary_attach", "error boundary attaches only to a service task", { node: id });
+    else if (kinds.get(id) === "boundaryError" && !CAN_FAIL.has(kinds.get(host))) error("boundary_attach", "error boundary attaches only to a service task, a called process or a loop", { node: id });
+  }
+
+  // Containers: `parent` names a loop, and a chain of parents ends.
+  const parents = new Map<string, string>();
+  for (const [id, raw] of Object.entries(nodes)) {
+    const parent = isObject(raw) ? raw.parent : undefined;
+    if (parent === undefined) continue;
+    if (typeof parent !== "string" || kinds.get(parent) !== "loop" || parent === id) error("container_invalid", "parent must be a loop", { node: id });
+    else if (roles.get(id) === "start") error("container_invalid", "a start cannot be inside a loop", { node: id });
+    else parents.set(id, parent);
+  }
+  for (const id of [...parents.keys()]) {
+    const seen = new Set([id]);
+    for (let up = parents.get(id); up !== undefined; up = parents.get(up)) {
+      if (seen.has(up)) {
+        error("container_invalid", "loops cannot contain each other", { node: id });
+        parents.delete(id);
+        break;
+      }
+      seen.add(up);
+    }
+  }
+  for (const [id, host] of attached) {
+    if (roles.has(host) && parents.get(id) !== parents.get(host)) error("boundary_attach", "a boundary node must be in the same container as its step", { node: id });
   }
 
   // What expressions may read: declared variables, what steps save and existing nodes.
   const named = (direction: (value: unknown) => boolean) => new Set(declared.filter((variable) => direction(variable.direction)).map((variable) => String(variable.name)));
   const writable = named((direction) => direction !== "in");
-  const saved = new Set(writable);
-  for (const raw of Object.values(nodes)) {
-    const saveTo = isObject(raw) && isObject(raw.config) ? raw.config.saveTo : undefined;
-    if (typeof saveTo === "string") saved.add(saveTo);
-  }
   const known = variables.length === 0;
-  const scope: ExpressionScope = { ...(known ? { input: named((direction) => direction === "in"), vars: saved } : {}), nodes: new Set(Object.keys(nodes)) };
+  const input = named((direction) => direction === "in");
+  /** What a step in a container reads: a body sees what is outside it, the outside does not see the body. */
+  const scopes = new Map<string | undefined, { readonly scope: ExpressionScope; readonly names: ReadonlySet<string> }>();
+  const scopeIn = (container: string | undefined): { readonly scope: ExpressionScope; readonly names: ReadonlySet<string> } => {
+    const ready = scopes.get(container);
+    if (ready) return ready;
+    const outer = container === undefined ? undefined : scopeIn(parents.get(container));
+    const vars = new Set<string>(outer ? outer.scope.vars : writable);
+    const seen = new Set<string>(outer ? outer.scope.nodes : []);
+    const names = new Set<string>(outer ? outer.names : []);
+    const own = container === undefined ? undefined : (nodes[container] as Json).config;
+    for (const key of ["item", "index"]) {
+      const name = isObject(own) ? own[key] : undefined;
+      if (typeof name === "string") names.add(name);
+    }
+    for (const name of names) vars.add(name);
+    for (const [id, raw] of Object.entries(nodes)) {
+      if (parents.get(id) !== container) continue;
+      seen.add(id);
+      const saveTo = isObject(raw) && isObject(raw.config) ? raw.config.saveTo : undefined;
+      if (typeof saveTo === "string") vars.add(saveTo);
+    }
+    const made = { scope: { ...(known ? { input, vars } : { vars }), nodes: seen, loop: container !== undefined }, names };
+    scopes.set(container, made);
+    return made;
+  };
+  const scopeOf = (container: string | undefined): ExpressionScope => {
+    const { scope } = scopeIn(container);
+    return known ? scope : { nodes: scope.nodes!, loop: scope.loop! };
+  };
 
   // What steps read: an assign writes declared variables, inputs and waits read what exists.
   for (const [id, raw] of Object.entries(nodes)) {
     if (!isObject(raw) || !isObject(raw.config) || definitionProblem(raw)) continue;
-    for (const problem of configExpressionProblems(raw.kind as string, raw.config, scope, known ? writable : undefined)) error("config_invalid", problem, { node: id });
+    const container = parents.get(id);
+    for (const problem of configExpressionProblems(raw.kind as string, raw.config, scopeOf(container), known ? writable : undefined)) error("config_invalid", problem, { node: id });
+    if (raw.kind !== "loop") continue;
+    const body = scopeOf(id);
+    if (raw.config.while !== undefined) {
+      // Before an iteration: it knows its number, not what the body of the last one kept to itself.
+      const outside = scopeOf(container);
+      const own = [raw.config.item, raw.config.index].filter((name): name is string => typeof name === "string");
+      const problem = checkExpression(raw.config.while, { ...outside, loop: true, ...(outside.vars ? { vars: new Set([...outside.vars, ...own]) } : {}) });
+      if (problem) error("config_invalid", `config.while: ${problem}`, { node: id });
+    }
+    const collect = raw.config.collect as Json | undefined;
+    if (collect !== undefined) {
+      const problem = checkExpression(collect.from, body);
+      if (problem) error("config_invalid", `config.collect.from: ${problem}`, { node: id });
+      if (known && !writable.has(collect.to as string)) error("config_invalid", `config.collect.to: ${String(collect.to)} is not a declared local or out variable`, { node: id });
+    }
+    for (const key of ["item", "index"]) {
+      const name = raw.config[key];
+      if (typeof name !== "string") continue;
+      if (known && (writable.has(name) || input.has(name))) error("config_invalid", `config.${key}: ${name} is already a variable of the process`, { node: id });
+      if (scopeIn(container).names.has(name)) error("config_invalid", `config.${key}: ${name} is already taken by an outer loop`, { node: id });
+    }
+    if (raw.config.item !== undefined && raw.config.item === raw.config.index) error("config_invalid", "config.item and config.index must differ", { node: id });
   }
 
   // Flows: ends, duplicates, conditions.
@@ -193,6 +278,7 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
       continue;
     }
     if (source === target) error("flow_self", "flow connects a node to itself", { flow: id });
+    if (parents.get(source) !== parents.get(target)) error("flow_across_container", "a flow cannot cross the border of a loop", { flow: id });
     const pair = `${source}\u0000${target}`;
     if (pairs.has(pair)) error("flow_duplicate", "another flow already connects these nodes", { flow: id });
     pairs.add(pair);
@@ -207,7 +293,7 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
     if (raw.condition !== undefined) {
       if (!fromChoice) error("condition_not_allowed", "only flows leaving an exclusive gateway have conditions", { flow: id });
       else {
-        const problem = checkExpression(raw.condition, scope);
+        const problem = checkExpression(raw.condition, scopeOf(parents.get(source)));
         if (problem) error("condition_invalid", problem, { flow: id });
       }
     }
@@ -217,7 +303,19 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
   // Rules by node role.
   const starts = [...roles].filter(([, role]) => role === "start").map(([id]) => id);
   if (starts.length === 0) error("no_start", "process needs a start node");
-  if (![...roles.values()].includes("end")) error("no_end", "process needs an end node");
+  if (![...roles].some(([id, role]) => role === "end" && !parents.has(id))) error("no_end", "process needs an end node");
+  // A body: one step without incoming flows to begin with and an end of its own.
+  const entries = new Map<string, string>();
+  for (const [loop, kind] of kinds) {
+    if (kind !== "loop") continue;
+    const members = [...parents].filter(([, parent]) => parent === loop).map(([id]) => id);
+    const first = members.filter((id) => roles.get(id) !== "boundary" && (incoming.get(id)?.length ?? 0) === 0);
+    if (first.length !== 1) error("loop_body", `the body of a loop needs exactly one step without incoming flows, not ${first.length}`, { node: loop });
+    else if (roles.get(first[0]!) !== "activity" && roles.get(first[0]!) !== "gateway") error("loop_body", "the body of a loop begins with a step", { node: loop });
+    else entries.set(loop, first[0]!);
+    if (!members.some((id) => roles.get(id) === "end")) error("loop_body", "the body of a loop needs an end of its own", { node: loop });
+  }
+  const opening = new Set(entries.values());
   for (const [id, role] of roles) {
     const ins = incoming.get(id)?.length ?? 0;
     const outs = outgoing.get(id) ?? [];
@@ -231,7 +329,7 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
         if (ins === 0) error("end_incoming", "end node needs an incoming flow", { node: id });
         break;
       case "activity":
-        if (ins === 0) error("activity_incoming", "step needs an incoming flow", { node: id });
+        if (ins === 0 && !opening.has(id)) error("activity_incoming", "step needs an incoming flow", { node: id });
         if (outs.length !== 1) error("activity_outgoing", "step needs exactly one outgoing flow; branch with a gateway", { node: id });
         break;
       case "boundary":
@@ -239,7 +337,7 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
         if (outs.length !== 1) error("boundary_outgoing", "boundary node needs exactly one outgoing flow", { node: id });
         break;
       case "gateway":
-        if (ins === 0 || outs.length === 0 || (ins < 2 && outs.length < 2)) {
+        if ((ins === 0 && !opening.has(id)) || outs.length === 0 || (ins < 2 && outs.length < 2 && !opening.has(id))) {
           error("gateway_flows", "gateway needs incoming and outgoing flows and must split or join", { node: id });
         }
         if (kinds.get(id) === "exclusiveGateway" && outs.length > 1) checkChoice(id, outs, flows, error);
@@ -251,8 +349,10 @@ export function validateProcess(document: unknown, options: ValidateProcessOptio
   const forward = new Map<string, string[]>();
   for (const [id, list] of outgoing) forward.set(id, list.map((flow) => (flows[flow] as Json).target as string));
   for (const [boundary, host] of attached) if (roles.has(host)) forward.set(host, [...forward.get(host) ?? [], boundary]);
+  // The way back goes only inside a container: the end of a body says nothing about what follows the loop.
   const backward = new Map<string, string[]>();
   for (const [from, list] of forward) for (const to of list) backward.set(to, [...backward.get(to) ?? [], from]);
+  for (const [loop, entry] of entries) forward.set(loop, [...forward.get(loop) ?? [], entry]);
   const reached = walk(starts, forward);
   const ending = walk([...roles].filter(([, role]) => role === "end").map(([id]) => id), backward);
   for (const id of roles.keys()) {
@@ -291,8 +391,16 @@ function checkChoice(id: string, outs: readonly string[], flows: Json, error: (c
 function checkSettings(value: unknown): string | null {
   if (!isObject(value)) return "settings must be an object";
   for (const [key, item] of Object.entries(value)) {
-    if (key === "stepTimeout") {
-      if (typeof item !== "string" || !ISO_DURATION.test(item)) return "settings.stepTimeout must be an ISO duration without months and years";
+    if (key === "stepTimeout" || key === "runTimeout") {
+      if (typeof item !== "string" || !ISO_DURATION.test(item)) return `settings.${key} must be an ISO duration without months and years`;
+    } else if (key === "runAs") {
+      if (item !== "starter" && item !== "process") return "settings.runAs must be starter or process";
+    } else if (key === "sameKey") {
+      if (item !== "allow" && item !== "skip" && item !== "queue") return "settings.sameKey must be allow, skip or queue";
+    } else if (key === "maxConcurrent") {
+      if (!Number.isSafeInteger(item) || (item as number) < 1 || (item as number) > 100_000) return "settings.maxConcurrent must be an integer 1–100000";
+    } else if (key === "errorHandler") {
+      if (typeof item !== "string" || !PROCESS_KEY.test(item)) return "settings.errorHandler must be a process key";
     } else if (key === "log") {
       if (!isObject(item)) return "settings.log must be an object";
       for (const [flag, on] of Object.entries(item)) {
@@ -338,7 +446,11 @@ function configExpressionProblems(kind: string, config: Json, scope: ExpressionS
       if (problem) out.push(`config.assignments[${index}].value: ${problem}`);
     }
   }
-  if (kind === "serviceTask" && config.input !== undefined) walkInput(config.input, "config.input", scope, out);
+  if ((kind === "serviceTask" || kind === "callProcess") && config.input !== undefined) walkInput(config.input, "config.input", scope, out);
+  if (kind === "loop" && config.over !== undefined) {
+    const problem = checkExpression(config.over, scope);
+    if (problem) out.push(`config.over: ${problem}`);
+  }
   for (const key of ["at", "correlation"]) {
     if (typeof config[key] === "string") {
       const problem = checkPath(config[key], scope);

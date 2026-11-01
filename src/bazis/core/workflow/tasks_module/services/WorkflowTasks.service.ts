@@ -93,7 +93,7 @@ export class WorkflowTasks extends IWorkflowTasks {
       if (error instanceof WorkflowError && error.code === "wrong_status") await this.close(task.tokenId, "cancelled");
       throw error;
     }
-    const saved = instance.nodes[task.nodeId];
+    const saved = instance.tokens.find((t) => t.id === task.tokenId)?.output;
     await this.db.tasks.asNoTracking().where((t) => t.id.eq(task.id)).executeUpdate({
       status: "completed",
       completedById: actor.id,

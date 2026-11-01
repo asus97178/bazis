@@ -20,7 +20,7 @@ export {
   type ProcessNode,
   type ProcessSettings,
 } from "./ProcessDocument";
-export { NODE_KINDS, nodeKindOf, ISO_DURATION, type JsonSchema, type NodeKindDefinition, type NodeRole } from "./nodeKinds";
+export { NODE_KINDS, nodeKindOf, ISO_DURATION, MAX_ITERATIONS, MAX_LOOP_PARALLEL, PROCESS_KEY, type JsonSchema, type NodeKindDefinition, type NodeRole } from "./nodeKinds";
 export { PROCESS_LIMITS, validateProcess, hasErrors, type ProcessIssue, type ProcessIssueCode, type ValidateProcessOptions } from "./validateProcess";
 export { DATA_PATH, DATA_PATHS, isPath, readPath, resolveInput, type InstanceData } from "./paths";
 export {

@@ -55,6 +55,8 @@ only in `drain` / `advance`.
 - PASS `src/bazis/library/workflow/test/workflow.document.test.ts` — document validation, paths, conditions, forms, durations.
 - PASS `src/bazis/library/workflow/test/workflow.expressions.test.ts`, `workflow.v2.test.ts` — expressions and their text, variables, settings, `extensions`, `upgradeDocument`, the structure, the palette, masks.
 - PASS `src/bazis/core/workflow/test/workflow.postgres.document.live.test.ts` on PostgreSQL 17: the catalog brought over from the old store, `assign`, paths of the run, `out`, `timeout`, `onError`, the history log, the ports, `/workflow/palette`, `/workflow/validate`, the card, `folder` in grants, the language of a request.
+- PASS `src/bazis/library/workflow/test/workflow.loop.test.ts` — the loop in a document: config, body, scopes, `unknown_process`, the structure, Mermaid, personal elements.
+- PASS `src/bazis/core/workflow/test/workflow.postgres.runs.live.test.ts` on PostgreSQL 17: loops (order, limits, batches, `while`, `skip` and `stop`, boundaries, joins inside an iteration, nesting), `callProcess` (output, failure and retry through the caller, boundary, `onError`, cancel both ways, depth), `runAs`, `runTimeout`, `errorHandler`, `maxConcurrent` under concurrent starts, `sameKey`, `startMany`.
 - PASS `src/bazis/core/workflow/test/workflow.postgres.contract.live.test.ts` on PostgreSQL 17: JSON:API lists, the draft lock, audit events with the request, `context.actor` and `context.metadata`.
 - PASS `src/bazis/core/workflow/test/workflow.postgres.live.test.ts` on PostgreSQL 17
   (`BAZIS_WORKFLOW_PG_URL`, database `bazis_wf_*`; run by `ops/live-postgres`):
