@@ -40,6 +40,7 @@ test("codegen declares isolated production and test targets", async () => {
     version: number;
     defaultTarget: string;
     targets: Record<string, { entrypoints: string[]; applicationParts?: string[] }>;
+    framework?: { packs: string[] };
   };
   expect(config).toEqual({
     version: 1,
@@ -54,6 +55,7 @@ test("codegen declares isolated production and test targets", async () => {
         ],
       },
     },
+    framework: { packs: ["src/bazis/core/access"] },
   });
 });
 
