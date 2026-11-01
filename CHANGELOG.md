@@ -4,6 +4,38 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.130.0 — 2026-11-01
+
+Process rights moved to `bazis/core/access` (stage 0 of WORKFLOW-002), and an
+example application for processes. Breaking: see
+[Upgrading](docs/guide/reference/upgrading.md#01300).
+
+### Added
+
+- `WorkflowModule` declares the permissions `workflow.processes.*`,
+  `workflow.instances.*`, `workflow.events.emit` and `workflow.tasks.work`, and
+  the reference kind `workflow.process`; it imports `AccessModule` itself. Each
+  part declares its own, so an application with only some parts gets only those.
+- Lists of processes, instances and tasks are filtered by the grants across all
+  partitions at once. `ProcessListQuery`, `InstanceListQuery` and `TaskListQuery`
+  take `access`, a filter from `IAccess`.
+- `IWorkflowTasks.partitions()`: the partitions that have tasks in given statuses.
+- `examples/workflow`: orders approved by a process, Tools, roles, the module's
+  own permissions, a JWT sign-in, tests of the process and of the rights.
+- CI runs the tests of both examples on a PostgreSQL service.
+
+### Changed (breaking)
+
+- `WorkflowAccess`, `DenyWorkflowAccess`, `WorkflowAction` and
+  `WorkflowAccessTarget` are removed: an application declares roles or implements
+  `AccessPolicy`. Permission names have the `workflow.` prefix.
+- `TaskListQuery.assignees` is replaced by `addressees`, per partition:
+  `[{ scope, principals }]`. Task addressees are counted when tasks are viewed.
+- The actor of a workflow HTTP request is always `{ kind: "user", id }`, where
+  `id` is the first of `AccessPolicy.ownerIds`.
+- A route without the permission answers 403 before the body is read and the
+  object is loaded; before, a bad body or an unknown id answered first.
+
 ## 0.129.0 — 2026-11-01
 
 Access as a layer of the framework (stage 1 of ACCESS-001); module providers in
