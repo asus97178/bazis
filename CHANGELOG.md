@@ -4,6 +4,49 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.132.0 — 2026-11-01
+
+The process document v2 (stage 2 of WORKFLOW-002): expressions, localized texts,
+variables, step settings and extensions. New workflow stores.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01320).
+
+### Added
+
+- Expressions in the document: `Expr`, `evaluateExpression`, `parseExpression`,
+  `printExpression`. Operators, functions and references to `$input`, `$vars`,
+  `$event`. An expression never throws: what cannot be computed is `null`.
+- `LocalizedText` for titles and form labels, `textOf`, `allTexts`.
+  `workflowConfig.language` and `languages`; the language of a request picks the
+  text, and HTTP responses carry `titleText` next to `title`.
+- Variables with `in`, `out` and `local` directions, the `assign` node, the
+  process `output`.
+- Step settings: `timeout`, `retry.growth`, `onError: "skip"`; process `settings`
+  with `stepTimeout` and `log`. A `timeout` longer than the job lease extends the
+  lease.
+- `extensions` in the document and the `WorkflowExtensions` contract.
+- `personal` on a validator writes `x-personal`; such values are masked in the
+  process history.
+- Designer core: `toStructure`, `fromStructure`, `isStructured`, `processPalette`,
+  `formOf`, `upgradeDocument`.
+- `POST /workflow/validate` and `GET /workflow/palette`.
+- Process card: `folder` and `owner`, `filter[folder]` for a folder and below,
+  grant conditions on `folder`.
+
+### Changed (breaking)
+
+- The process document is `bazis.workflow/v2`. Only v2 can be saved. Published
+  versions and drafts are upgraded on import; wrap a document in code with
+  `upgradeDocument` or rewrite it.
+- `input.fields` became `variables`, form field `code` became `name`, conditions
+  became expressions. `library/workflow/conditions.ts` is removed.
+- The document is stricter: an undeclared `$input.x` or `$vars.x` is an error,
+  `name` and `saveTo` follow `^[a-z][A-Za-z0-9_]{0,39}$`, `settings` accepts only
+  `stepTimeout` and `log`.
+- New stores: `bazis_wf2_def_*`, `bazis_wf2_run_*`, `bazis_wf2_task_*`. The catalog
+  is imported once on start. Instances and tasks are not transferred; old tables
+  are dropped by hand.
+- `workflowRuntimeConfig` is now `workflowConfig`.
+
 ## 0.131.0 — 2026-11-01
 
 The contract of Tools and of the workflow HTTP API (stage 1 of WORKFLOW-002).
