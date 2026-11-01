@@ -1,4 +1,7 @@
-import type { Condition, NodeKind, ProcessDocument } from "./ProcessDocument";
+import type { Expr } from "./expressions";
+import { printExpression } from "./expressionSyntax";
+import { textOf } from "./localized";
+import type { NodeKind, ProcessDocument } from "./ProcessDocument";
 
 /** Words Mermaid reads as syntax: such node ids are renamed. */
 const RESERVED = new Set(["end", "graph", "flowchart", "subgraph", "style", "class", "classdef", "click", "default", "linkstyle", "direction"]);
@@ -10,6 +13,7 @@ const SHAPES: Record<NodeKind, readonly [open: string, close: string]> = {
   end: ["((", "))"],
   userTask: ["[", "]"],
   serviceTask: ["[[", "]]"],
+  assign: ["[/", "/]"],
   timerCatch: ["{{", "}}"],
   eventWait: ["{{", "}}"],
   exclusiveGateway: ["{", "}"],
@@ -42,14 +46,14 @@ export function processToMermaid(document: ProcessDocument, direction: "LR" | "T
   for (const [nodeId, node] of Object.entries(document.nodes)) {
     const [open, close] = SHAPES[node.kind] ?? ["[", "]"];
     const detail = detailOf(node.kind, node.config ?? {});
-    lines.push(`  ${idOf(nodeId)}${open}"${label(node.title || nodeId)}${detail === undefined ? "" : `<br/><small>${label(detail)}</small>`}"${close}`);
+    lines.push(`  ${idOf(nodeId)}${open}"${label(textOf(node.title, "en") || nodeId)}${detail === undefined ? "" : `<br/><small>${label(detail)}</small>`}"${close}`);
   }
   for (const [nodeId, node] of Object.entries(document.nodes)) {
     if (node.attachedTo !== undefined && document.nodes[node.attachedTo] !== undefined) lines.push(`  ${idOf(node.attachedTo)} -.- ${idOf(nodeId)}`);
   }
   for (const flow of Object.values(document.flows)) {
     if (document.nodes[flow.source] === undefined || document.nodes[flow.target] === undefined) continue;
-    const text = flow.title ?? (flow.condition !== undefined ? conditionText(flow.condition) : flow.isDefault === true ? "default" : undefined);
+    const text = flow.title !== undefined ? textOf(flow.title, "en") : flow.condition !== undefined ? expressionText(flow.condition) : flow.isDefault === true ? "default" : undefined;
     lines.push(`  ${idOf(flow.source)} -->${text === undefined ? "" : `|"${label(text)}"|`} ${idOf(flow.target)}`);
   }
   return `${lines.join("\n")}\n`;
@@ -70,15 +74,21 @@ function detailOf(kind: NodeKind, config: Readonly<Record<string, unknown>>): st
       const assignee = config.assignee as { role?: unknown; user?: unknown } | undefined;
       return assignee === undefined ? undefined : text(assignee.role) !== undefined ? `role ${assignee.role}` : text(assignee.user) === undefined ? undefined : `user ${assignee.user}`;
     }
+    case "assign": {
+      const list = config.assignments;
+      return Array.isArray(list) ? list.map((item: { var?: unknown }) => String(item.var)).join(", ") : undefined;
+    }
     default: return undefined;
   }
 }
 
-function conditionText(condition: Condition): string {
-  if ("all" in condition) return condition.all.map(conditionText).join(" and ");
-  if ("any" in condition) return condition.any.map(conditionText).join(" or ");
-  if ("not" in condition) return `not (${conditionText(condition.not)})`;
-  return condition.op === "empty" || condition.op === "notEmpty" ? `${condition.path} ${condition.op}` : `${condition.path} ${condition.op} ${JSON.stringify(condition.value)}`;
+/** A condition in the designer's syntax; one that does not print shows as JSON. */
+function expressionText(expression: Expr): string {
+  try {
+    return printExpression(expression);
+  } catch {
+    return JSON.stringify(expression);
+  }
 }
 
 /** Text inside a quoted Mermaid label: quotes and markup are entities. */

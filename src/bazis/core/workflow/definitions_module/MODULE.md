@@ -1,6 +1,6 @@
 # WorkflowDefinitionsModule
 
-Passport version: 1.1. Check date: 2026-10-31.
+Passport version: 1.1. Check date: 2026-11-01.
 Status: implemented; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/definitions_module`.
@@ -20,7 +20,7 @@ The part provides the pack's `WorkflowClock`.
 
 | Component | File | Dependencies | Output |
 | --- | --- | --- | --- |
-| `WfProcess`, `WfVersion`, `DefinitionsDbContext` | [model](model) | ORM, owned store `bazis.workflow.definitions` | tables `bazis_wf_def_processes`, `bazis_wf_def_versions` |
+| `WfProcess`, `WfVersion`, `DefinitionsDbContext` | [model](model) | ORM, owned store `bazis.workflow.definitions.v2` | tables `bazis_wf2_def_processes`, `bazis_wf2_def_versions` |
 | `IWorkflowDefinitions` / `WorkflowDefinitions` (scoped) | [services](services) | `DefinitionsDbContext`, `WorkflowTools`, `CodeProcessCatalog`, `WorkflowClock`, `WorkflowEvents` | catalog operations, `WorkflowError`; `conflict` on changes of a process declared in code and on an out-of-date `expected` of a draft; `publishCode`; `WORKFLOW_PROCESS_CHANGED` after the commit |
 | `defineProcess`, the `processes` channel | [code/defineProcess.ts](code/defineProcess.ts), [code/codeProcesses.ts](code/codeProcesses.ts) | module-owned metadata of DI | build-time check: the fields, the document without Tools, one key per application, `WorkflowModule` imported; `WorkflowSetupError` as a configuration error |
 | `CodeProcessCatalog` (singleton) | [code/CodeProcessCatalog.ts](code/CodeProcessCatalog.ts) | the container's contributions | which module owns a key (`ProcessSummary.module`) |
@@ -37,10 +37,10 @@ Permissions: `workflow.processes.*` ([access/Definitions.permissions.ts](access/
 
 ## 3. Data
 
-`bazis_wf_def_processes`: `id` uuid v7, `key` unique, `title`, `description`,
+`bazis_wf2_def_processes`: `id` uuid v7, `key` unique, `title` and `description` (`LocalizedText`), `titleText`, `folder`, `owner`,
 `draft` json, `draftUpdatedAt/ByKind/ById`, `latestVersion`, `retentionDays`,
 `archivedAt`, `createdAt`, `updatedAt`.
-`bazis_wf_def_versions`: `id` uuid v7, `processId` (FK, cascade), `version`
+`bazis_wf2_def_versions`: `id` uuid v7, `processId` (FK, cascade), `version`
 (unique with `processId`), `document` json, `documentHash` (sha-256 of the
 canonical JSON), `publishedAt`, `publishedByKind/ById`.
 

@@ -3,7 +3,7 @@ import { processToMermaid, type ProcessDocument } from "@/library/workflow";
 
 test("a process becomes a Mermaid flowchart with shapes by kind, details, conditions and boundary links", () => {
   const document: ProcessDocument = {
-    schemaVersion: "bazis.workflow/v1",
+    schemaVersion: "bazis.workflow/v2",
     nodes: {
       Start: { kind: "manualStart", title: "Start" },
       Pay: { kind: "serviceTask", title: "Pay \"now\"", config: { tool: "payments.charge" } },
@@ -16,7 +16,7 @@ test("a process becomes a Mermaid flowchart with shapes by kind, details, condit
     flows: {
       a: { source: "Start", target: "Pay" },
       b: { source: "Pay", target: "Paid" },
-      c: { source: "Paid", target: "end-1", condition: { all: [{ path: "$vars.paid", op: "eq", value: true }, { path: "$input.note", op: "notEmpty" }] } },
+      c: { source: "Paid", target: "end-1", condition: { op: "and", args: [{ op: "eq", args: [{ path: "$vars.paid" }, true] }, { op: "notEmpty", args: [{ path: "$input.note" }] }] } },
       d: { source: "Paid", target: "Review", isDefault: true },
       e: { source: "Review", target: "end-1", title: "called" },
       f: { source: "Late", target: "end" },
@@ -33,7 +33,7 @@ test("a process becomes a Mermaid flowchart with shapes by kind, details, condit
   Review -.- Late
   Start --> Pay
   Pay --> Paid
-  Paid -->|"$vars.paid eq true and $input.note notEmpty"| n_end_1
+  Paid -->|"{paid} == true and notEmpty({$input.note})"| n_end_1
   Paid -->|"default"| Review
   Review -->|"called"| n_end_1
   Late --> n_end

@@ -5,7 +5,6 @@ import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinit
 import { runtimePermissions } from "./access/Runtime.permissions";
 import { WorkflowRetention } from "./background/WorkflowRetention";
 import { WorkflowWorker } from "./background/WorkflowWorker";
-import { workflowRuntimeConfig } from "./config/Runtime.config";
 import { EventsController } from "./http/Events.controller";
 import { InstancesController } from "./http/Instances.controller";
 import { GraphCache } from "./internal/GraphCache";
@@ -25,7 +24,6 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
 @Module({
   imports: [AccessModule, WorkflowDefinitionsModule],
   permissions: runtimePermissions,
-  config: [workflowRuntimeConfig],
   ormBazis: { context: RuntimeDbContext, entities: [...RUNTIME_ENTITIES], ownedStore: runtimeStore, registerRepositories: false },
   providers: [
     singleton(GraphCache),

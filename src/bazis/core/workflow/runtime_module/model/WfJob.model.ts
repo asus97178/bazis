@@ -9,7 +9,7 @@ export type JobKind = "tool" | "timer" | "retry" | "schedule";
  * token. Application instances claim it with `FOR UPDATE SKIP LOCKED`.
  */
 @ForeignKey(() => WfInstance, { properties: ["instanceId"], onDelete: "cascade" })
-@Entity({ table: "bazis_wf_run_jobs" })
+@Entity({ table: "bazis_wf2_run_jobs" })
 export class WfJob {
   @UUID({ version: "v7" })
   id = "";
@@ -33,6 +33,22 @@ export class WfJob {
   @Index()
   @Column({ type: "datetime" })
   dueAt = new Date(0);
+
+  /** What a job carries besides its token: an event to deliver (stage 4). */
+  @Column({ type: "json", nullable: true })
+  payload: unknown = null;
+
+  /** Jobs with one key merge into the last: `debounce` of an event start (stage 4). */
+  @Index()
+  @Column({ type: "text", nullable: true })
+  dedupeKey: string | null = null;
+
+  /** The partition and the start node of a `schedule` job (stage 4). */
+  @Column({ type: "text", nullable: true })
+  partition: string | null = null;
+
+  @Column({ type: "text", nullable: true })
+  nodeId: string | null = null;
 
   @Column({ type: "integer" })
   attempts = 0;

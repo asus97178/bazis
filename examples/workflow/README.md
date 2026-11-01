@@ -8,6 +8,7 @@ do what is the data of `defineRoles`.
 | Part | Where |
 | --- | --- |
 | The process: a big order waits for a manager for two days | `modules/order/process/OrderApproval.process.ts` |
+| Variables, an `assign` step, expressions, titles in two languages, a folder | the same process |
 | A step: the module's own operation | `modules/order/tools/SetOrderStatus.tool.ts` |
 | What the module lets an administrator allow | `modules/order/access/Order.permissions.ts` |
 | Roles → permissions | `modules/App.module.ts` |

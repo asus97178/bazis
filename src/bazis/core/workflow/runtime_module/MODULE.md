@@ -1,6 +1,6 @@
 # WorkflowRuntimeModule
 
-Passport version: 1.1. Check date: 2026-10-31.
+Passport version: 1.1. Check date: 2026-11-01.
 Status: implemented for stage 1 of WORKFLOW-001; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/runtime_module`.
@@ -13,7 +13,7 @@ where execution is. No state lives in memory: one engine step is one
 transaction holding the instance row `FOR UPDATE` over the five tables of the
 part, which is why they have one owner.
 
-Executes every node kind of `bazis.workflow/v1` (stages 1–3): manual, event
+Executes every node kind of `bazis.workflow/v2` (stages 1–3): manual, event
 and scheduled starts, end, `serviceTask` with `config.retry`, `boundaryError`,
 `userTask` as a wait, `timerCatch`, `eventWait`, `boundaryTimer` and
 `boundaryEvent` (interrupting or not), exclusive and parallel gateways, cancel,
@@ -23,7 +23,7 @@ retry, `emit`.
 
 | Component | File | Dependencies | Output |
 | --- | --- | --- | --- |
-| 5 entities, `RuntimeDbContext` | [model](model) | ORM, owned store `bazis.workflow.runtime` | `bazis_wf_run_instances`, `_tokens`, `_jobs`, `_subscriptions`, `_history` |
+| 5 entities, `RuntimeDbContext` | [model](model) | ORM, owned store `bazis.workflow.runtime.v2` | `bazis_wf2_run_instances`, `_tokens`, `_jobs`, `_subscriptions`, `_history` |
 | `WorkflowEngine` (scoped) | [internal/WorkflowEngine.ts](internal/WorkflowEngine.ts) | `RuntimeDbContext`, `IWorkflowDefinitions`, `GraphCache`, `WorkflowEvents`, `WorkflowClock` | token moves, gateways, finish, cancel, retry; events after commit; due times by the clock |
 | `GraphCache` (singleton) | [internal/GraphCache.ts](internal/GraphCache.ts) | — | graphs of versions, up to 500 |
 | `ToolStep` (scoped) | [internal/ToolStep.ts](internal/ToolStep.ts) | `RuntimeDbContext`, `WorkflowEngine`, `WorkflowTools` | one `tool` job: `ToolRunner.as("workflow").run(tool, input, { actor, idempotencyKey: tokenId, metadata })`; a retry keeps the job with a later `dueAt`; a final failure goes to `WorkflowEngine.failStep` (error boundary or `failed`) |
@@ -37,7 +37,7 @@ retry, `emit`.
 | `WorkflowRetention` | [background/WorkflowRetention.ts](background/WorkflowRetention.ts) | `SERVICE_PROVIDER`, settings, `IWorkflowDefinitions`, `WorkflowClock` | deletes old `completed`/`cancelled` instances (cascade); idle with a manual clock |
 | events | [events/Runtime.events.ts](events/Runtime.events.ts) | `WorkflowEvents` | `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED`, `WORKFLOW_INSTANCE_FINISHED`, and for the audit `WORKFLOW_INSTANCE_STARTED`, `WORKFLOW_INSTANCE_CANCELLED`, `WORKFLOW_INSTANCE_RETRIED` (after the step commits), `WORKFLOW_INSTANCES_DELETED` (after each retention batch) |
 
-exports: `[IWorkflowRuntime]`. config: `workflowRuntimeConfig`.
+exports: `[IWorkflowRuntime]`. config: `workflowConfig`.
 
 ## 3. Settings (`workflow.*`)
 

@@ -85,7 +85,7 @@ class NoteTool {
 }
 
 const TASK_DOCUMENT: ProcessDocument = {
-  schemaVersion: "bazis.workflow/v1",
+  schemaVersion: "bazis.workflow/v2",
   nodes: {
     Start: { kind: "manualStart", title: "Start" },
     Approve: { kind: "userTask", title: "Approve", config: { assignee: { role: "manager" } } },
@@ -95,7 +95,7 @@ const TASK_DOCUMENT: ProcessDocument = {
 };
 
 const TOOL_DOCUMENT = {
-  schemaVersion: "bazis.workflow/v1",
+  schemaVersion: "bazis.workflow/v2",
   nodes: {
     Start: { kind: "manualStart", title: "Start" },
     Note: { kind: "serviceTask", title: "Note", config: { tool: "contract.note", input: {} } },
@@ -159,7 +159,7 @@ beforeAll(async () => {
   if (!enabled) return;
   const sql = postgres({ url });
   try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf\\_%'", [])) as { tablename: string }[];
+    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
     if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
     await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
   } finally {

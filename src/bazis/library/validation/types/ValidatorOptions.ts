@@ -160,4 +160,6 @@ export interface ValidatorOptions {
   refKeys?: string;
   /** JSON Pointer to the sibling input that sets their area (`x-ref-scope`): `/table`. */
   refScope?: `/${string}`;
+  /** Personal data (`x-personal`): a process masks the value in its history. */
+  personal?: boolean;
 }

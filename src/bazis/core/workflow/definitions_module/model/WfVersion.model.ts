@@ -4,7 +4,7 @@ import { WfProcess } from "./WfProcess.model";
 /** A published version of a process: an immutable snapshot of its document. */
 @ForeignKey(() => WfProcess, { properties: ["processId"], onDelete: "cascade" })
 @Index(["processId", "version"], { unique: true })
-@Entity({ table: "bazis_wf_def_versions" })
+@Entity({ table: "bazis_wf2_def_versions" })
 export class WfVersion {
   @UUID({ version: "v7" })
   id = "";

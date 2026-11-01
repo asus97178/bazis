@@ -2,11 +2,15 @@ import { grantsToWhere } from "../../../access";
 import { createHash } from "node:crypto";
 import { paginate, UniqueViolationError } from "../../../orm";
 import type { AgentToolContract } from "../../../agent";
-import { emptyProcess, hasErrors, validateProcess, type ProcessDocument, type ProcessIssue } from "../../../../library/workflow";
+import { allTexts, checkLocalizedText, emptyProcess, hasErrors, processPalette, validateProcess, type LocalizedText, type ProcessDocument, type ProcessIssue, type ProcessPalette } from "../../../../library/workflow";
+import type { ServiceProvider } from "../../../di";
 import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowAuditOptions, type WorkflowPage } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
+import { WorkflowExtensions, type ExtensionTarget, type WorkflowPortContext } from "../../contracts/WorkflowExtensions";
+import { canonicalJson } from "../../internal/canonicalJson";
 import type { WorkflowEvents } from "../../internal/WorkflowEvents";
+import type { WorkflowLanguages } from "../../internal/WorkflowLanguages";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { CodeProcessCatalog } from "../code/CodeProcessCatalog";
 import type { OwnedCodeProcess } from "../code/codeProcesses";
@@ -23,11 +27,14 @@ import {
   type SavedDraft,
   type SaveDraftOptions,
   type UpdateProcess,
+  type ValidateOptions,
   type VersionDetails,
   type VersionSummary,
 } from "./IWorkflowDefinitions.service";
 
 const KEY = /^[a-z][a-z0-9_.-]{0,63}$/;
+/** A path of segments without empty ones: `Sales/Orders`. */
+const FOLDER = /^[^/\s](?:[^/]*[^/\s])?(?:\/[^/\s](?:[^/]*[^/\s])?)*$/;
 /** Who publishes the processes declared in code. */
 const CODE_ACTOR: WorkflowActor = { kind: "system", id: "code" };
 
@@ -38,6 +45,9 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     private readonly code: CodeProcessCatalog,
     private readonly clock: WorkflowClock,
     private readonly events: WorkflowEvents,
+    private readonly languages: WorkflowLanguages,
+    /** The scope: the port is asked here, so that the application's own registration replaces the default. */
+    private readonly services: ServiceProvider,
   ) {
     super();
   }
@@ -51,9 +61,16 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     if (query.archived === false) source = source.where((p) => p.archivedAt.isNull());
     if (query.search !== undefined && query.search.trim() !== "") {
       const text = query.search.trim();
-      source = source.where((p) => p.key.contains(text, { ignoreCase: true }).or(p.title.contains(text, { ignoreCase: true })));
+      source = source.where((p) => p.key.contains(text, { ignoreCase: true }).or(p.titleText.contains(text, { ignoreCase: true })));
     }
-    const { items, total } = await paginate(source, pageQueryOf(query, { field: "key", dir: "asc" }));
+    if (query.folder !== undefined) {
+      const folder = query.folder;
+      source = source.where((p) => p.folder.eq(folder).or(p.folder.startsWith(`${folder}/`)));
+    }
+    if (query.owner !== undefined) source = source.where((p) => p.owner.eq(query.owner!));
+    // The list sorts by a title as `titleText`: `title` itself is JSON.
+    const sort = query.sort?.map((field) => (field.field === "title" ? { ...field, field: "titleText" } : field));
+    const { items, total } = await paginate(source, pageQueryOf({ ...query, ...(sort === undefined ? {} : { sort }) }, { field: "key", dir: "asc" }));
     return { items: items.map((row) => this.summaryOf(row)), total };
   }
 
@@ -61,12 +78,44 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     return this.detailsOf(await this.process(key, false));
   }
 
+  async folderOf(key: string): Promise<string | null> {
+    const row = await this.db.processes.asNoTracking().firstOrDefault((p) => p.key.eq(key));
+    return row?.folder ?? null;
+  }
+
+  async validate(document: unknown, options: ValidateOptions = {}): Promise<readonly ProcessIssue[]> {
+    const port = this.services.resolve(WorkflowExtensions);
+    const namespaces = new Set(port.namespaces());
+    const issues = validateProcess(document, { tools: (name) => this.workflowTools.has(name), extensions: (namespace) => namespaces.has(namespace) });
+    if (namespaces.size === 0 || issues.some((issue) => issue.code === "too_large" || issue.code === "schema")) return issues;
+    const context: WorkflowPortContext = { partition: null, language: options.language ?? this.languages.default, actor: options.actor ?? null };
+    const found: ProcessIssue[] = [...issues];
+    const { extensions, variables, nodes } = document as ProcessDocument;
+    const checkAll = async (data: Readonly<Record<string, unknown>> | undefined, target: ExtensionTarget): Promise<void> => {
+      if (typeof data !== "object" || data === null) return;
+      for (const [namespace, value] of Object.entries(data)) {
+        if (!namespaces.has(namespace)) continue;
+        for (const message of await port.check(namespace, value, target, context)) found.push({ severity: "error", code: "extension_invalid", message: `${namespace}: ${message}`, ...target });
+      }
+    };
+    await checkAll(extensions, {});
+    if (Array.isArray(variables)) for (const variable of variables) await checkAll(variable?.extensions, { variable: variable?.name });
+    for (const [node, raw] of Object.entries(nodes)) await checkAll(raw?.extensions, { node });
+    return found;
+  }
+
+  palette(): ProcessPalette {
+    return processPalette(this.tools());
+  }
+
   async create(process: CreateProcess, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<ProcessDetails> {
     if (typeof process.key !== "string" || !KEY.test(process.key)) throw new WorkflowError("invalid_input", "key must match ^[a-z][a-z0-9_.-]{0,63}$");
     const row = Object.assign(new WfProcess(), {
       key: process.key,
-      title: title(process.title),
+      ...this.titled(process.title),
       description: description(process.description),
+      folder: folder(process.folder),
+      owner: owner(process.owner),
       retentionDays: retention(process.retentionDays),
       draft: emptyProcess(),
       draftUpdatedAt: this.clock.now(),
@@ -88,19 +137,22 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     const row = await this.process(key, true);
     const { archived, ...fields } = changes;
     if (Object.values(fields).some((value) => value !== undefined)) this.assertNotCode(key);
-    const before = { title: row.title, description: row.description, retentionDays: row.retentionDays, archived: row.archivedAt !== null };
-    if (changes.title !== undefined) row.title = title(changes.title);
+    const card = (): string => canonicalJson({ title: row.title, description: row.description, folder: row.folder, owner: row.owner, retentionDays: row.retentionDays });
+    const before = { card: card(), archived: row.archivedAt !== null };
+    if (changes.title !== undefined) Object.assign(row, this.titled(changes.title));
     if (changes.description !== undefined) row.description = description(changes.description);
+    if (changes.folder !== undefined) row.folder = folder(changes.folder);
+    if (changes.owner !== undefined) row.owner = owner(changes.owner);
     if (changes.retentionDays !== undefined) row.retentionDays = retention(changes.retentionDays);
     if (archived !== undefined) row.archivedAt = archived ? row.archivedAt ?? this.clock.now() : null;
     await this.db.saveChanges();
-    if (row.title !== before.title || row.description !== before.description || row.retentionDays !== before.retentionDays) await this.changed("updated", key, actor, options);
+    if (card() !== before.card) await this.changed("updated", key, actor, options);
     if (archived !== undefined && archived !== before.archived) await this.changed(archived ? "archived" : "restored", key, actor, options);
     return this.detailsOf(row);
   }
 
   async saveDraft(key: string, document: unknown, actor: WorkflowActor, options: SaveDraftOptions = {}): Promise<SavedDraft> {
-    const issues = this.validate(document);
+    const issues = await this.validate(document, { actor, ...(options.language === undefined ? {} : { language: options.language }) });
     if (issues.some((issue) => issue.code === "too_large")) throw new WorkflowError("invalid_document", "The document is too large", issues);
     return await this.db.transactionScope(async (transaction) => {
       const row = await this.db.processes.where((p) => p.key.eq(key)).forUpdate().firstOrDefault();
@@ -120,13 +172,13 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     });
   }
 
-  async publish(key: string, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<VersionDetails> {
+  async publish(key: string, actor: WorkflowActor, options: WorkflowAuditOptions & Pick<ValidateOptions, "language"> = {}): Promise<VersionDetails> {
     return await this.db.transactionScope(async (transaction) => {
       const row = await this.db.processes.where((p) => p.key.eq(key)).forUpdate().firstOrDefault();
       if (!row) throw notFound(key);
       this.assertNotCode(key);
       if (row.archivedAt !== null) throw new WorkflowError("archived", `Process ${key} is archived`);
-      const issues = this.validate(row.draft);
+      const issues = await this.validate(row.draft, { actor, ...(options.language === undefined ? {} : { language: options.language }) });
       if (hasErrors(issues)) throw new WorkflowError("invalid_document", `Process ${key} has errors and cannot be published`, issues);
       const { version, created } = await this.publishDraft(row, actor);
       if (created) transaction.afterCommit(() => this.changed("published", key, actor, options, version.version));
@@ -151,9 +203,13 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
           this.db.processes.add(row);
           transaction.afterCommit(() => this.changed("created", process.key, CODE_ACTOR));
         }
-        const fields = { title: title(process.title), description: description(process.description), retentionDays: retention(process.retentionDays) };
-        if (row.title !== fields.title) row.title = fields.title;
-        if (row.description !== fields.description) row.description = fields.description;
+        const named = this.titled(process.title);
+        const about = description(process.description);
+        if (canonicalJson(row.title) !== canonicalJson(named.title)) Object.assign(row, named);
+        if (canonicalJson(row.description) !== canonicalJson(about)) row.description = about;
+        const fields = { folder: folder(process.folder), owner: owner(process.owner), retentionDays: retention(process.retentionDays) };
+        if (row.folder !== fields.folder) row.folder = fields.folder;
+        if (row.owner !== fields.owner) row.owner = fields.owner;
         if (row.retentionDays !== fields.retentionDays) row.retentionDays = fields.retentionDays;
         if (row.draft === null || canonicalJson(row.draft) !== canonicalJson(process.document)) {
           row.draft = process.document;
@@ -260,6 +316,8 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
       key: row.key,
       title: row.title,
       description: row.description,
+      folder: row.folder,
+      owner: row.owner,
       latestVersion: row.latestVersion,
       retentionDays: row.retentionDays,
       archived: row.archivedAt !== null,
@@ -278,8 +336,11 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     };
   }
 
-  private validate(document: unknown): ProcessIssue[] {
-    return validateProcess(document, { tools: (name) => this.workflowTools.has(name) });
+  /** A title with the column a list searches and sorts by. */
+  private titled(value: unknown): { readonly title: LocalizedText; readonly titleText: string } {
+    const problem = checkLocalizedText(value, 200);
+    if (problem) throw new WorkflowError("invalid_input", `title ${problem}`);
+    return { title: value as LocalizedText, titleText: allTexts(value as LocalizedText, this.languages.default) };
   }
 
   private async process(key: string, tracked: boolean): Promise<WfProcess> {
@@ -294,14 +355,22 @@ function notFound(key: string): WorkflowError {
   return new WorkflowError("not_found", `Process ${key} does not exist`);
 }
 
-function title(value: unknown): string {
-  if (typeof value !== "string" || value.trim() === "" || value.length > 200) throw new WorkflowError("invalid_input", "title must be 1–200 characters");
+function description(value: unknown): LocalizedText | null {
+  if (value === undefined || value === null) return null;
+  const problem = checkLocalizedText(value, 2000, 0);
+  if (problem) throw new WorkflowError("invalid_input", `description ${problem}`);
+  return value as LocalizedText;
+}
+
+function folder(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || value.length > 500 || !FOLDER.test(value)) throw new WorkflowError("invalid_input", "folder must be a path like Sales/Orders");
   return value;
 }
 
-function description(value: unknown): string | null {
+function owner(value: unknown): string | null {
   if (value === undefined || value === null) return null;
-  if (typeof value !== "string" || value.length > 2000) throw new WorkflowError("invalid_input", "description must be up to 2000 characters");
+  if (typeof value !== "string" || value === "" || value.length > 200) throw new WorkflowError("invalid_input", "owner must be up to 200 characters");
   return value;
 }
 
@@ -320,13 +389,4 @@ function versionOf(key: string, row: WfVersion): VersionDetails {
     publishedBy: { kind: row.publishedByKind === "system" ? "system" : "user", id: row.publishedById },
     document: row.document as ProcessDocument,
   };
-}
-
-/** JSON with sorted keys: the same document gives the same hash whatever the key order. */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (typeof value === "object" && value !== null) {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
 }

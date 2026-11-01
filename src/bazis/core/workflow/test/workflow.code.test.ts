@@ -8,7 +8,7 @@ const simple = (key: string) => defineProcess({
   key,
   title: "Simple",
   document: {
-    schemaVersion: "bazis.workflow/v1",
+    schemaVersion: "bazis.workflow/v2",
     nodes: { Start: { kind: "manualStart", title: "Start" }, End: { kind: "end", title: "End" } },
     flows: { f: { source: "Start", target: "End" } },
   },
@@ -34,7 +34,7 @@ test("a document with errors stops the build with the module, the key and every 
   const broken = defineProcess({
     key: "Bad Key",
     title: "",
-    document: { schemaVersion: "bazis.workflow/v1", nodes: { Start: { kind: "manualStart", title: "Start" } }, flows: { f: { source: "Start", target: "Nowhere" } } },
+    document: { schemaVersion: "bazis.workflow/v2", nodes: { Start: { kind: "manualStart", title: "Start" } }, flows: { f: { source: "Start", target: "Nowhere" } } },
   });
   @Module({ processes: [broken] }) class OrdersModule {}
   const error = await buildError(OrdersModule);
@@ -86,7 +86,7 @@ test("inspectProcesses checks the processes of a module tree against its Tools w
     key,
     title: key,
     document: {
-      schemaVersion: "bazis.workflow/v1",
+      schemaVersion: "bazis.workflow/v2",
       nodes: { Start: { kind: "manualStart", title: "Start" }, Call: { kind: "serviceTask", title: "Call", config: { tool } }, End: { kind: "end", title: "End" } },
       flows: { a: { source: "Start", target: "Call" }, b: { source: "Call", target: "End" } },
     },

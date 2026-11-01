@@ -172,8 +172,8 @@ function root(dsn: string) {
 }
 
 const ORDER = {
-  schemaVersion: "bazis.workflow/v1",
-  input: { fields: [{ code: "amount", type: "number", required: true }] },
+  schemaVersion: "bazis.workflow/v2",
+  variables: [{ name: "amount", type: "number", direction: "in", required: true }],
   nodes: {
     Start: { kind: "manualStart", title: "Start" },
     Pay: { kind: "serviceTask", title: "Pay", config: { tool: "payments.charge", input: { amount: "$input.amount" }, saveTo: "payment" } },
@@ -182,13 +182,13 @@ const ORDER = {
     Email: { kind: "serviceTask", title: "Email", config: { tool: "notify.email", input: { payment: "$vars.payment.paymentId" } } },
     Sms: { kind: "serviceTask", title: "SMS", config: { tool: "notify.sms" } },
     Join: { kind: "parallelGateway", title: "Joined" },
-    Review: { kind: "userTask", title: "Call the customer", config: { assignee: { role: "support" }, form: { fields: [{ code: "comment", type: "string", required: true }] }, dueIn: "P1D" } },
+    Review: { kind: "userTask", title: "Call the customer", config: { assignee: { role: "support" }, form: { fields: [{ name: "comment", type: "string", required: true }] }, dueIn: "P1D" } },
     End: { kind: "end", title: "End" },
   },
   flows: {
     f1: { source: "Start", target: "Pay" },
     f2: { source: "Pay", target: "Paid" },
-    f3: { source: "Paid", target: "Split", condition: { path: "$vars.payment.status", op: "eq", value: "paid" } },
+    f3: { source: "Paid", target: "Split", condition: { op: "eq", args: [{ path: "$vars.payment.status" }, "paid"] } },
     f4: { source: "Paid", target: "Review", isDefault: true },
     f5: { source: "Split", target: "Email" },
     f6: { source: "Split", target: "Sms" },
@@ -200,7 +200,7 @@ const ORDER = {
 };
 
 const FRAGILE = {
-  schemaVersion: "bazis.workflow/v1",
+  schemaVersion: "bazis.workflow/v2",
   nodes: {
     Start: { kind: "manualStart", title: "Start" },
     Step: { kind: "serviceTask", title: "Step", config: { tool: "flaky.step" } },
@@ -231,7 +231,7 @@ beforeAll(async () => {
   if (!enabled) return;
   const sql = postgres({ url });
   try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf\\_%'", [])) as { tablename: string }[];
+    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
     if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
     await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
   } finally {
@@ -365,7 +365,7 @@ async function publish(key: string, document: unknown) {
   expect((await call("POST", `/workflow/processes/${key}/publish`)).status).toBe(201);
 }
 
-const doc = (nodes: Record<string, unknown>, flows: Record<string, unknown>, input?: unknown) => ({ schemaVersion: "bazis.workflow/v1", ...(input === undefined ? {} : { input }), nodes, flows });
+const doc = (nodes: Record<string, unknown>, flows: Record<string, unknown>, variables?: unknown) => ({ schemaVersion: "bazis.workflow/v2", ...(variables === undefined ? {} : { variables }), nodes, flows });
 
 interface Snapshot {
   readonly id: string;
@@ -417,7 +417,7 @@ test.skipIf(!enabled)("stage 2: a business reason goes to the error boundary wit
     b: { source: "Charge", target: "End" },
     c: { source: "Declined", target: "Email" },
     d: { source: "Email", target: "Sorry" },
-  }, { fields: [{ code: "amount", type: "number", required: true }] }));
+  }, [{ name: "amount", type: "number", direction: "in", required: true }]));
   calls.length = 0;
   const declined = await until((await call("POST", "/workflow/instances", { processKey: "declines", input: { amount: 5000 } })).body.id, (i) => i.status !== "running");
   expect(declined.status).toBe("completed");
@@ -437,7 +437,7 @@ test.skipIf(!enabled)("stage 2: timers wait for a duration or a date from the da
     Until: { kind: "timerCatch", title: "Until", config: { at: "$input.at" } },
     End: { kind: "end", title: "End" },
   }, { a: { source: "Start", target: "Wait" }, b: { source: "Wait", target: "Until" }, c: { source: "Until", target: "End" } },
-  { fields: [{ code: "at", type: "datetime", required: true }] }));
+  [{ name: "at", type: "datetime", direction: "in", required: true }]));
   const startedAt = Date.now();
   const started = await call("POST", "/workflow/instances", { processKey: "waits", input: { at: new Date(Date.now() - 60_000).toISOString() } });
   expect(started.body.tokens.find((t: { nodeId: string }) => t.nodeId === "Wait").status).toBe("waiting");
@@ -488,7 +488,7 @@ test.skipIf(!enabled)("stage 3: a wait takes the event of its correlation; HTTP 
     Start: { kind: "manualStart", title: "Start" },
     Wait: { kind: "eventWait", title: "Paid", config: { event: "payments.received", correlation: "$input.orderId", saveTo: "payment" } },
     End: { kind: "end", title: "End" },
-  }, { a: { source: "Start", target: "Wait" }, b: { source: "Wait", target: "End" } }, { fields: [{ code: "orderId", type: "string", required: true }] }));
+  }, { a: { source: "Start", target: "Wait" }, b: { source: "Wait", target: "End" } }, [{ name: "orderId", type: "string", direction: "in", required: true }]));
   const one = (await call("POST", "/workflow/instances", { processKey: "awaits", input: { orderId: "1" } })).body.id;
   const two = (await call("POST", "/workflow/instances", { processKey: "awaits", input: { orderId: "2" } })).body.id;
   const scope = app.container.createScope();
@@ -513,7 +513,7 @@ test.skipIf(!enabled)("stage 3: an event starts the processes listening for it; 
     Start: { kind: "eventStart", title: "Signed up", config: { event: "users.signed-up" } },
     Email: { kind: "serviceTask", title: "Email", config: { tool: "notify.email", input: { to: "$input.email" } } },
     End: { kind: "end", title: "End" },
-  }, { a: { source: "Start", target: "Email" }, b: { source: "Email", target: "End" } }, { fields: [{ code: "email", type: "string", required: true }] }));
+  }, { a: { source: "Start", target: "Email" }, b: { source: "Email", target: "End" } }, [{ name: "email", type: "string", direction: "in", required: true }]));
   const scope = app.container.createScope();
   try {
     const runtime = scope.resolve(IWorkflowRuntime);
@@ -533,7 +533,7 @@ test.skipIf(!enabled)("stage 3: an event starts the processes listening for it; 
     Cancelled: { kind: "boundaryEvent", title: "Cancelled", attachedTo: "Review", config: { event: "orders.cancelled", correlation: "$input.orderId" } },
     End: { kind: "end", title: "End" },
     Dropped: { kind: "end", title: "Dropped" },
-  }, { a: { source: "Start", target: "Review" }, b: { source: "Review", target: "End" }, c: { source: "Cancelled", target: "Dropped" } }, { fields: [{ code: "orderId", type: "string", required: true }] }));
+  }, { a: { source: "Start", target: "Review" }, b: { source: "Review", target: "End" }, c: { source: "Cancelled", target: "Dropped" } }, [{ name: "orderId", type: "string", direction: "in", required: true }]));
   const id = (await call("POST", "/workflow/instances", { processKey: "cancellable", input: { orderId: "77" } })).body.id;
   expect((await call("POST", "/workflow/events/orders.cancelled", { payload: { by: "client" }, correlation: "77" })).body.continued).toEqual([id]);
   const done = await until(id, (i) => i.status !== "running");
@@ -548,7 +548,7 @@ test.skipIf(!enabled)("stage 3: a scheduled version gets one job; a firing start
     End: { kind: "end", title: "End" },
   }, { a: { source: "Start", target: "End" } }));
   const sql = postgres({ url });
-  const jobs = async () => (await sql.query(`SELECT id, "dueAt", "versionId" FROM "bazis_wf_run_jobs" WHERE kind = 'schedule'`, [])) as { id: string; dueAt: Date; versionId: string }[];
+  const jobs = async () => (await sql.query(`SELECT id, "dueAt", "versionId" FROM "bazis_wf2_run_jobs" WHERE kind = 'schedule'`, [])) as { id: string; dueAt: Date; versionId: string }[];
   const scope = app.container.createScope();
   try {
     const schedules = scope.resolve(Schedules);
@@ -577,7 +577,7 @@ test.skipIf(!enabled)("stage 3: a scheduled version gets one job; a firing start
 test.skipIf(!enabled)("stage 4: a user task appears in the inbox of its assignees; claim, release and complete", async () => {
   await publish("approval", doc({
     Start: { kind: "manualStart", title: "Start" },
-    Approve: { kind: "userTask", title: "Approve the purchase", config: { assignee: { role: "boss" }, form: { fields: [{ code: "ok", type: "boolean", required: true }] }, dueIn: "P1D" } },
+    Approve: { kind: "userTask", title: "Approve the purchase", config: { assignee: { role: "boss" }, form: { fields: [{ name: "ok", type: "boolean", required: true }] }, dueIn: "P1D" } },
     End: { kind: "end", title: "End" },
   }, { a: { source: "Start", target: "Approve" }, b: { source: "Approve", target: "End" } }));
   const boss = (user: string) => as(user, { "x-roles": "boss" });
@@ -634,16 +634,16 @@ test.skipIf(!enabled)("stage 4: a cancelled instance cancels its task; a task fo
 test.skipIf(!enabled)("retention deletes finished instances older than the process keeps them", async () => {
   const sql = postgres({ url });
   try {
-    await sql.execute(`UPDATE "bazis_wf_run_instances" SET "endedAt" = now() - interval '40 days' WHERE "processKey" = 'order' AND status = 'completed'`, []);
+    await sql.execute(`UPDATE "bazis_wf2_run_instances" SET "endedAt" = now() - interval '40 days' WHERE "processKey" = 'order' AND status = 'completed'`, []);
     const retention = app.container.resolve(WorkflowRetention);
-    await sql.execute(`UPDATE "bazis_wf_run_instances" SET "endedAt" = now() - interval '40 days' WHERE "processKey" = 'approval'`, []);
+    await sql.execute(`UPDATE "bazis_wf2_run_instances" SET "endedAt" = now() - interval '40 days' WHERE "processKey" = 'approval'`, []);
     await call("PATCH", "/workflow/processes/approval", { retentionDays: 30 });
     expect(await retention.sweep()).toBe(3);
     // The task of the deleted approval instance went with it.
-    expect(await sql.query(`SELECT 1 FROM "bazis_wf_task_items" WHERE "processKey" = 'approval'`, [])).toEqual([]);
-    const left = (await sql.query(`SELECT status FROM "bazis_wf_run_instances" WHERE "processKey" = 'order' ORDER BY status`, [])) as { status: string }[];
+    expect(await sql.query(`SELECT 1 FROM "bazis_wf2_task_items" WHERE "processKey" = 'approval'`, [])).toEqual([]);
+    const left = (await sql.query(`SELECT status FROM "bazis_wf2_run_instances" WHERE "processKey" = 'order' ORDER BY status`, [])) as { status: string }[];
     expect(left.map((row) => row.status)).toEqual(["cancelled"]);
-    expect(await sql.query(`SELECT 1 FROM "bazis_wf_run_tokens" t LEFT JOIN "bazis_wf_run_instances" i ON i.id = t."instanceId" WHERE i.id IS NULL`, [])).toEqual([]);
+    expect(await sql.query(`SELECT 1 FROM "bazis_wf2_run_tokens" t LEFT JOIN "bazis_wf2_run_instances" i ON i.id = t."instanceId" WHERE i.id IS NULL`, [])).toEqual([]);
   } finally {
     await sql.close();
   }

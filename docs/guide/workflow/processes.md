@@ -36,7 +36,7 @@ export class AppModule {}
 
 - **Таблицы модуль создаёт сам** при первом старте и проверяет при каждом
   следующем: это [owned stores](../database/owned-stores.md) с префиксами
-  `bazis_wf_def_`, `bazis_wf_run_` и `bazis_wf_task_`. Нужно только подключение к PostgreSQL
+  `bazis_wf2_def_`, `bazis_wf2_run_` и `bazis_wf2_task_`. Нужно только подключение к PostgreSQL
   в `@Infra` (`ormBazisConnect`), миграции не нужны.
 - **`roles`** говорит, кому что можно ([Права](#права)). Без ролей все
   маршруты `/workflow/...` отвечают 403, а без проверки входа — 401.
@@ -86,50 +86,170 @@ export class PaymentsModule {}
 
 ## Документ процесса
 
-Процесс описывается JSON-документом `bazis.workflow/v1`: вход, узлы и
-переходы.
+Процесс описывается JSON-документом `bazis.workflow/v2`: переменные, настройки,
+узлы и переходы.
 
 ```json
 {
-  "schemaVersion": "bazis.workflow/v1",
-  "input": { "fields": [
-    { "code": "orderId", "type": "string", "required": true },
-    { "code": "amount", "type": "number", "required": true }
-  ] },
+  "schemaVersion": "bazis.workflow/v2",
+  "variables": [
+    { "name": "orderId", "type": "string", "direction": "in", "required": true },
+    { "name": "amount", "type": "number", "direction": "in", "required": true },
+    { "name": "total", "type": "number", "direction": "local" },
+    { "name": "receipt", "type": "object", "direction": "out" }
+  ],
   "nodes": {
-    "Start": { "kind": "manualStart", "title": "Заказ создан" },
+    "Start": { "kind": "manualStart", "title": { "ru": "Заказ создан", "en": "Order placed" } },
+    "Tax": { "kind": "assign", "title": "Налог", "config": { "assignments": [
+      { "var": "total", "value": { "op": "mul", "args": [{ "path": "$input.amount" }, 1.2] } }
+    ] } },
     "Pay": { "kind": "serviceTask", "title": "Оплата", "config": {
       "tool": "payments.charge",
-      "input": { "orderId": "$input.orderId", "amount": "$input.amount" },
-      "saveTo": "payment"
+      "input": { "orderId": "$input.orderId", "amount": "$vars.total" },
+      "saveTo": "receipt"
     } },
     "Paid": { "kind": "exclusiveGateway", "title": "Оплачено?" },
     "Call": { "kind": "userTask", "title": "Позвонить клиенту", "config": {
       "assignee": { "role": "support" },
-      "form": { "fields": [{ "code": "comment", "type": "string", "required": true }] },
+      "form": { "fields": [{ "name": "comment", "type": "string", "required": true }] },
       "dueIn": "P1D"
     } },
     "End": { "kind": "end", "title": "Готово" }
   },
   "flows": {
-    "f1": { "source": "Start", "target": "Pay" },
-    "f2": { "source": "Pay", "target": "Paid" },
-    "f3": { "source": "Paid", "target": "End", "condition": { "path": "$vars.payment.status", "op": "eq", "value": "paid" } },
-    "f4": { "source": "Paid", "target": "Call", "isDefault": true },
-    "f5": { "source": "Call", "target": "End" }
+    "f1": { "source": "Start", "target": "Tax" },
+    "f2": { "source": "Tax", "target": "Pay" },
+    "f3": { "source": "Pay", "target": "Paid" },
+    "f4": { "source": "Paid", "target": "End", "condition": { "op": "eq", "args": [{ "path": "$vars.receipt.status" }, "paid"] } },
+    "f5": { "source": "Paid", "target": "Call", "isDefault": true },
+    "f6": { "source": "Call", "target": "End" }
   }
 }
 ```
 
-- **Данные экземпляра** читаются путями: `$input.amount` — вход,
-  `$vars.payment` — переменная, которую записал `saveTo`,
-  `$nodes.Pay.paymentId` — результат шага.
-- **Условия** — без кода: `all`, `any`, `not` и сравнения `eq`, `ne`,
-  `gt`, `gte`, `lt`, `lte`, `in`, `contains`, `empty`, `notEmpty`. Из
-  шлюза «Выбор по условию» идёт первый переход, чьё условие верно, иначе
-  переход `isDefault`.
-- **Поля входа и форм:** `string`, `text`, `number`, `integer`, `boolean`,
-  `date`, `datetime`, `enum` (с `values`), `required`.
+Из шлюза «Выбор по условию» идёт первый переход, чьё условие верно, иначе
+переход `isDefault`. Названия — строка на языке по умолчанию или объект
+«язык → текст»: `{ "ru": "Оплата", "en": "Payment" }`.
+
+### Переменные
+
+| `direction` | Что это | Как читается |
+| --- | --- | --- |
+| `in` | Вход запуска: форма ручного запуска и тело `start` | `$input.orderId` |
+| `local` | Внутри процесса; `default` — начальное значение | `$vars.total` |
+| `out` | То, что процесс отдаёт: `output` экземпляра, когда он завершён | `$vars.receipt` |
+
+- Типы: `string`, `text`, `number`, `integer`, `boolean`, `date`, `datetime`,
+  `enum` (с `values`), `object`, `list`, `ref` (с `ref`: вид ссылки).
+- `name` — `^[a-z][A-Za-z0-9_]{0,39}$`. `required` — только у `in`. Без значения
+  поле получает `default`.
+- Поля формы задачи — то же самое без `direction`.
+- `saveTo` шага создаёт переменную сам, объявлять её не обязательно. Шаг `assign`
+  пишет только в объявленные `local` и `out`. Путь к переменной или полю входа,
+  которых нет, — ошибка документа.
+
+### Выражения
+
+Условие перехода, значение в `assign` и параметр инструмента — выражение:
+JSON-дерево без `eval` и своего языка. Лист — JSON-литерал или `{ "path": "…" }`.
+
+```json
+{ "op": "mul", "args": [{ "path": "$vars.amount" }, 1.2] }
+{ "op": "concat", "args": ["https://api/orders/", { "path": "$input.orderId" }] }
+{ "op": "gt", "args": [{ "path": "$event.record.amount" }, 100000] }
+```
+
+| Группа | Функции |
+| --- | --- |
+| Арифметика | `add` `sub` `mul` `div` `mod` `round` |
+| Сравнение | `eq` `ne` `gt` `gte` `lt` `lte` `in` `contains` `empty` `notEmpty` |
+| Логика | `and` `or` `not` `if` `coalesce` |
+| Строки | `concat` `lower` `upper` `trim` `length` `format` |
+| Даты | `now` `dateAdd` `dateDiff` `toDate` |
+| Списки | `length` `first` `pluck` |
+
+| Путь | Что читает |
+| --- | --- |
+| `$input.x`, `$vars.x`, `$nodes.Pay.x` | Вход, переменная, результат шага |
+| `$event` | Данные события, которое запустило или продолжило процесс |
+| `$trigger` | Как запущен: `{ via, at, actor, eventKey? }` |
+| `$run` | Этот запуск: `{ id, processKey, version, partition, test }` |
+| `$now` | Время движка, ISO-строка |
+
+- Выражение не падает. То, что нельзя вычислить (нет значения в арифметике,
+  деление на ноль, неверная дата), — `null`, а сравнение с `null` ложно: условие
+  на отсутствующие данные просто не выполняется.
+- Функция и типы литералов проверяются при сохранении. Предел — глубина 16 и 200
+  узлов на выражение.
+- `format("{0} из {1}", a, b)`, `dateAdd(дата, "P1D")` (ISO без месяцев и лет),
+  `dateDiff(конец, начало, "days")` (`ms`, `seconds`, `minutes`, `hours`, `days`).
+- В параметре инструмента по-прежнему можно писать путь строкой: `"$input.orderId"`.
+
+### Настройки шага
+
+```json
+"Pay": { "kind": "serviceTask", "title": "Оплата", "config": {
+  "tool": "payments.charge",
+  "timeout": "PT30S",
+  "retry": { "maxAttempts": 3, "backoff": "PT1M", "growth": "exponential", "factor": 3 },
+  "onError": "skip",
+  "saveTo": "receipt"
+} }
+```
+
+- `timeout` — сколько ждать инструмент; по умолчанию `settings.stepTimeout`, а без
+  него — настройка самого инструмента. Истёк — ошибка с причиной `timeout`:
+  повтор по `retry`, затем `boundaryError` с `errorCode: "timeout"`.
+- `onError: "skip"` — шаг пропущен, его результат `{ skipped: true, error }`, в
+  истории запись `skipped`. Граничный `boundaryError` важнее.
+
+### Настройки процесса и журнал
+
+`settings` — часть версии документа:
+
+```json
+"settings": { "stepTimeout": "PT30S", "log": { "variables": true, "toolPayloads": true, "maskPersonal": true } }
+```
+
+| `log` | По умолчанию | Что в истории |
+| --- | --- | --- |
+| `variables` | `false` | Значения, которые записал `assign`; иначе только имена |
+| `toolPayloads` | `false` | Вход и выход инструментов целиком |
+| `maskPersonal` | `true` | Персональные данные — `***` |
+
+Персональные данные — переменная с `personal: true` или поле инструмента с
+`@Validator({ personal: true })` (`x-personal` в схеме). Маскируется и то, что из
+них вычислено. Маска — только в истории: в самом экземпляре значения настоящие.
+
+Настройка, которой ещё нет в этой версии фреймворка, — ошибка `settings_invalid`:
+иначе она молча бы не работала.
+
+### Данные приложения
+
+`extensions` есть в корне документа, у узлов и у переменных: ключ — пространство
+имён приложения. Движок их не читает. Проверяет их порт, который приложение
+регистрирует в любом своём модуле:
+
+```ts
+import { WorkflowExtensions, type ExtensionTarget, type WorkflowPortContext } from "bazis/core/workflow";
+
+class CmsExtensions extends WorkflowExtensions {
+  namespaces() { return ["cms"]; }
+  check(namespace: string, value: unknown, target: ExtensionTarget, context: WorkflowPortContext) {
+    return Array.isArray((value as { places?: unknown }).places) ? [] : ["places must be a list"];
+  }
+}
+
+@Module({ providers: [singleton(WorkflowExtensions, CmsExtensions)] })
+```
+
+Пространство имён без проверки — ошибка `extension_unknown` при сохранении и
+публикации, замечания порта — `extension_invalid`. Уже опубликованная версия с
+таким ключом исполняется: снятый модуль приложения не ломает живые процессы.
+
+Правила полей читает другой порт, `WorkflowInputValidator`: он получает поле с его
+`extensions` и контекст `{ purpose, processKey, partition, language, actor }`, а его
+коды ошибок — обычные строки.
 
 | Узел | Что делает | Работает |
 | --- | --- | --- |
@@ -147,6 +267,7 @@ export class PaymentsModule {}
 | `boundaryEvent` | Событие во время шага: прерывает его или запускает ветвь рядом | 0.126.0 |
 | `eventStart` | Запуск по событию | 0.126.0 |
 | `scheduleStart` | Запуск по расписанию cron | 0.126.0 |
+| `assign` | Записывает значения выражений в переменные | 0.132.0 |
 
 ## Каталог и публикация
 
@@ -157,7 +278,7 @@ export class PaymentsModule {}
 ```text
 POST /workflow/processes  {"key":"order","title":"Заказ","retentionDays":90}
 → 201 {"key":"order","title":"Заказ","latestVersion":null,"retentionDays":90,"archived":false,
-       "draft":{"schemaVersion":"bazis.workflow/v1","nodes":{"Start":…,"End":…},…},…}
+       "draft":{"schemaVersion":"bazis.workflow/v2","nodes":{"Start":…,"End":…},…},…}
 
 PUT /workflow/processes/order/draft  {"document": {…документ выше…}}
 → 200 {"issues":[],"draftUpdatedAt":"2026-11-01T12:40:07.311Z"}
@@ -173,6 +294,8 @@ POST /workflow/processes/order/publish
   ошибка `unknown_tool` на узле.
 - Повторная публикация того же документа возвращает ту же версию, а не
   создаёт новую.
+- Граф, который нельзя нарисовать списком шагов, — предупреждение
+  `not_structured`, не ошибка ([Свой дизайнер](#свой-дизайнер)).
 - `retentionDays` — сколько дней хранить завершённые и отменённые
   экземпляры вместе с их задачами; упавшие не удаляются никогда.
 - Двое редактируют один черновик — передайте `expected`: `draftUpdatedAt`,
@@ -185,10 +308,11 @@ PUT /workflow/processes/order/draft  {"document":{…},"expected":"2026-11-01T12
 → 409 {"error":"The draft of order was saved by someone else","details":{"code":"conflict"}}
 ```
 
-Список — [как у всех списков](../http/lists.md): фильтры `filter[archived]`
-и `filter[search]` (часть ключа или названия), `sort` по `key`, `title`,
-`createdAt`, `updatedAt`, страницы `page[size]` (по умолчанию 50, не больше
-200) и `page[number]`. Что не объявлено — `400`.
+Список — [как у всех списков](../http/lists.md): фильтры `filter[archived]`,
+`filter[search]` (часть ключа или названия на любом языке), `filter[folder]` (папка
+и всё, что ниже) и `filter[owner]`, `sort` по `key`, `title`, `folder`, `createdAt`,
+`updatedAt`, страницы `page[size]` (по умолчанию 50, не больше 200) и `page[number]`.
+Что не объявлено — `400`.
 
 ```text
 GET /workflow/processes?filter[search]=list-&page[size]=2&sort=-key
@@ -226,6 +350,56 @@ export class SetOrderStatusInput {
 объекта (`x-ref-keys`), `refScope` — где искать: `"/table"` значит «в таблице
 из входа `table`» (`x-ref-scope`). Значения — литералы: схему строит генератор.
 Сам вызов такие ссылки пока не проверяет.
+
+### Карточка и язык
+
+```text
+POST /workflow/processes  {"key":"order","title":{"ru":"Заказ","en":"Order"},"folder":"Продажи/Заказы","owner":"u-5"}
+Accept-Language: ru-RU
+→ 201 {"key":"order","title":{"ru":"Заказ","en":"Order"},"titleText":"Заказ","folder":"Продажи/Заказы","owner":"u-5",…}
+```
+
+- `title` и `description` — строка или «язык → текст». `folder` — строка-путь,
+  отдельной сущности «папка» нет. `owner` — непрозрачный id приложения.
+- `titleText` есть только в ответах HTTP — название на языке запроса, а `title`
+  остаётся для редактирования. То же у задач.
+- Язык запроса — из `Accept-Language` среди `workflow.languages`, иначе
+  `workflow.language`. В событиях, расписании и фоне — всегда `workflow.language`.
+
+```sh
+BAZIS_WORKFLOW__LANGUAGE=ru
+BAZIS_WORKFLOW__LANGUAGES=ru,en
+```
+
+### Свой дизайнер
+
+Экранов дизайнера во фреймворке нет, но всё для него есть:
+
+| Что | Где |
+| --- | --- |
+| Виды узлов с JSON Schema их `config`, функции выражений, пути, контракты инструментов | `GET /workflow/palette` |
+| Проверка документа без сохранения: `{"document":…}` → `{"issues":[…]}` | `POST /workflow/validate` |
+| Граф ↔ список шагов: `toStructure`, `fromStructure`, `isStructured` | `bazis/library/workflow` |
+| Текст выражения ↔ дерево: `parseExpression`, `printExpression` | `bazis/library/workflow` |
+| Форма настройки шага по виду узла или инструменту: `formOf` | `bazis/library/workflow` |
+
+```ts
+import { parseExpression, printExpression } from "bazis/library/workflow";
+
+parseExpression('{amount} * 1.2');       // { op: "mul", args: [{ path: "$vars.amount" }, 1.2] }
+parseExpression('concat({$input.a}, "-", now())');
+printExpression({ op: "mul", args: [{ path: "$vars.amount" }, 1.2] });  // {amount} * 1.2
+```
+
+`{amount}` — это `$vars.amount`, остальные пути пишутся полностью: `{$input.a}`.
+Операторы: `+ - * / %`, `== != > >= < <=`, `and or not`. Ошибка разбора —
+`ExpressionSyntaxError` с `position`. Печать обратима: `parseExpression(printExpression(e))`
+даёт то же дерево.
+
+Списком рисуются последовательности, развилка с одним слиянием (или ветки, которые
+все идут в конец), параллельный блок со слиянием и граничные события на шагах.
+Остальное, например цикл из переходов в процессе из кода, дизайнер показывает
+только для чтения.
 
 ## Запуск
 
@@ -425,8 +599,8 @@ timer Pause {"firedAt":"…:39:11.630Z"}
 ```
 
 - `maxAttempts` — сколько попыток всего, вместе с первой. Пауза перед
-  следующей удваивается от `backoff` (по умолчанию 10 секунд), но не
-  больше суток.
+  следующей растёт от `backoff` (по умолчанию 10 секунд) в `factor` раз
+  (по умолчанию 2), но не больше суток. `growth: "fixed"` — пауза постоянная.
 - Все попытки идут с одним ключом идемпотентности: инструмент с записью
   должен узнать повтор по `context.idempotencyKey`.
 - Повторяются только непредвиденные сбои. Отказ подтверждения и ошибка с
@@ -564,7 +738,7 @@ POST /workflow/events/customers.registered  {"payload":{"phone":"+7900"}}
        "issues":[{"field":"name","code":"required","message":"field name is required"}]}]}
 ```
 
-Данные события проверяются по `input` процесса; поля, которых там нет
+Данные события проверяются по переменным `in` процесса и целиком доступны как `$event`; поля, которых там нет
 (`phone`), отбрасываются. Экземпляр получает `partition` события,
 `businessKey` — его корреляцию, а выполняется от имени того, кто прислал
 событие, или `{"kind":"system","id":"event:customers.registered"}` при
@@ -696,12 +870,12 @@ GET /workflow/instances               (Bearer, роль customer)             �
 
 | Право | Где | Раздел | Условия |
 | --- | --- | --- | --- |
-| `workflow.processes.read` | список и карточка процесса, версии, `/workflow/tools` | нет | `process` |
-| `workflow.processes.manage` | создание, изменение, черновик | нет | `process` |
-| `workflow.processes.publish` | публикация | нет | `process` |
-| `workflow.instances.start` | запуск | из запроса | `process` |
-| `workflow.instances.read` | список экземпляров, карточка, история | экземпляра | `process`, `own` |
-| `workflow.instances.manage` | отмена, повтор | экземпляра | `process` |
+| `workflow.processes.read` | список и карточка процесса, версии, `/workflow/tools`, `/workflow/palette`, `/workflow/validate` | нет | `process`, `folder` |
+| `workflow.processes.manage` | создание, изменение, черновик | нет | `process`, `folder` |
+| `workflow.processes.publish` | публикация | нет | `process`, `folder` |
+| `workflow.instances.start` | запуск | из запроса | `process`, `folder` |
+| `workflow.instances.read` | список экземпляров, карточка, история | экземпляра | `process`, `folder`, `own` |
+| `workflow.instances.manage` | отмена, повтор | экземпляра | `process`, `folder` |
 | `workflow.events.emit` | `POST /workflow/events/:eventKey` | из запроса | `event` |
 | `workflow.tasks.work` | входящие задачи `/workflow/tasks` | задачи | `process` |
 
@@ -711,8 +885,10 @@ GET /workflow/instances               (Bearer, роль customer)             �
   экземпляров и задач фильтруются по таким грантам сразу по всем разделам.
 - `{ own: true }` (в ролях — `:own`) у экземпляров значит «запущенные мной»: в
   `startedBy.id` записан первый из `AccessPolicy.ownerIds`.
-- Значения для условий на `process` админка берёт из
-  `GET /access/references/workflow.process`.
+- Значения для условий на `process` и `folder` админка берёт из
+  `GET /access/references/workflow.process` и `…/workflow.folder`.
+- Условие на `folder` — точное: `{ folder: { eq: "Продажи" } }` не включает
+  `Продажи/Заказы`. Перенос процесса требует права и в той папке, куда он идёт.
 - Адресаты задач считаются при просмотре и по разделам: `AccessPolicy.principals`
   может сделать человека менеджером только в одном магазине.
 - В фоне права не проверяются: расписания, события и шаги процесса идут от
@@ -779,7 +955,7 @@ bunx bazis g process Delivery --module Delivery
   ↗  listed in processes of src/app/modules/delivery/Delivery.module.ts
 ```
 
-В заготовке — ручной старт и конец. Документ — тот же `bazis.workflow/v1`,
+В заготовке — ручной старт и конец. Документ — тот же `bazis.workflow/v2`,
 что и в каталоге, только записанный в TypeScript, с подсказками типов:
 
 ```ts
@@ -788,14 +964,15 @@ import { defineProcess } from "bazis/core/workflow";
 
 export const DeliveryProcess = defineProcess({
   key: "delivery",
-  title: "Доставка",
+  title: { ru: "Доставка", en: "Delivery" },
+  folder: "Логистика",
   retentionDays: 30,
   document: {
-    schemaVersion: "bazis.workflow/v1",
-    input: { fields: [
-      { code: "orderId", type: "string", required: true },
-      { code: "city", type: "string", required: true },
-    ] },
+    schemaVersion: "bazis.workflow/v2",
+    variables: [
+      { name: "orderId", type: "string", direction: "in", required: true },
+      { name: "city", type: "string", direction: "in", required: true },
+    ],
     nodes: {
       Start: { kind: "manualStart", title: "Заказ оплачен" },
       Book: { kind: "serviceTask", title: "Забронировать доставку", config: {

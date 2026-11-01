@@ -1,6 +1,7 @@
 import { definePermissions } from "../../../access";
 
 const process = { ref: "workflow.process", column: "key" };
+const folder = { ref: "workflow.folder", column: "folder" };
 
 /**
  * The rights of the process catalog (WORKFLOW-002 §6.2). A process is one per
@@ -10,14 +11,14 @@ const process = { ref: "workflow.process", column: "key" };
 export const definitionsPermissions = definePermissions({
   "workflow.processes.read": {
     title: { en: "See processes", ru: "Видеть процессы" },
-    on: { process },
+    on: { process, folder },
   },
   "workflow.processes.manage": {
     title: { en: "Edit processes", ru: "Редактировать процессы" },
-    on: { process },
+    on: { process, folder },
   },
   "workflow.processes.publish": {
     title: { en: "Publish processes", ru: "Публиковать процессы" },
-    on: { process },
+    on: { process, folder },
   },
 });

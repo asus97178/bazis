@@ -1,5 +1,5 @@
-import type { AgentToolResult } from "../../../agent";
-import { durationMs, resolveInput } from "../../../../library/workflow";
+import type { AgentSchemaContract, AgentToolResult } from "../../../agent";
+import { durationMs, maskByMapping, maskBySchema, masksPersonal, personalPaths, resolveInput, type ProcessDocument } from "../../../../library/workflow";
 import type { WorkflowToolMetadata } from "../../contracts/types";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
@@ -13,6 +13,11 @@ import { dataOf, type WorkflowEngine } from "./WorkflowEngine";
  * started the instance, with the token id as its idempotency key: after a crash
  * between the call and the step the call may repeat (TOOLS-001 §7).
  */
+/** How long a claimed job belongs to its worker; if it dies, another one takes the job after that. */
+export const LEASE_MS = 5 * 60_000;
+
+const TIMEOUT_CODES: ReadonlySet<string> = new Set(["TOOL_TIMEOUT", "TOOL_TIMEOUT_OUTCOME_UNKNOWN"]);
+
 export class ToolStep {
   constructor(
     private readonly db: RuntimeDbContext,
@@ -30,7 +35,12 @@ export class ToolStep {
     const graph = await this.engine.graphOf(instance.versionId);
     const node = graph.document.nodes[token.nodeId];
     const name = String(node?.config?.tool ?? "");
-    const input = resolveInput(node?.config?.input ?? {}, dataOf(instance));
+    const input = resolveInput(node?.config?.input ?? {}, dataOf(instance, this.engine.now()));
+    const timeoutMs = stepTimeoutMs(node?.config?.timeout, graph.document);
+    // A step may run longer than the lease: another worker must not take the job and call the Tool again meanwhile.
+    if (timeoutMs !== undefined && timeoutMs >= LEASE_MS) {
+      await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeUpdate({ lockedUntil: new Date(this.engine.now().getTime() + timeoutMs + LEASE_MS) });
+    }
     const runner = this.tools.bound;
     const result: AgentToolResult = runner === undefined
       ? { callId: token.id, name, status: "error", error: { code: "TOOL_NOT_FOUND", message: `Tool ${name} is not available to processes` }, metadata: {} } as AgentToolResult
@@ -39,12 +49,15 @@ export class ToolStep {
         actor: { kind: instance.startedByKind, id: instance.startedById },
         metadata: { instanceId: instance.id, processKey: instance.processKey, nodeId: token.nodeId, partition: instance.partition, test: false } satisfies WorkflowToolMetadata,
         signal,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
       });
 
-    const reason = reasonOf(result);
+    const timedOut = TIMEOUT_CODES.has(result.error?.code ?? "");
+    const reason = timedOut ? "timeout" : reasonOf(result);
+    const payloads = graph.document.settings?.log?.toolPayloads === true ? this.payloads(graph.document, name, node?.config?.input, input, result) : {};
     await this.engine.inStep(instance.id, async (step) => {
       const current = step.tokens.find((t) => t.id === token.id);
-      const retryAt = current?.status === "waiting" && step.instance.status === "running" && result.status === "error" && reason === undefined
+      const retryAt = current?.status === "waiting" && step.instance.status === "running" && result.status === "error" && (reason === undefined || timedOut)
         ? nextAttempt(node?.config?.retry, job.attempts, this.engine.now())
         : undefined;
       if (retryAt !== undefined) {
@@ -59,6 +72,7 @@ export class ToolStep {
         status: result.status,
         attempt: job.attempts,
         durationMs: result.durationMs ?? null,
+        ...payloads,
         ...(result.error ? { error: { code: result.error.code ?? null, message: result.error.message, ...(reason === undefined ? {} : { reason }) } } : {}),
         ...(retryAt === undefined ? {} : { retryAt: retryAt.toISOString() }),
       });
@@ -74,6 +88,15 @@ export class ToolStep {
       }
     });
   }
+
+  /** The input and output for the history under `log.toolPayloads`; personal data is masked unless `log.maskPersonal` is `false`. */
+  private payloads(document: ProcessDocument, name: string, mapping: unknown, input: unknown, result: AgentToolResult): Record<string, unknown> {
+    if (!masksPersonal(document)) return { input, output: result.output ?? null };
+    const contract = this.tools.bound?.describe(name);
+    const schemaOf = (side: AgentSchemaContract | undefined) => (side?.kind === "json-schema" ? side.schema : undefined);
+    const masked = maskByMapping(mapping ?? {}, maskBySchema(input, schemaOf(contract?.input)), personalPaths(document));
+    return { input: masked, output: maskBySchema(result.output ?? null, schemaOf(contract?.output)) };
+  }
 }
 
 /** The business reason of a `ToolError`, if the Tool gave one. */
@@ -83,15 +106,23 @@ function reasonOf(result: AgentToolResult): string | undefined {
   return typeof reason === "string" ? reason : undefined;
 }
 
+/** How long a step's Tool may run: its `timeout`, else `settings.stepTimeout`; `undefined` leaves the Tool's own limit. */
+function stepTimeoutMs(timeout: unknown, document: ProcessDocument): number | undefined {
+  const value = typeof timeout === "string" ? timeout : document.settings?.stepTimeout;
+  return value === undefined ? undefined : durationMs(value);
+}
+
 /**
  * When to try a failed call again under the node's `retry` policy, or
- * `undefined` when the attempts are used up. The pause doubles from `backoff`
- * (10 seconds by default) and stops growing at a day.
+ * `undefined` when the attempts are used up. The pause starts at `backoff` (10
+ * seconds by default), grows by `factor` (2 by default) unless `growth` is
+ * `fixed`, and stops growing at a day.
  */
 export function nextAttempt(policy: unknown, attempts: number, now: Date): Date | undefined {
   if (typeof policy !== "object" || policy === null) return undefined;
-  const { maxAttempts, backoff } = policy as { maxAttempts?: unknown; backoff?: unknown };
+  const { maxAttempts, backoff, growth, factor } = policy as { maxAttempts?: unknown; backoff?: unknown; growth?: unknown; factor?: unknown };
   if (typeof maxAttempts !== "number" || attempts >= maxAttempts) return undefined;
   const base = typeof backoff === "string" ? durationMs(backoff) ?? 10_000 : 10_000;
-  return new Date(now.getTime() + Math.min(base * 2 ** Math.max(attempts - 1, 0), 86_400_000));
+  const scale = growth === "fixed" ? 1 : (typeof factor === "number" ? factor : 2) ** Math.max(attempts - 1, 0);
+  return new Date(now.getTime() + Math.min(base * scale, 86_400_000));
 }

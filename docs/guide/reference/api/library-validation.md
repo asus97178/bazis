@@ -6,7 +6,7 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Validator(options)` | Декоратор правил поля: `required`, длины, `range`, `pattern`, `email`, `uuid`, `enumType`, `custom`… Литералы `ref`, `refKeys`, `refScope` ничего не проверяют, а идут в схему как `x-ref`, `x-ref-keys`, `x-ref-scope` | [Правила](../../overview/validation.md#правила) |
+| `Validator(options)` | Декоратор правил поля: `required`, длины, `range`, `pattern`, `email`, `uuid`, `enumType`, `custom`… Литералы `ref`, `refKeys`, `refScope`, `personal` ничего не проверяют, а идут в схему как `x-ref`, `x-ref-keys`, `x-ref-scope`, `x-personal` | [Правила](../../overview/validation.md#правила) |
 | `Validator.validate(instance)`, `Validator.validateAsync(instance)` | Проверить объект вне привязки — в сервисе, скрипте | [Проверка данных](../../overview/validation.md) |
 | `Validator.setDefaultMessages`, `Validator.resetDefaultMessages` | Свои шаблоны текстов для всего процесса | [Свои тексты](../../overview/validation.md#свои-тексты-и-русский-язык) |
 | `Validator.ruleSet(fields)` | Правила данными, без класса: возвращает `RuleSet` с `validate`, `validateAsync`, `fields` | [Правила как данные](../../overview/validation.md#правила-как-данные-validatorruleset) |

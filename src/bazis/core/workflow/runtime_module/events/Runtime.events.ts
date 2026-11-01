@@ -1,5 +1,5 @@
 import { createEventToken } from "../../../kernel";
-import type { FormSpec } from "../../../../library/workflow";
+import type { FormSpec, LocalizedText } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
 import type { InstanceStatus, StartedVia } from "../model/WfInstance.model";
 
@@ -10,7 +10,7 @@ export interface WorkflowTaskRequested {
   readonly processKey: string;
   readonly nodeId: string;
   readonly partition: string | null;
-  readonly title: string;
+  readonly title: LocalizedText;
   readonly assignee: { readonly role: string } | { readonly user: string };
   readonly form: FormSpec | null;
   /** When the task is due, from the node's `dueIn`. */

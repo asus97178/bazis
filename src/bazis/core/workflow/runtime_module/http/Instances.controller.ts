@@ -4,12 +4,16 @@ import { Authorize, Controller, Created, Get, Post, type HttpContext } from "../
 import { buildListDocument } from "../../../../library/jsonapi";
 import { body, callerOf, filterOf, listQuery, optionalString, pagingOfList, param, requiredString } from "../../internal/http";
 import type { InstanceStatus } from "../model/WfInstance.model";
+import { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import { IWorkflowRuntime, type InstanceSummary } from "../services/IWorkflowRuntime.service";
 
 /** Instances over HTTP (WORKFLOW-001 §4); rights are `workflow.instances.*` (WORKFLOW-002 §6.2). */
 @Controller("workflow/instances")
 export class InstancesController {
-  constructor(private readonly runtime: IWorkflowRuntime) {}
+  constructor(
+    private readonly runtime: IWorkflowRuntime,
+    private readonly definitions: IWorkflowDefinitions,
+  ) {}
 
   @Post()
   @Authorize(can("workflow.instances.start"))
@@ -17,13 +21,14 @@ export class InstancesController {
     const request = await body(ctx);
     const processKey = requiredString(request.processKey, "processKey", 64);
     const partition = optionalString(request.partition, "partition") ?? null;
-    const { actor, request: from } = await callerOf(ctx, "workflow.instances.start", { scope: partition, process: processKey });
+    const { actor, request: from, language } = await callerOf(ctx, "workflow.instances.start", { scope: partition, process: processKey, folder: await this.definitions.folderOf(processKey) });
     const instance = await this.runtime.start(processKey, {
       input: request.input,
       partition,
       businessKey: optionalString(request.businessKey, "businessKey") ?? null,
       actor,
       request: from,
+      language,
     });
     return Created(`${ctx.path}/${instance.id}`, instance);
   }
@@ -52,7 +57,7 @@ export class InstancesController {
   @Authorize(can("workflow.instances.read"))
   async get(ctx: HttpContext) {
     const instance = await this.runtime.instance(param(ctx, "id"));
-    await callerOf(ctx, "workflow.instances.read", objectOf(instance));
+    await callerOf(ctx, "workflow.instances.read", await this.objectOf(instance));
     return instance;
   }
 
@@ -60,7 +65,7 @@ export class InstancesController {
   @Authorize(can("workflow.instances.read"))
   async history(ctx: HttpContext) {
     const instance = await this.runtime.instance(param(ctx, "id"));
-    await callerOf(ctx, "workflow.instances.read", objectOf(instance));
+    await callerOf(ctx, "workflow.instances.read", await this.objectOf(instance));
     return { data: await this.runtime.history(instance.id) };
   }
 
@@ -69,7 +74,7 @@ export class InstancesController {
   async cancel(ctx: HttpContext) {
     const instance = await this.runtime.instance(param(ctx, "id"));
     const request = await body(ctx);
-    const { actor, request: from } = await callerOf(ctx, "workflow.instances.manage", objectOf(instance));
+    const { actor, request: from } = await callerOf(ctx, "workflow.instances.manage", await this.objectOf(instance));
     return await this.runtime.cancel(instance.id, { reason: optionalString(request.reason, "reason", 1000) ?? null, actor, request: from });
   }
 
@@ -77,14 +82,14 @@ export class InstancesController {
   @Authorize(can("workflow.instances.manage"))
   async retry(ctx: HttpContext) {
     const instance = await this.runtime.instance(param(ctx, "id"));
-    const { actor, request } = await callerOf(ctx, "workflow.instances.manage", objectOf(instance));
+    const { actor, request } = await callerOf(ctx, "workflow.instances.manage", await this.objectOf(instance));
     return await this.runtime.retry(instance.id, { actor, request });
+  }
+
+  /** The instance as the object of a permission. */
+  private async objectOf(instance: InstanceSummary): Promise<AccessObject> {
+    return { scope: instance.partition, process: instance.processKey, folder: await this.definitions.folderOf(instance.processKey), startedById: instance.startedBy.id };
   }
 }
 contextOnlyController(InstancesController);
-
-/** The instance as the object of a permission. */
-function objectOf(instance: InstanceSummary): AccessObject {
-  return { scope: instance.partition, process: instance.processKey, startedById: instance.startedBy.id };
-}
 

@@ -1,16 +1,17 @@
 import { validateForm, type FormIssue, type FormSpec } from "../../../library/workflow";
+import type { WorkflowPortContext } from "./WorkflowExtensions";
 
 /** What a value is checked for: a process input or a task form. */
-export interface WorkflowInputContext {
+export interface WorkflowInputContext extends WorkflowPortContext {
   readonly purpose: "input" | "task";
   readonly processKey: string;
-  readonly partition: string | null;
 }
 
 /**
- * Checks a process input and task forms against their fields (WORKFLOW-001 §9).
- * The default checks the types of `bazis.workflow/v1`; an application with its
- * own field rules registers its implementation of this class in any module.
+ * Checks a process input and task forms against their fields (WORKFLOW-002 §3.4):
+ * a field carries the application's rules in `extensions`. The default checks the
+ * types; an application with its own field rules registers its implementation of
+ * this class in any module.
  */
 export abstract class WorkflowInputValidator {
   abstract validate(spec: FormSpec | undefined, value: unknown, context: WorkflowInputContext): { readonly value: Record<string, unknown>; readonly issues: readonly FormIssue[] } | Promise<{ readonly value: Record<string, unknown>; readonly issues: readonly FormIssue[] }>;

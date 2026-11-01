@@ -8,7 +8,7 @@ export class TasksDbContext extends DbContext {
 /** The table of the Tasks part: bazis creates and checks it in the application database. */
 export const tasksStore = defineOrmOwnedStoreV1({
   contract: "bazis.orm-owned-store/v1",
-  storeKey: "bazis.workflow.tasks",
+  storeKey: "bazis.workflow.tasks.v2",
   formatVersion: 1,
-  ownedScope: { schema: "public", tablePrefix: "bazis_wf_task_" },
+  ownedScope: { schema: "public", tablePrefix: "bazis_wf2_task_" },
 });

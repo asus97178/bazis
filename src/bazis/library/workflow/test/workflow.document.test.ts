@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { durationMs, emptyProcess, parseCron, evaluateCondition, hasErrors, readPath, resolveInput, validateForm, validateProcess } from "@/library/workflow";
+import { durationMs, emptyProcess, evaluateExpression, hasErrors, parseCron, readPath, resolveInput, validateForm, validateProcess, type Expr } from "@/library/workflow";
 
 const DOCUMENT = {
-  schemaVersion: "bazis.workflow/v1",
-  input: { fields: [{ code: "amount", type: "number", required: true }] },
+  schemaVersion: "bazis.workflow/v2",
+  variables: [{ name: "amount", type: "number", direction: "in", required: true }],
   nodes: {
     Start: { kind: "manualStart", title: "Start" },
     Pay: { kind: "serviceTask", title: "Pay", config: { tool: "payments.charge", input: { amount: "$input.amount" }, saveTo: "payment", retry: { maxAttempts: 3, backoff: "PT1M" } } },
@@ -14,7 +14,7 @@ const DOCUMENT = {
   flows: {
     a: { source: "Start", target: "Pay" },
     b: { source: "Pay", target: "Paid" },
-    c: { source: "Paid", target: "End", condition: { path: "$vars.payment.status", op: "eq", value: "paid" } },
+    c: { source: "Paid", target: "End", condition: { op: "eq", args: [{ path: "$vars.payment.status" }, "paid"] } },
     d: { source: "Paid", target: "Review", isDefault: true },
     e: { source: "Review", target: "End" },
   },
@@ -56,7 +56,7 @@ describe("validateProcess", () => {
 
   test("a condition may read only declared input fields and existing nodes", () => {
     const wrong = structuredClone(DOCUMENT) as unknown as { flows: Record<string, unknown> };
-    wrong.flows.c = { source: "Paid", target: "End", condition: { path: "$input.total", op: "gt", value: 1 } };
+    wrong.flows.c = { source: "Paid", target: "End", condition: { op: "gt", args: [{ path: "$input.total" }, 1] } };
     expect(validateProcess(wrong)).toEqual([expect.objectContaining({ code: "condition_invalid", flow: "c" })]);
   });
 });
@@ -72,14 +72,19 @@ describe("instance data", () => {
   });
 
   test("conditions", () => {
-    expect(evaluateCondition({ all: [{ path: "$input.amount", op: "gte", value: "100" }, { path: "$input.tags", op: "contains", value: "vip" }] }, data)).toBe(true);
-    expect(evaluateCondition({ not: { path: "$vars.payment.status", op: "in", value: ["paid", "refunded"] } }, data)).toBe(false);
-    expect(evaluateCondition({ any: [{ path: "$vars.none", op: "notEmpty" }, { path: "$nodes.Pay.id", op: "eq", value: "p-2" }] }, data)).toBe(false);
+    const run = (expression: Expr) => evaluateExpression(expression, data);
+    expect(run({ op: "and", args: [{ op: "gte", args: [{ path: "$input.amount" }, "100"] }, { op: "contains", args: [{ path: "$input.tags" }, "vip"] }] })).toBe(true);
+    expect(run({ op: "not", args: [{ op: "in", args: [{ path: "$vars.payment.status" }, ["paid", "refunded"]] }] })).toBe(false);
+    expect(run({ op: "or", args: [{ op: "notEmpty", args: [{ path: "$vars.none" }] }, { op: "eq", args: [{ path: "$nodes.Pay.id" }, "p-2"] }] })).toBe(false);
+  });
+
+  test("a step input takes paths, expressions and literals", () => {
+    expect(resolveInput({ total: { op: "mul", args: [{ path: "$input.amount" }, 2] }, status: { path: "$vars.payment.status" }, literal: { a: 1 } }, data)).toEqual({ total: 300, status: "paid", literal: { a: 1 } });
   });
 });
 
 test("forms check types, required and unknown fields", () => {
-  const spec = { fields: [{ code: "amount", type: "integer" as const, required: true }, { code: "kind", type: "enum" as const, values: ["a", "b"] }, { code: "on", type: "date" as const }] };
+  const spec = { fields: [{ name: "amount", type: "integer" as const, required: true }, { name: "kind", type: "enum" as const, values: ["a", "b"] }, { name: "on", type: "date" as const }] };
   expect(validateForm(spec, { amount: 3, kind: "a", on: "2026-10-31" })).toEqual({ value: { amount: 3, kind: "a", on: "2026-10-31" }, issues: [] });
   expect(validateForm(spec, { amount: 1.5, kind: "c", extra: 1 }).issues.map((issue) => [issue.field, issue.code])).toEqual([["extra", "unknown"], ["amount", "type"], ["kind", "enum"]]);
   expect(validateForm(spec, {}).issues.map((issue) => issue.code)).toEqual(["required"]);

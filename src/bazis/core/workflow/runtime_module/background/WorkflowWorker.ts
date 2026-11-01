@@ -2,14 +2,14 @@ import { BackgroundService, delay } from "../../../background";
 import type { ServiceProvider } from "../../../di";
 import { WorkflowClock } from "../../contracts/WorkflowClock";
 import type { ConfigView } from "../../../kernel";
-import type { WorkflowSettings } from "../config/Runtime.config";
+import type { WorkflowSettings } from "../../contracts/Workflow.config";
 import { WorkflowJobs } from "../internal/WorkflowJobs";
 
 /** How often the scheduled starts are matched against the published versions. */
 const RECONCILE_MS = 60_000;
 
 /**
- * Takes due jobs of `bazis_wf_run_jobs` every `worker.intervalMs`, up to
+ * Takes due jobs of `bazis_wf2_run_jobs` every `worker.intervalMs`, up to
  * `worker.batchSize` at a time ({@link WorkflowJobs}). A full batch is
  * followed by the next one at once.
  */

@@ -58,8 +58,8 @@ function approval(title = "Order approval"): CodeProcess {
     title,
     retentionDays: 30,
     document: {
-      schemaVersion: "bazis.workflow/v1",
-      input: { fields: [{ code: "order", type: "string", required: true }] },
+      schemaVersion: "bazis.workflow/v2",
+      variables: [{ name: "order", type: "string", direction: "in", required: true }],
       nodes: {
         Start: { kind: "manualStart", title: "Start" },
         Reserve: { kind: "serviceTask", title: "Reserve", config: { tool: "stock.reserve", input: { order: "$input.order" } } },
@@ -82,7 +82,7 @@ const nightly = defineProcess({
   key: "nightly-report",
   title: "Nightly report",
   document: {
-    schemaVersion: "bazis.workflow/v1",
+    schemaVersion: "bazis.workflow/v2",
     nodes: { Daily: { kind: "scheduleStart", title: "At nine", config: { cron: "0 9 * * *" } }, End: { kind: "end", title: "End" } },
     flows: { f: { source: "Daily", target: "End" } },
   },
@@ -92,7 +92,7 @@ const unknownTool = defineProcess({
   key: "broken",
   title: "Broken",
   document: {
-    schemaVersion: "bazis.workflow/v1",
+    schemaVersion: "bazis.workflow/v2",
     nodes: { Start: { kind: "manualStart", title: "Start" }, Call: { kind: "serviceTask", title: "Call", config: { tool: "nobody.has" } }, End: { kind: "end", title: "End" } },
     flows: { a: { source: "Start", target: "Call" }, b: { source: "Call", target: "End" } },
   },
@@ -129,7 +129,7 @@ beforeAll(async () => {
   if (!enabled) return;
   const sql = postgres({ url });
   try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf\\_%'", [])) as { tablename: string }[];
+    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
     if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
     await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
   } finally {
@@ -189,7 +189,7 @@ test.skipIf(!enabled)("testWorkflow runs jobs only in drain and moves time by th
   // Schedule jobs the earlier applications planned by the system clock.
   const sql = postgres({ url });
   try {
-    await sql.execute(`DELETE FROM "bazis_wf_run_jobs" WHERE kind = 'schedule'`, []);
+    await sql.execute(`DELETE FROM "bazis_wf2_run_jobs" WHERE kind = 'schedule'`, []);
   } finally {
     await sql.close();
   }

@@ -1,19 +1,23 @@
-import type { FormSpec } from "./formFields";
+import type { Expr } from "./expressions";
+import type { VariableSpec } from "./formFields";
+import type { LocalizedText } from "./localized";
 
 /**
  * A process document: the framework's own JSON, not BPMN XML (a designer may
- * render BPMN from it). One object holds the process input (`input`), the graph
- * (`nodes`, `flows`) and the canvas layout (`diagram`).
+ * render BPMN from it). One object holds the variables, the settings, the graph
+ * (`nodes`, `flows`), the canvas layout (`diagram`) and the application's data
+ * (`extensions`).
  */
-export const PROCESS_SCHEMA_VERSION = "bazis.workflow/v1";
+export const PROCESS_SCHEMA_VERSION = "bazis.workflow/v2";
 
-/** The node kinds of version 1; closed: a new kind comes with a new document version. */
+/** The node kinds of version 2; closed: a new kind comes with a new document version. */
 export type NodeKind =
   | "manualStart"
   | "scheduleStart"
   | "eventStart"
   | "userTask"
   | "serviceTask"
+  | "assign"
   | "timerCatch"
   | "eventWait"
   | "exclusiveGateway"
@@ -25,34 +29,23 @@ export type NodeKind =
 
 export interface ProcessNode {
   readonly kind: NodeKind;
-  readonly title: string;
+  readonly title: LocalizedText;
   /** Boundary nodes only: the step the node is attached to. */
   readonly attachedTo?: string;
   readonly config?: Readonly<Record<string, unknown>>;
+  /** The application's data by namespace; the engine does not read it. */
+  readonly extensions?: Readonly<Record<string, unknown>>;
 }
 
 export interface ProcessFlow {
   readonly source: string;
   readonly target: string;
-  readonly title?: string;
+  readonly title?: LocalizedText;
   /** Condition of a flow that leaves an exclusive gateway. */
-  readonly condition?: Condition;
+  readonly condition?: Expr;
   /** The flow an exclusive gateway takes when no condition holds. */
   readonly isDefault?: boolean;
 }
-
-/** Comparison operators of conditions. */
-export type ConditionOp = "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "in" | "contains" | "empty" | "notEmpty";
-
-/**
- * A condition: a tree of `all` / `any` / `not` and comparisons. `path` addresses
- * instance data: `$input.<field>`, `$vars.<name>`, `$nodes.<node>.<field>`.
- */
-export type Condition =
-  | { readonly all: readonly Condition[] }
-  | { readonly any: readonly Condition[] }
-  | { readonly not: Condition }
-  | { readonly path: string; readonly op: ConditionOp; readonly value?: unknown };
 
 export interface Bounds {
   readonly x: number;
@@ -72,13 +65,33 @@ export interface ProcessDiagram {
   readonly edges: Readonly<Record<string, { readonly waypoints: readonly Point[] }>>;
 }
 
+/** What goes to the history of an instance. */
+export interface ProcessLogSettings {
+  /** The values of variables an `assign` step sets; `false` by default. */
+  readonly variables?: boolean;
+  /** The input and output of Tools; `false` by default. */
+  readonly toolPayloads?: boolean;
+  /** Personal data shows as `***`; `true` by default. */
+  readonly maskPersonal?: boolean;
+}
+
+/** Settings of a process: they are part of the version. */
+export interface ProcessSettings {
+  /** The default `timeout` of steps with a Tool: an ISO duration. */
+  readonly stepTimeout?: string;
+  readonly log?: ProcessLogSettings;
+}
+
 export interface ProcessDocument {
   readonly schemaVersion: typeof PROCESS_SCHEMA_VERSION;
-  /** Fields the process starts with; without them it starts with no data. */
-  readonly input?: FormSpec;
+  /** `in` — the input of a start, `local` — inside the process, `out` — what it gives back. */
+  readonly variables?: readonly VariableSpec[];
+  readonly settings?: ProcessSettings;
   readonly nodes: Readonly<Record<string, ProcessNode>>;
   readonly flows: Readonly<Record<string, ProcessFlow>>;
   readonly diagram?: ProcessDiagram;
+  /** The application's data by namespace; the engine does not read it. */
+  readonly extensions?: Readonly<Record<string, unknown>>;
 }
 
 /** A new process: a manual start leading straight to the end. It already passes validation. */
@@ -91,4 +104,27 @@ export function emptyProcess(): ProcessDocument {
     },
     flows: { StartToEnd: { source: "Start", target: "End" } },
   };
+}
+
+/** The fields a start takes: the `in` variables. */
+export function inputSpecOf(document: Pick<ProcessDocument, "variables">): { readonly fields: readonly VariableSpec[] } {
+  return { fields: (document.variables ?? []).filter((variable) => variable.direction === "in") };
+}
+
+/** What `$vars` holds at the start: the `local` and `out` variables with a default. */
+export function initialVarsOf(document: Pick<ProcessDocument, "variables">): Record<string, unknown> {
+  const vars: Record<string, unknown> = {};
+  for (const variable of document.variables ?? []) {
+    if (variable.direction !== "in" && variable.default !== undefined) vars[variable.name] = variable.default;
+  }
+  return vars;
+}
+
+/** What a finished process gives back: its `out` variables. */
+export function outputOf(document: Pick<ProcessDocument, "variables">, vars: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  for (const variable of document.variables ?? []) {
+    if (variable.direction === "out") output[variable.name] = Object.hasOwn(vars, variable.name) ? vars[variable.name] : null;
+  }
+  return output;
 }

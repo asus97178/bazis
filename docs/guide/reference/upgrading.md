@@ -7,6 +7,44 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.132.0
+
+- **Документ процесса — `bazis.workflow/v2`, сохранить можно только его.**
+  Опубликованные версии и черновики переносятся сами (ниже). Документ в коде
+  замените или оберните: `document: upgradeDocument(старый)`.
+  | Было | Стало |
+  | --- | --- |
+  | `input: { fields: [{ code, type, … }] }` | `variables: [{ name, type, direction: "in", … }]` |
+  | Поле формы `{ code: "ok", … }` | `{ name: "ok", … }` |
+  | `{ path, op, value }` | `{ op, args: [{ path }, value] }` |
+  | `{ all: […] }`, `{ any: […] }`, `{ not: c }` | `{ op: "and", args: […] }`, `{ op: "or", … }`, `{ op: "not", args: [c] }` |
+
+  Заодно документ стал строже: `$input.x` без такой переменной `in`, `$vars.x`
+  без объявления или `saveTo` — ошибка, а `name` и `saveTo` — по
+  `^[a-z][A-Za-z0-9_]{0,39}$`. Опубликованное продолжает работать, а вот черновик
+  с такой ошибкой не опубликуется.
+- **Новые хранилища.** Таблицы теперь `bazis_wf2_def_*`, `bazis_wf2_run_*`,
+  `bazis_wf2_task_*`. При первом старте каталог переносится сам: процессы, версии
+  с их датами, черновики; название уходит в язык `workflow.language`.
+  **Экземпляры и задачи не переносятся** — завершите живые на старом выпуске.
+  Старые таблицы фреймворк не трогает. Проверьте каталог и удалите их руками, иначе
+  процесс, удалённый из пустого каталога, вернётся при следующем старте:
+  ```sql
+  DROP TABLE "bazis_wf_task_items", "bazis_wf_run_history", "bazis_wf_run_jobs", "bazis_wf_run_subscriptions", "bazis_wf_run_tokens", "bazis_wf_run_instances", "bazis_wf_def_versions", "bazis_wf_def_processes";
+  DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key IN ('bazis.workflow.definitions', 'bazis.workflow.runtime', 'bazis.workflow.tasks');
+  ```
+- **`title` и `description` процесса и `title` задачи — `LocalizedText`**, строка или
+  объект «язык → текст». Для показа в ответах HTTP есть `titleText`, в коде —
+  `textOf(title, language)`.
+- **В `bazis/library/workflow`:** `FormField.code` → `name`, `FormFieldType` →
+  `FieldType`, `formFieldCodes` → `formFieldNames`, `evaluateCondition` →
+  `evaluateExpression` с `isTruthy`; типов `Condition` и `ConditionOp` больше нет.
+- **`workflowRuntimeConfig` → `workflowConfig`.**
+- **Свои реализации контрактов.** `IWorkflowDefinitions` получил `folderOf`,
+  `validate` и `palette`; контекст `WorkflowInputValidator` — `language` и `actor`.
+- **Настройка, которой нет в этой версии (`settings.runAs` и другие), — ошибка
+  документа**, а не молчаливо пропущенное значение.
+
 ## 0.131.0
 
 - **Списки `/workflow/processes`, `/workflow/instances`, `/workflow/tasks` — в

@@ -1,13 +1,17 @@
 import type { AccessFilter } from "../../../access";
 import type { AgentToolContract } from "../../../agent";
-import type { ProcessDocument, ProcessIssue } from "../../../../library/workflow";
+import type { LocalizedText, ProcessDocument, ProcessIssue, ProcessPalette } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { OwnedCodeProcess } from "../code/codeProcesses";
 
 export interface ProcessSummary {
   readonly key: string;
-  readonly title: string;
-  readonly description: string | null;
+  readonly title: LocalizedText;
+  readonly description: LocalizedText | null;
+  /** A path, `Sales/Orders`. */
+  readonly folder: string | null;
+  /** Whose process it is: an opaque id. */
+  readonly owner: string | null;
   readonly latestVersion: number | null;
   readonly retentionDays: number | null;
   readonly archived: boolean;
@@ -41,14 +45,18 @@ export interface VersionDetails extends VersionSummary {
 
 export interface CreateProcess {
   readonly key: string;
-  readonly title: string;
-  readonly description?: string | null;
+  readonly title: LocalizedText;
+  readonly description?: LocalizedText | null;
+  readonly folder?: string | null;
+  readonly owner?: string | null;
   readonly retentionDays?: number | null;
 }
 
 export interface UpdateProcess {
-  readonly title?: string;
-  readonly description?: string | null;
+  readonly title?: LocalizedText;
+  readonly description?: LocalizedText | null;
+  readonly folder?: string | null;
+  readonly owner?: string | null;
   readonly retentionDays?: number | null;
   readonly archived?: boolean;
 }
@@ -57,11 +65,20 @@ export interface ProcessListQuery extends WorkflowPaging {
   /** Which processes the caller may see, from `IAccess`; without it the calling code has decided. */
   readonly access?: AccessFilter;
   readonly archived?: boolean;
-  /** Part of the key or title, case-insensitive. */
+  /** Part of the key or a title in any language, case-insensitive. */
   readonly search?: string;
+  /** This folder and those below it. */
+  readonly folder?: string;
+  readonly owner?: string;
 }
 
-export interface SaveDraftOptions extends WorkflowAuditOptions {
+/** Who asks for a validation: it goes to the application's `WorkflowExtensions`. */
+export interface ValidateOptions {
+  readonly language?: string;
+  readonly actor?: WorkflowActor;
+}
+
+export interface SaveDraftOptions extends WorkflowAuditOptions, Pick<ValidateOptions, "language"> {
   /** The `draftUpdatedAt` the caller read: another save since then is `conflict`. Without it the last save wins. */
   readonly expected?: Date;
 }
@@ -81,6 +98,12 @@ export interface SavedDraft {
 export abstract class IWorkflowDefinitions {
   abstract list(query?: ProcessListQuery): Promise<WorkflowPage<ProcessSummary>>;
   abstract get(key: string): Promise<ProcessDetails>;
+  /** The folder of a process, for a check of rights; `null` also for a process that does not exist. */
+  abstract folderOf(key: string): Promise<string | null>;
+  /** Every finding of a document, with the application's `extensions` checks; nothing is stored. */
+  abstract validate(document: unknown, options?: ValidateOptions): Promise<readonly ProcessIssue[]>;
+  /** What a designer builds its forms from: node kinds, functions, paths and Tools. */
+  abstract palette(): ProcessPalette;
   abstract create(process: CreateProcess, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<ProcessDetails>;
   /** A process declared in code takes only `archived`; other fields give `conflict`. */
   abstract update(key: string, changes: UpdateProcess, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<ProcessDetails>;
@@ -90,7 +113,7 @@ export abstract class IWorkflowDefinitions {
    * Validates the draft and stores it as the next version; the same document
    * again returns the latest version. `conflict` for a process declared in code.
    */
-  abstract publish(key: string, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<VersionDetails>;
+  abstract publish(key: string, actor: WorkflowActor, options?: WorkflowAuditOptions & Pick<ValidateOptions, "language">): Promise<VersionDetails>;
   abstract versions(key: string): Promise<readonly VersionSummary[]>;
   abstract version(key: string, version: number): Promise<VersionDetails>;
   /** The latest published version of a process that is not archived. */

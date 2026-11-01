@@ -2,14 +2,28 @@ import { IAccess, type AccessObject, type SubjectAccess } from "../../access";
 import { ForbiddenError, type HttpContext } from "../../http";
 import { frameworkBadRequest } from "../../http/Errors/HttpError";
 import { ListQueryError, parseListQuery, type ListQuery, type ListQueryOptions, type ListQueryProblem } from "../../../library/jsonapi";
+import { textOf, type LocalizedText } from "../../../library/workflow";
 import type { WorkflowActor, WorkflowPaging, WorkflowRequest } from "../contracts/types";
 import { WorkflowError } from "../contracts/WorkflowError";
+import { WorkflowLanguages } from "./WorkflowLanguages";
 
 /** Who calls a route: their rights and how they are recorded as an actor. */
 export interface WorkflowCaller {
   readonly access: SubjectAccess;
   readonly actor: WorkflowActor;
   readonly request: WorkflowRequest;
+  /** The language of the request: `Accept-Language` among `workflow.languages`. */
+  readonly language: string;
+}
+
+/** A record with `titleText`: its `title` in the language of the request. `title` itself stays for editing. */
+export function withTitleText<T extends { readonly title: LocalizedText }>(item: T, language: string, fallback: string): T & { readonly titleText: string } {
+  return { ...item, titleText: textOf(item.title, language, fallback) };
+}
+
+/** The default language, for {@link withTitleText}. */
+export function defaultLanguage(ctx: HttpContext): string {
+  return ctx.services.resolve(WorkflowLanguages).default;
 }
 
 /**
@@ -23,12 +37,17 @@ export async function callerOf(ctx: HttpContext, permission?: string, object?: A
   if (permission !== undefined && !await access.can(permission, object)) throw new ForbiddenError();
   const sub = access.subject.sub;
   const [id = sub.slice(sub.lastIndexOf(":") + 1)] = await access.ownerIds();
-  return { access, actor: { kind: "user", id }, request: { ip: ctx.clientIp ?? null, userAgent: ctx.header("user-agent") ?? null } };
+  return { access, actor: { kind: "user", id }, request: { ip: ctx.clientIp ?? null, userAgent: ctx.header("user-agent") ?? null }, language: ctx.services.resolve(WorkflowLanguages).of(ctx.header("accept-language")) };
 }
 
 /** A route parameter as a string. */
 export function param(ctx: HttpContext, name: string): string {
   return String(ctx.params[name] ?? "");
+}
+
+/** A title or a description from a body; the service checks it. */
+export function optionalText(value: unknown): LocalizedText | null | undefined {
+  return value as LocalizedText | null | undefined;
 }
 
 /** The JSON body as an object; anything else is `invalid_input`. */

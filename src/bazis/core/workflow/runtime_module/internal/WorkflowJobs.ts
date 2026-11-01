@@ -4,11 +4,9 @@ import { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
 import { Schedules } from "./Schedules";
 import { TimerStep } from "./TimerStep";
-import { ToolStep } from "./ToolStep";
+import { LEASE_MS, ToolStep } from "./ToolStep";
 import { WorkflowEngine } from "./WorkflowEngine";
 
-/** How long a claimed job belongs to its worker; if it dies, another one takes the job after that. */
-const LEASE_MS = 5 * 60_000;
 /** A job that keeps failing outside its Tool (the database, a lost version) fails its step after this many tries. */
 const MAX_JOB_ATTEMPTS = 5;
 
@@ -16,7 +14,7 @@ const MAX_JOB_ATTEMPTS = 5;
 export type JobFailureReport = (message: string, error: unknown, fields?: Readonly<Record<string, unknown>>) => void;
 
 /**
- * Claiming and running jobs of `bazis_wf_run_jobs`: the work of the worker, and
+ * Claiming and running jobs of `bazis_wf2_run_jobs`: the work of the worker, and
  * of `drain` in tests. Every job runs in its own DI scope.
  */
 export class WorkflowJobs {

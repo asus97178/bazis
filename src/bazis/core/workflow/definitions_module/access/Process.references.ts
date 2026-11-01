@@ -20,7 +20,7 @@ export class ProcessReferences extends References {
   async search(text: string, _context: unknown, page: ReferencePage): Promise<readonly ReferenceItem[]> {
     const found = text.trim();
     let source = this.db.processes.asNoTracking();
-    if (found !== "") source = source.where((p) => p.key.contains(found, { ignoreCase: true }).or(p.title.contains(found, { ignoreCase: true })));
+    if (found !== "") source = source.where((p) => p.key.contains(found, { ignoreCase: true }).or(p.titleText.contains(found, { ignoreCase: true })));
     const rows = await source.orderBy((p) => p.key).skip(page.offset).take(page.limit).toList();
     return rows.map((row) => ({ id: row.key, title: row.title }));
   }
