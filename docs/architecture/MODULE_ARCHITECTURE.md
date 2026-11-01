@@ -585,14 +585,17 @@ a factory/value, the constructor dependency types, the lifetime, the source modu
 dependency and its availability through `exports`. Describing dependencies in the passport
 does not require repeating them as an array in the registration.
 
-The regular path is `scoped`, `singleton`, `transient` and the existing factory/value
-shortcuts from [shortcuts.ts](../../src/bazis/core/di/module/shortcuts.ts).
-A regular class uses `scoped(IService, Service)` or `scoped(Service)`.
-Dependencies are declared in the constructor; codegen extracts their types, including
-`IRepository<Entity>`, and DI uses the generated binding.
-A manual third `deps` argument is not needed to repeat these same dependencies.
-It is allowed for a concrete justified override, not as the standard for a
-new module. After a constructor changes, codegen is refreshed.
+`providers` of a module use only the agreed forms:
+`scoped(IService, Service)` / `singleton(...)` / `transient(...)` (or the class
+alone), `singletonValue(TOKEN, value)`, `singletonAsyncFactory(TOKEN, [deps], async factory)`
+and `...withEventSubscribers(Class)`. Dependencies are declared in the constructor;
+codegen extracts their types, including `IRepository<Entity>`, and DI uses the
+generated binding. There is no dependency list, no synchronous factory and no
+`DI.*` in a module: a computed service is a class with a constructor. Codegen
+refuses any other form (`BAZIS_DI_PROVIDER_FORM`), in applications and in the
+framework's own packs. `controllers`, `background`, `gateways`, `grpcControllers`
+and `tools` list the classes themselves. After a constructor changes, codegen is
+refreshed.
 
 A controller is already registered through `controllers` (HTTP) or `grpcControllers`
 (gRPC), a background class through

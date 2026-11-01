@@ -74,8 +74,7 @@ export class SystemClock implements IClock { now() { return new Date(); } }
 `export const IClock = createToken<IClock>("IClock")`. Подробнее — в главе
 [Провайдеры и DI](../overview/providers.md#регистрация-по-контракту).
 
-Токены `createToken` нужны и для значений:
-`singletonValue(APP_NAME, "my-app")`, `singletonFactory(TOKEN, [deps], factory)`.
+Токены `createToken` нужны и для значений: `singletonValue(APP_NAME, "my-app")`.
 
 ## Контроллер
 
@@ -173,9 +172,7 @@ greet(name: string) { return `${this.config.get("prefix")}, ${name}!`; }
 ```
 
 Кодогенерация находит объявление `defineConfig<GreetingConfig>(...)` по типу,
-поэтому тип в угловых скобках у `defineConfig` обязателен. Это работает с
-версии 0.96.5; в более ранних токен указывали вручную:
-`scoped(GreetingService, GreetingService, [greetingConfig.token] as const)`.
+поэтому тип в угловых скобках у `defineConfig` обязателен.
 
 Любое значение переопределяется переменной окружения вида
 `BAZIS_<ИМЯ>__<КЛЮЧ>`: `BAZIS_GREETING__PREFIX=Hey`. Значение неверного типа

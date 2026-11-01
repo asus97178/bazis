@@ -191,24 +191,29 @@ export class CreateTaskTool {
 
 ```ts
 // tasks/agentOptions.ts
-import { TOOL_EXECUTION_OPTIONS, type ToolExecutionOptions } from "bazis/core/agent";
-import { DI } from "bazis/core/di";
-import { LOGGER, type Logger } from "bazis/core/kernel";
+import type { ToolExecutionOptions } from "bazis/core/agent";
+import type { Logger } from "bazis/core/kernel";
 
 /**
  * Every tool call leaves a line in the application log, and a tool runs only
  * for a signed-in user: the controller puts the user into the run's metadata.
+ * Fields, not methods: the executor copies the options with `{ ...options }`.
  */
-export const agentOptions = DI.singleton(DI.factoryProvider(TOOL_EXECUTION_OPTIONS, [LOGGER], (logger: Logger): ToolExecutionOptions => ({
-  auditSink: (entry) => logger.info("agent tool", {
-    phase: entry.phase,
-    tool: entry.toolName,
-    user: entry.metadata.userId,
-    status: entry.result?.status,
-    durationMs: entry.durationMs,
-  }),
-  approvalPolicy: (request) => typeof request.metadata.userId === "string",
-})));
+export class AgentOptions implements ToolExecutionOptions {
+  readonly auditSink: ToolExecutionOptions["auditSink"];
+  readonly approvalPolicy: ToolExecutionOptions["approvalPolicy"];
+
+  constructor(logger: Logger) {
+    this.auditSink = (entry) => logger.info("agent tool", {
+      phase: entry.phase,
+      tool: entry.toolName,
+      user: entry.metadata.userId,
+      status: entry.result?.status,
+      durationMs: entry.durationMs,
+    });
+    this.approvalPolicy = (request) => typeof request.metadata.userId === "string";
+  }
+}
 ```
 
 ## 5. Агент и контроллер
@@ -271,7 +276,7 @@ export class AssistantController {
   providers: [
     scoped(ITasksService, TasksService),
     scoped(RemindersService),
-    agentOptions,
+    singleton(TOOL_EXECUTION_OPTIONS, AgentOptions),
   ],
   background: [TaskReminders],
   exports: [ITasksService],

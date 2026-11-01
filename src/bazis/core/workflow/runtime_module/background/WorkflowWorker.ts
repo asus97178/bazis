@@ -2,7 +2,7 @@ import { BackgroundService, delay } from "../../../background";
 import type { ServiceProvider } from "../../../di";
 import { WorkflowClock } from "../../contracts/WorkflowClock";
 import type { ConfigView } from "../../../kernel";
-import type { workflowRuntimeConfig } from "../config/Runtime.config";
+import type { WorkflowSettings } from "../config/Runtime.config";
 import { WorkflowJobs } from "../internal/WorkflowJobs";
 
 /** How often the scheduled starts are matched against the published versions. */
@@ -51,12 +51,3 @@ export class WorkflowWorker extends BackgroundService {
   }
 }
 
-/** The resolved settings of {@link workflowRuntimeConfig}. */
-export interface WorkflowSettings {
-  readonly "worker.enabled": boolean;
-  readonly "worker.intervalMs": number;
-  readonly "worker.batchSize": number;
-  readonly "retention.enabled": boolean;
-  readonly "retention.intervalMs": number;
-  readonly "retention.batchSize": number;
-}

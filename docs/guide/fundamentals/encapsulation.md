@@ -92,12 +92,12 @@ export class AppModule {}
 Module encapsulation violated:
 Module "ClockModule": "ReportService" depends on "IClock", but "IClock" is registered in "ClockModule"
 and "AppModule", and the application uses one implementation per token, the last registered one, from
-"AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give the
-implementations different keys (DI.keyedSingleton).
+"AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give each
+implementation its own contract.
 ```
 
 Если разным частям приложения действительно нужны разные реализации,
-зарегистрируйте их под [ключами](dependency-injection.md#ключи).
+дайте каждой [свой контракт](dependency-injection.md#конкретная-реализация-из-нескольких).
 
 > [!NOTE]
 > Сообщение в таком виде — с версии 0.97.7.

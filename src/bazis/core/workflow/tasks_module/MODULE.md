@@ -20,7 +20,7 @@ people stays with the application (`WorkflowAccess.assignees`).
 | --- | --- | --- | --- |
 | `WfTask`, `TasksDbContext` | [model](model) | ORM, owned store `bazis.workflow.tasks` | table `bazis_wf_task_items` |
 | `IWorkflowTasks` / `WorkflowTasks` (scoped) | [services](services) | `TasksDbContext`, `IWorkflowRuntime`, `WorkflowClock` | `list`, `get`, `claim`, `release`, `complete` |
-| `TaskEvents` (scoped subscriber) | [events/TaskEvents.ts](events/TaskEvents.ts) | `WorkflowTasks` | `WORKFLOW_TASK_REQUESTED` creates the task (one per token), `WORKFLOW_TOKEN_CLOSED` cancels it, `WORKFLOW_INSTANCES_DELETED` deletes the tasks of deleted instances |
+| `TaskEvents` (scoped subscriber) | [events/TaskEvents.ts](events/TaskEvents.ts) | `TasksDbContext` | `WORKFLOW_TASK_REQUESTED` creates the task (one per token), `WORKFLOW_TOKEN_CLOSED` cancels it, `WORKFLOW_INSTANCES_DELETED` deletes the tasks of deleted instances |
 | `TasksController` | [http/Tasks.controller.ts](http/Tasks.controller.ts) | `IWorkflowTasks`, `WorkflowAccess` | `/workflow/tasks…` |
 
 exports: `[IWorkflowTasks]`.

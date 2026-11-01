@@ -31,13 +31,13 @@
 Интерфейс без токена:
 
 ```text
-constructor parameter 1 of "Greeter" has type "IClock", which is neither a DI token (createToken) nor a class known to codegen. Register it, import it from the framework package, or bind the class with an explicit factory.
+constructor parameter 1 of "Greeter" has type "IClock", which is neither a DI token (createToken) nor a class known to codegen. Register it in a module or import it from the framework package.
 ```
 
 Примитив:
 
 ```text
-constructor parameter 1 "prefix" of "Greeter" has type "string", which cannot be injected: DI resolves dependencies by class, contract or token, and a plain type does not say which value to inject. Declare a token with the same name as a type alias (export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")) and register a value, or pass the deps explicitly: scoped(Greeter, Greeter, [TOKEN] as const).
+constructor parameter 1 "prefix" of "Greeter" has type "string", which cannot be injected: DI resolves dependencies by class, contract or token, and a plain type does not say which value to inject. Declare a token with the same name as a type alias (export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")), register a value with singletonValue(Prefix, "…") and type the parameter with it: prefix: Prefix.
 ```
 
 - **Что сделать.** Сделайте контракт абстрактным классом — он и будет
@@ -60,12 +60,25 @@ constructor parameter 1 of "Mailer" has type "ConfigView<MailConfig>", but no de
 ### `BAZIS_DI_CONFIG_AMBIGUOUS`
 
 ```text
-constructor parameter 1 of "Mailer" has type "ConfigView<MailConfig>", which matches several declarations: "mailA", "mailB". Give each declaration its own type, or pass the token explicitly: scoped(Service, Service, [config.token]).
+constructor parameter 1 of "Mailer" has type "ConfigView<MailConfig>", which matches several declarations: "mailA", "mailB". Give each declaration its own type.
 ```
 
-- **Что сделать.** У каждого `defineConfig` — свой интерфейс. Если
-  настройки действительно одинаковые, передайте токен явно:
-  `scoped(Mailer, Mailer, [mailA.token])`.
+- **Что сделать.** У каждого `defineConfig` — свой интерфейс, даже если поля
+  одинаковые: `interface MailAConfig extends MailConfig {}`.
+
+### `BAZIS_DI_PROVIDER_FORM`
+
+```text
+providers of NotesModule: "scoped(NotesService, NotesService, [INotesRepository])" passes a dependency list. Remove it: codegen reads the constructor. Agreed forms: scoped(IService, Service), singleton(IService, Service), transient(IService, Service) (or the class alone), singletonValue(TOKEN, value), singletonAsyncFactory(TOKEN, [deps], async factory) or ...withEventSubscribers(Class).
+```
+
+- **Причина.** В `providers` модуля — форма, которой нет в согласованном
+  наборе: список зависимостей, синхронная фабрика, `DI.*`. Или в
+  `controllers`, `background`, `gateways`, `grpcControllers`, `tools` стоит
+  не класс, а `DI.bindDeps(...)`.
+- **Что сделать.** Зарегистрируйте сервис одной из форм из сообщения.
+  Вычисляемое значение — класс с конструктором
+  ([DI подробно](../../fundamentals/dependency-injection.md#вычисляемый-сервис--класс)).
 
 ### `BAZIS_DI_CONSTRUCTOR_UNRESOLVED`
 

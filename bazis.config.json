@@ -17,7 +17,8 @@
   },
   "framework": {
     "packs": [
-      "src/bazis/core/access"
+      "src/bazis/core/access",
+      "src/bazis/core/workflow"
     ]
   }
 }

@@ -178,7 +178,7 @@ singleton(AccessPolicy, AppAccessPolicy)   // или scoped, если ей ну�
   imports: [AccessModule],
   permissions: orderPermissions,
   references: { "orders.process": ProcessReferences },
-  providers: [DI.singleton(DI.classProvider(ProcessReferences, ProcessReferences))],
+  providers: [singleton(ProcessReferences)],
 })
 ```
 
@@ -197,7 +197,7 @@ const policy = new StaticAccessPolicy({
   grants: { "user:7": { "orders.read": [{ scopes: "all", where: { own: true } }] } },
 });
 const app = await startTestApp(AppModule, {
-  overrides: [DI.singleton(DI.valueProvider(AccessPolicy, policy))],
+  overrides: [singletonValue(AccessPolicy, policy)],
 });
 ```
 

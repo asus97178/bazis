@@ -5,7 +5,7 @@ import { WorkflowClock } from "../../contracts/WorkflowClock";
 import { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import { WORKFLOW_INSTANCES_DELETED } from "../events/Runtime.events";
 import { RuntimeDbContext } from "../model/Runtime.dbContext";
-import type { WorkflowSettings } from "./WorkflowWorker";
+import type { WorkflowSettings } from "../config/Runtime.config";
 
 const DAY_MS = 86_400_000;
 

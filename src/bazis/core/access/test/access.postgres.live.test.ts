@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema } from "@/library/orm";
 import { IAccess, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Grants } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
-import { DI, Module } from "@/core/di";
+import { Module, singleton, singletonValue } from "@/core/di";
 import { createTestContainer } from "@/core/testing";
 
 // ACCESS-001 §4.3: the list filter and the object check agree on real rows.
@@ -50,7 +50,7 @@ describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
       { scopes: ["s1", null], where: { any: [{ own: true }, { all: [{ status: { in: ["new", "paid"] } }, { not: { kind: { eq: "secret" } } }] }] } },
       { scopes: "all", where: { all: [{ group: { eq: "paper" } }, { not: { status: { isNull: true } } }] } },
     ];
-    @Module({ imports: [AccessModule], permissions, providers: [DI.singleton(DI.classProvider(GroupLookup, GroupLookup)), DI.singleton(DI.valueProvider(AccessPolicy, new StaticAccessPolicy({ grants: { "user:7": { "shop.items.read": grants } } })))] })
+    @Module({ imports: [AccessModule], permissions, providers: [singleton(GroupLookup), singletonValue(AccessPolicy, new StaticAccessPolicy({ grants: { "user:7": { "shop.items.read": grants } } }))] })
     class AppModule {}
 
     try {

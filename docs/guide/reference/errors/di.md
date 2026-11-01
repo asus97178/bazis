@@ -99,7 +99,7 @@ Cycle detected: InvoiceService -> OrderService -> InvoiceService
 [bazis] Run: bunx bazis codegen   (bazis dev, bazis build and bazis test run it automatically)
 
 [bazis] configuration error: Service graph validation failed:
-Class provider "Mailer" requires at least 1 constructor deps, but only 0 declared. Constructor dependencies are wired by codegen: if the constructor was added or changed after the last run, run `bazis codegen` (bazis dev, bazis test and bazis build run it automatically); otherwise pass the deps explicitly.
+Class provider "Mailer" requires at least 1 constructor deps, but only 0 declared. Constructor dependencies are wired by codegen: if the constructor was added or changed after the last run, run `bazis codegen` (bazis dev, bazis test and bazis build run it automatically).
 ```
 
 - **Причина.** Конструктор изменили, а сгенерированный код остался старым.
@@ -208,11 +208,11 @@ ScopeDisposedError: Cannot use a disposed scope or container.
 ### `InvalidProviderError`
 
 ```text
-[bazis] configuration error: Module "InvalidProviderModule": providers[0] is not a provider registration ({ provide: Clock }). Register it with singleton(Clock), scoped(Clock), transient(Clock), singletonValue(TOKEN, value) or singletonFactory(TOKEN, [deps], factory).
+[bazis] configuration error: Module "InvalidProviderModule": providers[0] is not a provider registration ({ provide: Clock }). Register it with singleton(Clock), scoped(Clock), transient(Clock), or singletonValue(TOKEN, value).
 ```
 
 В `providers` модуля — объект вместо регистрации. Регистрируйте через
-`singleton`, `scoped`, `transient`, `singletonValue`, `singletonFactory`.
+`singleton`, `scoped`, `transient`, `singletonValue`, `singletonAsyncFactory`.
 До 0.100.8 здесь был `TypeError: undefined is not an object`.
 
 Другой вариант той же ошибки — при регистрации вручную, текст из

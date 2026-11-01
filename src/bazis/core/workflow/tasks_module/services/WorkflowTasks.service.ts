@@ -1,8 +1,6 @@
-import { UniqueViolationError } from "../../../orm";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
-import type { WorkflowInstancesDeleted, WorkflowTaskRequested, WorkflowTokenClosed } from "../../runtime_module/events/Runtime.events";
 import type { IWorkflowRuntime } from "../../runtime_module/services/IWorkflowRuntime.service";
 import type { TasksDbContext } from "../model/Tasks.dbContext";
 import { WfTask, type TaskStatus } from "../model/WfTask.model";
@@ -89,37 +87,6 @@ export class WorkflowTasks extends IWorkflowTasks {
       output: typeof saved === "object" && saved !== null && !Array.isArray(saved) ? saved as Record<string, unknown> : null,
     });
     return await this.get(task.id);
-  }
-
-  /** A step started waiting for a person: its task. Repeated events of one token make one task. */
-  async requested(event: WorkflowTaskRequested): Promise<void> {
-    const assignee = "role" in event.assignee ? `role:${event.assignee.role}` : `user:${event.assignee.user}`;
-    this.db.tasks.add(Object.assign(new WfTask(), {
-      tokenId: event.tokenId,
-      instanceId: event.instanceId,
-      processKey: event.processKey,
-      nodeId: event.nodeId,
-      partition: event.partition,
-      title: event.title,
-      assignee,
-      form: event.form,
-      dueAt: event.dueAt,
-    }));
-    try {
-      await this.db.saveChanges();
-    } catch (error) {
-      if (!(error instanceof UniqueViolationError)) throw error;
-    }
-  }
-
-  /** The step closed otherwise than by its task: the task is cancelled. */
-  async closed(event: WorkflowTokenClosed): Promise<void> {
-    await this.close(event.tokenId, "cancelled");
-  }
-
-  /** Retention deleted the instances: their tasks go too. */
-  async deleted(event: WorkflowInstancesDeleted): Promise<void> {
-    if (event.instanceIds.length > 0) await this.db.tasks.asNoTracking().where((t) => t.instanceId.in([...event.instanceIds])).executeDelete();
   }
 
   private async close(tokenId: string, status: "cancelled"): Promise<void> {

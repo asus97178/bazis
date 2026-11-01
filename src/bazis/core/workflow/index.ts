@@ -4,6 +4,7 @@
  * extension points. The document format is `bazis/library/workflow`.
  */
 import type { CodeProcess } from "./definitions_module/code/defineProcess";
+import "./generated/deps";
 
 export { WorkflowModule } from "./Workflow.module";
 export { defineProcess, type CodeProcess, type ProcessDefinition } from "./definitions_module/code/defineProcess";

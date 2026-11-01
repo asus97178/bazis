@@ -325,6 +325,6 @@ function assertProviderDefinition(value: unknown, moduleName: string, index: num
   throw new InvalidProviderError(
     name,
     `Module "${moduleName}": providers[${index}] is not a provider registration${provide === undefined ? "" : ` ({ provide: ${name} })`}. `
-      + `Register it with singleton(${name}), scoped(${name}), transient(${name}), singletonValue(TOKEN, value) or singletonFactory(TOKEN, [deps], factory).`,
+      + `Register it with singleton(${name}), scoped(${name}), transient(${name}), or singletonValue(TOKEN, value).`,
   );
 }

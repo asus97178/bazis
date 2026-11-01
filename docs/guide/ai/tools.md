@@ -254,9 +254,9 @@ if (gateway.busy) throw new AgentToolPreCommitError("Платёжный шлюз
 для агентов и `ToolRunner`:
 
 ```ts
-DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
+singletonValue(TOOL_EXECUTION_OPTIONS, {
   retryPolicy: { maxAttempts: 3, delayMs: 100, backoff: "exponential" },
-}))
+})
 ```
 
 ```text

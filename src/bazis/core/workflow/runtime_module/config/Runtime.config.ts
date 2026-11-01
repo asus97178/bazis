@@ -5,7 +5,17 @@ import { defineConfig } from "../../../kernel";
  * application configuration: `BAZIS_WORKFLOW__WORKER__ENABLED=false` keeps an
  * instance from running jobs, for example a web-only one.
  */
-export const workflowRuntimeConfig = defineConfig("workflow", {
+/** The settings of the workflow background services, `workflow.*` in the configuration. */
+export interface WorkflowSettings {
+  readonly "worker.enabled": boolean;
+  readonly "worker.intervalMs": number;
+  readonly "worker.batchSize": number;
+  readonly "retention.enabled": boolean;
+  readonly "retention.intervalMs": number;
+  readonly "retention.batchSize": number;
+}
+
+export const workflowRuntimeConfig = defineConfig<WorkflowSettings>("workflow", {
   default: {
     "worker.enabled": true,
     "worker.intervalMs": 1000,

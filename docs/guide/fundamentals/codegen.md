@@ -56,8 +56,7 @@ codegen, и предупреждает:
 [bazis] configuration error: Service graph validation failed:
 Class provider "PingController" requires at least 1 constructor deps, but only 0 declared.
 Constructor dependencies are wired by codegen: if the constructor was added or changed after
-the last run, run `bazis codegen` (bazis dev, bazis test and bazis build run it automatically);
-otherwise pass the deps explicitly.
+the last run, run `bazis codegen` (bazis dev, bazis test and bazis build run it automatically).
 ```
 
 Новый метод контроллера с параметрами — тоже:

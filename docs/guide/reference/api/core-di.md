@@ -16,12 +16,12 @@
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `singleton(X)`, `scoped(X)`, `transient(X)` | Класс с временем жизни; `singleton(Contract, Impl)` — реализация по контракту | [Провайдеры](../../overview/providers.md) |
-| `singletonValue(TOKEN, value)` | Готовое значение | [Значения и фабрики](../../overview/providers.md#значения-и-фабрики) |
-| `singletonFactory(TOKEN, [deps], factory)`, `singletonFactoryWithResolver` | Результат функции; `WithResolver` получает ещё и контейнер | [Фабрики](../../fundamentals/dependency-injection.md#фабрики) |
-| `singletonAsyncFactory`, `singletonAsyncFactoryWithResolver` | Результат асинхронной функции; создаётся при запуске | там же |
+| `singletonValue(TOKEN, value)` | Готовое значение | [Значения](../../overview/providers.md#значения) |
+| `singletonAsyncFactory(TOKEN, [deps], async factory)` | Результат асинхронной функции; создаётся при запуске | [Асинхронные фабрики](../../fundamentals/dependency-injection.md#асинхронные-фабрики) |
+| `singletonFactory`, `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` | Низкоуровневые фабрики фреймворка; в `providers` модуля их не пишут — codegen отклоняет (`BAZIS_DI_PROVIDER_FORM`) | [Способы регистрации](../../fundamentals/dependency-injection.md#способы-регистрации) |
 | `createToken<T>(name)` | Токен для значения или интерфейса | [Интерфейс и токен](../../overview/providers.md#интерфейс-и-токен) |
-| `keyedDependency`, `namedDependency`, `lazyDependency`, `optionalDependency` | Зависимость по ключу, по имени, ленивая, необязательная — в списке зависимостей фабрики | [Внедрение зависимостей](../../fundamentals/dependency-injection.md) |
-| `DI` | Низкоуровневые регистрации: `DI.keyedSingleton`, `DI.classProvider`, `DI.factoryProvider`, `DI.valueProvider`, `DI.externallyOwned`, `DI.bindDeps`… | [Ключи](../../fundamentals/dependency-injection.md#ключи) |
+| `keyedDependency`, `namedDependency`, `lazyDependency`, `optionalDependency` | Зависимости в списке асинхронной фабрики; ленивая и необязательная в конструкторе — `Lazy<T>` и `?` | [Внедрение зависимостей](../../fundamentals/dependency-injection.md) |
+| `DI` | Низкоуровневые регистрации фреймворка и тестов (`overrides`); в `providers` модуля не пишутся | [Способы регистрации](../../fundamentals/dependency-injection.md#способы-регистрации) |
 | `ProviderDefinition` | Регистрация, которую возвращают функции выше | — |
 | `SERVICE_PROVIDER` | Токен самого контейнера (как `IServiceProvider` в .NET) | — |
 

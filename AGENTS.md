@@ -46,6 +46,15 @@ an bazis application; check the code before using the example.
 When implementing a module use the [per-file code examples](docs/architecture/MODULE_CODE_EXAMPLES.md):
 an atomic feature, a composite module, DTO, ORM, DI, HTTP and extra adapters.
 
+Follow the documented patterns, not existing code that deviates from them. In
+particular `providers` of a module use only the agreed forms of
+[DI and lifetime](docs/architecture/MODULE_ARCHITECTURE.md#61-di-and-lifetime):
+`scoped/singleton/transient(IService, Service)`, `singletonValue`,
+`singletonAsyncFactory`, `...withEventSubscribers` — no dependency lists,
+factories or `DI.*`; codegen refuses anything else (`BAZIS_DI_PROVIDER_FORM`).
+A framework pack gets its constructor wiring from `framework.packs` of
+`bazis.config.json`, like an application.
+
 Before editing code, briefly record: the chosen module type, its responsibility, the
 affected components and the input contracts. For a regular fix it is enough to name
 the existing module and the concrete contract or behavior being changed.
