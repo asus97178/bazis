@@ -1,6 +1,7 @@
 import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
-import { Controller, Post, type HttpContext } from "../../../http";
-import { authorize, body, optionalString, param } from "../../internal/http";
+import { can } from "../../../access";
+import { Authorize, Controller, Post, type HttpContext } from "../../../http";
+import { body, callerOf, optionalString, param } from "../../internal/http";
 import { IWorkflowRuntime } from "../services/IWorkflowRuntime.service";
 
 /** Events from outside — a webhook, another service — over HTTP (WORKFLOW-001 §4). */
@@ -9,11 +10,12 @@ export class EventsController {
   constructor(private readonly runtime: IWorkflowRuntime) {}
 
   @Post(":eventKey")
+  @Authorize(can("workflow.events.emit"))
   async emit(ctx: HttpContext) {
     const eventKey = param(ctx, "eventKey");
     const request = await body(ctx);
     const partition = optionalString(request.partition, "partition") ?? null;
-    const actor = await authorize(ctx, "events.emit", { partition });
+    const { actor } = await callerOf(ctx, "workflow.events.emit", { scope: partition, event: eventKey });
     const result = await this.runtime.emit(eventKey, request.payload ?? {}, {
       correlation: optionalString(request.correlation, "correlation") ?? null,
       partition,

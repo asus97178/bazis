@@ -114,6 +114,7 @@ outputs, the rules every change follows:
 | --- | --- |
 | `src/bazis` | The package; npm publishes exactly this directory |
 | `examples/todo` | Example app built the way a user builds one: three modules, PostgreSQL, an end-to-end test, a binary |
+| `examples/workflow` | Business processes and permissions without a CMS: an order approved by a process, Tools, roles, tests on PostgreSQL |
 | `docs/` | Architecture, quick start, release history |
 | `toolchain/`, `scripts/bazis-bun` | The pinned, hash-checked Bun 1.4.0 used by CI and scripts |
 | `scripts/ci.ts`, `scripts/package-check.ts` | CI pipeline and the check that installs the packed package into an empty project |

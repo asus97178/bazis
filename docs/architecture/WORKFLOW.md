@@ -1,6 +1,6 @@
 # Бизнес-процессы во фреймворке
 
-Идентификатор: **WORKFLOW-001**. Версия: **1.1**. Дата: **2026-10-31**.
+Идентификатор: **WORKFLOW-001**. Версия: **1.2**. Дата: **2026-11-01**.
 Статус: **принята; этапы 1–5 реализованы в bazis 0.124.0–0.128.0**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
@@ -15,8 +15,9 @@ HTTP и фоновое исполнение — без CMS. UI во фреймв
 
 Что изменилось с версии 1.0: вместо одного модуля-фабрики — составной модуль из
 трёх частей; у частей есть HTTP; задачи сотрудникам и черновики процессов — во
-фреймворке; настройки — через `config`; права HTTP — через порт
-`WorkflowAccess`; формат документа — в `library`.
+фреймворке; настройки — через `config`; формат документа — в `library`.
+В версии 1.2 порт прав `WorkflowAccess` заменён общим слоем
+[ACCESS-001](ACCESS.md) (§6).
 
 ## 1. Состав
 
@@ -33,7 +34,6 @@ src/bazis/core/workflow/               составной модуль WorkflowM
   MODULE.md                            паспорт пака и карта зависимостей
   Workflow.module.ts                   только imports / exports частей
   index.ts                             точка входа bazis/core/workflow
-  access/WorkflowAccess.ts             порт прав HTTP (общий контракт частей)
   contracts/                           WorkflowError, WorkflowInputValidator, общие типы
   definitions_module/                  «какие процессы есть»
   runtime_module/                      «как процессы исполняются»
@@ -157,7 +157,8 @@ export class AppModule {}
 | `documentHash` | text | sha-256 документа: та же публикация не создаёт версию |
 | `publishedAt`, `publishedByKind`, `publishedById` | | |
 
-Пространств и прав запуска здесь нет: кто что может, решает `WorkflowAccess`.
+Пространств и прав запуска здесь нет: кто что может, решает система прав
+приложения (§6).
 
 ### Сервис `IWorkflowDefinitions`
 
@@ -176,15 +177,15 @@ tools(): readonly WorkflowToolInfo[]                               // катал
 
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
-| `GET /workflow/processes` | `processes.read` | список |
-| `POST /workflow/processes` | `processes.manage` | 201 / 409 |
-| `GET /workflow/processes/:key` | `processes.read` | процесс с черновиком |
-| `PATCH /workflow/processes/:key` | `processes.manage` | 200 |
-| `PUT /workflow/processes/:key/draft` | `processes.manage` | 200 `{ issues }` |
-| `POST /workflow/processes/:key/publish` | `processes.publish` | 201 версия / 422 `invalid_document` |
-| `GET /workflow/processes/:key/versions` | `processes.read` | список версий |
-| `GET /workflow/processes/:key/versions/:version` | `processes.read` | версия с документом |
-| `GET /workflow/tools` | `processes.read` | Tools для процессов со схемами входа и выхода |
+| `GET /workflow/processes` | `workflow.processes.read` | список |
+| `POST /workflow/processes` | `workflow.processes.manage` | 201 / 409 |
+| `GET /workflow/processes/:key` | `workflow.processes.read` | процесс с черновиком |
+| `PATCH /workflow/processes/:key` | `workflow.processes.manage` | 200 |
+| `PUT /workflow/processes/:key/draft` | `workflow.processes.manage` | 200 `{ issues }` |
+| `POST /workflow/processes/:key/publish` | `workflow.processes.publish` | 201 версия / 422 `invalid_document` |
+| `GET /workflow/processes/:key/versions` | `workflow.processes.read` | список версий |
+| `GET /workflow/processes/:key/versions/:version` | `workflow.processes.read` | версия с документом |
+| `GET /workflow/tools` | `workflow.processes.read` | Tools для процессов со схемами входа и выхода |
 
 ## 4. Runtime
 
@@ -345,13 +346,13 @@ export const workflowRuntimeConfig = defineConfig("workflow", {
 
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
-| `POST /workflow/instances` | `instances.start` | 201 экземпляр / 404 / 422 `invalid_input` |
-| `GET /workflow/instances` | `instances.read` | список с фильтрами |
-| `GET /workflow/instances/:id` | `instances.read` | экземпляр с токенами |
-| `GET /workflow/instances/:id/history` | `instances.read` | история |
-| `POST /workflow/instances/:id/cancel` | `instances.manage` | 200 / 409 `wrong_status` |
-| `POST /workflow/instances/:id/retry` | `instances.manage` | 200 / 409 `wrong_status` |
-| `POST /workflow/events/:eventKey` | `events.emit` | 202 |
+| `POST /workflow/instances` | `workflow.instances.start` | 201 экземпляр / 404 / 422 `invalid_input` |
+| `GET /workflow/instances` | `workflow.instances.read` | список с фильтрами |
+| `GET /workflow/instances/:id` | `workflow.instances.read` | экземпляр с токенами |
+| `GET /workflow/instances/:id/history` | `workflow.instances.read` | история |
+| `POST /workflow/instances/:id/cancel` | `workflow.instances.manage` | 200 / 409 `wrong_status` |
+| `POST /workflow/instances/:id/retry` | `workflow.instances.manage` | 200 / 409 `wrong_status` |
+| `POST /workflow/events/:eventKey` | `workflow.events.emit` | 202 |
 
 ## 5. Tasks
 
@@ -380,50 +381,37 @@ complete(taskId, output, actor)  // invalid_input по форме; вызыва�
 `complete` сначала завершает шаг через `completeToken` (проверка формы), затем
 отмечает задачу; шаг, закрытый без задачи, при попытке завершения отменяет её.
 
-Задача видна, если её `assignee` — среди `WorkflowAccess.assignees(ctx,
-actor)` или её взял сам вызывающий; чужая отвечает 404.
+Задача видна, если её `assignee` — среди адресатов субъекта в разделе задачи
+(`AccessPolicy.principals`, считаются при просмотре) или её взял сам
+вызывающий; чужая отвечает 404.
 
 ### HTTP (`/workflow/tasks`)
 
 | Метод и путь | Право | Ответ |
 | --- | --- | --- |
-| `GET /workflow/tasks?status&partition&processKey` | `tasks.work` | задачи для `WorkflowAccess.assignees(ctx)` и взятые вызывающим; по умолчанию `open` и `claimed` |
-| `GET /workflow/tasks/:id` | `tasks.work` | задача с формой |
-| `POST /workflow/tasks/:id/claim` | `tasks.work` | 200 / 409 `conflict` (взята другим) |
-| `POST /workflow/tasks/:id/release` | `tasks.work` | 200 / 409 `wrong_status` |
-| `POST /workflow/tasks/:id/complete` `{ output }` | `tasks.work` | 200 / 409 / 422 `invalid_input` |
+| `GET /workflow/tasks?status&partition&processKey` | `workflow.tasks.work` | задачи адресатов субъекта и взятые вызывающим; по умолчанию `open` и `claimed` |
+| `GET /workflow/tasks/:id` | `workflow.tasks.work` | задача с формой |
+| `POST /workflow/tasks/:id/claim` | `workflow.tasks.work` | 200 / 409 `conflict` (взята другим) |
+| `POST /workflow/tasks/:id/release` | `workflow.tasks.work` | 200 / 409 `wrong_status` |
+| `POST /workflow/tasks/:id/complete` `{ output }` | `workflow.tasks.work` | 200 / 409 / 422 `invalid_input` |
 
-## 6. Права: порт `WorkflowAccess`
+## 6. Права
 
-Контроллеры фреймворка не знают, как в приложении устроен вход. Права и
-«кто делает запрос» даёт порт — абстрактный класс, он же DI-токен:
+Своего порта прав у процессов нет: это общий слой фреймворка
+[ACCESS-001](ACCESS.md), каталог прав — [WORKFLOW-002](WORKFLOW_BUILDER.md) §6.2.
 
-```ts
-export abstract class WorkflowAccess {
-  /** Кто делает запрос; undefined — 401. */
-  abstract actor(ctx: HttpContext): ToolActor | undefined;
-  /** Можно ли действие над целью; false — 403. */
-  abstract can(ctx: HttpContext, action: WorkflowAction, target: WorkflowAccessTarget): boolean | Promise<boolean>;
-  /** Кому адресованы задачи этого пользователя: user:<id>, role:<код>. */
-  assignees(ctx: HttpContext): readonly string[] { … `user:${actor.id}` … }
-}
-
-type WorkflowAction =
-  | "processes.read" | "processes.manage" | "processes.publish"
-  | "instances.start" | "instances.read" | "instances.manage"
-  | "events.emit" | "tasks.work";
-
-interface WorkflowAccessTarget { processKey?: string; partition?: string; instanceId?: string; taskId?: string }
-```
-
-- По умолчанию всё запрещено: пока приложение не зарегистрировало свою
-  реализацию, HTTP модуля отвечает 403. Сервисы порт не проверяют: их вызывает
-  код приложения, который сам решает, что можно.
-- Приложение регистрирует реализацию в любом модуле:
-  `DI.singleton(DI.classProvider(WorkflowAccess, AppWorkflowAccess, []))`.
-  Так же подключается свой `WorkflowInputValidator`.
-- Списки фильтруются тем же портом: `instances.read` проверяется на
-  `partition` из запроса.
+- Части модуля объявляют права `workflow.*` и импортируют `AccessModule`:
+  приложение получает его вместе с `WorkflowModule`.
+- Кто делает запрос и что ему дано, отвечает `AccessPolicy` приложения. По
+  умолчанию — роли из токена (`@Module({ roles })`); без ролей всё запрещено.
+- Маршрут требует право хоть где-нибудь (`@Authorize(can(…))`); объект
+  проверяет обработчик, списки фильтрует `Access.filter`. Нет субъекта — 401,
+  нет права — 403.
+- Актор записей HTTP — `{ kind: "user", id }`, где `id` — первый из
+  `ownerIds` субъекта: так `{ own: true }` означает «запущенные мной».
+- Сервисы права не проверяют: их вызывает код приложения, который сам решает,
+  что можно. Для этого их списки принимают готовый `access` — фильтр из
+  `IAccess`.
 
 ## 7. Tools
 
@@ -454,7 +442,7 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
 
 ## 9. Точки расширения
 
-- `WorkflowAccess` — права и личность в HTTP (§6).
+- `AccessPolicy` — права и личность в HTTP (§6).
 - `WorkflowInputValidator` — проверка входа процесса и форм задач (по
   умолчанию — поля §2; bazis-cms подставляет правила дата-менеджера).
 - Виды узлов закрыты в v1: новый вид — новая версия документа, а не плагин
@@ -481,8 +469,7 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
 
 1. `library/workflow`; Definitions целиком; Runtime: старт и конец,
    `serviceTask`, оба шлюза, `userTask` как ожидание с событиями и
-   `completeToken`, отмена и повтор, история, воркер, чистка, HTTP;
-   `WorkflowAccess`.
+   `completeToken`, отмена и повтор, история, воркер, чистка, HTTP.
 2. Повторы и `boundaryError`; таймеры (`timerCatch`, `boundaryTimer`) —
    0.125.0.
 3. События (`eventStart`, `eventWait`, `boundaryEvent`, `emit`, HTTP) и
@@ -495,9 +482,9 @@ interface WorkflowAccessTarget { processKey?: string; partition?: string; instan
 CMS убирает свои `wf_processes`, `wf_process_versions`, `wf_instances`,
 `wf_tokens`, `wf_jobs`, `wf_history`, движок, воркер, проверку документа и
 контроллеры процессов и экземпляров. Оставляет дизайнер и UI; пространства
-передаёт как `partition`; права — своей реализацией `WorkflowAccess`; правила
+передаёт как `partition`; права — своей реализацией `AccessPolicy`; правила
 полей — `WorkflowInputValidator`; подключение процессов к пространствам и
-«кто запускает» — своей таблицей, которую читает её `WorkflowAccess`.
+«кто запускает» — своей таблицей, которую читает её `AccessPolicy`.
 Документы переходят с `cms.workflow/v1` на `bazis.workflow/v1` (то же
 содержимое).
 

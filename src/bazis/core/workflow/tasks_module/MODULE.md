@@ -12,7 +12,7 @@ The inbox of `userTask` steps: who a task is for, its form and deadline, who
 took it, and completing it. The task follows its step through events of the
 Runtime part; completing a task completes the step through
 `IWorkflowRuntime.completeToken`, which checks the form. Resolving a role to
-people stays with the application (`WorkflowAccess.assignees`).
+people stays with the application (`AccessPolicy.principals`).
 
 ## 2. Components
 
@@ -21,7 +21,7 @@ people stays with the application (`WorkflowAccess.assignees`).
 | `WfTask`, `TasksDbContext` | [model](model) | ORM, owned store `bazis.workflow.tasks` | table `bazis_wf_task_items` |
 | `IWorkflowTasks` / `WorkflowTasks` (scoped) | [services](services) | `TasksDbContext`, `IWorkflowRuntime`, `WorkflowClock` | `list`, `get`, `claim`, `release`, `complete` |
 | `TaskEvents` (scoped subscriber) | [events/TaskEvents.ts](events/TaskEvents.ts) | `TasksDbContext` | `WORKFLOW_TASK_REQUESTED` creates the task (one per token), `WORKFLOW_TOKEN_CLOSED` cancels it, `WORKFLOW_INSTANCES_DELETED` deletes the tasks of deleted instances |
-| `TasksController` | [http/Tasks.controller.ts](http/Tasks.controller.ts) | `IWorkflowTasks`, `WorkflowAccess` | `/workflow/tasks…` |
+| `TasksController` | [http/Tasks.controller.ts](http/Tasks.controller.ts) | `IWorkflowTasks`, `IAccess` | `/workflow/tasks…` |
 
 exports: `[IWorkflowTasks]`.
 
@@ -36,9 +36,10 @@ store. Indexes `(assignee, status)`, `(partition, status)`, `instanceId`.
 
 ## 4. HTTP
 
-A task is visible to a caller when its `assignee` is one of
-`WorkflowAccess.assignees(ctx, actor)` or the caller claimed it; any other task
-answers 404. Every route needs `tasks.work`.
+A task is visible to a caller when its `assignee` is one of the subject's
+`principals` in the task's partition, counted when viewed, or the caller claimed
+it; any other task answers 404. The grants of the right narrow this further: a
+task outside them answers 403 and is not in the list. Every route needs `workflow.tasks.work`.
 
 | Route | Result |
 | --- | --- |

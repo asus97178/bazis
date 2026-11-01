@@ -1,3 +1,4 @@
+import { grantsToWhere } from "../../../access";
 import { createHash } from "node:crypto";
 import { UniqueViolationError } from "../../../orm";
 import type { AgentToolContract } from "../../../agent";
@@ -38,7 +39,10 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
 
   async list(query: ProcessListQuery = {}): Promise<WorkflowPage<ProcessSummary>> {
     const { limit, offset } = pagingOf(query);
+    const where = query.access === undefined ? "all" : grantsToWhere(query.access);
+    if (where === "none") return { items: [], total: 0 };
     let source = this.db.processes.asNoTracking();
+    if (where !== "all") source = source.where(() => where);
     if (query.archived === true) source = source.where((p) => p.archivedAt.isNotNull());
     if (query.archived === false) source = source.where((p) => p.archivedAt.isNull());
     if (query.search !== undefined && query.search.trim() !== "") {

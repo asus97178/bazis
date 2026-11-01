@@ -1,7 +1,9 @@
+import { AccessModule } from "../../access";
 import { Module, scoped } from "../../di";
 import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinitions.module";
 import { withEventSubscribers } from "../../kernel";
 import { WorkflowRuntimeModule } from "../runtime_module/WorkflowRuntime.module";
+import { tasksPermissions } from "./access/Tasks.permissions";
 import { TaskEvents } from "./events/TaskEvents";
 import { TasksController } from "./http/Tasks.controller";
 import { TasksDbContext, tasksStore } from "./model/Tasks.dbContext";
@@ -13,7 +15,8 @@ import { WorkflowTasks } from "./services/WorkflowTasks.service";
  * Tasks for people: the inbox of `userTask` steps ([passport](MODULE.md)).
  */
 @Module({
-  imports: [WorkflowDefinitionsModule, WorkflowRuntimeModule],
+  imports: [AccessModule, WorkflowDefinitionsModule, WorkflowRuntimeModule],
+  permissions: tasksPermissions,
   ormBazis: { context: TasksDbContext, entities: [WfTask], ownedStore: tasksStore, registerRepositories: false },
   providers: [
     scoped(IWorkflowTasks, WorkflowTasks),

@@ -29,9 +29,9 @@ retry, `emit`.
 | `ToolStep` (scoped) | [internal/ToolStep.ts](internal/ToolStep.ts) | `RuntimeDbContext`, `WorkflowEngine`, `WorkflowTools` | one `tool` job: `ToolRunner.as("workflow").run(tool, input, { actor, idempotencyKey: tokenId, metadata })`; a retry keeps the job with a later `dueAt`; a final failure goes to `WorkflowEngine.failStep` (error boundary or `failed`) |
 | `TimerStep` (scoped) | [internal/TimerStep.ts](internal/TimerStep.ts) | `RuntimeDbContext`, `WorkflowEngine` | one `timer` job: `timerCatch` moves on, `boundaryTimer` takes its flow |
 | `Schedules` (scoped) | [internal/Schedules.ts](internal/Schedules.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions` | one `schedule` job per scheduled latest version (reconciled at start and every minute under an advisory lock); a firing starts instances and plans the next from now in one transaction: missed firings are not caught up |
-| `EventsController` | [http/Events.controller.ts](http/Events.controller.ts) | `IWorkflowRuntime`, `WorkflowAccess` | `POST /workflow/events/:eventKey` |
+| `EventsController` | [http/Events.controller.ts](http/Events.controller.ts) | `IWorkflowRuntime`, `IAccess` | `POST /workflow/events/:eventKey` |
 | `IWorkflowRuntime` / `WorkflowRuntime` (scoped) | [services](services) | engine, `IWorkflowDefinitions`, `WorkflowInputValidator` (`DefaultWorkflowInputValidator`, replaced by the application's own registration) | start, cancel, retry, completeToken, lists, history |
-| `InstancesController` | [http/Instances.controller.ts](http/Instances.controller.ts) | `IWorkflowRuntime`, `WorkflowAccess` | `/workflow/instances…` |
+| `InstancesController` | [http/Instances.controller.ts](http/Instances.controller.ts) | `IWorkflowRuntime`, `IAccess` | `/workflow/instances…` |
 | `WorkflowJobs` | [internal/WorkflowJobs.ts](internal/WorkflowJobs.ts) | `SERVICE_PROVIDER` | claims due jobs `FOR UPDATE SKIP LOCKED` ordered by id, lease 5 min, runs each in its own scope; used by the worker and by `testWorkflow`'s `drain` |
 | `WorkflowWorker` | [background/WorkflowWorker.ts](background/WorkflowWorker.ts) | `SERVICE_PROVIDER`, settings | `WorkflowJobs` every `worker.intervalMs`; a full batch is followed at once; idle with a manual `WorkflowClock` |
 | `WorkflowRetention` | [background/WorkflowRetention.ts](background/WorkflowRetention.ts) | `SERVICE_PROVIDER`, settings, `IWorkflowDefinitions`, `WorkflowClock` | deletes old `completed`/`cancelled` instances (cascade); idle with a manual clock |
@@ -54,13 +54,13 @@ exports: `[IWorkflowRuntime]`. config: `workflowRuntimeConfig`.
 
 | Route | Right (target) | Result |
 | --- | --- | --- |
-| `POST /workflow/instances` `{ processKey, input?, partition?, businessKey? }` | `instances.start` (processKey, partition) | 201 instance with tokens / 404 / 409 `archived` / 422 `invalid_input` |
-| `GET /workflow/instances?partition&status&processKey&businessKey&startedById&limit&offset` | `instances.read` (partition, processKey) | `{ data, meta: { total } }`, newest first |
-| `GET /workflow/instances/:id` | `instances.read` (the instance's partition) | instance with tokens |
-| `GET /workflow/instances/:id/history` | `instances.read` | `{ data }` in order |
-| `POST /workflow/instances/:id/cancel` `{ reason? }` | `instances.manage` | 200 / 409 `wrong_status` |
-| `POST /workflow/instances/:id/retry` | `instances.manage` | 200 / 409 `wrong_status` (not `failed`) |
-| `POST /workflow/events/:eventKey` `{ payload?, correlation?, partition? }` | `events.emit` (partition) | 202 `{ started, continued, rejected }` |
+| `POST /workflow/instances` `{ processKey, input?, partition?, businessKey? }` | `workflow.instances.start` (partition of the request, process) | 201 instance with tokens / 404 / 409 `archived` / 422 `invalid_input` |
+| `GET /workflow/instances?partition&status&processKey&businessKey&startedById&limit&offset` | `workflow.instances.read`, the list is filtered by its grants | `{ data, meta: { total } }`, newest first |
+| `GET /workflow/instances/:id` | `workflow.instances.read` (the instance) | instance with tokens |
+| `GET /workflow/instances/:id/history` | `workflow.instances.read` | `{ data }` in order |
+| `POST /workflow/instances/:id/cancel` `{ reason? }` | `workflow.instances.manage` | 200 / 409 `wrong_status` |
+| `POST /workflow/instances/:id/retry` | `workflow.instances.manage` | 200 / 409 `wrong_status` (not `failed`) |
+| `POST /workflow/events/:eventKey` `{ payload?, correlation?, partition? }` | `workflow.events.emit` (partition of the request, event) | 202 `{ started, continued, rejected }` |
 
 The tasks HTTP is the [Tasks part](../tasks_module/MODULE.md).
 
@@ -74,5 +74,6 @@ The tasks HTTP is the [Tasks part](../tasks_module/MODULE.md).
   `reference/upgrading.md`, 0.126.0).
 - Boundary tokens find their step by its node: two live tokens on one step node
   (possible only in a loop) share its boundary timers.
-- The read routes load the instance before asking `WorkflowAccess`, so an
-  unknown id answers 404 before 403.
+- A route needs its permission anywhere (`can`), then the handler checks the
+  loaded instance: without the right 403 for any id; with a right elsewhere an
+  unknown id answers 404 and a foreign one 403.

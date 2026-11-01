@@ -1,3 +1,4 @@
+import type { AccessFilter } from "../../../access";
 import type { FormIssue } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { HistoryType } from "../model/WfHistory.model";
@@ -75,6 +76,8 @@ export interface EmitResult {
 }
 
 export interface InstanceListQuery extends WorkflowPaging {
+  /** Which instances the caller may see, from `IAccess`; without it the calling code has decided. */
+  readonly access?: AccessFilter;
   readonly partition?: string;
   readonly status?: InstanceStatus;
   readonly processKey?: string;

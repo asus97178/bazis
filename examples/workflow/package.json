@@ -1,0 +1,21 @@
+{
+  "name": "workflow-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "codegen": "bazis codegen",
+    "dev": "bazis dev",
+    "test": "bazis test",
+    "build": "bazis build",
+    "build:bin": "bazis build --bin",
+    "token": "bun run scripts/token.ts"
+  },
+  "dependencies": {
+    "bazis": "file:../../src/bazis"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "typescript": "^6"
+  }
+}

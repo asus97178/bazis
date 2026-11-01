@@ -1,25 +1,26 @@
-import { ForbiddenError, UnauthorizedError, type HttpContext } from "../../http";
-import { WorkflowAccess, type WorkflowAccessTarget, type WorkflowAction } from "../access/WorkflowAccess";
+import { IAccess, type AccessObject, type SubjectAccess } from "../../access";
+import { ForbiddenError, type HttpContext } from "../../http";
 import type { WorkflowActor } from "../contracts/types";
 import { WorkflowError } from "../contracts/WorkflowError";
 
-/**
- * Asks the application's {@link WorkflowAccess} who calls and whether the action
- * is allowed. Without a registered access every route answers 403.
- */
-export async function authorize(ctx: HttpContext, action: WorkflowAction, target: WorkflowAccessTarget = {}): Promise<WorkflowActor> {
-  const access = ctx.services.tryResolve(WorkflowAccess);
-  if (access === undefined) throw new ForbiddenError("Workflow HTTP is closed: register a WorkflowAccess implementation");
-  const actor = await access.actor(ctx);
-  if (actor === undefined) throw new UnauthorizedError();
-  if (!await access.can(ctx, action, target)) throw new ForbiddenError();
-  return actor;
+/** Who calls a route: their rights and how they are recorded as an actor. */
+export interface WorkflowCaller {
+  readonly access: SubjectAccess;
+  readonly actor: WorkflowActor;
 }
 
-/** Whom the caller's tasks are addressed to, from the application's {@link WorkflowAccess}. */
-export async function assigneesOf(ctx: HttpContext, actor: WorkflowActor): Promise<readonly string[]> {
-  const access = ctx.services.tryResolve(WorkflowAccess);
-  return access === undefined ? [] : await access.assignees(ctx, actor);
+/**
+ * The caller of a route; 401 without a subject. With `permission` and `object`
+ * also checks the object the route's `can` could not know: 403 without the
+ * right. The actor's id is the first owner id, so that `{ own: true }` means
+ * the instances the subject started.
+ */
+export async function callerOf(ctx: HttpContext, permission?: string, object?: AccessObject): Promise<WorkflowCaller> {
+  const access = await ctx.services.resolve(IAccess).for(ctx);
+  if (permission !== undefined && !await access.can(permission, object)) throw new ForbiddenError();
+  const sub = access.subject.sub;
+  const [id = sub.slice(sub.lastIndexOf(":") + 1)] = await access.ownerIds();
+  return { access, actor: { kind: "user", id } };
 }
 
 /** A route parameter as a string. */

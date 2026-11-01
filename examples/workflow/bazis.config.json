@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "defaultTarget": "production",
+  "targets": {
+    "production": {
+      "entrypoints": [
+        "src/index.ts"
+      ]
+    }
+  }
+}

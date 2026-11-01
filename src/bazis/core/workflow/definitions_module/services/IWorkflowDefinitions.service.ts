@@ -1,3 +1,4 @@
+import type { AccessFilter } from "../../../access";
 import type { AgentToolContract } from "../../../agent";
 import type { ProcessDocument, ProcessIssue } from "../../../../library/workflow";
 import type { WorkflowActor, WorkflowPage, WorkflowPaging } from "../../contracts/types";
@@ -53,6 +54,8 @@ export interface UpdateProcess {
 }
 
 export interface ProcessListQuery extends WorkflowPaging {
+  /** Which processes the caller may see, from `IAccess`; without it the calling code has decided. */
+  readonly access?: AccessFilter;
   readonly archived?: boolean;
   /** Part of the key or title, case-insensitive. */
   readonly search?: string;

@@ -1,6 +1,8 @@
+import { AccessModule } from "../../access";
 import { Module, scoped, singleton } from "../../di";
 import { DefaultWorkflowInputValidator, WorkflowInputValidator } from "../contracts/WorkflowInputValidator";
 import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinitions.module";
+import { runtimePermissions } from "./access/Runtime.permissions";
 import { WorkflowRetention } from "./background/WorkflowRetention";
 import { WorkflowWorker } from "./background/WorkflowWorker";
 import { workflowRuntimeConfig } from "./config/Runtime.config";
@@ -21,7 +23,8 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
  * validator by registering its own `WorkflowInputValidator`.
  */
 @Module({
-  imports: [WorkflowDefinitionsModule],
+  imports: [AccessModule, WorkflowDefinitionsModule],
+  permissions: runtimePermissions,
   config: [workflowRuntimeConfig],
   ormBazis: { context: RuntimeDbContext, entities: [...RUNTIME_ENTITIES], ownedStore: runtimeStore, registerRepositories: false },
   providers: [

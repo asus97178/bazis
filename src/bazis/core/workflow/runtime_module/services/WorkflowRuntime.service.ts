@@ -1,3 +1,4 @@
+import { grantsToWhere } from "../../../access";
 import type { FormIssue, FormSpec } from "../../../../library/workflow";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import { WorkflowError } from "../../contracts/WorkflowError";
@@ -134,7 +135,10 @@ export class WorkflowRuntime extends IWorkflowRuntime {
   async instances(query: InstanceListQuery = {}): Promise<WorkflowPage<InstanceSummary>> {
     const { limit, offset } = pagingOf(query);
     if (query.status !== undefined && !STATUSES.has(query.status)) throw new WorkflowError("invalid_input", "status must be running, completed, cancelled or failed");
+    const where = query.access === undefined ? "all" : grantsToWhere(query.access);
+    if (where === "none") return { items: [], total: 0 };
     let source = this.db.instances.asNoTracking();
+    if (where !== "all") source = source.where(() => where);
     if (query.partition !== undefined) source = source.where((i) => i.partition.eq(query.partition!));
     if (query.status !== undefined) source = source.where((i) => i.status.eq(query.status!));
     if (query.processKey !== undefined) source = source.where((i) => i.processKey.eq(query.processKey!));

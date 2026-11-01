@@ -28,9 +28,11 @@ The part provides the pack's `WorkflowClock`.
 | `inspectProcesses` | [code/inspectProcesses.ts](code/inspectProcesses.ts) | the module tree, `@Tool` metadata | the checks of build and start without the container, for `bazis workflow check` |
 | `WorkflowClock` (singleton) | [../contracts/WorkflowClock.ts](../contracts/WorkflowClock.ts) | — | the engine's time; `SystemWorkflowClock` by default |
 | `WorkflowTools` (singleton) | [../internal/WorkflowTools.ts](../internal/WorkflowTools.ts) | `ToolRunner.as("workflow")` if the application has Tools | which Tools a service task may call, their contracts |
-| `ProcessesController` | [http/Processes.controller.ts](http/Processes.controller.ts) | `IWorkflowDefinitions`, `WorkflowAccess` | `/workflow/processes…`, `/workflow/tools` |
+| `ProcessesController` | [http/Processes.controller.ts](http/Processes.controller.ts) | `IWorkflowDefinitions`, `IAccess` | `/workflow/processes…`, `/workflow/tools` |
+| `ProcessReferences` (scoped) | [access/Process.references.ts](access/Process.references.ts) | `DefinitionsDbContext` | reference kind `workflow.process`: what an administrator picks in a condition |
 
 exports: `[IWorkflowDefinitions, WorkflowTools, WorkflowClock]`.
+Permissions: `workflow.processes.*` ([access/Definitions.permissions.ts](access/Definitions.permissions.ts)), without a partition until `WorkflowPartitions` (WORKFLOW-002 stage 4).
 
 ## 3. Data
 
@@ -49,12 +51,12 @@ known from the modules, so a process removed from code becomes the catalog's own
 
 | Route | Right | Result |
 | --- | --- | --- |
-| `GET /workflow/processes?archived&search&limit&offset` | `processes.read` | `{ data, meta: { total } }` |
-| `POST /workflow/processes` `{ key, title, description?, retentionDays? }` | `processes.manage` | 201 / 409 `conflict` / 422 |
-| `GET /workflow/processes/:key` | `processes.read` | process with the draft / 404 |
-| `PATCH /workflow/processes/:key` `{ title?, description?, retentionDays?, archived? }` | `processes.manage` | 200 |
-| `PUT /workflow/processes/:key/draft` `{ document }` | `processes.manage` | 200 `{ issues }` |
-| `POST /workflow/processes/:key/publish` | `processes.publish` | 201 version / 409 `archived` / 422 `invalid_document` with issues |
-| `GET /workflow/processes/:key/versions` | `processes.read` | `{ data }`, newest first |
-| `GET /workflow/processes/:key/versions/:version` | `processes.read` | version with the document |
-| `GET /workflow/tools` | `processes.read` | `{ data }`: Tool contracts with JSON schemas |
+| `GET /workflow/processes?archived&search&limit&offset` | `workflow.processes.read` | `{ data, meta: { total } }` |
+| `POST /workflow/processes` `{ key, title, description?, retentionDays? }` | `workflow.processes.manage` | 201 / 409 `conflict` / 422 |
+| `GET /workflow/processes/:key` | `workflow.processes.read` | process with the draft / 404 |
+| `PATCH /workflow/processes/:key` `{ title?, description?, retentionDays?, archived? }` | `workflow.processes.manage` | 200 |
+| `PUT /workflow/processes/:key/draft` `{ document }` | `workflow.processes.manage` | 200 `{ issues }` |
+| `POST /workflow/processes/:key/publish` | `workflow.processes.publish` | 201 version / 409 `archived` / 422 `invalid_document` with issues |
+| `GET /workflow/processes/:key/versions` | `workflow.processes.read` | `{ data }`, newest first |
+| `GET /workflow/processes/:key/versions/:version` | `workflow.processes.read` | version with the document |
+| `GET /workflow/tools` | `workflow.processes.read` | `{ data }`: Tool contracts with JSON schemas |

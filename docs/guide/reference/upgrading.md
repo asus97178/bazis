@@ -7,6 +7,27 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.130.0
+
+- **Порта `WorkflowAccess` больше нет: права процессов — общий слой
+  [`bazis/core/access`](../security/access.md).** Удалены `WorkflowAccess`,
+  `DenyWorkflowAccess`, `WorkflowAction`, `WorkflowAccessTarget`.
+  - Без своей системы прав — объявите роли: `@Module({ roles: defineRoles({ … }) })`.
+    Проверка входа кладёт принципала в `ctx.state` под `PRINCIPAL_STATE_KEY`
+    (`subject` и `findFirst` для claim `role`).
+  - Со своей системой — вместо класса с `actor`, `can`, `assignees` напишите
+    `AccessPolicy`: `subject`, `grants`, `ownerIds`, `principals`. Регистрация:
+    `singleton(AccessPolicy, AppAccessPolicy)`.
+  - Имена прав получили префикс: `instances.read` → `workflow.instances.read`.
+  - `actor` запросов теперь всегда `{ kind: "user", id }`, где `id` — первый
+    из `ownerIds`.
+- **`IWorkflowTasks.list`: `assignees` → `addressees`.** Вместо плоского списка —
+  адресаты по разделам, `[{ scope, principals }]`: их отдаёт
+  `AccessPolicy.principals`, а разделы с задачами — новый `tasks.partitions()`.
+- **Право проверяется до разбора запроса.** Маршрут без права отвечает `403` и на
+  неверное тело, и на неизвестный id: раньше тело и экземпляр проверялись
+  первыми.
+
 ## 0.129.0
 
 - **В `providers` модуля — только согласованные формы.** Codegen

@@ -1,15 +1,16 @@
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 
 setDefaultTimeout(30_000);
-import { DI, Module } from "@/core/di";
+import { AccessPolicy, type AccessSubject, type Grants, type Scope, type ScopePrincipals } from "@/core/access";
+import { DI, Module, singleton } from "@/core/di";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret } from "@/core/kernel";
 import { ormBazisConnect } from "@/core/orm";
 import { startTestApp } from "@/core/testing";
 import { Tool, TOOL_EXECUTION_OPTIONS, type AgentToolExecutionContext } from "@/core/agent";
-import type { HttpContext } from "@/core/http";
+import type { AuthorizeContext } from "@/core/http";
 import { postgres } from "@/library/orm";
-import { defineProcess, IWorkflowDefinitions, IWorkflowRuntime, WorkflowAccess, WorkflowModule, WorkflowSetupError, type CodeProcess, type WorkflowActor } from "@/core/workflow";
+import { defineProcess, IWorkflowDefinitions, IWorkflowRuntime, WorkflowModule, WorkflowSetupError, type CodeProcess } from "@/core/workflow";
 import { testWorkflow } from "@/core/workflow/testing";
 
 /**
@@ -32,13 +33,21 @@ class ReserveTool {
   }
 }
 
-class OpenAccess extends WorkflowAccess {
-  actor(ctx: HttpContext): WorkflowActor | undefined {
-    return { kind: "user", id: ctx.header("x-user") ?? "u-1" };
+class OpenPolicy extends AccessPolicy {
+  subject(ctx: AuthorizeContext): AccessSubject {
+    return { sub: ctx.header("x-user") ?? "u-1" };
   }
 
-  can(): boolean {
-    return true;
+  grants(): Grants {
+    return "all";
+  }
+
+  ownerIds(subject: AccessSubject): readonly string[] {
+    return [subject.sub];
+  }
+
+  async principals(subject: AccessSubject, scopes: readonly Scope[]): Promise<readonly ScopePrincipals[]> {
+    return scopes.map((scope) => ({ scope, principals: [`user:${subject.sub}`] }));
   }
 }
 
@@ -97,7 +106,7 @@ function root(dsn: string, processes: readonly CodeProcess[]) {
   @Module({
     imports: [TestInfra, WorkflowModule, OrdersModule],
     providers: [
-      DI.singleton(DI.classProvider(WorkflowAccess, OpenAccess, [])),
+      singleton(AccessPolicy, OpenPolicy),
       DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, { auditSink: () => undefined })),
     ],
   })

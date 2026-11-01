@@ -1,3 +1,4 @@
+import { grantsToWhere, type ScopePrincipals } from "../../../access";
 import { isUuid, pagingOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
@@ -19,22 +20,33 @@ export class WorkflowTasks extends IWorkflowTasks {
 
   async list(query: TaskListQuery): Promise<WorkflowPage<TaskDetails>> {
     const { limit, offset } = pagingOf(query);
-    const statuses = [...(query.status ?? ["open", "claimed"])];
-    if (statuses.length === 0 || statuses.some((status) => !STATUSES.has(status))) throw new WorkflowError("invalid_input", "status must be open, claimed, completed or cancelled");
-    const assignees = [...query.assignees];
+    const statuses = statusesOf(query.status);
+    const groups = groupByPrincipals(query.addressees);
     const mine = query.actor?.id;
-    if (assignees.length === 0 && mine === undefined) return { items: [], total: 0 };
+    const where = query.access === undefined ? "all" : grantsToWhere(query.access);
+    if (where === "none" || (groups.length === 0 && mine === undefined)) return { items: [], total: 0 };
     let source = this.db.tasks.asNoTracking().where((t) => t.status.in(statuses));
-    source = mine === undefined
-      ? source.where((t) => t.assignee.in(assignees))
-      : assignees.length === 0
-        ? source.where((t) => t.claimedById.eq(mine))
-        : source.where((t) => t.assignee.in(assignees).or(t.claimedById.eq(mine)));
+    if (where !== "all") source = source.where(() => where);
+    source = source.where((t) => {
+      const theirs = groups.map(({ scopes, principals }) => {
+        const named = scopes.filter((scope): scope is string => scope !== null);
+        const partition = !scopes.includes(null) ? t.partition.in(named) : named.length === 0 ? t.partition.isNull() : t.partition.isNull().or(t.partition.in(named));
+        return t.assignee.in(principals).and(partition);
+      });
+      if (mine !== undefined) theirs.push(t.claimedById.eq(mine));
+      return theirs.reduce((left, right) => left.or(right));
+    });
     if (query.partition !== undefined) source = source.where((t) => t.partition.eq(query.partition!));
     if (query.processKey !== undefined) source = source.where((t) => t.processKey.eq(query.processKey!));
     const total = await source.count();
     const rows = await source.orderBy((t) => t.id).skip(offset).take(limit).toList();
     return { items: rows.map(detailsOf), total };
+  }
+
+  async partitions(query: { readonly status?: readonly TaskStatus[] } = {}): Promise<readonly (string | null)[]> {
+    const statuses = statusesOf(query.status);
+    const rows = await this.db.database.querySqlRaw(`SELECT DISTINCT "partition" FROM "bazis_wf_task_items" WHERE "status" IN (${statuses.map((_, index) => `{${index}}`).join(", ")})`, ...statuses);
+    return rows.map((row) => row.partition as string | null);
   }
 
   async get(taskId: string): Promise<TaskDetails> {
@@ -107,6 +119,26 @@ export class WorkflowTasks extends IWorkflowTasks {
     if (!task) throw notFound(taskId);
     return task;
   }
+}
+
+function statusesOf(status: readonly TaskStatus[] | undefined): TaskStatus[] {
+  const statuses = [...(status ?? ["open", "claimed"] as const)];
+  if (statuses.length === 0 || statuses.some((item) => !STATUSES.has(item))) throw new WorkflowError("invalid_input", "status must be open, claimed, completed or cancelled");
+  return statuses;
+}
+
+/** Partitions with the same addressees go together: usually all of them, so the query stays short. */
+function groupByPrincipals(addressees: readonly ScopePrincipals[]): { scopes: (string | null)[]; principals: string[] }[] {
+  const groups = new Map<string, { scopes: (string | null)[]; principals: string[] }>();
+  for (const { scope, principals } of addressees) {
+    if (principals.length === 0) continue;
+    const list = [...new Set(principals)].sort();
+    const key = JSON.stringify(list);
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, { scopes: [scope], principals: list });
+    else group.scopes.push(scope);
+  }
+  return [...groups.values()];
 }
 
 function notFound(taskId: string): WorkflowError {
