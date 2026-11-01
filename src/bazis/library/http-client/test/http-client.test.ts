@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  HttpClient,
+  HttpClientBase,
   HttpClientConfigError,
   HttpClientError,
   HttpClientFactoryBuilder,
@@ -40,14 +40,14 @@ function json(body: unknown, init?: ResponseInit): Response {
 describe("HttpClient: URL, baseUrl, params", () => {
   test("preserves baseUrl prefix and serializes params (arrays repeat)", async () => {
     const rec = recorder(() => json({ ok: true }));
-    const client = new HttpClient({ baseUrl: "https://api.test/v1", fetch: rec.fetch });
+    const client = new HttpClientBase({ baseUrl: "https://api.test/v1", fetch: rec.fetch });
     await client.get("/items", { params: { q: "x", tag: ["a", "b"], skip: undefined } });
     expect(rec.last().url).toBe("https://api.test/v1/items?q=x&tag=a&tag=b");
   });
 
   test("absolute url bypasses baseUrl", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({ baseUrl: "https://api.test", fetch: rec.fetch });
+    const client = new HttpClientBase({ baseUrl: "https://api.test", fetch: rec.fetch });
     await client.get("https://other.test/raw");
     expect(rec.last().url).toBe("https://other.test/raw");
   });
@@ -56,7 +56,7 @@ describe("HttpClient: URL, baseUrl, params", () => {
 describe("HttpClient: data and responses", () => {
   test("auto-JSON request body + sets content-type, parses JSON response into .data", async () => {
     const rec = recorder(() => json({ id: 7 }));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     const res = await client.post<{ id: number }>("https://x.test/a", { name: "n" });
     expect(rec.last().headers.get("content-type")).toBe("application/json");
     expect(rec.last().body).toBe(JSON.stringify({ name: "n" }));
@@ -66,7 +66,7 @@ describe("HttpClient: data and responses", () => {
 
   test("raw BodyInit is passed through without JSON encoding", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     const form = new URLSearchParams({ a: "1" });
     await client.post("https://x.test/a", form);
     expect(rec.last().body).toBe(form);
@@ -74,7 +74,7 @@ describe("HttpClient: data and responses", () => {
 
   test("responseType text returns string data", async () => {
     const rec = recorder(() => new Response("plain", { status: 200 }));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     const res = await client.get<string>("https://x.test/a", { responseType: "text" });
     expect(res.data).toBe("plain");
   });
@@ -83,7 +83,7 @@ describe("HttpClient: data and responses", () => {
 describe("HttpClient: validateStatus", () => {
   test("non-2xx rejects with HttpClientError carrying the response", async () => {
     const rec = recorder(() => json({ error: "no" }, { status: 404, statusText: "Not Found" }));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     try {
       await client.get("https://x.test/missing");
       throw new Error("should have thrown");
@@ -98,7 +98,7 @@ describe("HttpClient: validateStatus", () => {
 
   test("validateStatus: null never rejects", async () => {
     const rec = recorder(() => json({}, { status: 500 }));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     const res = await client.get("https://x.test/a", { validateStatus: null });
     expect(res.status).toBe(500);
   });
@@ -107,7 +107,7 @@ describe("HttpClient: validateStatus", () => {
 describe("HttpClient: auth, credentials, headers", () => {
   test("basic auth header and per-request header precedence", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({ headers: { "x-app": "default" }, fetch: rec.fetch });
+    const client = new HttpClientBase({ headers: { "x-app": "default" }, fetch: rec.fetch });
     await client.get("https://x.test/a", {
       auth: { username: "u", password: "p" },
       headers: { "x-app": "override" },
@@ -118,7 +118,7 @@ describe("HttpClient: auth, credentials, headers", () => {
 
   test("strips credentials when an absolute URL escapes baseUrl origin", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       baseUrl: "https://api.test/v1",
       headers: {
         accept: "application/json",
@@ -144,7 +144,7 @@ describe("HttpClient: auth, credentials, headers", () => {
 
   test("does not let an empty request baseUrl erase the inherited origin boundary", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       baseUrl: "https://api.test",
       headers: { authorization: "Bearer inherited-secret" },
       fetch: rec.fetch,
@@ -158,7 +158,7 @@ describe("HttpClient: auth, credentials, headers", () => {
 
   test("keeps only explicitly permitted correlation headers on a foreign origin", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       baseUrl: "https://api.test",
       headers: { "x-custom-secret": "drop" },
       correlationHeaders: () => ({ "x-request-id": "req-foreign" }),
@@ -174,7 +174,7 @@ describe("HttpClient: auth, credentials, headers", () => {
 
   test("cross-origin credentials require an explicit opt-in", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       baseUrl: "https://api.test",
       headers: { authorization: "Bearer explicit" },
       allowCrossOriginCredentials: true,
@@ -186,7 +186,7 @@ describe("HttpClient: auth, credentials, headers", () => {
 
   test("re-applies cross-origin header policy after transformRequest mutates headers", async () => {
     const rec = recorder(() => json({ ok: true }));
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       baseUrl: "https://api.test",
       fetch: rec.fetch,
       transformRequest(data, headers) {
@@ -229,7 +229,7 @@ describe("HttpClient: auth, credentials, headers", () => {
     });
 
     try {
-      const client = new HttpClient({
+      const client = new HttpClientBase({
         baseUrl: `http://127.0.0.1:${source.port}`,
         headers: {
           accept: "application/json",
@@ -281,7 +281,7 @@ describe("HttpClient: auth, credentials, headers", () => {
     });
 
     try {
-      const client = new HttpClient({
+      const client = new HttpClientBase({
         baseUrl: `http://127.0.0.1:${source.port}`,
         headers: { authorization: "Bearer explicit", "x-api-key": "explicit-key" },
         allowCrossOriginCredentials: true,
@@ -323,7 +323,7 @@ describe("HttpClient: redirects", () => {
     secondUrl = `http://127.0.0.1:${second.port}`;
 
     try {
-      const client = new HttpClient({ baseUrl: firstUrl, maxRedirects: 2 });
+      const client = new HttpClientBase({ baseUrl: firstUrl, maxRedirects: 2 });
       await expect(client.get("/loop")).rejects.toMatchObject({
         code: HttpErrorCode.TooManyRedirects,
       });
@@ -359,7 +359,7 @@ describe("HttpClient: redirects", () => {
     });
 
     try {
-      const client = new HttpClient({ baseUrl: `http://127.0.0.1:${server.port}` });
+      const client = new HttpClientBase({ baseUrl: `http://127.0.0.1:${server.port}` });
       await client.post("/post-302", { value: 302 });
       await client.post("/post-307", { value: 307 });
 
@@ -389,7 +389,7 @@ describe("HttpClient: redirects", () => {
         controller.close();
       },
     });
-    const client = new HttpClient({ fetch: fetchImpl });
+    const client = new HttpClientBase({ fetch: fetchImpl });
 
     await expect(client.put("https://api.test/start", body)).rejects.toMatchObject({
       code: HttpErrorCode.RedirectBodyNotReplayable,
@@ -406,7 +406,7 @@ describe("HttpClient: redirects", () => {
         headers: { location: "https://attacker.test/collect" },
       });
     }) as unknown as typeof fetch;
-    const blocked = new HttpClient({ baseUrl: "https://api.test", fetch: blockedFetch });
+    const blocked = new HttpClientBase({ baseUrl: "https://api.test", fetch: blockedFetch });
 
     await expect(blocked.put("/submit", { secret: "do-not-forward" })).rejects.toMatchObject({
       code: HttpErrorCode.RedirectBodyNotReplayable,
@@ -426,7 +426,7 @@ describe("HttpClient: redirects", () => {
       trustedBody = init?.body;
       return json({ ok: true });
     }) as unknown as typeof fetch;
-    const trusted = new HttpClient({
+    const trusted = new HttpClientBase({
       baseUrl: "https://api.test",
       allowCrossOriginCredentials: true,
       fetch: trustedFetch,
@@ -441,7 +441,7 @@ describe("HttpClient: redirects", () => {
 describe("HttpClient: interceptors", () => {
   test("request and response interceptors transform config and result", async () => {
     const rec = recorder(() => json({ n: 1 }));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     client.interceptors.request.use((config) => {
       config.headers = { ...config.headers, "x-trace": "yes" };
       return config;
@@ -463,7 +463,7 @@ describe("HttpClient: timeout and retry", () => {
     }) as unknown as typeof fetch;
 
     for (const timeoutMs of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      const client = new HttpClient({ fetch: impl, timeoutMs });
+      const client = new HttpClientBase({ fetch: impl, timeoutMs });
       await expect(client.get("https://x.test/a")).rejects.toThrow(
         "timeoutMs must be a non-negative safe integer",
       );
@@ -473,7 +473,7 @@ describe("HttpClient: timeout and retry", () => {
 
   test("preserves inherited limits when an override contains undefined and accepts explicit zero", async () => {
     const rec = recorder(() => json({}));
-    const client = new HttpClient({ fetch: rec.fetch, timeoutMs: 100, maxResponseBytes: 10 });
+    const client = new HttpClientBase({ fetch: rec.fetch, timeoutMs: 100, maxResponseBytes: 10 });
 
     await client.get("https://x.test/inherit", { timeoutMs: undefined, maxResponseBytes: undefined });
     expect(rec.last().url).toBe("https://x.test/inherit");
@@ -485,7 +485,7 @@ describe("HttpClient: timeout and retry", () => {
   test("preserves inherited redirect guards when an override contains undefined", async () => {
     let intercepted: { redirect?: RequestInit["redirect"]; maxRedirects?: number } | undefined;
     const rec = recorder(() => json({}));
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       fetch: rec.fetch,
       redirect: "error",
       maxRedirects: 2,
@@ -506,7 +506,7 @@ describe("HttpClient: timeout and retry", () => {
       calls += 1;
       return json({});
     }) as unknown as typeof fetch;
-    const client = new HttpClient({ fetch: impl, maxResponseBytes: -1 });
+    const client = new HttpClientBase({ fetch: impl, maxResponseBytes: -1 });
 
     await expect(client.get("https://x.test/a")).rejects.toThrow(
       "maxResponseBytes must be a non-negative safe integer",
@@ -519,7 +519,7 @@ describe("HttpClient: timeout and retry", () => {
       new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
       })) as unknown as typeof fetch;
-    const client = new HttpClient({ fetch: impl, timeoutMs: 15 });
+    const client = new HttpClientBase({ fetch: impl, timeoutMs: 15 });
     try {
       await client.get("https://x.test/slow");
       throw new Error("should have thrown");
@@ -534,7 +534,7 @@ describe("HttpClient: timeout and retry", () => {
       calls += 1;
       return calls === 1 ? new Response(null, { status: 503 }) : json({ ok: true });
     }) as unknown as typeof fetch;
-    const client = new HttpClient({ fetch: impl, retry: { maxRetries: 1, backoffMs: 1 } });
+    const client = new HttpClientBase({ fetch: impl, retry: { maxRetries: 1, backoffMs: 1 } });
     const res = await client.get("https://x.test/a");
     expect(res.status).toBe(200);
     expect(calls).toBe(2);
@@ -546,7 +546,7 @@ describe("HttpClient: timeout and retry", () => {
       calls += 1;
       return new Response(null, { status: 503 });
     }) as unknown as typeof fetch;
-    const client = new HttpClient({ fetch: impl, retry: { maxRetries: 2, backoffMs: 1 }, validateStatus: null });
+    const client = new HttpClientBase({ fetch: impl, retry: { maxRetries: 2, backoffMs: 1 }, validateStatus: null });
     await client.post("https://x.test/a", "body");
     expect(calls).toBe(1);
   });
@@ -561,7 +561,7 @@ describe("HttpClient: timeout and retry", () => {
       }
       return json({ ok: true });
     }) as unknown as typeof fetch;
-    const client = new HttpClient({ fetch: impl, retry: { maxRetries: 1, backoffMs: 0 } });
+    const client = new HttpClientBase({ fetch: impl, retry: { maxRetries: 1, backoffMs: 0 } });
     await client.get("https://x.test/a");
     expect(canceled).toBe(true);
   });
@@ -571,7 +571,7 @@ describe("HttpClient: timeout and retry", () => {
       status: 503,
       headers: { "retry-after": "1" },
     })) as unknown as typeof fetch;
-    const client = new HttpClient({ fetch: impl, timeoutMs: 15, retry: { maxRetries: 3 } });
+    const client = new HttpClientBase({ fetch: impl, timeoutMs: 15, retry: { maxRetries: 3 } });
     await expect(client.get("https://x.test/a")).rejects.toMatchObject({ code: HttpErrorCode.Timeout });
   });
 });
@@ -579,7 +579,7 @@ describe("HttpClient: timeout and retry", () => {
 describe("HttpClient: transforms", () => {
   test("transformRequest pre-processes body, transformResponse post-processes data", async () => {
     const rec = recorder(() => json({ value: 2 }));
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     const res = await client.post<{ doubled: number }>("https://x.test/a", { value: 1 }, {
       transformRequest: (data) => ({ ...(data as object), stamped: true }),
       transformResponse: (data) => ({ doubled: (data as { value: number }).value * 2 }),
@@ -599,7 +599,7 @@ describe("HttpClient: download progress", () => {
           headers: { "content-type": "application/json", "content-length": String(payload.length) },
         }),
     );
-    const client = new HttpClient({ fetch: rec.fetch });
+    const client = new HttpClientBase({ fetch: rec.fetch });
     const events: number[] = [];
     const res = await client.get<{ big: string }>("https://x.test/file", {
       onDownloadProgress: (event) => events.push(event.loaded),
@@ -610,7 +610,7 @@ describe("HttpClient: download progress", () => {
   });
 
   test("rejects advertised and streamed bodies above maxResponseBytes", async () => {
-    const advertised = new HttpClient({
+    const advertised = new HttpClientBase({
       fetch: (async () => new Response("large", { headers: { "content-length": "100" } })) as unknown as typeof fetch,
       maxResponseBytes: 4,
     });
@@ -618,7 +618,7 @@ describe("HttpClient: download progress", () => {
       code: HttpErrorCode.ResponseTooLarge,
     });
 
-    const streamed = new HttpClient({
+    const streamed = new HttpClientBase({
       fetch: (async () => new Response(new ReadableStream({
         start(controller) {
           controller.enqueue(new TextEncoder().encode("123"));
@@ -634,7 +634,7 @@ describe("HttpClient: download progress", () => {
   });
 
   test("does not reject a bodyless HEAD response for its advertised representation length", async () => {
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       fetch: (async () => new Response(null, {
         status: 200,
         headers: { "content-length": "1000000" },
@@ -651,7 +651,7 @@ describe("HttpClient: download progress", () => {
 describe("HttpClient: create + factory", () => {
   test("create merges defaults", async () => {
     const rec = recorder(() => json({}));
-    const base = new HttpClient({ baseUrl: "https://api.test", fetch: rec.fetch });
+    const base = new HttpClientBase({ baseUrl: "https://api.test", fetch: rec.fetch });
     const scoped = base.create({ headers: { "x-tenant": "acme" } });
     await scoped.get("/x");
     expect(rec.last().url).toBe("https://api.test/x");
@@ -660,8 +660,8 @@ describe("HttpClient: create + factory", () => {
 
   test("factory fails fast on unknown client", () => {
     const factory = new HttpClientFactoryBuilder().addClient("api", { baseUrl: "https://api.test" }).build();
-    expect(factory.createClient("api")).toBeInstanceOf(HttpClient);
-    expect(factory.createClient()).toBeInstanceOf(HttpClient);
+    expect(factory.createClient("api")).toBeInstanceOf(HttpClientBase);
+    expect(factory.createClient()).toBeInstanceOf(HttpClientBase);
     expect(() => factory.createClient("nope")).toThrow(HttpClientConfigError);
   });
 

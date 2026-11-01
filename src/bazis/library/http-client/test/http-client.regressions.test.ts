@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HttpClient, HttpClientError, HttpErrorCode } from "../index";
+import { HttpClientBase, HttpClientError, HttpErrorCode } from "../index";
 import { appendQuery } from "../serialize";
 
 describe("transport cancellation reasons survive browser error normalization", () => {
@@ -8,7 +8,7 @@ describe("transport cancellation reasons survive browser error normalization", (
       test(`${cause} during ${phase} when transport reports TypeError`, async () => {
         const caller = new AbortController();
         let calls = 0;
-        const client = new HttpClient({
+        const client = new HttpClientBase({
           timeoutMs: cause === "timeout" ? 15 : 1000,
           signal: caller.signal,
           fetch: (async (_url, init) => {
@@ -38,7 +38,7 @@ describe("transport cancellation reasons survive browser error normalization", (
       start(controller) { controller.enqueue(new Uint8Array([1])); },
       cancel() { canceled++; return new Promise(() => {}); },
     });
-    const client = new HttpClient({ fetch: (async () => new Response(body)) as unknown as typeof fetch });
+    const client = new HttpClientBase({ fetch: (async () => new Response(body)) as unknown as typeof fetch });
     await expect(bounded(client.get("https://api.test", { onDownloadProgress: () => { throw failure; } }))).rejects.toBe(failure);
     expect(canceled).toBe(1);
     expect(body.locked).toBe(false);
@@ -74,7 +74,7 @@ describe("query precedes fragment", () => {
   test("params reach the HTTP peer", async () => {
     const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: req => Response.json({ query: new URL(req.url).search }) });
     try {
-      const response = await new HttpClient().get(`http://127.0.0.1:${server.port}/items#part`, { params: { page: 2 } });
+      const response = await new HttpClientBase().get(`http://127.0.0.1:${server.port}/items#part`, { params: { page: 2 } });
       expect(response.data).toEqual({ query: "?page=2" });
     } finally {
       await server.stop(true);
@@ -90,7 +90,7 @@ describe("malformed JSON preserves the HTTP envelope", () => {
   ] as const) {
     test(`${status} / validateStatus ${String(validateStatus)}`, async () => {
       const raw = new Response("<upstream failed>", { status, headers: { "content-type": "application/problem+json", "x-upstream": "gateway" } });
-      const client = new HttpClient({ fetch: (async () => raw) as unknown as typeof fetch });
+      const client = new HttpClientBase({ fetch: (async () => raw) as unknown as typeof fetch });
       const error = await client.get("https://api.test/failure", { validateStatus }).catch(e => e);
       expect(error).toBeInstanceOf(HttpClientError);
       expect(error.code).toBe(code);
@@ -103,7 +103,7 @@ describe("malformed JSON preserves the HTTP envelope", () => {
   }
 
   test("custom status validation runs once; progress/transform errors remain caller errors", async () => {
-    const client = new HttpClient({ fetch: (async () => new Response("{", { headers: { "content-type": "application/json" } })) as unknown as typeof fetch });
+    const client = new HttpClientBase({ fetch: (async () => new Response("{", { headers: { "content-type": "application/json" } })) as unknown as typeof fetch });
     let validations = 0;
     const error = await client.get("https://api.test", { validateStatus: () => { validations++; return false; } }).catch(e => e);
     expect(error.code).toBe(HttpErrorCode.BadStatus);
@@ -126,7 +126,7 @@ describe("producer cleanup cannot retain client operations", () => {
           start(controller) { if (operation.includes("limit")) controller.enqueue(new Uint8Array([65, 66])); },
           cancel() { canceled++; return cancellation === "pending" ? gate : Promise.reject(new Error("cleanup failed")); },
         });
-        const client = new HttpClient({
+        const client = new HttpClientBase({
           timeoutMs: 100,
           retry: operation === "retry" ? { maxRetries: 1, backoffMs: 0 } : undefined,
           maxResponseBytes: operation.includes("limit") ? 1 : undefined,
@@ -159,7 +159,7 @@ describe("producer cleanup cannot retain client operations", () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     const controller = new AbortController();
-    const client = new HttpClient({
+    const client = new HttpClientBase({
       timeoutMs: mode === "timeout" ? 20 : 0,
       signal: controller.signal,
       retry: { maxRetries: 1, backoffMs: 1000 },

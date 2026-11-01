@@ -41,7 +41,7 @@ export * as validation from "./library/validation";
 // Golden-path application API.
 export {
   GrpcController, GrpcMethod, GrpcError, GrpcStatus, grpcModule, grpcService, loadGrpcPackage,
-  GrpcClient, grpcClientProvider,
+  GrpcClient, GrpcClientBase,
   type GrpcClientOptions, type GrpcClientTlsOptions, type GrpcCallOptions, type GrpcResponse, type GrpcResponseStream,
   type GrpcContext, type GrpcModuleOptions,
 } from "./core/grpc";

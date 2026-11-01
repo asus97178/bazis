@@ -5,7 +5,7 @@ import { bindModel } from "../../http/Binding/modelBinder";
 import { registerRequestModelShape } from "../../http/Binding/requestModelRegistry";
 import { registerGeneratedProviderAttachments } from "../../di/module/generatedProviderAttachments";
 import { Validator, modelValidatorAdapter } from "../../../library/validation";
-import { GRPC_REQUEST_BINDINGS, GrpcClient, GrpcController, GrpcError, GrpcMethod, GrpcServer, GrpcStatus, grpcModule, type GrpcModuleOptions } from "../index";
+import { GRPC_REQUEST_BINDINGS, GrpcClientBase, GrpcController, GrpcError, GrpcMethod, GrpcServer, GrpcStatus, grpcModule, type GrpcModuleOptions } from "../index";
 import { GrpcRequestBinding } from "../GrpcRequest.binding";
 import { echoClient, echoService, type EchoMessage } from "./fixtures/contract";
 
@@ -45,7 +45,7 @@ async function fixture(options: GrpcModuleOptions = {}, swallow = false) {
   const container = createContainer(grpcModule({ address: "127.0.0.1:0", imports: [Feature], ...options }));
   const server = container.resolveAll(HOSTED_SERVICE).find((item): item is GrpcServer => item instanceof GrpcServer)!;
   await server.start();
-  const client = new GrpcClient(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000 });
+  const client = new GrpcClientBase(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000 });
   return { server, client, received, get disposed() { return disposed; }, async close() {
     client.close(); await server.stop(); await container.dispose();
   } };

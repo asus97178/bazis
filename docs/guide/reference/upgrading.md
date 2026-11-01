@@ -30,6 +30,30 @@
   типа: `export type Prefix = string; export const Prefix = createToken<Prefix>("Prefix")`.
   Настройки в конструкторе — `ConfigView<Type>` с `defineConfig<Type>(...)`.
   `overrides` в тестах не проверяются.
+- **gRPC-клиент — класс с `@GrpcClient`.** `grpcClientProvider` удалён, класс
+  клиента переименован в `GrpcClientBase`:
+
+  ```ts
+  @GrpcClient(UsersRpc, { config: usersRpcConfig })   // address, timeoutMs
+  export class UsersClient extends GrpcClientBase {}
+
+  @Module({ grpcClients: [UsersClient], providers: [scoped(UsersApi)] })
+  ```
+
+  Сервис просит `UsersClient` вместо `GrpcClient`; второму сервису — свой класс
+  вместо третьего аргумента-токена. Без DI — `new GrpcClientBase(service, options)`.
+- **HTTP-клиент — класс с `@HttpClient`.** `httpClientModule` удалён, класс
+  клиента переименован в `HttpClientBase`:
+
+  ```ts
+  @HttpClient({ config: weatherConfig })   // baseUrl, timeoutMs, maxResponseBytes
+  export class WeatherClient extends HttpClientBase {}
+
+  @Module({ httpClients: [WeatherClient], providers: [scoped(WeatherService)] })
+  ```
+
+  Именованные клиенты `HttpClientFactory.createClient("name")` в DI — теперь
+  отдельные классы. Без DI — `new HttpClientBase({ … })`.
 - **`IWorkflowDefinitions.publishCode`.** Своя реализация каталога процессов
   должна реализовать `publishCode(entries)`: фреймворк публикует им процессы
   из кода при старте.

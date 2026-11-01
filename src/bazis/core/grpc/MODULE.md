@@ -32,10 +32,10 @@ No parts, own DI or persistent storage are used.
 | Registration | [moduleControllers.ts](moduleControllers.ts) | grpcControllers → owner-bound scoped providers of the existing DI |
 | Composition | [Grpc.module.ts](Grpc.module.ts) | imports, controllers, options → a singleton HOSTED_SERVICE |
 | Server | [GrpcServer.ts](GrpcServer.ts) | Configuration/registrations → listener, routes, start/stop and the call limit |
-| Client | [GrpcClient.ts](GrpcClient.ts) | ServiceDefinition/address → four RPC kinds, session reuse, limits and close/dispose |
+| Client | [GrpcClientBase.ts](GrpcClientBase.ts) | ServiceDefinition/address → four RPC kinds, session reuse, limits and close/dispose |
 | Client call | [GrpcClientCall.ts](GrpcClientCall.ts) | Bounded framing, streaming, metadata/status, deadline and cancellation |
 | Client contracts | [clientContracts.ts](clientContracts.ts) | Options, GrpcResponse and GrpcResponseStream without library types |
-| Client registration | [grpcClientProvider.ts](grpcClientProvider.ts) | A regular singleton factory provider; DI owns dispose |
+| Client registration | [grpcClients.ts](grpcClients.ts) | `@GrpcClient(service, { config, ...options })` and the module field `grpcClients`: a singleton per client class, address/timeout from its config, DI owns dispose |
 | Call | [GrpcCall.ts](GrpcCall.ts) | Request/stream → response/status; scope, cancellation and backpressure |
 | DTO binding | [GrpcRequest.binding.ts](GrpcRequest.binding.ts), [GrpcBinding.contract.ts](GrpcBinding.contract.ts) | The shared binder/validator; exact-class generated metadata; INVALID_ARGUMENT and bounded field errors |
 | Contracts | [contracts.ts](contracts.ts) | Options and the RPC context |
@@ -142,9 +142,9 @@ not a new module, DI or protobuf runtime. No external libraries are used.
 The calling application loads the same `.proto`. For the UsersRpc from the example above:
 
 ```ts
-import { GrpcClient } from "bazis/core/grpc";
+import { GrpcClientBase } from "bazis/core/grpc";
 
-const client = new GrpcClient(UsersRpc, { address: "127.0.0.1:50051" });
+const client = new GrpcClientBase(UsersRpc, { address: "127.0.0.1:50051" });
 try {
   const { data: user } = await client.unary<{ id: number }, { id: number; name: string }>(
     "GetUser", { id: 42 }, { timeoutMs: 2000 },
@@ -159,10 +159,13 @@ In an existing feature module the client is registered next to the consuming ser
 
 ```ts
 import { Module, scoped } from "bazis/core/di";
-import { GrpcClient, grpcClientProvider } from "bazis/core/grpc";
+import { GrpcClient, GrpcClientBase } from "bazis/core/grpc";
+
+@GrpcClient(UsersRpc, { config: usersRpcConfig })
+export class UsersClient extends GrpcClientBase {}
 
 export class UsersGateway {
-  constructor(private readonly rpc: GrpcClient) {}
+  constructor(private readonly rpc: UsersClient) {}
   async getUser(id: number) {
     const reply = await this.rpc.unary<{ id: number }, { id: number; name: string }>(
       "GetUser", { id },
@@ -172,10 +175,8 @@ export class UsersGateway {
 }
 
 @Module({
-  providers: [
-    grpcClientProvider(UsersRpc, { address: "users.internal:50051" }),
-    scoped(UsersGateway),
-  ],
+  grpcClients: [UsersClient],
+  providers: [scoped(UsersGateway)],
   exports: [UsersGateway],
 })
 export class ConsumerModule {}
@@ -189,7 +190,7 @@ listen on a reachable interface (not loopback), and the client must use the serv
 real hostname/IP. Outside a trusted local connection use https/TLS; authorization is
 passed through Metadata and checked by the application handler.
 
-`new GrpcClient(service, options)` takes the same ServiceDefinition as the controller.
+`new GrpcClientBase(service, options)` takes the same ServiceDefinition as the controller.
 Methods are chosen by key, originalName or the name from the RPC path; an
 unknown/ambiguous method and a wrong call mode give a TypeError before the network.
 
@@ -233,10 +234,11 @@ After cancellation iterator.return() is called best-effort, without delaying com
 on an arbitrary user iterator. Never-finishing user code cannot be stopped by force; it
 must honor its own cancellation.
 
-`grpcClientProvider(service, options, token = GrpcClient)` returns a regular singleton
-factory provider of the existing DI. Each container owns its client and calls
-dispose(); no connection is opened at registration. Several services use different DI
-tokens and regular imports/exports.
+`@GrpcClient(service, { config, ...options })` declares a client class extending
+`GrpcClientBase`; a module lists it in `grpcClients`, and a metadata expander registers
+it as a singleton of the existing DI (with its config). Each container owns its client
+and calls dispose(); no connection is opened at registration. Several services are
+several classes, injected by type.
 HTTP/2 push is off; the inbound header list is declared as 8192 bytes and limited to 128
 pairs. These transport limits do not replace application authorization.
 
@@ -375,7 +377,7 @@ message `Internal server error.` without internal details. Since 0.98.32 such a 
 is written to the application `LOGGER` (`gRPC handler failed`, the path and the redacted
 error); a `GrpcError` and a cancelled call are not logged.
 
-A `GrpcError` of `GrpcClient` (a status from the server, a deadline, a broken or refused
+A `GrpcError` of `GrpcClientBase` (a status from the server, a deadline, a broken or refused
 connection) carries the `bazis/core/http` upstream mark: when it escapes an HTTP handler
 the error boundary answers `504 Gateway Timeout` for DEADLINE_EXCEEDED and
 `502 Bad Gateway` otherwise, like `HttpClientError`. A service that gives a remote status
@@ -407,8 +409,8 @@ timer. RST_STREAM/a broken connection also cancel the RPC.
 
 The transport adds no retries and no transactions; a deadline does not roll back domain
 effects. Reflection, grpc.health.v1, server interceptors and automatic retry/load
-balancing are not added. Client registration uses the existing DI through
-grpcClientProvider, not a separate container system.
+balancing are not added. Client registration uses the existing DI through the
+`grpcClients` field, not a separate container system.
 The own ServerCredentials.createSsl(rootCerts, keyCertPairs, checkClientCertificate)
 passes TLS/mTLS to the built-in HTTP/2. The client was also checked against an
 independent HTTP/2 TLS server: a trusted certificate, a wrong hostname, an untrusted CA,

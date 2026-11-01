@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createSecureServer, type ServerHttp2Session, type ServerHttp2Stream } from "node:http2";
 import type { AddressInfo } from "node:net";
-import { GrpcClient, GrpcStatus, type GrpcClientTlsOptions } from "../index";
+import { GrpcClientBase, GrpcStatus, type GrpcClientTlsOptions } from "../index";
 import { echoService } from "./fixtures/contract";
 
-test("GrpcClient TLS: trusted identity succeeds, untrusted/wrong identity fails, mTLS requires a client certificate", async () => {
+test("GrpcClientBase TLS: trusted identity succeeds, untrusted/wrong identity fails, mTLS requires a client certificate", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "bazis-grpc-tls-"));
   try {
     const config = path.join(root, "openssl.cnf"), certPath = path.join(root, "cert.pem"), keyPath = path.join(root, "key.pem");
@@ -31,9 +31,9 @@ test("GrpcClient TLS: trusted identity succeeds, untrusted/wrong identity fails,
       });
       await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
       const address = `https://127.0.0.1:${(server.address() as AddressInfo).port}`;
-      const clients: GrpcClient[] = [];
+      const clients: GrpcClientBase[] = [];
       const client = (tls?: GrpcClientTlsOptions) => {
-        const value = new GrpcClient(echoService, { address, tls, timeoutMs: 1500 }); clients.push(value); return value;
+        const value = new GrpcClientBase(echoService, { address, tls, timeoutMs: 1500 }); clients.push(value); return value;
       };
       try {
         const trusted = client({ ca, servername: "localhost", ...(mutual ? { cert: ca, key } : {}) });

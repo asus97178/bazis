@@ -68,7 +68,7 @@ export class MessageModel {
 `);
     await Bun.write(path.join(root, "src/proto.d.ts"), 'declare module "*.proto" { const filename: string; export default filename; }');
     await Bun.write(path.join(root, "src/feature.ts"), `
-import { Module, scoped, singleton, Controller, Get, GrpcController, GrpcMethod, GrpcError, GrpcStatus, grpcService, loadGrpcPackage, GrpcClient, grpcClientProvider } from "bazis";
+import { Module, scoped, singleton, Controller, Get, GrpcController, GrpcMethod, GrpcError, GrpcStatus, grpcService, loadGrpcPackage, GrpcClient, GrpcClientBase } from "bazis";
 import protoPath from "./echo.proto" with { type: "file" };
 import type { MessageModel as Request } from "./requests";
 import { MessageModel, ContactModel } from "./requests";
@@ -76,8 +76,10 @@ export const service = grpcService(loadGrpcPackage(protoPath, { defaults: true }
 export interface Message { text: string; count: number }
 export let handlerCalls = 0;
 export const clientOptions = { address: "127.0.0.1:1", timeoutMs: 2000 };
+@GrpcClient(service, clientOptions)
+export class EchoClient extends GrpcClientBase {}
 export class ClientProbe {
-  constructor(readonly client: GrpcClient) {}
+  constructor(readonly client: EchoClient) {}
   unary() { return this.client.unary<Message, Message>("Echo", { text: "own-client", count: 4 }); }
 }
 export class PrivateGreeter {
@@ -112,44 +114,34 @@ export class GeneratedHttpController {
   constructor(private readonly greeter: PrivateGreeter) {}
   @Get() get() { return { text: this.greeter.greet("http") }; }
 }
-@Module({ providers: [scoped(PrivateGreeter), grpcClientProvider(service, clientOptions), singleton(ClientProbe)], controllers: [GeneratedHttpController], grpcControllers: [GeneratedGrpcController], exports: [ClientProbe] })
+@Module({ providers: [scoped(PrivateGreeter), singleton(ClientProbe)], grpcClients: [EchoClient], controllers: [GeneratedHttpController], grpcControllers: [GeneratedGrpcController], exports: [ClientProbe] })
 export class FeatureModule {}
 `);
-    await Bun.write(path.join(root, "src/main.ts"), `
+    await Bun.write(path.join(root, "src/driver.ts"), `
 import { strict as assert } from "node:assert";
 import { echoClient } from "./nativeClient";
-import { runApp } from "bazis/core/app";
-import { DI, Module, HOSTED_SERVICE, SERVICE_PROVIDER } from "bazis/core/di";
+import { HOSTED_SERVICE, ServiceProvider } from "bazis/core/di";
 import { GrpcServer } from "bazis/core/grpc";
 import { HttpServer } from "bazis/core/http";
 import { ApplicationLifetime } from "bazis/core/kernel";
-import { modelValidatorAdapter } from "bazis/library/validation";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
-import { FeatureModule, ClientProbe, clientOptions, handlerCalls } from "./feature";
-let ownClient: import("bazis/core/grpc").GrpcClient | undefined;
+import { ClientProbe, clientOptions, handlerCalls } from "./feature";
+export const state: { ownClient?: import("bazis/core/grpc").GrpcClientBase } = {};
 const grpcOnly = process.argv.includes("--grpc-only");
 const custom = process.argv.includes("--custom-validator");
 const override = process.argv.includes("--grpc-override");
-const customValidator = { validate(instance: object) {
-  return (instance as {text?:string}).text === "custom-reject"
-    ? {isValid:false,errors:[{property:"text",message:"Custom validator",code:"custom-limit"}]}
-    : modelValidatorAdapter.validate(instance);
-} };
-await registerBazisGeneratedRuntime();
-@Module({
-  imports: [FeatureModule], exports: [],
-  providers: [DI.singleton(DI.factoryProviderWithResolver(HOSTED_SERVICE, [], resolver => ({
-    phase: 20,
-    async start() {
-      const provider = resolver.resolve(SERVICE_PROVIDER);
-      const hosted = provider.resolveAll(HOSTED_SERVICE);
+export class Driver {
+  readonly phase = 20;
+  constructor(private readonly resolver: ServiceProvider) {}
+  async start() {
+      const resolver = this.resolver;
+      const hosted = resolver.resolveAll(HOSTED_SERVICE);
       const grpc = hosted.find(s => s instanceof GrpcServer) as GrpcServer;
       const http = hosted.find(s => s instanceof HttpServer) as HttpServer;
       const client = echoClient(grpc.port!);
       try {
         clientOptions.address = "127.0.0.1:" + grpc.port;
         const probe = resolver.resolve(ClientProbe);
-        ownClient = probe.client;
+        state.ownClient = probe.client; const ownClient = state.ownClient;
         if (custom) {
           const result = await ownClient.unary("Echo", {text:"custom-reject",count:1}).catch(error => error);
           if (override) assert.equal(result.data.text, "hello custom-reject");
@@ -199,22 +191,42 @@ await registerBazisGeneratedRuntime();
         console.log("GRPC_HTTP_CODEGEN_BINARY_PASS");
       } finally { client.close(); }
       resolver.resolve(ApplicationLifetime).stop();
-    }, stop() {},
-  })))],
-})
+  }
+  stop() {}
+}
+`);
+    await Bun.write(path.join(root, "src/main.ts"), `
+import { strict as assert } from "node:assert";
+import { runApp } from "bazis/core/app";
+import { Module, HOSTED_SERVICE, singleton } from "bazis/core/di";
+import { modelValidatorAdapter } from "bazis/library/validation";
+import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
+import { FeatureModule } from "./feature";
+import { Driver, state } from "./driver";
+const grpcOnly = process.argv.includes("--grpc-only");
+const custom = process.argv.includes("--custom-validator");
+const override = process.argv.includes("--grpc-override");
+const customValidator = { validate(instance: object) {
+  return (instance as {text?:string}).text === "custom-reject"
+    ? {isValid:false,errors:[{property:"text",message:"Custom validator",code:"custom-limit"}]}
+    : modelValidatorAdapter.validate(instance);
+} };
+await registerBazisGeneratedRuntime();
+@Module({ imports: [FeatureModule], exports: [], providers: [singleton(HOSTED_SERVICE, Driver)] })
 class AppModule {}
 const code = await runApp(AppModule, { validator: custom ? customValidator : undefined, http: grpcOnly ? undefined : {port: 0, hostname: "127.0.0.1"}, grpc: {address: "127.0.0.1:0", validator: override ? modelValidatorAdapter : undefined}, kernel: {signals: [], startupReport: false} });
 if (code !== 0) throw new Error("runApp failed: " + code);
-assert.ok(ownClient);
-await assert.rejects(ownClient.unary("Echo", {}), {code:1});
+assert.ok(state.ownClient);
+await assert.rejects(state.ownClient.unary("Echo", {}), {code:1});
 `);
+
     const generated = await run([process.execPath, "run", "src/bazis/core/scripts/di-generate.ts"], root);
     expect(generated.code, generated.output).toBe(0);
     const deps = await Bun.file(path.join(root, "src/generated/bazis/deps.ts")).text();
     expect(deps).toContain("GeneratedGrpcController");
     expect(deps).toContain("PrivateGreeter");
     expect(deps).toContain("ClientProbe");
-    expect(deps).toContain("GrpcClient");
+    expect(deps).toContain("EchoClient");
     const bindings = await Bun.file(path.join(root, "src/generated/bazis/bindings.ts")).text();
     expect(bindings).toContain("GRPC_REQUEST_BINDINGS");
     expect(bindings).toContain('"collect": { model:');

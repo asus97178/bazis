@@ -54,7 +54,7 @@ export interface ApiVersioningOptions {
 export interface HttpModuleOptions {
   /**
    * Permit explicitly negotiated redirects for exact browser-side limits.
-   * The HttpClient must also enable inspectableRedirects. Default: false.
+   * The HttpClientBase must also enable inspectableRedirects. Default: false.
    * Authorized/CORS-allowed clients can then inspect each redirect Location.
    */
   readonly inspectableRedirects?: boolean;

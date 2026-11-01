@@ -1,21 +1,49 @@
 # HTTP-клиент
 
-`HttpClient` — клиент для запросов к другим сервисам. Его API повторяет
+`HttpClientBase` — клиент для запросов к другим сервисам. Его API повторяет
 Axios: `get`, `post`, `baseUrl`, `params`, перехватчики, ответ в `data`.
 Поверх `fetch` он добавляет тайм-аут, повторы, предел размера ответа и
 защиту секретов при запросах на чужой адрес. Работает и на сервере, и в
 браузере.
 
-Все примеры проверены на bazis 0.108.0.
+В приложении клиента к внешнему сервису объявляют как контроллер: класс с
+декоратором `@HttpClient` и поле модуля `httpClients`.
+
+Все примеры проверены на bazis 0.129.0.
 
 ## Подключение
 
-```ts
-import { Module, scoped } from "bazis/core/di";
-import { httpClientModule } from "bazis/core/http-client";
+Адрес сервиса и тайм-аут — в настройках:
 
+```ts
+// weather/config/Weather.config.ts
+import { defineConfig } from "bazis/core/kernel";
+
+export interface WeatherConfig {
+  baseUrl: string;
+  timeoutMs: number;
+}
+
+export const weatherConfig = defineConfig<WeatherConfig>("weather", {
+  default: { baseUrl: "https://weather.example.com", timeoutMs: 2000 },
+});
+```
+
+Клиент — класс-наследник `HttpClientBase` с декоратором:
+
+```ts
+// weather/clients/WeatherClient.ts
+import { HttpClient, HttpClientBase } from "bazis/core/http-client";
+
+@HttpClient({ config: weatherConfig })
+export class WeatherClient extends HttpClientBase {}
+```
+
+Модуль перечисляет клиентов в `httpClients`, сервис просит клиента по типу:
+
+```ts
 @Module({
-  imports: [httpClientModule({ default: { baseUrl: "https://weather.example.com" } })],
+  httpClients: [WeatherClient],
   providers: [scoped(WeatherService)],
   controllers: [WeatherController],
   exports: [],
@@ -24,13 +52,11 @@ export class WeatherModule {}
 ```
 
 ```ts
-import { HttpClient } from "bazis/core/http-client";
-
 export class WeatherService {
-  constructor(private readonly http: HttpClient) {}
+  constructor(private readonly weather: WeatherClient) {}
 
   async forecast(city: string) {
-    const { data } = await this.http.get<Forecast>("/forecast", { params: { city, day: ["mon", "tue"] } });
+    const { data } = await this.weather.get<Forecast>("/forecast", { params: { city, day: ["mon", "tue"] } });
     return data;
   }
 }
@@ -40,10 +66,15 @@ export class WeatherService {
 GET https://weather.example.com/forecast?city=Kazan&day=mon&day=tue
 ```
 
-> [!NOTE]
-> Внедрение `HttpClient` по типу — с версии 0.98.11. Раньше нужен был
-> токен `HTTP_CLIENT`; с версии 0.109.0 токенов `HTTP_CLIENT` и
-> `HTTP_CLIENT_FACTORY` нет.
+- `baseUrl` и `timeoutMs` (а если объявлен — и `maxResponseBytes`) берутся
+  из настроек клиента: `BAZIS_WEATHER__BASEURL=…` меняет адрес без правки
+  кода. Настройки модуль объявляет сам — отдельно в `config` их писать не
+  нужно.
+- Остальные настройки запроса — прямо в декораторе:
+  `@HttpClient({ config: weatherConfig, headers: { accept: "application/json" }, retry: { maxRetries: 3 } })`.
+- По умолчанию тайм-аут 30 с и предел ответа 16 МиБ; correlation id
+  запроса уходит в заголовки сам (ниже).
+- Клиент — один на приложение (`singleton`).
 
 ## Запросы
 
@@ -160,36 +191,25 @@ http.get("https://other.example/echo", { headers: { "x-api-key": … } }) → к
 
 ## Несколько внешних сервисов
 
-Именованные клиенты задаются в модуле и берутся через фабрику:
+Каждый сервис — свой класс со своими настройками; потребитель просит нужный
+по типу:
 
 ```ts
-httpClientModule({
-  default: { timeoutMs: 10_000 },
-  clients: {
-    payments: { baseUrl: "https://pay.example.com", headers: { "x-api-key": process.env.PAY_KEY! } },
-    weather: { baseUrl: "https://weather.example.com", timeoutMs: 2_000 },
-  },
-})
+@HttpClient({ config: paymentsConfig })
+export class PaymentsClient extends HttpClientBase {}
+
+@HttpClient({ config: weatherConfig })
+export class WeatherClient extends HttpClientBase {}
+
+@Module({ httpClients: [PaymentsClient, WeatherClient], providers: [scoped(CheckoutService)] })
+export class CheckoutModule {}
 ```
 
 ```ts
-import { HttpClient, HttpClientFactory } from "bazis/core/http-client";
-
 export class CheckoutService {
-  private readonly payments: HttpClient;
-
-  constructor(clients: HttpClientFactory) {
-    this.payments = clients.createClient("payments");
-  }
+  constructor(private readonly payments: PaymentsClient) {}
 }
 ```
-
-Неизвестное имя — ошибка: `HttpClient "pay" is not configured (known
-clients: payments, weather)`. Настройки клиента дополняют `default`.
-
-> [!NOTE]
-> `HttpClientFactory` внедряется по типу с версии 0.98.11. Раньше это был
-> интерфейс, и нужен был токен `HTTP_CLIENT_FACTORY` (удалён в 0.109.0).
 
 ## Перехватчики
 
@@ -200,18 +220,18 @@ api.interceptors.response.use((response) => response, (error) => { metrics.faile
 ```
 
 `create(config)` делает новый клиент с настройками поверх текущих.
-Добавляйте перехватчики к своему клиенту из `create`, а не к общему
-`HttpClient` из DI: он один на приложение, и перехватчик из конструктора
-сервиса добавлялся бы заново при каждом запросе.
+Добавляйте перехватчики к своему клиенту из `create`, а не к клиенту из
+DI: он один на приложение, и перехватчик из конструктора scoped-сервиса
+добавлялся бы заново при каждом запросе.
 
 ## В браузере, без DI
 
 Тот же клиент работает во фронтенде — например, во Vue вместо Axios:
 
 ```ts
-import { HttpClient } from "bazis/library/http-client";
+import { HttpClientBase } from "bazis/library/http-client";
 
-export const api = new HttpClient({ baseUrl: "/api", timeoutMs: 10_000 });
+export const api = new HttpClientBase({ baseUrl: "/api", timeoutMs: 10_000 });
 api.interceptors.request.use((config) => ({ ...config, headers: { ...config.headers, authorization: `Bearer ${auth.token}` } }));
 
 const { data } = await api.get<Order[]>("/orders", { params: { page: 2 } });

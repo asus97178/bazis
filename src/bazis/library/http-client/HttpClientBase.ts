@@ -78,7 +78,7 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
  * Basic `auth`, `withCredentials`, idempotent retries with backoff, and
  * pluggable correlation-header propagation. No dependency on the Bazis core.
  */
-export class HttpClient {
+export class HttpClientBase {
   public readonly defaults: RequestConfig;
   public readonly interceptors: {
     readonly request: InterceptorManager<ResolvedRequestConfig>;
@@ -95,12 +95,12 @@ export class HttpClient {
   }
 
   /** Creates a new client whose defaults are this client's defaults merged with `config`. */
-  public create(config: RequestConfig = {}): HttpClient {
-    return new HttpClient(this.mergeConfig(this.defaults, config));
+  public create(config: RequestConfig = {}): HttpClientBase {
+    return new HttpClientBase(this.mergeConfig(this.defaults, config));
   }
 
-  public static create(config: RequestConfig = {}): HttpClient {
-    return new HttpClient(config);
+  public static create(config: RequestConfig = {}): HttpClientBase {
+    return new HttpClientBase(config);
   }
 
   public request<T = unknown>(config: RequestConfig): Promise<HttpResponse<T>>;

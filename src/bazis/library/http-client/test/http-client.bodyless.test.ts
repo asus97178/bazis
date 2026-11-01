@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { HttpClient } from "../HttpClient";
+import { HttpClientBase } from "../HttpClientBase";
 import { trackDownload } from "../progress";
 
 // Some browser Fetch implementations expose an empty stream for bodyless
@@ -7,7 +7,7 @@ import { trackDownload } from "../progress";
 for (const status of [204, 205, 304]) {
   test(`response limits preserve bodyless status ${status} without wrapping its stream`, async () => {
     const { response, reads } = bodyless(status);
-    const client = new HttpClient({ maxResponseBytes: 1024, validateStatus: () => true,
+    const client = new HttpClientBase({ maxResponseBytes: 1024, validateStatus: () => true,
       fetch: (async () => response) as unknown as typeof fetch });
     const result = await client.get("https://client.example.test/logout");
     expect(result.status).toBe(status);

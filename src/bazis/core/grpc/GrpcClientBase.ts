@@ -8,7 +8,7 @@ import { Metadata } from "./Metadata";
 import type { MethodDefinition, ServiceDefinition } from "./serviceDefinition";
 
 /** Standard gRPC/HTTP2 client using only built-in networking and Bazis codecs. */
-export class GrpcClient {
+export class GrpcClientBase {
   private readonly methods = new Map<string, MethodDefinition | null>();
   private readonly sessions = new Map<ClientHttp2Session, Set<GrpcClientCall<unknown>>>();
   private readonly calls = new Set<GrpcClientCall<unknown>>();

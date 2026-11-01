@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import { createContainer, Module, HOSTED_SERVICE, singletonFactory, ModuleEncapsulationError, type Class } from "../../di";
-import { GrpcClient, grpcClientProvider, GrpcController, GrpcMethod, grpcModule, GrpcServer,
+import { GrpcClient, GrpcClientBase, GrpcController, GrpcMethod, grpcModule, GrpcServer,
   GrpcError, GrpcStatus as Status, Metadata, type GrpcContext, type GrpcClientOptions } from "../index";
 import { echoService, type EchoMessage } from "./fixtures/contract";
+import { defineConfig, memorySource } from "../../kernel";
+import { createTestContainer } from "../../testing";
 
 async function eventually(check: () => boolean): Promise<void> {
   for (let i = 0; i < 100 && !check(); i++) await Bun.sleep(10);
@@ -46,11 +48,11 @@ async function fixture(options: Partial<GrpcClientOptions> = {}, controller: Cla
   const container = createContainer(grpcModule({ imports: [{ grpcControllers: [controller] }], address: "127.0.0.1:0" }));
   const server = container.resolveAll(HOSTED_SERVICE).find((s): s is GrpcServer => s instanceof GrpcServer)!;
   await server.start();
-  const client = new GrpcClient(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000, ...options });
+  const client = new GrpcClientBase(echoService, { address: `127.0.0.1:${server.port}`, timeoutMs: 2000, ...options });
   return { client, server, async close() { client.close(); await server.stop(); await container.dispose(); } };
 }
 
-test("GrpcClient: unary aliases, metadata snapshots, all streaming modes and concurrent reuse", async () => {
+test("GrpcClientBase: unary aliases, metadata snapshots, all streaming modes and concurrent reuse", async () => {
   const defaults = new Metadata(); defaults.set("x-text", "default");
   const f = await fixture({ metadata: defaults });
   try {
@@ -76,7 +78,7 @@ test("GrpcClient: unary aliases, metadata snapshots, all streaming modes and con
   } finally { await f.close(); }
 });
 
-test("GrpcClient: remote errors/trailers and partial stream are not successes", async () => {
+test("GrpcClientBase: remote errors/trailers and partial stream are not successes", async () => {
   const f = await fixture();
   try {
     const error = await f.client.unary("Echo", { text: "error" }).catch(error => error);
@@ -91,7 +93,7 @@ test("GrpcClient: remote errors/trailers and partial stream are not successes", 
   } finally { await f.close(); }
 });
 
-test("GrpcClient: messages larger than the HTTP/2 flow-control window round-trip", async () => {
+test("GrpcClientBase: messages larger than the HTTP/2 flow-control window round-trip", async () => {
   const f = await fixture();
   try {
     const text = "x".repeat(256 * 1024);
@@ -101,7 +103,7 @@ test("GrpcClient: messages larger than the HTTP/2 flow-control window round-trip
   } finally { await f.close(); }
 });
 
-test("GrpcClient: deadlines, AbortSignal, early iteration exit and unobserved streams release calls", async () => {
+test("GrpcClientBase: deadlines, AbortSignal, early iteration exit and unobserved streams release calls", async () => {
   const f = await fixture();
   try {
     await expect(f.client.unary("Echo", { text: "wait" }, { timeoutMs: 30 })).rejects.toMatchObject({ code: Status.DEADLINE_EXCEEDED });
@@ -122,7 +124,7 @@ test("GrpcClient: deadlines, AbortSignal, early iteration exit and unobserved st
   } finally { await f.close(); }
 });
 
-test("GrpcClient: limits and terminal close reject new calls; no queue", async () => {
+test("GrpcClientBase: limits and terminal close reject new calls; no queue", async () => {
   const f = await fixture({ maxConcurrentCalls: 1, maxSendMessageLength: 32, maxReceiveMessageLength: 32 });
   try {
     const pending = f.client.unary("Echo", { text: "wait" });
@@ -137,7 +139,7 @@ test("GrpcClient: limits and terminal close reject new calls; no queue", async (
   finally { await limited.close(); }
 });
 
-test("GrpcClient: non-cooperative upload is cancelled without waiting for iterator.return", async () => {
+test("GrpcClientBase: non-cooperative upload is cancelled without waiting for iterator.return", async () => {
   const f = await fixture();
   let next = 0, returned = 0;
   const source: AsyncIterable<EchoMessage> = { [Symbol.asyncIterator]() { return {
@@ -151,12 +153,12 @@ test("GrpcClient: non-cooperative upload is cancelled without waiting for iterat
   } finally { await f.close(); }
 });
 
-test("GrpcClient: configuration, mode and expired-call validation happens before network", async () => {
+test("GrpcClientBase: configuration, mode and expired-call validation happens before network", async () => {
   const options = { address: "127.0.0.1:1" };
   for (const changes of [{ timeoutMs: 0 }, { timeoutMs: NaN }, { tls: {} }, { metadata: null }, { extra: true }, { maxConcurrentCalls: -1 }, { address: "http://host/path" }, { address: "http://user:pass@host" }, { address: "ftp://host" }]) {
-    expect(() => new GrpcClient(echoService, { ...options, ...changes } as GrpcClientOptions)).toThrow();
+    expect(() => new GrpcClientBase(echoService, { ...options, ...changes } as GrpcClientOptions)).toThrow();
   }
-  const client = new GrpcClient(echoService, options);
+  const client = new GrpcClientBase(echoService, options);
   try {
     await expect(client.unary("missing", {})).rejects.toBeInstanceOf(TypeError);
     await expect(client.unary("Chat", {})).rejects.toBeInstanceOf(TypeError);
@@ -169,21 +171,42 @@ test("GrpcClient: configuration, mode and expired-call validation happens before
   } finally { client.close(); }
 });
 
-test("grpcClientProvider: ordinary singleton ownership, private visibility and disposal per container", async () => {
+test("@GrpcClient in grpcClients: a singleton per container, private to its module, closed with the container", async () => {
   const f = await fixture();
-  const provider = grpcClientProvider(echoService, { address: `127.0.0.1:${f.server.port}`, timeoutMs: 2000 });
-  @Module({ providers: [provider], exports: [] }) class PrivateFeature {}
-  class Consumer { constructor(readonly client: GrpcClient) {} }
-  expect(() => createContainer({ imports: [PrivateFeature], providers: [singletonFactory(Consumer, [GrpcClient], client => new Consumer(client))] })).toThrow(ModuleEncapsulationError);
-  @Module({ providers: [provider], exports: [GrpcClient] }) class Feature {}
+  @GrpcClient(echoService, { address: `127.0.0.1:${f.server.port}`, timeoutMs: 2000 })
+  class EchoClient extends GrpcClientBase {}
+  @Module({ grpcClients: [EchoClient], exports: [] }) class PrivateFeature {}
+  class Consumer { constructor(readonly client: EchoClient) {} }
+  expect(() => createContainer({ imports: [PrivateFeature], providers: [singletonFactory(Consumer, [EchoClient], client => new Consumer(client))] })).toThrow(ModuleEncapsulationError);
+  @Module({ grpcClients: [EchoClient], exports: [EchoClient] }) class Feature {}
   const first = createContainer(Feature), second = createContainer(Feature);
   try {
-    const a = first.resolve(GrpcClient), b = second.resolve(GrpcClient);
-    expect(a).toBe(first.resolve(GrpcClient)); expect(a).not.toBe(b);
+    const a = first.resolve(EchoClient), b = second.resolve(EchoClient);
+    expect(a).toBeInstanceOf(EchoClient);
+    expect(a).toBe(first.resolve(EchoClient)); expect(a).not.toBe(b);
     const active = a.unary("Echo", { text: "wait" });
     await first.dispose();
     await expect(active).rejects.toMatchObject({ code: Status.CANCELLED });
     await expect(a.unary("Echo", {})).rejects.toMatchObject({ code: Status.CANCELLED });
     expect((await b.unary("Echo", { text: "independent" })).data).toMatchObject({ text: "independent" });
   } finally { await first.dispose(); await second.dispose(); await f.close(); }
+});
+
+test("@GrpcClient takes the address and timeout from its config, which the module declares itself", async () => {
+  const f = await fixture();
+  interface EchoRpcConfig { address: string; timeoutMs: number }
+  const echoRpcConfig = defineConfig<EchoRpcConfig>("echoRpc", { default: { address: "127.0.0.1:1", timeoutMs: 2000 } });
+  @GrpcClient(echoService, { config: echoRpcConfig })
+  class EchoClient extends GrpcClientBase {}
+  @Module({ grpcClients: [EchoClient], exports: [EchoClient] }) class Feature {}
+  const container = await createTestContainer(Feature, { configure: (builder) => builder.addConfigSource(memorySource({ echoRpc: { address: `127.0.0.1:${f.server.port}` } })) });
+  try {
+    expect((await container.resolve(EchoClient).unary("Echo", { text: "from config" })).data).toMatchObject({ text: "from config" });
+  } finally { await container.dispose(); await f.close(); }
+});
+
+test("grpcClients refuses a class without @GrpcClient or not based on GrpcClientBase", () => {
+  class Plain extends GrpcClientBase {}
+  @Module({ grpcClients: [Plain], exports: [] }) class Broken {}
+  expect(() => createContainer(Broken)).toThrow("Broken: Plain in grpcClients must extend GrpcClientBase and be declared with @GrpcClient(service, …).");
 });

@@ -1039,7 +1039,7 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
 function collectProviderFormErrors(source: ts.SourceFile): void {
   // Inside the function: the script runs before later top-level constants are initialized.
   const AGREED_PROVIDERS = "scoped(IService, Service), singleton(IService, Service), transient(IService, Service) (or the class alone), singletonValue(TOKEN, value), singletonAsyncFactory(TOKEN, [deps], async factory) or ...withEventSubscribers(Class)";
-  const CLASS_LISTS = ["controllers", "grpcControllers", "gateways", "background", "tools"];
+  const CLASS_LISTS = ["controllers", "grpcControllers", "gateways", "background", "tools", "grpcClients", "httpClients"];
   const callee = (call: ts.CallExpression): { file?: string; name?: string } => {
     let symbol = checker.getSymbolAtLocation(call.expression);
     if (symbol && (symbol.flags & ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
