@@ -2,6 +2,7 @@ import { contextOnlyController } from "../../../http/Routing/contextOnlyControll
 import { can, type AccessObject } from "../../../access";
 import { Authorize, Controller, Created, Get, Post, type HttpContext } from "../../../http";
 import { buildListDocument } from "../../../../library/jsonapi";
+import { WorkflowError } from "../../contracts/WorkflowError";
 import { body, callerOf, filterOf, listQuery, optionalString, pagingOfList, param, requiredString } from "../../internal/http";
 import type { InstanceStatus } from "../model/WfInstance.model";
 import { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
@@ -29,6 +30,7 @@ export class InstancesController {
       actor,
       request: from,
       language,
+      ...(request.test === true ? { test: true } : {}),
     });
     return Created(`${ctx.path}/${instance.id}`, instance);
   }
@@ -49,9 +51,11 @@ export class InstancesController {
   async list(ctx: HttpContext) {
     const { access } = await callerOf(ctx);
     const list = listQuery(ctx, {
-      filter: { partition: ["eq"], processKey: ["eq"], status: ["eq"], businessKey: ["eq"], startedById: ["eq"], parentInstanceId: ["eq"] },
+      filter: { partition: ["eq"], processKey: ["eq"], status: ["eq"], businessKey: ["eq"], startedById: ["eq"], parentInstanceId: ["eq"], test: ["eq"] },
       sort: ["createdAt", "endedAt", "status", "processKey"],
     });
+    const test = filterOf(list, "test");
+    if (test !== undefined && test !== "true" && test !== "false") throw new WorkflowError("invalid_input", "test must be true or false");
     const page = await this.runtime.instances({
       ...pagingOfList(list),
       access: await access.filter("workflow.instances.read"),
@@ -61,6 +65,7 @@ export class InstancesController {
       businessKey: filterOf(list, "businessKey"),
       startedById: filterOf(list, "startedById"),
       parentInstanceId: filterOf(list, "parentInstanceId"),
+      ...(test === undefined ? {} : { test: test === "true" }),
     });
     return buildListDocument(page.items, list, page.total, { basePath: ctx.path });
   }
@@ -100,7 +105,7 @@ export class InstancesController {
 
   /** The instance as the object of a permission. */
   private async objectOf(instance: InstanceSummary): Promise<AccessObject> {
-    return { scope: instance.partition, process: instance.processKey, folder: await this.definitions.folderOf(instance.processKey), startedById: instance.startedBy.id };
+    return { scope: instance.partition, process: instance.processKey, folder: await this.definitions.folderOf(instance.processKey), startedById: instance.startedBy.id, test: instance.test };
   }
 }
 contextOnlyController(InstancesController);

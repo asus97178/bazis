@@ -14,7 +14,7 @@ export const runtimePermissions = definePermissions({
   "workflow.instances.read": {
     title: { en: "See instances", ru: "Видеть экземпляры" },
     scope: { column: "partition" },
-    on: { process, folder },
+    on: { process, folder, test: { type: "boolean" } },
     owner: "startedById",
   },
   "workflow.instances.manage": {

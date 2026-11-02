@@ -1,6 +1,8 @@
 import type { AgentSchemaContract, AgentToolResult } from "../../../agent";
-import { durationMs, maskByMapping, maskBySchema, masksPersonal, personalPaths, resolveInput, type ProcessDocument } from "../../../../library/workflow";
+import { durationMs, inputReferences, maskByMapping, maskBySchema, masksPersonal, personalPaths, resolveInput, type ProcessDocument } from "../../../../library/workflow";
 import type { WorkflowToolMetadata } from "../../contracts/types";
+import type { WorkflowLanguages } from "../../internal/WorkflowLanguages";
+import type { WorkflowReferences } from "../../internal/WorkflowReferences";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
@@ -23,6 +25,8 @@ export class ToolStep {
     private readonly db: RuntimeDbContext,
     private readonly engine: WorkflowEngine,
     private readonly tools: WorkflowTools,
+    private readonly references: WorkflowReferences,
+    private readonly languages: WorkflowLanguages,
   ) {}
 
   async run(job: WfJob, signal: AbortSignal): Promise<void> {
@@ -42,13 +46,22 @@ export class ToolStep {
       await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeUpdate({ lockedUntil: new Date(this.engine.now().getTime() + timeoutMs + LEASE_MS) });
     }
     const runner = this.tools.bound;
+    const trial = instance.test ? runner?.getTool(name)?.metadata.dryRun : undefined;
+    const missing = await this.references.missing(inputReferences(this.references.inputSchemaOf(name), input), { scope: instance.partition, language: this.languages.default });
     const result: AgentToolResult = runner === undefined
       ? { callId: token.id, name, status: "error", error: { code: "TOOL_NOT_FOUND", message: `Tool ${name} is not available to processes` }, metadata: {} } as AgentToolResult
+      : missing.length > 0
+      // A value computed by the process, or one that is gone since the publication (WORKFLOW-002 §6.3).
+      ? { callId: token.id, name, status: "error", error: { code: "ref_not_found", message: `${missing[0]!.kind} ${JSON.stringify(missing[0]!.id)} does not exist`, details: { reason: "ref_not_found", path: missing[0]!.path } }, metadata: {} } as AgentToolResult
+      : trial === "unsupported"
+      // A trial never calls a Tool that cannot run without changing anything.
+      ? { callId: token.id, name, status: "success", output: { dryRun: true }, metadata: {} } as AgentToolResult
       : await runner.run(name, input, {
         idempotencyKey: token.id,
         actor: runActorOf(graph.document, instance),
-        metadata: { instanceId: instance.id, processKey: instance.processKey, nodeId: token.nodeId, partition: instance.partition, test: false } satisfies WorkflowToolMetadata,
+        metadata: { instanceId: instance.id, processKey: instance.processKey, nodeId: token.nodeId, partition: instance.partition, test: instance.test } satisfies WorkflowToolMetadata,
         signal,
+        ...(trial === "supported" ? { dryRun: true } : {}),
         ...(timeoutMs === undefined ? {} : { timeoutMs }),
       });
 
@@ -72,6 +85,7 @@ export class ToolStep {
         status: result.status,
         attempt: job.attempts,
         durationMs: result.durationMs ?? null,
+        ...(trial === undefined ? {} : { dryRun: trial === "supported" ? "called" : "not called" }),
         ...payloads,
         ...(result.error ? { error: { code: result.error.code ?? null, message: result.error.message, ...(reason === undefined ? {} : { reason }) } } : {}),
         ...(retryAt === undefined ? {} : { retryAt: retryAt.toISOString() }),

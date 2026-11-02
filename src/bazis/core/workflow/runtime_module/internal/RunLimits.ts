@@ -39,7 +39,7 @@ export class RunLimits {
   }
 
   private async releaseProcess(processKey: string): Promise<void> {
-    const waiting = await this.db.instances.asNoTracking().where((i) => i.processKey.eq(processKey).and(i.status.eq("pending"))).orderBy((i) => i.id).take(RELEASE_BATCH).toList();
+    const waiting = await this.db.instances.asNoTracking().where((i) => i.processKey.eq(processKey).and(i.test.eq(false)).and(i.status.eq("pending"))).orderBy((i) => i.id).take(RELEASE_BATCH).toList();
     if (waiting.length === 0) return;
     // Graphs live in the Definitions store, out of reach inside the transaction; `inStep` finds them cached.
     const graphs = new Map(await Promise.all(waiting.map(async (row) => [row.id, await this.engine.graphOf(row.versionId)] as const)));
@@ -65,7 +65,7 @@ export class RunLimits {
   /** Whether an instance older than this one still works on the key: it goes first. */
   private async keyTaken(processKey: string, businessKey: string, id: string): Promise<boolean> {
     const same = await this.db.instances.asNoTracking()
-      .where((i) => i.processKey.eq(processKey).and(i.businessKey.eq(businessKey)).and(i.status.in(["pending", "running", "failed"])).and(i.id.lt(id)))
+      .where((i) => i.processKey.eq(processKey).and(i.test.eq(false)).and(i.businessKey.eq(businessKey)).and(i.status.in(["pending", "running", "failed"])).and(i.id.lt(id)))
       .count();
     return same > 0;
   }
@@ -73,7 +73,7 @@ export class RunLimits {
   /** Whether a scheduled run of the partition goes on, or waits since before this one. */
   private async scheduleTaken(processKey: string, partition: string | null, id: string): Promise<boolean> {
     const same = await this.db.instances.asNoTracking()
-      .where((i) => i.processKey.eq(processKey).and(i.startedVia.eq("schedule")).and(partition === null ? i.partition.isNull() : i.partition.eq(partition)).and(i.status.eq("running").or(i.status.eq("pending").and(i.id.lt(id)))))
+      .where((i) => i.processKey.eq(processKey).and(i.test.eq(false)).and(i.startedVia.eq("schedule")).and(partition === null ? i.partition.isNull() : i.partition.eq(partition)).and(i.status.eq("running").or(i.status.eq("pending").and(i.id.lt(id)))))
       .count();
     return same > 0;
   }
@@ -113,6 +113,7 @@ export class RunLimits {
     await this.engine.inStep(failed.id, async (step) => {
       await this.dropJob(job);
       const { id } = await this.engine.begin(graph, start[0], {
+        test: failed.test,
         input: value,
         partition: failed.partition,
         businessKey: null,

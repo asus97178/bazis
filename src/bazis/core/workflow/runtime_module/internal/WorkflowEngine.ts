@@ -4,7 +4,7 @@ import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import type { WorkflowEvents } from "../../internal/WorkflowEvents";
-import { WORKFLOW_INSTANCE_CANCELLED, WORKFLOW_INSTANCE_FINISHED, WORKFLOW_INSTANCE_RETRIED, WORKFLOW_INSTANCE_STARTED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED } from "../events/Runtime.events";
+import { WORKFLOW_INSTANCE_CANCELLED, WORKFLOW_INSTANCE_FINISHED, WORKFLOW_INSTANCE_RETRIED, WORKFLOW_INSTANCE_STARTED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, WORKFLOW_TRIAL_TASK_REQUESTED, WORKFLOW_TRIAL_TOKEN_CLOSED } from "../events/Runtime.events";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import { WfHistory, type HistoryType } from "../model/WfHistory.model";
 import { WfInstance, type StartedVia } from "../model/WfInstance.model";
@@ -53,6 +53,8 @@ export interface BeginOptions {
   readonly queued?: boolean;
   /** The firing a scheduled start belongs to: `$trigger.scheduledAt`. */
   readonly scheduledAt?: Date;
+  /** A trial run (WORKFLOW-002 §5.4): takes no place among real ones and tells the application nothing. */
+  readonly test?: boolean;
 }
 
 /** Why a step failed. `reason` is the business reason an error boundary may name. */
@@ -162,7 +164,7 @@ export class WorkflowEngine {
    */
   async begin(graph: ProcessGraph, startNodeId: string, options: BeginOptions): Promise<Begun> {
     return await this.db.transactionScope(async (transaction) => {
-      const admission = await this.admit(graph, options.businessKey);
+      const admission = options.test === true ? "start" : await this.admit(graph, options.businessKey);
       if (typeof admission === "object") return { id: admission.skippedBy, skipped: true };
       const waits = admission === "queue" || options.queued === true;
       const instance = this.newInstance(graph, options, waits ? "pending" : "running");
@@ -211,7 +213,7 @@ export class WorkflowEngine {
     await this.lockProcess(graph.processKey);
     if (keyed) {
       const same = await this.db.instances.asNoTracking()
-        .where((i) => i.processKey.eq(graph.processKey).and(i.businessKey.eq(businessKey)).and(i.status.in(["pending", "running", "failed"])))
+        .where((i) => i.processKey.eq(graph.processKey).and(i.businessKey.eq(businessKey)).and(i.test.eq(false)).and(i.status.in(["pending", "running", "failed"])))
         .firstOrDefault();
       if (same) return sameKey === "skip" ? { skippedBy: same.id } : "queue";
     }
@@ -224,13 +226,13 @@ export class WorkflowEngine {
   }
 
   async runningOf(processKey: string): Promise<number> {
-    return await this.db.instances.asNoTracking().where((i) => i.processKey.eq(processKey).and(i.status.eq("running"))).count();
+    return await this.db.instances.asNoTracking().where((i) => i.processKey.eq(processKey).and(i.test.eq(false)).and(i.status.eq("running"))).count();
   }
 
   /** Scheduled runs of a process that still go on in a partition, for `overlap`. A failed one waits for a person and takes no place. */
   async scheduledLive(processKey: string, partition: string | null): Promise<number> {
     return await this.db.instances.asNoTracking()
-      .where((i) => i.processKey.eq(processKey).and(i.startedVia.eq("schedule")).and(i.status.in(["pending", "running"])).and(partition === null ? i.partition.isNull() : i.partition.eq(partition)))
+      .where((i) => i.processKey.eq(processKey).and(i.test.eq(false)).and(i.startedVia.eq("schedule")).and(i.status.in(["pending", "running"])).and(partition === null ? i.partition.isNull() : i.partition.eq(partition)))
       .count();
   }
 
@@ -255,6 +257,7 @@ export class WorkflowEngine {
       processKey: graph.processKey,
       version: graph.version,
       partition: options.partition,
+      test: options.test === true,
       input: options.input,
       vars: initialVarsOf(graph.document),
       event: options.event?.payload ?? null,
@@ -928,12 +931,22 @@ export class WorkflowEngine {
 
   /** Events go out after the commit, so a handler never sees a step that rolled back. */
   private publishAfter(transaction: { afterCommit(callback: () => void | Promise<void>): void }, step: Step): void {
-    if (step.events.length === 0) return;
-    const events = [...step.events];
+    const events = step.instance.test ? trialEvents(step) : [...step.events];
+    if (events.length === 0) return;
     transaction.afterCommit(async () => {
       for (const { event, payload } of events) await this.events.publish(event, payload);
     });
   }
+}
+
+/** What a trial run tells: only what its tasks need, and they go to who started it. */
+function trialEvents(step: Step): PendingEvent[] {
+  const { instance } = step;
+  return step.events.flatMap(({ event, payload }): PendingEvent[] => {
+    if (event === (WORKFLOW_TOKEN_CLOSED as EventToken<unknown>)) return [{ event: WORKFLOW_TRIAL_TOKEN_CLOSED as EventToken<unknown>, payload }];
+    if (event !== (WORKFLOW_TASK_REQUESTED as EventToken<unknown>)) return [];
+    return [{ event: WORKFLOW_TRIAL_TASK_REQUESTED as EventToken<unknown>, payload: { ...(payload as object), assignee: { user: instance.startedById } } }];
+  });
 }
 
 /** When a timer fires: `duration` from now, or the date at the `at` path; `undefined` if neither is valid. */

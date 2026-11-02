@@ -19,6 +19,7 @@ do what is the data of `defineRoles`.
 | Roles → permissions | `modules/App.module.ts` |
 | The audit log: the framework's events, kept by the application | `modules/audit/events/AuditLog.ts` |
 | Who makes the request (a JWT) | `auth/signedIn.ts` |
+| A trial run that changes nothing | `test/orderApproval.test.ts` |
 | Tests: the process on a stopped clock, the rights over HTTP | `test/` |
 
 ## Run

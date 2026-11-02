@@ -6,6 +6,7 @@ import { DefaultWorkflowExtensions, WorkflowExtensions } from "../contracts/Work
 import { DefaultWorkflowPartitions, WorkflowPartitions } from "../contracts/WorkflowPartitions";
 import { WorkflowEvents } from "../internal/WorkflowEvents";
 import { WorkflowLanguages } from "../internal/WorkflowLanguages";
+import { WorkflowReferences } from "../internal/WorkflowReferences";
 import { WorkflowTools } from "../internal/WorkflowTools";
 import { definitionsPermissions } from "./access/Definitions.permissions";
 import { FolderReferences } from "./access/Folder.references";
@@ -42,6 +43,7 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     singleton(WorkflowExtensions, DefaultWorkflowExtensions),
     singleton(WorkflowPartitions, DefaultWorkflowPartitions),
     scoped(WorkflowEvents),
+    scoped(WorkflowReferences),
     scoped(CatalogImport),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
     scoped(ProcessReferences),
@@ -51,6 +53,6 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     singleton(HOSTED_SERVICE, CodeProcessPublisher),
   ],
   controllers: [ProcessesController],
-  exports: [IWorkflowDefinitions, WorkflowTools, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowExtensions, WorkflowPartitions, ProcessFolderLookup],
+  exports: [IWorkflowDefinitions, WorkflowReferences, WorkflowTools, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowExtensions, WorkflowPartitions, ProcessFolderLookup],
 })
 export class WorkflowDefinitionsModule {}

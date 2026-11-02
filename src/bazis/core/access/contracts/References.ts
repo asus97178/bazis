@@ -25,6 +25,8 @@ export interface ReferenceItem {
 export interface ReferenceContext {
   readonly scope: Scope;
   readonly language?: string;
+  /** The area the ids are looked for in: the fields of one table. A kind without areas ignores it. */
+  readonly within?: string;
 }
 
 export interface ReferencePage {

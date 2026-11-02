@@ -2,7 +2,7 @@ import { grantsToWhere } from "../../../access";
 import { createHash } from "node:crypto";
 import { paginate, UniqueViolationError } from "../../../orm";
 import type { AgentToolContract } from "../../../agent";
-import { allTexts, checkLocalizedText, emptyProcess, hasErrors, processPalette, validateProcess, type LocalizedText, type ProcessDocument, type ProcessIssue, type ProcessPalette } from "../../../../library/workflow";
+import { allTexts, checkLocalizedText, emptyProcess, hasErrors, processPalette, validateProcess, type DocumentReference, type LocalizedText, type ProcessDocument, type ProcessIssue, type ProcessPalette } from "../../../../library/workflow";
 import type { ServiceProvider } from "../../../di";
 import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowAuditOptions, type WorkflowPage } from "../../contracts/types";
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
@@ -13,6 +13,7 @@ import { WorkflowProcessUsage } from "../../contracts/WorkflowProcessUsage";
 import { canonicalJson } from "../../internal/canonicalJson";
 import type { WorkflowEvents } from "../../internal/WorkflowEvents";
 import type { WorkflowLanguages } from "../../internal/WorkflowLanguages";
+import type { WorkflowReferences } from "../../internal/WorkflowReferences";
 import type { WorkflowTools } from "../../internal/WorkflowTools";
 import type { CodeProcessCatalog } from "../code/CodeProcessCatalog";
 import type { OwnedCodeProcess } from "../code/codeProcesses";
@@ -25,6 +26,8 @@ import {
   type CreateProcess,
   type ProcessDetails,
   type ProcessListQuery,
+  type ProcessReference,
+  type ProcessReferenceQuery,
   type ProcessSummary,
   type SavedDraft,
   type SaveDraftOptions,
@@ -48,6 +51,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     private readonly clock: WorkflowClock,
     private readonly events: WorkflowEvents,
     private readonly languages: WorkflowLanguages,
+    private readonly references: WorkflowReferences,
     /** The scope: the port is asked here, so that the application's own registration replaces the default. */
     private readonly services: ServiceProvider,
   ) {
@@ -100,7 +104,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     const published = await this.db.processes.asNoTracking().where((p) => p.archivedAt.isNull().and(p.latestVersion.isNotNull())).select((p) => ({ key: p.key })).toList();
     const processes = new Set([...published.map((row) => row.key), ...options.processes ?? []]);
     const issues = validateProcess(document, { tools: (name) => this.workflowTools.has(name), processes: (key) => processes.has(key), extensions: (namespace) => namespaces.has(namespace) });
-    if (namespaces.size === 0 || issues.some((issue) => issue.code === "too_large" || issue.code === "schema")) return issues;
+    if (issues.some((issue) => issue.code === "too_large" || issue.code === "schema")) return issues;
     const context: WorkflowPortContext = { partition: null, language: options.language ?? this.languages.default, actor: options.actor ?? null };
     const found: ProcessIssue[] = [...issues];
     const { extensions, variables, nodes } = document as ProcessDocument;
@@ -111,9 +115,52 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
         for (const message of await port.check(namespace, value, target, context)) found.push({ severity: "error", code: "extension_invalid", message: `${namespace}: ${message}`, ...target });
       }
     };
-    await checkAll(extensions, {});
-    if (Array.isArray(variables)) for (const variable of variables) await checkAll(variable?.extensions, { variable: variable?.name });
-    for (const [node, raw] of Object.entries(nodes)) await checkAll(raw?.extensions, { node });
+    if (namespaces.size > 0) {
+      await checkAll(extensions, {});
+      if (Array.isArray(variables)) for (const variable of variables) await checkAll(variable?.extensions, { variable: variable?.name });
+      for (const [node, raw] of Object.entries(nodes)) await checkAll(raw?.extensions, { node });
+    }
+    found.push(...await this.brokenReferences(document as ProcessDocument, context.language));
+    return found;
+  }
+
+  /** The literal references no owner knows. The processes a document calls are told above as `unknown_process`. */
+  private async brokenReferences(document: ProcessDocument, language: string): Promise<ProcessIssue[]> {
+    let references: DocumentReference[];
+    try {
+      references = this.references.of(document);
+    } catch {
+      // A document that is not whole yet: its shape has been told above.
+      return [];
+    }
+    const missing = await this.references.missing(references.filter((reference) => reference.kind !== "workflow.process"), { scope: null, language });
+    return missing.map((reference) => ({
+      severity: "error" as const,
+      code: "broken_ref" as const,
+      message: this.references.owned(reference.kind)
+        ? `${reference.kind} ${JSON.stringify(reference.id)}${reference.within === undefined ? "" : ` in ${reference.within}`} does not exist`
+        : `no module owns the reference kind ${reference.kind}`,
+      ...(reference.node === undefined ? {} : { node: reference.node }),
+      ...(reference.variable === undefined ? {} : { variable: reference.variable }),
+    }));
+  }
+
+  async referencing(reference: ProcessReferenceQuery): Promise<readonly ProcessReference[]> {
+    const found: ProcessReference[] = [];
+    for (const version of await this.published()) {
+      for (const item of this.references.of(version.document)) {
+        if (item.kind !== reference.kind || item.id !== reference.id) continue;
+        if (reference.within !== undefined && item.within !== reference.within) continue;
+        found.push({
+          processKey: version.key,
+          version: version.version,
+          path: item.path,
+          ...(item.node === undefined ? {} : { node: item.node }),
+          ...(item.variable === undefined ? {} : { variable: item.variable }),
+          ...(item.within === undefined ? {} : { within: item.within }),
+        });
+      }
+    }
     return found;
   }
 
@@ -199,12 +246,15 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
   }
 
   async publish(key: string, actor: WorkflowActor, options: WorkflowAuditOptions & Pick<ValidateOptions, "language"> = {}): Promise<VersionDetails> {
+    // Before the transaction: the owners of references and the ports read their own contexts.
+    const draft = await this.process(key, false);
+    const issues = await this.validate(draft.draft, { actor, processes: [key], ...(options.language === undefined ? {} : { language: options.language }) });
     return await this.db.transactionScope(async (transaction) => {
       const row = await this.db.processes.where((p) => p.key.eq(key)).forUpdate().firstOrDefault();
       if (!row) throw notFound(key);
       this.assertNotCode(key);
       if (row.archivedAt !== null) throw new WorkflowError("archived", `Process ${key} is archived`);
-      const issues = await this.validate(row.draft, { actor, processes: [key], ...(options.language === undefined ? {} : { language: options.language }) });
+      if (canonicalJson(row.draft) !== canonicalJson(draft.draft)) throw new WorkflowError("conflict", `The draft of ${key} was saved while it was being published`);
       if (hasErrors(issues)) throw new WorkflowError("invalid_document", `Process ${key} has errors and cannot be published`, issues);
       const { version, created } = await this.publishDraft(row, actor);
       if (created) transaction.afterCommit(() => this.changed("published", key, actor, options, version.version));

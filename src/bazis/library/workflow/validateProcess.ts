@@ -33,6 +33,7 @@ export type ProcessIssueCode =
   | "config_invalid"
   | "unknown_tool"
   | "unknown_process"
+  | "broken_ref"
   | "container_invalid"
   | "flow_across_container"
   | "loop_body"

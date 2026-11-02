@@ -155,3 +155,17 @@ test.skipIf(!enabled)("big orders of one customer make one alert about the last 
     expect([small, first]).not.toContain(about);
   });
 });
+
+test.skipIf(!enabled)("a trial of the approval changes no order and asks only who started it", async () => {
+  await run(async (wf, place, status) => {
+    const id = await place(5000);
+    await wf.drain();
+    const trial = await wf.start("order-approval", { test: true, input: { orderId: id, amount: 100 }, actor: { kind: "user", id: "ann" } });
+    await wf.drain();
+    const done = await wf.instance(trial.id);
+    expect(done).toMatchObject({ status: "completed", test: true });
+    // The small order would be approved at once: the step did not run, and the order is as it was.
+    expect((await wf.history(trial.id)).filter((entry) => entry.type === "tool").map((entry) => entry.data?.dryRun)).toEqual(["not called"]);
+    expect(await status(id)).toBe("new");
+  });
+});

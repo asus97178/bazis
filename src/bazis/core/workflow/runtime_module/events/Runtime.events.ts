@@ -68,3 +68,10 @@ export const WORKFLOW_INSTANCES_DELETED = createEventToken<WorkflowInstancesDele
 export const WORKFLOW_INSTANCE_STARTED = createEventToken<WorkflowInstanceStarted>("workflow.instance-started");
 export const WORKFLOW_INSTANCE_CANCELLED = createEventToken<WorkflowInstanceCancelled>("workflow.instance-cancelled");
 export const WORKFLOW_INSTANCE_RETRIED = createEventToken<WorkflowInstanceRetried>("workflow.instance-retried");
+
+/**
+ * Only for the part with the tasks: a trial run publishes nothing to the
+ * application, but its tasks still come and go (WORKFLOW-002 §5.4).
+ */
+export const WORKFLOW_TRIAL_TASK_REQUESTED = createEventToken<WorkflowTaskRequested>("workflow.trial-task-requested");
+export const WORKFLOW_TRIAL_TOKEN_CLOSED = createEventToken<WorkflowTokenClosed>("workflow.trial-token-closed");

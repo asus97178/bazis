@@ -1,6 +1,6 @@
 import { expandModuleMetadata, type BazisModuleRef } from "../../../di";
-import { toolMetadataOf } from "../../../agent";
-import { validateProcess } from "../../../../library/workflow";
+import { describeTool, toolMetadataOf } from "../../../agent";
+import { documentReferences, schemaReferenceKinds, validateProcess } from "../../../../library/workflow";
 import { WORKFLOW_CALLER } from "../../internal/WorkflowTools";
 import { WorkflowDefinitionsModule } from "../WorkflowDefinitions.module";
 import { definitionProblems, type OwnedCodeProcess } from "./codeProcesses";
@@ -28,16 +28,23 @@ export function inspectProcesses(root: BazisModuleRef): ProcessInspection {
   const found: OwnedCodeProcess[] = [];
   const errors: string[] = [];
   const tools = new Set<string>();
+  const schemas = new Map<string, unknown>();
+  const kinds = new Set<string>();
   const visited = new Set<BazisModuleRef>();
   const visit = (moduleRef: BazisModuleRef): void => {
     if (visited.has(moduleRef)) return;
     visited.add(moduleRef);
     const module = typeof moduleRef === "function" ? moduleRef.name || "<anonymous module>" : "<module>";
-    const fields = moduleRef as { readonly processes?: unknown; readonly tools?: unknown };
+    const fields = moduleRef as { readonly processes?: unknown; readonly tools?: unknown; readonly references?: unknown };
+    if (typeof fields.references === "object" && fields.references !== null) for (const kind of Object.keys(fields.references)) kinds.add(kind);
     if (Array.isArray(fields.tools)) {
       for (const target of fields.tools) {
         const metadata = typeof target === "function" ? toolMetadataOf(target as new () => object) : undefined;
-        if (metadata?.callers.includes(WORKFLOW_CALLER)) tools.add(metadata.name);
+        if (metadata?.callers.includes(WORKFLOW_CALLER)) {
+          tools.add(metadata.name);
+          const input = describeTool({ target: target as new () => object, metadata }).input;
+          if (input?.kind === "json-schema") schemas.set(metadata.name, input.schema);
+        }
       }
     }
     if (fields.processes !== undefined) {
@@ -53,6 +60,10 @@ export function inspectProcesses(root: BazisModuleRef): ProcessInspection {
   visit(root);
   if (found.length > 0 && !visited.has(WorkflowDefinitionsModule)) {
     errors.push(`${found[0]!.module} declares processes, but the application does not import WorkflowModule (bazis/core/workflow).`);
+  }
+  // The values live in the database: `check` knows only whether someone owns their kind.
+  for (const [tool, schema] of schemas) {
+    for (const kind of schemaReferenceKinds(schema)) if (!kinds.has(kind)) errors.push(`Tool ${tool} refers to the kind ${kind}, and no module owns it.`);
   }
   const owners = new Map<string, string>();
   for (const { process, module } of found) {

@@ -2,6 +2,7 @@
 // Do not edit manually.
 import { registerFrameworkClassDeps } from "../../di/module/autoDeps";
 import { DbContextOptions } from "../../../library/orm/DbContextOptions";
+import { IAccessCatalog } from "../../access/catalog/IAccessCatalog.service";
 import { ServiceProvider } from "../../di/ServiceProvider";
 import { EventBus } from "../../kernel/events/EventBus";
 import { WorkflowClock } from "../contracts/WorkflowClock";
@@ -18,6 +19,7 @@ import { IWorkflowDefinitions } from "../definitions_module/services/IWorkflowDe
 import { WorkflowDefinitions } from "../definitions_module/services/WorkflowDefinitions.service";
 import { WorkflowEvents } from "../internal/WorkflowEvents";
 import { WorkflowLanguages } from "../internal/WorkflowLanguages";
+import { WorkflowReferences } from "../internal/WorkflowReferences";
 import { WorkflowTools } from "../internal/WorkflowTools";
 import { WorkflowRetention } from "../runtime_module/background/WorkflowRetention";
 import { WorkflowWorker } from "../runtime_module/background/WorkflowWorker";
@@ -63,11 +65,12 @@ registerFrameworkClassDeps([
   [TasksController, [IWorkflowTasks]],
   [TasksDbContext, [DbContextOptions]],
   [TimerStep, [RuntimeDbContext, WorkflowEngine]],
-  [ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools]],
-  [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents, WorkflowLanguages, ServiceProvider]],
+  [ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools, WorkflowReferences, WorkflowLanguages]],
+  [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowReferences, ServiceProvider]],
   [WorkflowEngine, [RuntimeDbContext, IWorkflowDefinitions, GraphCache, WorkflowEvents, WorkflowClock]],
   [WorkflowEvents, [EventBus, ServiceProvider, "optional:Logger"]],
   [WorkflowLanguages, ["Config:workflow"]],
+  [WorkflowReferences, [IAccessCatalog, WorkflowTools, ServiceProvider]],
   [WorkflowRetention, [ServiceProvider, "Config:workflow"]],
   [WorkflowRuntime, [RuntimeDbContext, WorkflowEngine, EventDelivery, IWorkflowDefinitions, ServiceProvider, WorkflowLanguages]],
   [WorkflowTasks, [TasksDbContext, IWorkflowRuntime, WorkflowClock, WorkflowEvents]],

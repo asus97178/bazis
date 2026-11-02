@@ -92,6 +92,24 @@ export interface SavedDraft {
   readonly draftUpdatedAt: Date;
 }
 
+export interface ProcessReferenceQuery {
+  readonly kind: string;
+  readonly id: string;
+  /** The area of the value: the table of a field. Without it any area goes. */
+  readonly within?: string;
+}
+
+/** A process that refers to a value, and where. */
+export interface ProcessReference {
+  readonly processKey: string;
+  readonly version: number;
+  readonly node?: string;
+  readonly variable?: string;
+  readonly within?: string;
+  /** Where in the input of the step: `/values/status`. */
+  readonly path: string;
+}
+
 /**
  * The process catalog: drafts and immutable published versions
  * (WORKFLOW-001 §3). Errors are {@link WorkflowError}: `not_found`, `conflict`,
@@ -132,6 +150,11 @@ export abstract class IWorkflowDefinitions {
   abstract published(): Promise<readonly VersionDetails[]>;
   /** A version by id, for the engine; `undefined` if there is none. */
   abstract versionById(id: string): Promise<VersionDetails | undefined>;
+  /**
+   * Who refers to a value (WORKFLOW-002 §6.3), by the latest published versions: the
+   * application forbids or warns before it removes a field or a table.
+   */
+  abstract referencing(reference: ProcessReferenceQuery): Promise<readonly ProcessReference[]>;
   /** Processes with a retention period: what the retention service deletes. */
   abstract retentionPolicies(): Promise<readonly { readonly key: string; readonly retentionDays: number }[]>;
   /** The Tools a service task may call, with their input and output schemas. */

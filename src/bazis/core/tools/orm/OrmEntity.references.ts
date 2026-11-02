@@ -46,7 +46,7 @@ export class OrmEntityReferences extends References {
   }
 }
 
-/** Reference kind `orm.field`: a field open to processes, `Order.status`. */
+/** Reference kind `orm.field`: a field open to processes, `Order.status`, or `status` within `Order`. */
 export class OrmFieldReferences extends References {
   constructor(private readonly services: ServiceProvider) {
     super();
@@ -56,16 +56,20 @@ export class OrmFieldReferences extends References {
     return opened(this.services).flatMap((item) => item.fields.map((field) => `${item.entity}.${field}`));
   }
 
-  async exists(ids: readonly string[]): Promise<ReadonlySet<string>> {
+  async exists(ids: readonly string[], context: ReferenceContext): Promise<ReadonlySet<string>> {
     const known = new Set(this.ids());
-    return new Set(ids.filter((id) => known.has(id)));
+    const { within } = context;
+    return new Set(ids.filter((id) => known.has(within === undefined ? id : `${within}.${id}`)));
   }
 
-  async describe(ids: readonly string[]): Promise<readonly ReferenceItem[]> {
-    return [...await this.exists(ids)].map((id) => ({ id, title: id }));
+  async describe(ids: readonly string[], context: ReferenceContext): Promise<readonly ReferenceItem[]> {
+    return [...await this.exists(ids, context)].map((id) => ({ id, title: id }));
   }
 
-  async search(text: string, _context: ReferenceContext, range: ReferencePage): Promise<readonly ReferenceItem[]> {
-    return page(this.ids(), text, range);
+  async search(text: string, context: ReferenceContext, range: ReferencePage): Promise<readonly ReferenceItem[]> {
+    const { within } = context;
+    if (within === undefined) return page(this.ids(), text, range);
+    const prefix = `${within}.`;
+    return page(this.ids().filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length)), text, range);
   }
 }

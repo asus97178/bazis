@@ -3,6 +3,7 @@ import { Module, scoped } from "bazis/core/di";
 import { ormEntityTools, StandardToolsModule } from "bazis/core/tools";
 import { WorkflowRuntimeModule } from "bazis/core/workflow";
 import { orderPermissions } from "./access/Order.permissions";
+import { OrderReferences } from "./access/Order.references";
 import { OrderController } from "./http/Order.controller";
 import { OrderDbContext } from "./model/Order.dbContext";
 import { Order } from "./model/Order.model";
@@ -22,11 +23,13 @@ import { SetOrderStatusTool } from "./tools/SetOrderStatus.tool";
     migrateOnStart: true,
   },
   permissions: orderPermissions,
+  references: { "orders.order": OrderReferences },
   processes: [orderApproval, orderBatch, orderDigest, bigOrderAlert],
   tools: [SetOrderStatusTool, ...ormEntityTools(Order, { context: OrderDbContext, ops: ["find"], fields: ["status", "amount"] })],
   controllers: [OrderController],
   providers: [
     scoped(IOrderService, OrderService),
+    scoped(OrderReferences),
   ],
   exports: [IOrderService],
 })
