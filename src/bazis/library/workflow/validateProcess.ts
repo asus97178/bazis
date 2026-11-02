@@ -451,6 +451,18 @@ function configExpressionProblems(kind: string, config: Json, scope: ExpressionS
     const problem = checkExpression(config.over, scope);
     if (problem) out.push(`config.over: ${problem}`);
   }
+  if (kind === "eventWait" && config.until !== undefined) {
+    const problem = checkExpression(config.until, scope);
+    if (problem) out.push(`config.until: ${problem}`);
+  }
+  if (kind === "eventStart") {
+    // Before an instance exists there is only the event: nothing to read in the input, variables and steps.
+    const before: ExpressionScope = { input: new Set(), vars: new Set(), nodes: new Set(), loop: false };
+    const filter = config.filter === undefined ? null : checkExpression(config.filter, before);
+    if (filter) out.push(`config.filter: ${filter}`);
+    const debounceKey = isObject(config.debounce) ? checkExpression(config.debounce.key, before) : null;
+    if (debounceKey) out.push(`config.debounce.key: ${debounceKey}`);
+  }
   for (const key of ["at", "correlation"]) {
     if (typeof config[key] === "string") {
       const problem = checkPath(config[key], scope);

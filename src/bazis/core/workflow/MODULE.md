@@ -1,7 +1,7 @@
 # WorkflowModule
 
-Passport version: 1.1. Check date: 2026-11-01.
-Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md) and stages 0–2 of [WORKFLOW-002](../../../../docs/architecture/WORKFLOW_BUILDER.md); checks below.
+Passport version: 1.2. Check date: 2026-11-03.
+Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md) and stages 0–4 of [WORKFLOW-002](../../../../docs/architecture/WORKFLOW_BUILDER.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.
@@ -36,6 +36,8 @@ document functions in `library/workflow`.
 Shared contracts of the pack (no providers): `contracts/WorkflowError.ts`,
 `contracts/WorkflowInputValidator.ts` (field check port),
 `contracts/WorkflowExtensions.ts` (check of the application's `extensions`),
+`contracts/WorkflowPartitions.ts` (where a process works), `contracts/WorkflowProcessUsage.ts`
+(what the catalog asks Runtime before deleting a process),
 `contracts/Workflow.config.ts` (settings, declared by Definitions),
 `contracts/WorkflowClock.ts` (the engine's time; registered by Definitions),
 `contracts/types.ts`; internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.

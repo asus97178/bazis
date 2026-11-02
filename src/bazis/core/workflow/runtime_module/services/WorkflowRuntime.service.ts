@@ -1,16 +1,18 @@
 import { grantsToWhere } from "../../../access";
-import { paginate } from "../../../orm";
-import { inputSpecOf, type FormIssue, type FormSpec } from "../../../../library/workflow";
+import { paginate, type OrmTransaction } from "../../../orm";
+import { inputSpecOf, type FormSpec } from "../../../../library/workflow";
 import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowPage } from "../../contracts/types";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import type { ServiceProvider } from "../../../di";
 import { WorkflowInputValidator } from "../../contracts/WorkflowInputValidator";
 import type { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import type { WorkflowLanguages } from "../../internal/WorkflowLanguages";
+import type { EventDelivery, EventMessage } from "../internal/EventDelivery";
 import type { WorkflowEngine } from "../internal/WorkflowEngine";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfHistory } from "../model/WfHistory.model";
 import type { WfInstance } from "../model/WfInstance.model";
+import { WfJob } from "../model/WfJob.model";
 import type { WfToken } from "../model/WfToken.model";
 import {
   IWorkflowRuntime,
@@ -35,6 +37,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
   constructor(
     private readonly db: RuntimeDbContext,
     private readonly engine: WorkflowEngine,
+    private readonly delivery: EventDelivery,
     private readonly definitions: IWorkflowDefinitions,
     /** The scope: the input validator is asked here, so that the application's own registration replaces the default. */
     private readonly services: ServiceProvider,
@@ -135,45 +138,14 @@ export class WorkflowRuntime extends IWorkflowRuntime {
   }
 
   async emit(eventKey: string, payload: unknown = {}, options: EmitOptions = {}): Promise<EmitResult> {
-    if (typeof eventKey !== "string" || !EVENT_KEY.test(eventKey)) throw new WorkflowError("invalid_input", "eventKey must look like payments.received");
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) throw new WorkflowError("invalid_input", "payload must be a JSON object");
-    const data = payload as Record<string, unknown>;
-    const correlation = optionalText(options.correlation, "correlation");
-    const partition = optionalText(options.partition, "partition");
-    const actor = options.actor ?? { kind: "system" as const, id: `event:${eventKey}` };
-    actorOf(actor);
+    return await this.delivery.emit(messageOf(eventKey, payload, options));
+  }
 
-    let waits = this.db.subscriptions.asNoTracking().where((s) => s.eventKey.eq(eventKey));
-    waits = correlation === null ? waits.where((s) => s.correlation.isNull()) : waits.where((s) => s.correlation.isNull().or(s.correlation.eq(correlation)));
-    if (partition !== null) waits = waits.where((s) => s.partition.eq(partition));
-    const continued = new Set<string>();
-    for (const wait of await waits.orderBy((s) => s.id).toList()) {
-      const moved = await this.engine.inStep(wait.instanceId, async (step) => {
-        await this.db.subscriptions.asNoTracking().where((s) => s.id.eq(wait.id)).executeDelete();
-        return await this.engine.eventReceived(step, wait.tokenId, eventKey, data);
-      });
-      if (moved === true) continued.add(wait.instanceId);
-    }
-
-    const started: string[] = [];
-    const skipped: { processKey: string; instanceId: string }[] = [];
-    const rejected: { processKey: string; issues: readonly FormIssue[] }[] = [];
-    for (const version of await this.definitions.published()) {
-      for (const [nodeId, node] of Object.entries(version.document.nodes)) {
-        if (node.kind !== "eventStart" || node.config?.event !== eventKey) continue;
-        // An event carries more than a process needs: fields the input does not declare are dropped, not refused.
-        const { value, issues: all } = await this.validator().validate(inputSpecOf(version.document), data, { purpose: "input", processKey: version.key, partition, language: this.languages.default, actor });
-        const issues = all.filter((issue) => issue.code !== "unknown");
-        if (issues.length > 0) {
-          rejected.push({ processKey: version.key, issues });
-          continue;
-        }
-        const begun = await this.engine.begin(this.engine.cache(version), nodeId, { input: value, partition, businessKey: correlation, startedVia: "event", actor, request: options.request ?? null, event: { key: eventKey, payload: data } });
-        if (begun.skipped) skipped.push({ processKey: version.key, instanceId: begun.id });
-        else started.push(begun.id);
-      }
-    }
-    return { started, skipped, continued: [...continued], rejected };
+  async emitLater(tx: OrmTransaction, eventKey: string, payload: unknown = {}, options: EmitOptions = {}): Promise<void> {
+    const message = messageOf(eventKey, payload, options);
+    const now = this.engine.now();
+    const job = Object.assign(new WfJob(), { id: Bun.randomUUIDv7(), kind: "event" as const, partition: message.partition, dueAt: now, payload: message, createdAt: now });
+    await tx.use(this.db, (db) => db.jobs.insertIfAbsent(job, { conflictBy: (j) => [j.id] }));
   }
 
   async instances(query: InstanceListQuery = {}): Promise<WorkflowPage<InstanceSummary>> {
@@ -212,6 +184,23 @@ export class WorkflowRuntime extends IWorkflowRuntime {
   private validator(): WorkflowInputValidator {
     return this.services.resolve(WorkflowInputValidator);
   }
+}
+
+/** An event as the delivery takes it; what cannot be delivered is refused here. */
+function messageOf(eventKey: string, payload: unknown, options: EmitOptions): EventMessage {
+  if (typeof eventKey !== "string" || !EVENT_KEY.test(eventKey)) throw new WorkflowError("invalid_input", "eventKey must look like payments.received");
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) throw new WorkflowError("invalid_input", "payload must be a JSON object");
+  const actor = options.actor ?? { kind: "system" as const, id: `event:${eventKey}` };
+  actorOf(actor);
+  return {
+    eventKey,
+    payload: payload as Record<string, unknown>,
+    correlation: optionalText(options.correlation, "correlation"),
+    partition: optionalText(options.partition, "partition"),
+    actor,
+    request: options.request ?? null,
+    cause: options.cause ?? null,
+  };
 }
 
 function notFound(instanceId: string): WorkflowError {

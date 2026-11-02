@@ -11,6 +11,9 @@ do what is the data of `defineRoles`.
 | Variables, an `assign` step, expressions, titles in two languages, a folder | the same process |
 | A loop over orders, a process that calls another, `runAs`, `runTimeout` | `modules/order/process/OrderBatch.process.ts` |
 | A second start for the same order does not begin: `sameKey` | `modules/order/process/OrderApproval.process.ts` |
+| A schedule on Moscow time that skips a firing while the last run goes on | `modules/order/process/OrderDigest.process.ts` |
+| A step made from the entity: `ormEntityTools` | `modules/order/Order.module.ts` |
+| A start by an event: `filter`, `debounce`; the event written with the order: `emitLater` | `modules/order/process/BigOrderAlert.process.ts`, `modules/order/services/Order.service.ts` |
 | A step: the module's own operation | `modules/order/tools/SetOrderStatus.tool.ts` |
 | What the module lets an administrator allow | `modules/order/access/Order.permissions.ts` |
 | Roles → permissions | `modules/App.module.ts` |

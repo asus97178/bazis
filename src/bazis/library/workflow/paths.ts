@@ -10,7 +10,7 @@ export interface InstanceData {
   readonly nodes: Readonly<Record<string, unknown>>;
   /** The data of the event that started or continued the process. */
   readonly event?: unknown;
-  /** How it was started: `{ via, at, actor, eventKey?, cause? }`. */
+  /** How it was started: `{ via, at, actor, eventKey?, cause?, scheduledAt? }`. */
   readonly trigger?: unknown;
   /** `{ id, processKey, version, partition, test }`. */
   readonly run?: unknown;
@@ -31,7 +31,7 @@ export const DATA_PATHS: readonly { readonly path: string; readonly description:
   { path: "$vars.<name>", description: "A variable of the process" },
   { path: "$nodes.<node>.<field>", description: "The result of a passed step" },
   { path: "$event", description: "The data of the event that started or continued the process" },
-  { path: "$trigger", description: "How it was started: { via, at, actor, eventKey?, cause? }" },
+  { path: "$trigger", description: "How it was started: { via, at, actor, eventKey?, cause?, scheduledAt? }" },
   { path: "$run", description: "This run: { id, processKey, version, partition, test }" },
   { path: "$now", description: "The engine's time" },
   { path: "$item", description: "Inside a loop body: the element of this iteration" },

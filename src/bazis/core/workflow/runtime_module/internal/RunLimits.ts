@@ -3,12 +3,12 @@ import { WorkflowError } from "../../contracts/WorkflowError";
 import type { IWorkflowDefinitions, VersionDetails } from "../../definitions_module/services/IWorkflowDefinitions.service";
 import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
-import type { WorkflowEngine } from "./WorkflowEngine";
+import { queuesSchedule, type WorkflowEngine } from "./WorkflowEngine";
 
 /** How many waiting instances of a process one pass looks at. */
 const RELEASE_BATCH = 1000;
 
-/** What a whole run is limited by and what follows its failure: `runTimeout`, `maxConcurrent`, `sameKey: "queue"`, `errorHandler`. */
+/** What a whole run is limited by and what follows its failure: `runTimeout`, `maxConcurrent`, `sameKey: "queue"`, `overlap: "queue"`, `errorHandler`. */
 export class RunLimits {
   constructor(
     private readonly db: RuntimeDbContext,
@@ -47,9 +47,11 @@ export class RunLimits {
       await this.engine.lockProcess(processKey);
       let running = await this.engine.runningOf(processKey);
       for (const row of waiting) {
-        const { maxConcurrent, sameKey } = graphs.get(row.id)!.document.settings ?? {};
+        const { document } = graphs.get(row.id)!;
+        const { maxConcurrent, sameKey } = document.settings ?? {};
         if (maxConcurrent !== undefined && running >= maxConcurrent) continue;
         if (sameKey === "queue" && row.businessKey !== null && await this.keyTaken(processKey, row.businessKey, row.id)) continue;
+        if (row.startedVia === "schedule" && queuesSchedule(document) && await this.scheduleTaken(processKey, row.partition, row.id)) continue;
         const released = await this.engine.inStep(row.id, async (step) => {
           if (step.instance.status !== "pending") return false;
           await this.engine.release(step);
@@ -64,6 +66,14 @@ export class RunLimits {
   private async keyTaken(processKey: string, businessKey: string, id: string): Promise<boolean> {
     const same = await this.db.instances.asNoTracking()
       .where((i) => i.processKey.eq(processKey).and(i.businessKey.eq(businessKey)).and(i.status.in(["pending", "running", "failed"])).and(i.id.lt(id)))
+      .count();
+    return same > 0;
+  }
+
+  /** Whether a scheduled run of the partition goes on, or waits since before this one. */
+  private async scheduleTaken(processKey: string, partition: string | null, id: string): Promise<boolean> {
+    const same = await this.db.instances.asNoTracking()
+      .where((i) => i.processKey.eq(processKey).and(i.startedVia.eq("schedule")).and(partition === null ? i.partition.isNull() : i.partition.eq(partition)).and(i.status.eq("running").or(i.status.eq("pending").and(i.id.lt(id)))))
       .count();
     return same > 0;
   }

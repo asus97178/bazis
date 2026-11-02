@@ -4,6 +4,7 @@ import { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
 import { ChildCalls } from "./ChildCalls";
 import { RunLimits } from "./RunLimits";
+import { EventDelivery } from "./EventDelivery";
 import { Schedules } from "./Schedules";
 import { TimerStep } from "./TimerStep";
 import { LEASE_MS, ToolStep } from "./ToolStep";
@@ -80,6 +81,12 @@ export class WorkflowJobs {
           break;
         case "errorHandler":
           await scope.resolve(RunLimits).errorHandler(job);
+          break;
+        case "event":
+          await scope.resolve(EventDelivery).deliverLater(job);
+          break;
+        case "eventStart":
+          await scope.resolve(EventDelivery).startLater(job);
           break;
         default:
           await scope.resolve(ToolStep).run(job, signal);

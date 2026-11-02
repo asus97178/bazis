@@ -1,16 +1,18 @@
 import { definePermissions } from "../../../access";
+import { ProcessPartitionLookup } from "./ProcessPartition.lookup";
 
 const process = { ref: "workflow.process", column: "key" };
 const folder = { ref: "workflow.folder", column: "folder" };
 
 /**
  * The rights of the process catalog (WORKFLOW-002 §6.2). A process is one per
- * application, so these have no partition until `WorkflowPartitions` connects
- * processes to partitions (stage 4).
+ * application: only reading it has partitions, those `WorkflowPartitions`
+ * connects it to.
  */
 export const definitionsPermissions = definePermissions({
   "workflow.processes.read": {
     title: { en: "See processes", ru: "Видеть процессы" },
+    scope: { lookup: ProcessPartitionLookup },
     on: { process, folder },
   },
   "workflow.processes.manage": {

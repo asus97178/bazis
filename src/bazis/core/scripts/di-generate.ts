@@ -1086,6 +1086,13 @@ function collectProviderFormErrors(source: ts.SourceFile): void {
     }
     fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: providers of ${module}: "${text(element)}" is not an agreed registration. A computed service is a class with a constructor: scoped(IService, Service). Agreed forms: ${AGREED_PROVIDERS}.`);
   };
+  /** Tools made from an entity: they are classes too, and carry their own wiring. */
+  const isOrmEntityTools = (element: ts.Expression): boolean => {
+    if (!ts.isSpreadElement(element)) return false;
+    const call = resolved(element.expression, ts.isCallExpression);
+    const target = call && callee(call);
+    return target?.name === "ormEntityTools" && target.file?.endsWith("/core/tools/orm/ormEntityTools.ts") === true;
+  };
   const checkModule = (module: string, argument: ts.Expression | undefined): void => {
     const object = argument && resolved(argument, ts.isObjectLiteralExpression);
     if (!object) return;
@@ -1100,6 +1107,7 @@ function collectProviderFormErrors(source: ts.SourceFile): void {
       }
       for (const element of list.elements) {
         if (field === "providers") checkProvider(module, element);
+        else if (field === "tools" && isOrmEntityTools(element)) continue;
         else if (!ts.isIdentifier(element) && !ts.isPropertyAccessExpression(element)) {
           fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: ${field} of ${module}: "${text(element)}" — list the class itself; its constructor dependencies come from codegen.`);
         }

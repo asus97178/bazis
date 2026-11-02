@@ -60,6 +60,8 @@ export interface AgentToolExecutionContext {
   readonly approval: AgentToolExecutionApproval;
   /** On whose behalf the call runs, when the caller says so. */
   readonly actor?: ToolActor;
+  /** A trial: the Tool, one with `dryRun: "supported"`, changes nothing (WORKFLOW-002 §5.4). */
+  readonly dryRun?: boolean;
   readonly metadata: JsonObject;
   readonly signal: AbortSignal;
 }
@@ -135,6 +137,8 @@ export interface AgentToolExecutionOptions {
   readonly caller?: string;
   /** On whose behalf the call runs; reaches the approval policy and the audit. */
   readonly actor?: ToolActor;
+  /** Tells the Tool to change nothing: `context.dryRun`. */
+  readonly dryRun?: boolean;
   readonly invocationId?: string;
   readonly metadata?: unknown;
   readonly approvalPolicy?: AgentToolApprovalPolicy;
@@ -1667,6 +1671,7 @@ export class AgentToolExecutor {
       ...(attempt.idempotencyKey !== undefined ? { idempotencyKey: attempt.idempotencyKey } : {}),
       approval,
       ...(options.actor !== undefined ? { actor: options.actor } : {}),
+      ...(options.dryRun === true ? { dryRun: true } : {}),
       metadata,
       signal,
     });

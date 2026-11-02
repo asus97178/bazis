@@ -19,7 +19,7 @@ import {
   type WorkflowInstanceFinished,
   type WorkflowTaskRequested,
   type WorkflowTokenClosed,
-} from "@/core/workflow";
+  WorkflowPartitions, type ProcessPartition } from "@/core/workflow";
 import { WorkflowRetention } from "../runtime_module/background/WorkflowRetention";
 import { Schedules } from "../runtime_module/internal/Schedules";
 import { RuntimeDbContext } from "../runtime_module/model/Runtime.dbContext";
@@ -30,6 +30,13 @@ import { RuntimeDbContext } from "../runtime_module/model/Runtime.dbContext";
  * database whose name starts with `bazis_wf_`: set `BAZIS_WORKFLOW_PG_URL`.
  * The test drops the workflow tables before it starts.
  */
+/** `welcome` works in a space too: an event starts a process only where it is connected. */
+class SpacePartitions extends WorkflowPartitions {
+  of(processKey: string): readonly ProcessPartition[] {
+    return [{ partition: null, enabled: true }, ...(processKey === "welcome" ? [{ partition: "space-9", enabled: true }] : [])];
+  }
+}
+
 const url = process.env.BAZIS_WORKFLOW_PG_URL;
 const database = (() => { try { return new URL(url ?? "").pathname.slice(1); } catch { return ""; } })();
 const enabled = database.startsWith("bazis_wf_");
@@ -158,6 +165,7 @@ function root(dsn: string) {
     imports: [TestInfra, WorkflowModule, ToolsModule, eventsModule({ subscribers: [Inbox] })],
     providers: [
       singleton(AccessPolicy, HeaderPolicy),
+      singleton(WorkflowPartitions, SpacePartitions),
       DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
         auditSink: () => undefined,
         approvalPolicy: (request: AgentToolApprovalRequest) => {
@@ -494,8 +502,8 @@ test.skipIf(!enabled)("stage 3: a wait takes the event of its correlation; HTTP 
   const scope = app.container.createScope();
   try {
     const runtime = scope.resolve(IWorkflowRuntime);
-    expect(await runtime.emit("payments.received", { amount: 5 })).toEqual({ started: [], skipped: [], continued: [], rejected: [] });
-    expect(await runtime.emit("payments.received", { amount: 10 }, { correlation: "1" })).toEqual({ started: [], skipped: [], continued: [one], rejected: [] });
+    expect(await runtime.emit("payments.received", { amount: 5 })).toEqual({ started: [], skipped: [], deferred: [], continued: [], rejected: [] });
+    expect(await runtime.emit("payments.received", { amount: 10 }, { correlation: "1" })).toEqual({ started: [], skipped: [], deferred: [], continued: [one], rejected: [] });
     expect((await runtime.instance(one))).toMatchObject({ status: "completed", vars: { payment: { amount: 10 } } });
     expect((await runtime.instance(two)).status).toBe("running");
   } finally {

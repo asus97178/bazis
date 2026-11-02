@@ -1,6 +1,6 @@
 # WorkflowDefinitionsModule
 
-Passport version: 1.1. Check date: 2026-11-01.
+Passport version: 1.2. Check date: 2026-11-03.
 Status: implemented; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/definitions_module`.

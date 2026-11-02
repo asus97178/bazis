@@ -1,6 +1,7 @@
 import { AccessModule } from "../../access";
 import { Module, scoped, singleton } from "../../di";
 import { DefaultWorkflowInputValidator, WorkflowInputValidator } from "../contracts/WorkflowInputValidator";
+import { WorkflowProcessUsage } from "../contracts/WorkflowProcessUsage";
 import { WorkflowDefinitionsModule } from "../definitions_module/WorkflowDefinitions.module";
 import { runtimePermissions } from "./access/Runtime.permissions";
 import { WorkflowRetention } from "./background/WorkflowRetention";
@@ -8,8 +9,10 @@ import { WorkflowWorker } from "./background/WorkflowWorker";
 import { EventsController } from "./http/Events.controller";
 import { InstancesController } from "./http/Instances.controller";
 import { ChildCalls } from "./internal/ChildCalls";
+import { EventDelivery } from "./internal/EventDelivery";
 import { GraphCache } from "./internal/GraphCache";
 import { RunLimits } from "./internal/RunLimits";
+import { RuntimeProcessUsage } from "./internal/RuntimeProcessUsage";
 import { Schedules } from "./internal/Schedules";
 import { TimerStep } from "./internal/TimerStep";
 import { ToolStep } from "./internal/ToolStep";
@@ -35,6 +38,8 @@ import { WorkflowRuntime } from "./services/WorkflowRuntime.service";
     scoped(Schedules),
     scoped(ChildCalls),
     scoped(RunLimits),
+    scoped(EventDelivery),
+    scoped(WorkflowProcessUsage, RuntimeProcessUsage),
     singleton(WorkflowInputValidator, DefaultWorkflowInputValidator),
     scoped(IWorkflowRuntime, WorkflowRuntime),
   ],

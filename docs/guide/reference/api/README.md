@@ -35,6 +35,7 @@
 | [`bazis/core/agent`](core-agent.md) | Агенты и инструменты |
 | [`bazis/core/access`](core-access.md) | Права модулей: permissions, `can`, фильтры списков, система прав |
 | [`bazis/core/access/testing`](core-access-testing.md) | `StaticAccessPolicy` — права в тестах |
+| [`bazis/core/tools`](core-tools.md) | Готовые инструменты: действия с сущностями приложения |
 | [`bazis/core/workflow`](core-workflow.md) | Бизнес-процессы: модуль, сервисы, события, процессы в коде |
 | [`bazis/core/workflow/testing`](core-workflow-testing.md) | `testWorkflow` — тесты процессов с часами теста |
 

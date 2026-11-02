@@ -11,8 +11,12 @@ export class OrderService extends IOrderService {
 
   async place(amount: number, customer: WorkflowActor): Promise<Order> {
     const order = Object.assign(new Order(), { amount, customerId: customer.id });
-    this.db.orders.add(order);
-    await this.db.saveChanges();
+    // The event goes with the order: no order, no event, and no event lost with a crash.
+    await this.db.transactionScope(async (tx) => {
+      this.db.orders.add(order);
+      await this.db.saveChanges();
+      await this.workflow.emitLater(tx, "orders.placed", { orderId: order.id, amount, customerId: customer.id });
+    });
     await this.workflow.start("order-approval", {
       input: { orderId: order.id, amount },
       businessKey: `order:${order.id}`,

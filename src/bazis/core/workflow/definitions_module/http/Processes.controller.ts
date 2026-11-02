@@ -1,7 +1,7 @@
 import { contextOnlyController } from "../../../http/Routing/contextOnlyControllers";
 import { can, type AccessObject } from "../../../access";
 import type { LocalizedText } from "../../../../library/workflow";
-import { Authorize, Controller, Created, Get, Patch, Post, Put, type HttpContext } from "../../../http";
+import { Authorize, Controller, Created, Delete, Get, Patch, Post, Put, type HttpContext } from "../../../http";
 import { buildListDocument } from "../../../../library/jsonapi";
 import { body, callerOf, defaultLanguage, filterOf, listQuery, optionalInteger, optionalString, optionalText, pagingOfList, param, requiredString, withTitleText } from "../../internal/http";
 import { WorkflowError } from "../../contracts/WorkflowError";
@@ -52,8 +52,18 @@ export class ProcessesController {
   @Authorize(can("workflow.processes.read"))
   async get(ctx: HttpContext) {
     const key = param(ctx, "key");
-    const { language } = await callerOf(ctx, "workflow.processes.read", await this.objectOf(key));
+    const { language } = await callerOf(ctx, "workflow.processes.read", await this.readObjectOf(key));
     return withTitleText(await this.definitions.get(key), language, defaultLanguage(ctx));
+  }
+
+  /** An archived process without unfinished instances and partitions (WORKFLOW-002 §4.3). */
+  @Delete("processes/:key")
+  @Authorize(can("workflow.processes.manage"))
+  async remove(ctx: HttpContext) {
+    const key = param(ctx, "key");
+    const { actor, request } = await callerOf(ctx, "workflow.processes.manage", await this.objectOf(key));
+    await this.definitions.remove(key, actor, { request });
+    ctx.res.status(204);
   }
 
   @Patch("processes/:key")
@@ -102,7 +112,7 @@ export class ProcessesController {
   @Authorize(can("workflow.processes.read"))
   async versions(ctx: HttpContext) {
     const key = param(ctx, "key");
-    await callerOf(ctx, "workflow.processes.read", await this.objectOf(key));
+    await callerOf(ctx, "workflow.processes.read", await this.readObjectOf(key));
     return { data: await this.definitions.versions(key) };
   }
 
@@ -110,7 +120,7 @@ export class ProcessesController {
   @Authorize(can("workflow.processes.read"))
   async version(ctx: HttpContext) {
     const key = param(ctx, "key");
-    await callerOf(ctx, "workflow.processes.read", await this.objectOf(key));
+    await callerOf(ctx, "workflow.processes.read", await this.readObjectOf(key));
     const version = optionalInteger(param(ctx, "version"), "version");
     if (version === undefined) throw new WorkflowError("invalid_input", "version must be an integer");
     return await this.definitions.version(key, version);
@@ -142,6 +152,11 @@ export class ProcessesController {
   /** A process as the object of a permission. */
   private async objectOf(key: string): Promise<AccessObject> {
     return { process: key, folder: await this.definitions.folderOf(key) };
+  }
+
+  /** Reading a process is allowed by the partitions it works in. */
+  private async readObjectOf(key: string): Promise<AccessObject> {
+    return { ...await this.objectOf(key), scope: await this.definitions.partitionsOf(key) };
   }
 
   private localized(items: readonly ProcessSummary[], language: string, ctx: HttpContext) {

@@ -44,6 +44,7 @@
     "./core/kernel": "./core/kernel/index.ts",
     "./core/orm": "./core/orm/index.ts",
     "./core/testing": "./core/testing/index.ts",
+    "./core/tools": "./core/tools/index.ts",
     "./core/websocket": "./core/websocket/index.ts",
     "./core/workflow": "./core/workflow/index.ts",
     "./core/workflow/testing": "./core/workflow/testing/index.ts",
