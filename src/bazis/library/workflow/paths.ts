@@ -20,10 +20,12 @@ export interface InstanceData {
   readonly item?: unknown;
   /** Inside a loop body: the number of this iteration, from 0. */
   readonly index?: number;
+  /** Only while the input of a Tool is resolved: the values of `$secrets.NAME`. */
+  readonly secrets?: Readonly<Record<string, string>>;
 }
 
 /** `$input.amount`, `$vars.payment.id`, `$nodes.Pay.paymentId`, `$event.record.id`, `$run.partition`, `$now`, `$item.id`, `$index`. */
-export const DATA_PATH = /^\$(input|vars|nodes|event|trigger|run|now|item|index)((\.[A-Za-z_][A-Za-z0-9_]*)*)$/;
+export const DATA_PATH = /^\$(input|vars|nodes|event|trigger|run|now|item|index|secrets)((\.[A-Za-z_][A-Za-z0-9_]*)*)$/;
 
 /** The roots of `$` paths, for a designer. */
 export const DATA_PATHS: readonly { readonly path: string; readonly description: string }[] = Object.freeze([
@@ -36,7 +38,25 @@ export const DATA_PATHS: readonly { readonly path: string; readonly description:
   { path: "$now", description: "The engine's time" },
   { path: "$item", description: "Inside a loop body: the element of this iteration" },
   { path: "$index", description: "Inside a loop body: the number of this iteration, from 0" },
+  { path: "$secrets.<name>", description: "Only in the input of a Tool: the value of a secret, which goes nowhere else" },
 ]);
+
+/** The secrets a Tool input names, in paths and expressions at any depth. */
+export function secretNames(input: unknown): string[] {
+  const names = new Set<string>();
+  const walk = (value: unknown): void => {
+    if (typeof value === "string") {
+      const match = /^\$secrets\.([A-Za-z_][A-Za-z0-9_]*)$/.exec(value);
+      if (match) names.add(match[1]!);
+    } else if (Array.isArray(value)) {
+      value.forEach(walk);
+    } else if (typeof value === "object" && value !== null) {
+      Object.values(value).forEach(walk);
+    }
+  };
+  walk(input);
+  return [...names];
+}
 
 /** `true` if the value is a path to instance data. */
 export function isPath(value: unknown): value is string {

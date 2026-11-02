@@ -53,6 +53,34 @@ const rememberedSecrets = new Set<string>();
 let longestFirst: readonly string[] = [];
 
 /**
+ * A copy of `value` with these exact strings cut out of every text and key: the
+ * secrets of one call. Unlike {@link rememberSecretValue} it knows nothing of the
+ * rest of the process, so it takes values of any length.
+ */
+export function redactValues<T>(value: T, secrets: readonly string[], replacement = DEFAULT_REPLACEMENT): T {
+  const list = secrets.filter((item) => item !== "").sort((left, right) => right.length - left.length);
+  if (list.length === 0) return value;
+  const text = (source: string) => list.reduce((current, secret) => current.split(secret).join(replacement), source);
+  const seen = new WeakMap<object, unknown>();
+  const walk = (item: unknown): unknown => {
+    if (typeof item === "string") return text(item);
+    if (typeof item !== "object" || item === null || item instanceof Date) return item;
+    if (seen.has(item)) return seen.get(item);
+    if (Array.isArray(item)) {
+      const copy: unknown[] = [];
+      seen.set(item, copy);
+      for (const element of item) copy.push(walk(element));
+      return copy;
+    }
+    const copy: Record<string, unknown> = {};
+    seen.set(item, copy);
+    for (const [key, element] of Object.entries(item)) copy[text(key)] = walk(element);
+    return copy;
+  };
+  return walk(value) as T;
+}
+
+/**
  * Remembers a secret value: from now on every redaction removes it wherever it
  * appears, also in plain text without a marker such as `password=`. `Secret`
  * calls it for every configuration secret. Process-wide; values shorter than

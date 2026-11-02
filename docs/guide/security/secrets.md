@@ -265,3 +265,8 @@ const keys = this.config.get("keys").reveal().split(",");
 - [Конфигурация](../fundamentals/configuration.md)
 - [Аутентификация через JWT](jwt.md)
 - [Обработка ошибок](../overview/errors.md)
+
+## Секреты в процессах
+
+Шаг процесса получает секрет по имени: `$secrets.CRM_TOKEN`. В документе и истории остаётся только имя, а значение идёт из `BAZIS_SECRETS__CRM_TOKEN` или
+из вашего `SecretStore`. Подробно — [HTTP-запрос и секреты](../workflow/processes.md#секреты).

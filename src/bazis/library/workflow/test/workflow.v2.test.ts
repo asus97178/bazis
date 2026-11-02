@@ -119,7 +119,8 @@ describe("validateProcess: version 2", () => {
     expect(problem({ onError: "ignore" })).toContain("onError");
     expect(problem({ input: { x: "$input.none" } })).toContain("no field none");
     expect(problem({ input: { x: { op: "eval", args: [] } } })).toContain("unknown function");
-    expect(problem({ input: { x: "$secrets.TOKEN" } })).toContain("not supported");
+    expect(problem({ input: { x: "$secrets.TOKEN", y: { op: "concat", args: ["Bearer ", { path: "$secrets.TOKEN" }] } } })).toBeUndefined();
+    expect(problem({ input: { x: "$secrets" } })).toContain("needs a name");
     expect(problem({ input: { deep: [{ x: "$vars.none" }] } })).toContain("config.input.deep[0].x");
   });
 

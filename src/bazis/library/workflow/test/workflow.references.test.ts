@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { documentReferences, inputReferences, schemaReferenceKinds, type ProcessDocument } from "@/library/workflow";
+import { documentReferences, inputReferences, resolveInput, schemaReferenceKinds, secretNames, validateProcess, type ProcessDocument } from "@/library/workflow";
 
 const schema = {
   type: "object",
@@ -63,4 +63,23 @@ test("a document holds references in its Tools, variables and calls", () => {
     { kind: "dm.table", id: "orders", path: "/table", node: "Step" },
     { kind: "workflow.process", id: "child", path: "/process", node: "Call" },
   ]);
+});
+
+test("the secrets of an input are found at any depth, and resolved only for it", () => {
+  const input = { a: "$secrets.ONE", b: { c: ["$secrets.TWO"], d: { op: "concat", args: ["x", { path: "$secrets.THREE" }] } }, e: "$secrets.ONE", f: "not $secrets.FOUR" };
+  expect(secretNames(input).sort()).toEqual(["ONE", "THREE", "TWO"]);
+  const data = { input: {}, vars: {}, nodes: {}, secrets: { ONE: "1", TWO: "2", THREE: "3" } };
+  expect(resolveInput(input, data)).toEqual({ a: "1", b: { c: ["2"], d: "x3" }, e: "1", f: "not $secrets.FOUR" });
+});
+
+test("a secret is refused wherever it could be kept", () => {
+  const document = (nodes: Record<string, unknown>, flows: Record<string, unknown>) => ({ schemaVersion: "bazis.workflow/v2", nodes: { Start: { kind: "manualStart", title: "Start" }, ...nodes, End: { kind: "end", title: "End" } }, flows });
+  const line = (node: unknown) => document({ Step: node }, { a: { source: "Start", target: "Step" }, b: { source: "Step", target: "End" } });
+  const messages = (node: unknown) => validateProcess(line(node)).filter((issue) => issue.severity === "error").map((issue) => issue.message);
+  expect(messages({ kind: "serviceTask", title: "T", config: { tool: "a.b", input: { token: "$secrets.TOKEN" } } })).toEqual([]);
+  expect(messages({ kind: "assign", title: "T", config: { assignments: [{ var: "x", value: { path: "$secrets.TOKEN" } }] } }).join()).toContain("only in the input of a Tool");
+  expect(messages({ kind: "callProcess", title: "T", config: { process: "other", input: { token: "$secrets.TOKEN" } } })[0]).toContain("only in the input of a Tool");
+  expect(messages({ kind: "eventWait", title: "T", config: { event: "a.b", correlation: "$secrets.TOKEN" } })[0]).toContain("only in the input of a Tool");
+  expect(messages({ kind: "timerCatch", title: "T", config: { at: "$secrets.TOKEN" } })[0]).toContain("only in the input of a Tool");
+  expect(messages({ kind: "eventWait", title: "T", config: { event: "a.b", until: { path: "$secrets.TOKEN" } } })[0]).toContain("only in the input of a Tool");
 });

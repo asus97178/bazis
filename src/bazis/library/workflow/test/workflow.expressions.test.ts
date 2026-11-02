@@ -126,7 +126,10 @@ describe("checkExpression", () => {
     expect(checkExpression({ path: "$nodes" }, scope)).toContain("needs a node");
     expect(checkExpression({ path: "$now.x" }, scope)).toContain("no fields");
     expect(checkExpression({ path: "amount" }, scope)).toContain("must look like");
-    expect(checkExpression({ path: "$secrets.TOKEN" }, scope)).toContain("must look like");
+    expect(checkExpression({ path: "$secrets.TOKEN" }, scope)).toContain("only in the input of a Tool");
+    expect(checkExpression({ path: "$secrets.TOKEN" }, { ...scope, secrets: true })).toBeNull();
+    expect(checkExpression({ path: "$secrets.a.b" }, { ...scope, secrets: true })).toContain("needs a name");
+    expect(checkExpression({ path: "$secrets" }, { ...scope, secrets: true })).toContain("needs a name");
     expect(checkExpression({ path: "$vars.amount", extra: 1 }, scope)).toContain("only the key");
   });
 
