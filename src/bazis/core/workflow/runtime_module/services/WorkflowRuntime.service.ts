@@ -55,7 +55,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (!start) throw new WorkflowError("wrong_status", `Process ${processKey} has no manual start`);
     const { value, issues } = await this.validator().validate(inputSpecOf(version.document), options.input, { purpose: "input", processKey, partition, language: options.language ?? this.languages.default, actor: options.actor });
     if (issues.length > 0) throw new WorkflowError("invalid_input", "The process input is invalid", issues);
-    const { id, skipped } = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor, request: options.request ?? null });
+    const { id, skipped } = await this.engine.begin(this.engine.cache(version), start[0], { input: value, partition, businessKey, startedVia: "manual", actor: options.actor, request: options.request ?? null, ...(options.test === true ? { test: true } : {}) });
     if (skipped) throw new WorkflowError("conflict", `Instance ${id} with this businessKey is not finished`);
     return await this.instance(id);
   }
@@ -160,6 +160,7 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     if (query.businessKey !== undefined) source = source.where((i) => i.businessKey.eq(query.businessKey!));
     if (query.startedById !== undefined) source = source.where((i) => i.startedById.eq(query.startedById!));
     if (query.parentInstanceId !== undefined) source = source.where((i) => i.parentInstanceId.eq(query.parentInstanceId!));
+    if (query.test !== undefined || query.parentInstanceId === undefined) source = source.where((i) => i.test.eq(query.test === true));
     const { items, total } = await paginate(source, pageQueryOf(query, { field: "id", dir: "desc" }));
     return { items: items.map(summaryOf), total };
   }
@@ -231,9 +232,18 @@ function summaryOf(row: WfInstance): InstanceSummary {
     startedBy: { kind: row.startedByKind, id: row.startedById },
     parentInstanceId: row.parentInstanceId,
     error: row.error,
+    failedNode: row.error === null || row.error.node === "" ? null : row.error.node,
+    test: row.test,
     createdAt: row.createdAt,
     endedAt: row.endedAt,
+    durationMs: durationOf(row),
   };
+}
+
+/** From the start by the engine's clock: `createdAt` is the clock of the database. */
+function durationOf(row: WfInstance): number | null {
+  const startedAt = typeof row.trigger?.at === "string" ? Date.parse(row.trigger.at) : Number.NaN;
+  return row.endedAt === null || Number.isNaN(startedAt) ? null : row.endedAt.getTime() - startedAt;
 }
 
 function tokenOf(row: WfToken) {

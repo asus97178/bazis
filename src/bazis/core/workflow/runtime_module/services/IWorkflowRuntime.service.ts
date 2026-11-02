@@ -16,6 +16,11 @@ export interface StartInstance extends WorkflowAuditOptions {
   readonly actor: WorkflowActor;
   /** The language of the request, for the application's validator; `workflow.language` by default. */
   readonly language?: string;
+  /**
+   * A trial run (WORKFLOW-002 §5.4): Tools change nothing, the application hears
+   * nothing, tasks go only to who started it. It lives for a day.
+   */
+  readonly test?: boolean;
 }
 
 /** One element of a mass start. */
@@ -63,8 +68,14 @@ export interface InstanceSummary {
   /** The instance whose `callProcess` started this one. */
   readonly parentInstanceId: string | null;
   readonly error: { readonly node: string; readonly code: string; readonly message: string } | null;
+  /** The step it failed on. */
+  readonly failedNode: string | null;
+  /** A trial run. */
+  readonly test: boolean;
   readonly createdAt: Date;
   readonly endedAt: Date | null;
+  /** How long it took by the engine's clock; `null` until it ends. */
+  readonly durationMs: number | null;
 }
 
 export interface TokenDetails {
@@ -141,6 +152,8 @@ export interface InstanceListQuery extends WorkflowPaging {
   readonly businessKey?: string;
   readonly startedById?: string;
   readonly parentInstanceId?: string;
+  /** Trial runs are hidden unless asked for: `true` gives only them. Children of a named parent are shown as they are. */
+  readonly test?: boolean;
 }
 
 /**

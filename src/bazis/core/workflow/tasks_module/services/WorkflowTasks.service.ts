@@ -100,7 +100,7 @@ export class WorkflowTasks extends IWorkflowTasks {
       completedAt: this.clock.now(),
       output: typeof saved === "object" && saved !== null && !Array.isArray(saved) ? saved as Record<string, unknown> : null,
     });
-    await this.events.publish(WORKFLOW_TASK_COMPLETED, { taskId: task.id, instanceId: task.instanceId, processKey: task.processKey, nodeId: task.nodeId, partition: task.partition, actor, request: options.request ?? null });
+    if (!task.test) await this.events.publish(WORKFLOW_TASK_COMPLETED, { taskId: task.id, instanceId: task.instanceId, processKey: task.processKey, nodeId: task.nodeId, partition: task.partition, actor, request: options.request ?? null });
     return await this.get(task.id);
   }
 
@@ -157,6 +157,7 @@ function detailsOf(row: WfTask): TaskDetails {
     nodeId: row.nodeId,
     partition: row.partition,
     title: row.title,
+    test: row.test,
     assignee: row.assignee,
     form: row.form,
     dueAt: row.dueAt,

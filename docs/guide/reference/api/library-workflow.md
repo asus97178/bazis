@@ -1,7 +1,7 @@
 # `bazis/library/workflow`
 
 Формат документа процесса `bazis.workflow/v2`: чистые функции без DI и
-базы — для дизайнера, CLI, браузера. Список — по пакету 0.134.0.
+базы — для дизайнера, CLI, браузера. Список — по пакету 0.135.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -15,6 +15,7 @@
 | `parseExpression`, `printExpression`, `ExpressionSyntaxError` | Текст выражения ↔ дерево | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
 | `toStructure`, `fromStructure`, `isStructured` | Граф ↔ список шагов | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
 | `processPalette`, `formOf` | Палитра; форма настройки шага | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
+| `documentReferences`, `inputReferences`, `schemaReferenceKinds` | Ссылки в документе и во входе инструмента | [Ссылки](../../workflow/processes.md#ссылки) |
 | `isTimeZone`, `ISO_MOMENT` | Часовой пояс IANA; момент с поясом | [Расписание](../../workflow/processes.md#расписание) |
 | `MAX_ITERATIONS`, `MAX_LOOP_PARALLEL` | Пределы цикла | [Цикл](../../workflow/processes.md#цикл) |
 | `PROCESS_KEY` | Формат ключа процесса | [Вызов другого процесса](../../workflow/processes.md#вызов-другого-процесса) |

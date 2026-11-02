@@ -108,6 +108,7 @@ export class ChildCalls {
       const current = step.tokens.find((t) => t.id === token.id);
       if (current?.status !== "waiting" || step.instance.status !== "running") return;
       const { id } = await this.engine.begin(childGraph, start[0], {
+        test: instance.test,
         input: value,
         partition: step.instance.partition,
         businessKey: null,

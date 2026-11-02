@@ -84,6 +84,9 @@ def gated(path):
     if 'workflow.postgres.triggers' in name:
         db = create_database(f'bazis_wf_triggers_{run_id}')
         return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
+    if 'workflow.postgres.trial' in name:
+        db = create_database(f'bazis_wf_trial_{run_id}')
+        return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}
     if 'workflow.postgres.tools' in name:
         db = create_database(f'bazis_wf_tools_{run_id}')
         return db, {'BAZIS_WORKFLOW_PG_URL': url(db)}

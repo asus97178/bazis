@@ -42,6 +42,7 @@ export {
 } from "./expressions";
 export { ExpressionSyntaxError, parseExpression, printExpression } from "./expressionSyntax";
 export { durationMs } from "./duration";
+export { documentReferences, inputReferences, schemaReferenceKinds, type DocumentReference, type InputReference } from "./references";
 export { isTimeZone, parseCron, type CronSchedule } from "./cron";
 export { processToMermaid } from "./mermaid";
 export { PERSONAL_MASK, maskByMapping, maskBySchema, masksPersonal, personalPaths, personalVariables, readsPersonal } from "./masking";

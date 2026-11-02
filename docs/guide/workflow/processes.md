@@ -271,6 +271,7 @@ class CmsExtensions extends WorkflowExtensions {
 | `scheduleStart` | Запуск по расписанию cron | 0.126.0 |
 | `timezone`, `from`, `until`, `overlap`, `catchUp`, `partitions` в `scheduleStart` | [Расписание](#расписание) | 0.134.0 |
 | `filter`, `debounce`, `delay`, `ignoreOwn` в `eventStart`; `until` в `eventWait` | [Запуск по событию](#запуск-по-событию) | 0.134.0 |
+| `test` при запуске | [Пробный запуск](#пробный-запуск) | 0.135.0 |
 | `assign` | Записывает значения выражений в переменные | 0.132.0 |
 | `loop` | Повторяет свои шаги: по списку, по условию, сколько-то раз | 0.133.0 |
 | `callProcess` | Запускает другой процесс и ждёт его конца | 0.133.0 |
@@ -802,6 +803,94 @@ history: timer Late {"firedAt":"…:39:09.571Z","interrupting":true}
 > Вызванный с `maxConcurrent` занимает место как любой экземпляр. Процесс с
 > `maxConcurrent: 1`, который вызывает сам себя, будет ждать сам себя вечно.
 
+## Пробный запуск
+
+Проверить процесс на настоящем приложении, ничего в нём не изменив:
+
+```text
+POST /workflow/instances  {"processKey":"order-approval","input":{"amount":5000},"test":true}
+→ 201 {"id":"01a19…","status":"running","test":true,…}
+```
+
+Из кода — `start(key, { test: true, … })`. Берётся последняя опубликованная версия.
+
+- **Инструменты.** С `dryRun: "supported"` вызывается с `context.dryRun = true` и сам ничего не меняет. Без поддержки
+  не вызывается: шаг получает `{ "dryRun": true }`. В журнале у записи `tool` есть `dryRun`: `called` или `not called`.
+  Ветвление, зависящее от настоящего ответа инструмента, в пробном запуске поэтому может пойти иначе.
+- **Приложение ничего не слышит.** События `WORKFLOW_INSTANCE_*`, `WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TASK_COMPLETED` не
+  публикуются, поэтому журнал аудита и уведомления молчат.
+- **Задачи** создаются с `test: true` и адресуются только тому, кто запустил: пробный запуск не засыпает входящие исполнителей.
+- **Пределы.** Пробный запуск не считается в `maxConcurrent`, `sameKey` и `overlap` и сам их не ждёт.
+- **Вложенное.** `callProcess` и `errorHandler` пробного запуска — тоже пробные.
+- **Списки.** В `GET /workflow/instances` пробные скрыты, `filter[test]=true` показывает только их. Право можно ограничить условием `{ test: { eq: false } }`.
+- **Срок.** Через сутки пробный запуск удаляется, в каком бы статусе он ни был.
+
+Свой инструмент поддерживает пробный запуск так:
+
+```ts
+@Tool({ name: "orders.set-status", description: "…", sideEffect: "write", dryRun: "supported", callers: ["workflow"] })
+export class SetOrderStatusTool {
+  async execute(input: SetOrderStatusInput, context: AgentToolExecutionContext) {
+    await this.orders.validate(input);
+    if (context.dryRun === true) return { status: input.status };
+    await this.orders.setStatus(input.orderId, input.status);
+    return { status: input.status };
+  }
+}
+```
+
+## Журнал запусков
+
+В `GET /workflow/instances` и `GET /workflow/instances/:id` у каждого запуска есть:
+
+| Поле | Что значит |
+| --- | --- |
+| `status` | `pending`, `running`, `completed`, `cancelled`, `failed`, `timedOut` |
+| `startedVia`, `startedBy` | Как запущен и кем |
+| `failedNode` | Шаг, на котором упал; у `timedOut` и успешных — `null` |
+| `error` | `node`, `code`, `message` |
+| `durationMs` | Сколько шёл по часам движка; пока идёт — `null` |
+| `test` | Пробный запуск |
+
+Подробности по шагам — `GET /workflow/instances/:id/history`.
+
+## Ссылки
+
+Поле входа инструмента может ссылаться на значение приложения: таблицу, поле, пользователя.
+В классе входа это `@Validator({ ref, refKeys, refScope })`, а в схеме — `x-ref`, `x-ref-keys`, `x-ref-scope`:
+
+```ts
+export class FindRecordsInput {
+  @Validator({ ref: "dm.table" })
+  table = "";
+
+  /** Ключи — поля таблицы из `table`. */
+  @Validator({ refKeys: "dm.field", refScope: "/table" })
+  values: Record<string, unknown> = {};
+}
+```
+
+`refScope` — указатель на соседнее поле входа, в котором лежит область. Значения знает владелец вида: модуль
+объявляет его в `@Module({ references })`, и `exists` получает область в `context.within`:
+
+```ts
+@Module({ references: { "dm.table": TableReferences, "dm.field": FieldReferences }, providers: [scoped(TableReferences), scoped(FieldReferences)] })
+export class RecordsModule {}
+```
+
+- **Вид без владельца** останавливает старт приложения и `bazis workflow check`.
+- **Значение в документе** проверяется при сохранении, в `/workflow/validate` и при публикации: нет такого — ошибка `broken_ref` с узлом,
+  и черновик не опубликуется. `bazis workflow check` базу не читает и значения не проверяет. У процесса в коде несуществующее значение — предупреждение
+  в журнале при старте: это могут быть данные, которые ещё появятся.
+- **Значение из выражения** проверяется на шаге: нет — ошибка `ref_not_found`, её ловит `boundaryError` с `errorCode: "ref_not_found"`. На шаге же проверяются и литералы: значение могли удалить после публикации.
+
+Обратный ход — кто ссылается на значение, по последним опубликованным версиям. Удобно спросить перед удалением поля:
+
+```ts
+const users = await definitions.referencing({ kind: "dm.field", id: "status", within: "orders" });
+// [{ processKey: "order-approval", version: 3, node: "Update", within: "orders", path: "/values/status" }]
+```
+
 ## Настройки запуска
 
 | `settings` | Что значит |
@@ -1098,7 +1187,7 @@ export class OrderModule {}
 - **`partitionField`** привязывает инструменты к разделу экземпляра: каждый запрос фильтруется по нему, новая запись получает его сама, а поле не читается и не пишется вручную. Без раздела у экземпляра — отказ `partition_required`. Иначе процесс одного арендатора видел бы и менял записи другого.
 - **Защита от массовых изменений.** `update` и `delete` требуют непустой `where`, а больше `maxChanges` записей (по умолчанию 100) — отказ `too_many_records`. `find` отдаёт не больше `maxRows` (по умолчанию 100).
 - **`callers`** — кто может вызывать, по умолчанию `["workflow"]`. **`name`** — средняя часть имени: `OrderItem` даёт `orm.order-item.find`.
-- **Пробный вызов.** С `context.dryRun` ничего не пишется: `create` возвращает запись, которая получилась бы, `update` и `delete` — сколько записей затронули бы.
+- **[Пробный запуск](#пробный-запуск).** С `context.dryRun` ничего не пишется: `create` возвращает запись, которая получилась бы, `update` и `delete` — сколько записей затронули бы.
 
 Причины — обычные причины ошибки: `boundaryError` с `errorCode: "too_many_records"` поймает отказ.
 

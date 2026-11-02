@@ -1,5 +1,5 @@
 import { OnEvent } from "../../../kernel";
-import { WORKFLOW_INSTANCES_DELETED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, type WorkflowInstancesDeleted, type WorkflowTaskRequested, type WorkflowTokenClosed } from "../../runtime_module/events/Runtime.events";
+import { WORKFLOW_INSTANCES_DELETED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, WORKFLOW_TRIAL_TASK_REQUESTED, WORKFLOW_TRIAL_TOKEN_CLOSED, type WorkflowInstancesDeleted, type WorkflowTaskRequested, type WorkflowTokenClosed } from "../../runtime_module/events/Runtime.events";
 import type { TasksDbContext } from "../model/Tasks.dbContext";
 import { WfTask } from "../model/WfTask.model";
 
@@ -10,6 +10,16 @@ export class TaskEvents {
   /** A step started waiting for a person: its task. Repeated events of one token make one task. */
   @OnEvent(WORKFLOW_TASK_REQUESTED)
   async requested(event: WorkflowTaskRequested): Promise<void> {
+    await this.add(event, false);
+  }
+
+  /** The task of a trial run: it goes to who started it, and is marked. */
+  @OnEvent(WORKFLOW_TRIAL_TASK_REQUESTED)
+  async trialRequested(event: WorkflowTaskRequested): Promise<void> {
+    await this.add(event, true);
+  }
+
+  private async add(event: WorkflowTaskRequested, test: boolean): Promise<void> {
     const assignee = "role" in event.assignee ? `role:${event.assignee.role}` : `user:${event.assignee.user}`;
     // Past the change tracker: the scope may go on to update tasks directly, which a context holding one would refuse.
     await this.db.tasks.insertIfAbsent(Object.assign(new WfTask(), {
@@ -18,6 +28,7 @@ export class TaskEvents {
       processKey: event.processKey,
       nodeId: event.nodeId,
       partition: event.partition,
+      test,
       title: event.title,
       assignee,
       form: event.form,
@@ -30,6 +41,11 @@ export class TaskEvents {
   @OnEvent(WORKFLOW_TOKEN_CLOSED)
   async closed(event: WorkflowTokenClosed): Promise<void> {
     await this.db.tasks.asNoTracking().where((t) => t.tokenId.eq(event.tokenId).and(t.status.in(["open", "claimed"]))).executeUpdate({ status: "cancelled" });
+  }
+
+  @OnEvent(WORKFLOW_TRIAL_TOKEN_CLOSED)
+  async trialClosed(event: WorkflowTokenClosed): Promise<void> {
+    await this.closed(event);
   }
 
   /** Retention deleted the instances: their tasks go too. */

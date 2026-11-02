@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.134.0.
+Список — по пакету 0.135.0.
 
 ## Модули
 
@@ -16,7 +16,7 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `IWorkflowDefinitions` | Каталог: `list`, `get`, `folderOf`, `partitionsOf`, `validate`, `palette`, `create`, `update`, `remove`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowDefinitions` | Каталог: `list`, `get`, `folderOf`, `partitionsOf`, `validate`, `palette`, `create`, `update`, `remove`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `referencing`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowRuntime` | Исполнение: `start`, `startMany`, `emit`, `emitLater`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowTasks` | Входящие задачи: `list`, `get`, `claim`, `release`, `complete` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
 | `defineProcess({ key, title, description?, folder?, owner?, retentionDays?, document })` | Процесс в коде модуля: перечисляется в `@Module({ processes })`, публикуется при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
@@ -54,7 +54,7 @@
 - **Процессы в коде:** `ProcessDefinition`, `CodeProcess`; поле `processes`
   в метаданных `@Module`.
 - **Каталог:** `ProcessSummary` (с `module` — модулем-владельцем процесса из кода), `ProcessDetails`, `VersionSummary`,
-  `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`, `ValidateOptions`.
+  `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`, `ValidateOptions`, `ProcessReference`, `ProcessReferenceQuery`.
 - **Исполнение:** `StartInstance`, `StartMany`, `StartManyItem`, `StartManyResult`, `EmitCause`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
   `TokenDetails`, `HistoryEntry`, `InstanceListQuery`, `InstanceStatus`,
   `TokenStatus`, `StartedVia`, `HistoryType`.

@@ -11,6 +11,8 @@ export interface TaskDetails {
   readonly nodeId: string;
   readonly partition: string | null;
   readonly title: LocalizedText;
+  /** A task of a trial run. */
+  readonly test: boolean;
   readonly assignee: string;
   readonly form: FormSpec | null;
   readonly dueAt: Date | null;
