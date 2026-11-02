@@ -4,6 +4,45 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.133.0 — 2026-11-02
+
+Loops, called processes and run settings (stage 3 of WORKFLOW-002). Documents,
+stores and ordinary runs stay as they are.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01330).
+
+### Added
+
+- The `loop` node: a body with its own entry and `end`, `$item` and `$index` in
+  expressions.
+- The `callProcess` node: a process runs another one and waits for its output.
+  Failures are `child_failed`, `child_cancelled`, `child_timed_out`,
+  `process_unavailable`, `invalid_input` and `call_depth`. A failed instance is
+  retried through its caller.
+- Run settings in the process `settings`: `runAs`, `runTimeout`, `maxConcurrent`,
+  `sameKey`, `errorHandler`.
+- Instance status `pending` for starts over `maxConcurrent` and status `timedOut`
+  for runs over `runTimeout`.
+- `startMany` and `POST /workflow/instances/bulk`, `filter[parentInstanceId]` on
+  the instance list, `EmitResult.skipped`.
+- `validateProcess` takes `processes` and checks the keys of `callProcess` and
+  `errorHandler`. New validation codes `unknown_process`, `container_invalid`,
+  `flow_across_container`, `loop_body`.
+- `MAX_ITERATIONS`, `MAX_LOOP_PARALLEL`, `PROCESS_KEY` in `bazis/library/workflow`.
+
+### Changed (breaking)
+
+- `IWorkflowRuntime` has `startMany`: add it to your own implementation.
+- `InstanceStatus` adds `pending` and `timedOut`, `StartedVia` adds `callProcess`
+  and `errorHandler`, `WORKFLOW_TOKEN_CLOSED.reason` adds `timedOut`.
+- `EmitResult.skipped` is required.
+- Saving, publishing and `/workflow/validate` reject a `callProcess` or
+  `errorHandler` key that matches no process.
+
+### Fixed
+
+- A task right after a task failed in `IWorkflowTasks.complete`. The task row is
+  now written by `tokenId` past the tracker.
+
 ## 0.132.0 — 2026-11-01
 
 The process document v2 (stage 2 of WORKFLOW-002): expressions, localized texts,

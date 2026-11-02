@@ -15,6 +15,8 @@
 | `parseExpression`, `printExpression`, `ExpressionSyntaxError` | Текст выражения ↔ дерево | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
 | `toStructure`, `fromStructure`, `isStructured` | Граф ↔ список шагов | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
 | `processPalette`, `formOf` | Палитра; форма настройки шага | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
+| `MAX_ITERATIONS`, `MAX_LOOP_PARALLEL` | Пределы цикла | [Цикл](../../workflow/processes.md#цикл) |
+| `PROCESS_KEY` | Формат ключа процесса | [Вызов другого процесса](../../workflow/processes.md#вызов-другого-процесса) |
 | `textOf`, `allTexts`, `checkLocalizedText` | Текст на нужном языке | [Карточка и язык](../../workflow/processes.md#карточка-и-язык) |
 | `checkFormSpec`, `variableProblems`, `checkExtensions`, `formFieldNames`, `validateForm`, `FIELD_NAME` | Поля и переменные, проверка значения | [Переменные](../../workflow/processes.md#переменные) |
 | `masksPersonal`, `personalPaths`, `personalVariables`, `readsPersonal`, `maskByMapping`, `maskBySchema`, `PERSONAL_MASK` | Маска персональных данных | [Настройки процесса и журнал](../../workflow/processes.md#настройки-процесса-и-журнал) |
