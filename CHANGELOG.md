@@ -4,6 +4,36 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.135.0 — 2026-11-03
+
+Trial runs, references and the journal of runs (stage 5 of WORKFLOW-002). Stores
+stay as they are.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01350).
+
+### Added
+
+- Trial runs: `start(key, { test: true })` and `test` in `POST /workflow/instances`.
+  A Tool with `dryRun: "supported"` runs with `context.dryRun`, another is not called.
+  The application hears nothing, tasks go to who started it and are marked `test`, limits
+  do not apply, called processes are trials too. Hidden from lists unless
+  `filter[test]=true`, gone after a day. `test` can be a condition of
+  `workflow.instances.read`.
+- References are checked by the owners of their kinds: `broken_ref` when a draft is saved
+  or published and in `/workflow/validate`, `ref_not_found` on a step.
+  `IWorkflowDefinitions.referencing`, `documentReferences`, `inputReferences`,
+  `schemaReferenceKinds`, `ReferenceContext.within`.
+- The journal of runs: `failedNode`, `durationMs`, `test` on an instance, `test` on a task.
+
+### Changed (breaking)
+
+- A Tool that refers to a kind no module owns stops the start and `bazis workflow check`.
+- A literal reference that does not exist blocks publishing. Published versions run,
+  and a step with such a value fails with `ref_not_found`.
+- `publish` checks the draft before its transaction: a draft saved meanwhile gives
+  `conflict`.
+- `InstanceSummary` requires `failedNode`, `test`, `durationMs`, `TaskDetails` requires
+  `test`, `IWorkflowDefinitions` has `referencing`.
+
 ## 0.134.0 — 2026-11-03
 
 How processes start and what they wait for (stage 4 of WORKFLOW-002): time zones,
