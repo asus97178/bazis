@@ -1,9 +1,12 @@
 import { Column, Entity, Index, UUID } from "../../../orm";
 
-/** `completed` and `cancelled` are finished: retention deletes them. `failed` waits for retry or cancel. */
-export type InstanceStatus = "running" | "completed" | "cancelled" | "failed";
+/**
+ * `completed`, `cancelled` and `timedOut` are finished: retention deletes them.
+ * `failed` waits for retry or cancel, `pending` for a free place (`maxConcurrent`, `sameKey: "queue"`).
+ */
+export type InstanceStatus = "pending" | "running" | "completed" | "cancelled" | "failed" | "timedOut";
 
-export type StartedVia = "manual" | "event" | "schedule";
+export type StartedVia = "manual" | "event" | "schedule" | "callProcess" | "errorHandler";
 
 /**
  * One run of a process. Bound to the version it started with: a new publication
@@ -62,7 +65,7 @@ export class WfInstance {
   @Column({ type: "boolean" })
   test = false;
 
-  /** The instance whose `callProcess` started this one (stage 3). */
+  /** The instance whose `callProcess` started this one, and the waiting token there. */
   @Index()
   @Column({ type: "text", nullable: true })
   parentInstanceId: string | null = null;

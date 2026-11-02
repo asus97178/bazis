@@ -10,7 +10,7 @@ import type { WorkflowSettings } from "../../contracts/Workflow.config";
 const DAY_MS = 86_400_000;
 
 /**
- * Deletes `completed` and `cancelled` instances older than their process's
+ * Deletes `completed`, `cancelled` and `timedOut` instances older than their process's
  * `retentionDays`, with tokens, jobs, subscriptions and history (by cascade),
  * `retention.batchSize` at a time. `failed` instances wait for a person and stay.
  * Each deleted batch is published as `WORKFLOW_INSTANCES_DELETED`, so parts
@@ -52,7 +52,7 @@ export class WorkflowRetention extends BackgroundService {
         for (;;) {
           if (signal?.aborted) return deleted;
           const ids = (await db.instances.asNoTracking()
-            .where((i) => i.processKey.eq(policy.key).and(i.status.in(["completed", "cancelled"])).and(i.endedAt.lt(cutoff)))
+            .where((i) => i.processKey.eq(policy.key).and(i.status.in(["completed", "cancelled", "timedOut"])).and(i.endedAt.lt(cutoff)))
             .orderBy((i) => i.id)
             .take(batchSize)
             .select((i) => ({ id: i.id }))

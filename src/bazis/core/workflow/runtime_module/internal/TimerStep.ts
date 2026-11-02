@@ -2,7 +2,7 @@ import type { RuntimeDbContext } from "../model/Runtime.dbContext";
 import type { WfJob } from "../model/WfJob.model";
 import type { WorkflowEngine } from "./WorkflowEngine";
 
-/** One `timer` job: a `timerCatch` step or a boundary timer is due. A closed token drops it. */
+/** One `timer` job: a `timerCatch` step or a boundary timer is due. A closed token drops it. A `loop` job works the same way. */
 export class TimerStep {
   constructor(
     private readonly db: RuntimeDbContext,
@@ -17,5 +17,15 @@ export class TimerStep {
         return await this.engine.timerFired(step, job.tokenId!);
       });
     if (fired === null) await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
+  }
+
+  async continueLoop(job: WfJob): Promise<void> {
+    const went = job.instanceId === null || job.tokenId === null
+      ? null
+      : await this.engine.inStep(job.instanceId, async (step) => {
+        await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
+        return await this.engine.continueLoop(step, job.tokenId!);
+      });
+    if (went === null) await this.db.jobs.asNoTracking().where((j) => j.id.eq(job.id)).executeDelete();
   }
 }

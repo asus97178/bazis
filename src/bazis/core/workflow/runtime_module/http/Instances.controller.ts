@@ -5,7 +5,7 @@ import { buildListDocument } from "../../../../library/jsonapi";
 import { body, callerOf, filterOf, listQuery, optionalString, pagingOfList, param, requiredString } from "../../internal/http";
 import type { InstanceStatus } from "../model/WfInstance.model";
 import { IWorkflowDefinitions } from "../../definitions_module/services/IWorkflowDefinitions.service";
-import { IWorkflowRuntime, type InstanceSummary } from "../services/IWorkflowRuntime.service";
+import { IWorkflowRuntime, type InstanceSummary, type StartManyItem } from "../services/IWorkflowRuntime.service";
 
 /** Instances over HTTP (WORKFLOW-001 §4); rights are `workflow.instances.*` (WORKFLOW-002 §6.2). */
 @Controller("workflow/instances")
@@ -33,12 +33,23 @@ export class InstancesController {
     return Created(`${ctx.path}/${instance.id}`, instance);
   }
 
+  /** A start per element, for an action over many records (WORKFLOW-002 §5.1). */
+  @Post("bulk")
+  @Authorize(can("workflow.instances.start"))
+  async startMany(ctx: HttpContext) {
+    const request = await body(ctx);
+    const processKey = requiredString(request.processKey, "processKey", 64);
+    const partition = optionalString(request.partition, "partition") ?? null;
+    const { actor, request: from, language } = await callerOf(ctx, "workflow.instances.start", { scope: partition, process: processKey, folder: await this.definitions.folderOf(processKey) });
+    return { data: await this.runtime.startMany(processKey, { items: request.items as readonly StartManyItem[], partition, actor, request: from, language }) };
+  }
+
   @Get()
   @Authorize(can("workflow.instances.read"))
   async list(ctx: HttpContext) {
     const { access } = await callerOf(ctx);
     const list = listQuery(ctx, {
-      filter: { partition: ["eq"], processKey: ["eq"], status: ["eq"], businessKey: ["eq"], startedById: ["eq"] },
+      filter: { partition: ["eq"], processKey: ["eq"], status: ["eq"], businessKey: ["eq"], startedById: ["eq"], parentInstanceId: ["eq"] },
       sort: ["createdAt", "endedAt", "status", "processKey"],
     });
     const page = await this.runtime.instances({
@@ -49,6 +60,7 @@ export class InstancesController {
       status: filterOf(list, "status") as InstanceStatus | undefined,
       businessKey: filterOf(list, "businessKey"),
       startedById: filterOf(list, "startedById"),
+      parentInstanceId: filterOf(list, "parentInstanceId"),
     });
     return buildListDocument(page.items, list, page.total, { basePath: ctx.path });
   }

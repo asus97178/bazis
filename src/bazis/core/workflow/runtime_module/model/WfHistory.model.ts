@@ -1,7 +1,7 @@
 import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
-export type HistoryType = "started" | "entered" | "left" | "tool" | "assigned" | "skipped" | "timer" | "event" | "error" | "retried" | "cancelled" | "completed";
+export type HistoryType = "started" | "queued" | "released" | "entered" | "left" | "tool" | "assigned" | "iteration" | "called" | "returned" | "skipped" | "timer" | "event" | "error" | "retried" | "cancelled" | "timedOut" | "handler" | "completed";
 
 /** The journal of an instance, append only. Its v7 ids give the order. */
 @ForeignKey(() => WfInstance, { properties: ["instanceId"], onDelete: "cascade" })

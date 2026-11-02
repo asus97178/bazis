@@ -6,6 +6,7 @@ import { OrderController } from "./http/Order.controller";
 import { OrderDbContext } from "./model/Order.dbContext";
 import { Order } from "./model/Order.model";
 import { orderApproval } from "./process/OrderApproval.process";
+import { orderBatch } from "./process/OrderBatch.process";
 import { IOrderService } from "./services/IOrder.service";
 import { OrderService } from "./services/Order.service";
 import { SetOrderStatusTool } from "./tools/SetOrderStatus.tool";
@@ -18,7 +19,7 @@ import { SetOrderStatusTool } from "./tools/SetOrderStatus.tool";
     migrateOnStart: true,
   },
   permissions: orderPermissions,
-  processes: [orderApproval],
+  processes: [orderApproval, orderBatch],
   tools: [SetOrderStatusTool],
   controllers: [OrderController],
   providers: [

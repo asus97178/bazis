@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.132.0.
+Список — по пакету 0.133.0.
 
 ## Модули
 
@@ -17,7 +17,7 @@
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `IWorkflowDefinitions` | Каталог: `list`, `get`, `folderOf`, `validate`, `palette`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
-| `IWorkflowRuntime` | Исполнение: `start`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowRuntime` | Исполнение: `start`, `startMany`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowTasks` | Входящие задачи: `list`, `get`, `claim`, `release`, `complete` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
 | `defineProcess({ key, title, description?, folder?, owner?, retentionDays?, document })` | Процесс в коде модуля: перечисляется в `@Module({ processes })`, публикуется при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
 | `WorkflowSetupError` | Ошибка конфигурации процессов в коде: при сборке и при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
@@ -40,8 +40,8 @@
 
 ## События
 
-`WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED` (`reason`: `cancelled`, `interrupted`),
-`WORKFLOW_INSTANCE_FINISHED`, `WORKFLOW_INSTANCES_DELETED` (чистка удалила
+`WORKFLOW_TASK_REQUESTED`, `WORKFLOW_TOKEN_CLOSED` (`reason`: `cancelled`, `interrupted`, `timedOut`),
+`WORKFLOW_INSTANCE_FINISHED` (`status`: `completed`, `cancelled`, `timedOut`), `WORKFLOW_INSTANCES_DELETED` (чистка удалила
 экземпляры) ([Задача сотруднику](../../workflow/processes.md#задача-сотруднику)).
 
 Для аудита: `WORKFLOW_PROCESS_CHANGED`, `WORKFLOW_INSTANCE_STARTED`,
@@ -54,7 +54,7 @@
   в метаданных `@Module`.
 - **Каталог:** `ProcessSummary` (с `module` — модулем-владельцем процесса из кода), `ProcessDetails`, `VersionSummary`,
   `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`, `ValidateOptions`.
-- **Исполнение:** `StartInstance`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
+- **Исполнение:** `StartInstance`, `StartMany`, `StartManyItem`, `StartManyResult`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
   `TokenDetails`, `HistoryEntry`, `InstanceListQuery`, `InstanceStatus`,
   `TokenStatus`, `StartedVia`, `HistoryType`.
 - **Задачи:** `TaskDetails`, `TaskListQuery`, `TaskStatus`.

@@ -158,3 +158,24 @@ test.skipIf(!enabled)("the card speaks the language of the request, and a design
   const folders = (await root("GET", "/access/references/workflow.folder")).body.data as { id: string }[];
   expect(folders.map((folder) => folder.id)).toEqual(expect.arrayContaining(["Sales", "Sales/Orders"]));
 });
+
+test.skipIf(!enabled)("a mass start says what became of each element", async () => {
+  const order = (await ann("POST", "/orders", { amount: 5000 })).body;
+  const started = await root("POST", "/workflow/instances/bulk", {
+    processKey: "order-approval",
+    items: [
+      { businessKey: `order:${order.id}`, input: { orderId: order.id, amount: 5000 } },
+      { businessKey: "order:new", input: { orderId: "new", amount: 1 } },
+      { businessKey: "order:bad", input: {} },
+      { input: { orderId: "x", amount: 1 } },
+    ],
+  });
+  expect(started.status).toBe(200);
+  expect(started.body.data.map((item: { status: string; reason?: string }) => [item.status, item.reason])).toEqual([
+    ["skipped", "same_key"],
+    ["started", undefined],
+    ["rejected", "invalid_input"],
+    ["rejected", "business_key_required"],
+  ]);
+  expect((await ann("POST", "/workflow/instances/bulk", { processKey: "order-approval", items: [] })).status).toBe(403);
+});

@@ -494,8 +494,8 @@ test.skipIf(!enabled)("stage 3: a wait takes the event of its correlation; HTTP 
   const scope = app.container.createScope();
   try {
     const runtime = scope.resolve(IWorkflowRuntime);
-    expect(await runtime.emit("payments.received", { amount: 5 })).toEqual({ started: [], continued: [], rejected: [] });
-    expect(await runtime.emit("payments.received", { amount: 10 }, { correlation: "1" })).toEqual({ started: [], continued: [one], rejected: [] });
+    expect(await runtime.emit("payments.received", { amount: 5 })).toEqual({ started: [], skipped: [], continued: [], rejected: [] });
+    expect(await runtime.emit("payments.received", { amount: 10 }, { correlation: "1" })).toEqual({ started: [], skipped: [], continued: [one], rejected: [] });
     expect((await runtime.instance(one))).toMatchObject({ status: "completed", vars: { payment: { amount: 10 } } });
     expect((await runtime.instance(two)).status).toBe("running");
   } finally {

@@ -122,7 +122,8 @@ export class ProcessesController {
   async validate(ctx: HttpContext) {
     const request = await body(ctx);
     const { actor, language } = await callerOf(ctx);
-    return { issues: await this.definitions.validate(request.document, { actor, language }) };
+    const key = optionalString(request.key, "key", 64);
+    return { issues: await this.definitions.validate(request.document, { actor, language, ...(key === undefined ? {} : { processes: [key] }) }) };
   }
 
   /** What a designer builds its forms from (WORKFLOW-002 §4.2). */

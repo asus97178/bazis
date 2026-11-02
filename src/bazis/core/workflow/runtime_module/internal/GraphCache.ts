@@ -10,6 +10,8 @@ export interface ProcessGraph {
   readonly incoming: ReadonlyMap<string, readonly (readonly [string, ProcessFlow])[]>;
   /** Boundary nodes by the step they are attached to. */
   readonly boundaries: ReadonlyMap<string, readonly (readonly [string, ProcessNode])[]>;
+  /** The node an iteration begins with, by loop. */
+  readonly entries: ReadonlyMap<string, string>;
 }
 
 export function buildGraph(versionId: string, processKey: string, version: number, document: ProcessDocument): ProcessGraph {
@@ -23,7 +25,11 @@ export function buildGraph(versionId: string, processKey: string, version: numbe
   for (const [id, node] of Object.entries(document.nodes)) {
     if (node.attachedTo !== undefined) boundaries.set(node.attachedTo, [...boundaries.get(node.attachedTo) ?? [], [id, node]]);
   }
-  return { versionId, processKey, version, document, outgoing, incoming, boundaries };
+  const entries = new Map<string, string>();
+  for (const [id, node] of Object.entries(document.nodes)) {
+    if (node.parent !== undefined && node.attachedTo === undefined && !incoming.has(id)) entries.set(node.parent, id);
+  }
+  return { versionId, processKey, version, document, outgoing, incoming, boundaries, entries };
 }
 
 /** Graphs of versions in memory. Versions are immutable, so entries never go stale; the oldest go first past the limit. */

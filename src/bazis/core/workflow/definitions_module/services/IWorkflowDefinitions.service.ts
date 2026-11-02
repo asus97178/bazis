@@ -76,6 +76,8 @@ export interface ProcessListQuery extends WorkflowPaging {
 export interface ValidateOptions {
   readonly language?: string;
   readonly actor?: WorkflowActor;
+  /** Keys that count as published besides the catalog: the process itself, processes of the code about to be published. */
+  readonly processes?: readonly string[];
 }
 
 export interface SaveDraftOptions extends WorkflowAuditOptions, Pick<ValidateOptions, "language"> {

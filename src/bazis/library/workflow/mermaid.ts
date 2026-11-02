@@ -13,6 +13,8 @@ const SHAPES: Record<NodeKind, readonly [open: string, close: string]> = {
   end: ["((", "))"],
   userTask: ["[", "]"],
   serviceTask: ["[[", "]]"],
+  callProcess: ["[[", "]]"],
+  loop: ["[", "]"],
   assign: ["[/", "/]"],
   timerCatch: ["{{", "}}"],
   eventWait: ["{{", "}}"],
@@ -25,7 +27,7 @@ const SHAPES: Record<NodeKind, readonly [open: string, close: string]> = {
 
 /**
  * A process as a Mermaid `flowchart` (WORKFLOW-001 §14): starts are stadiums,
- * Tool steps subroutines, tasks rectangles, waits hexagons, gateways rhombi,
+ * Tool steps and called processes subroutines, a loop a subgraph around its body, tasks rectangles, waits hexagons, gateways rhombi,
  * ends and boundary events circles. A boundary event hangs on its step by a
  * dotted link. Labels show the node kind's detail: the Tool, the cron, the
  * duration, the event key; flows show their title or condition.
@@ -43,11 +45,23 @@ export function processToMermaid(document: ProcessDocument, direction: "LR" | "T
     return id;
   };
   const lines = [`flowchart ${direction}`];
-  for (const [nodeId, node] of Object.entries(document.nodes)) {
-    const [open, close] = SHAPES[node.kind] ?? ["[", "]"];
-    const detail = detailOf(node.kind, node.config ?? {});
-    lines.push(`  ${idOf(nodeId)}${open}"${label(textOf(node.title, "en") || nodeId)}${detail === undefined ? "" : `<br/><small>${label(detail)}</small>`}"${close}`);
-  }
+  // A loop is a subgraph around its body; flows and boundaries link to it by its id.
+  const write = (parent: string | undefined, indent: string): void => {
+    for (const [nodeId, node] of Object.entries(document.nodes)) {
+      if (node.parent !== parent) continue;
+      const detail = detailOf(node.kind, node.config ?? {});
+      const text = `${label(textOf(node.title, "en") || nodeId)}${detail === undefined ? "" : `<br/><small>${label(detail)}</small>`}`;
+      if (node.kind === "loop") {
+        lines.push(`${indent}subgraph ${idOf(nodeId)}["${text}"]`);
+        write(nodeId, `${indent}  `);
+        lines.push(`${indent}end`);
+        continue;
+      }
+      const [open, close] = SHAPES[node.kind] ?? ["[", "]"];
+      lines.push(`${indent}${idOf(nodeId)}${open}"${text}"${close}`);
+    }
+  };
+  write(undefined, "  ");
   for (const [nodeId, node] of Object.entries(document.nodes)) {
     if (node.attachedTo !== undefined && document.nodes[node.attachedTo] !== undefined) lines.push(`  ${idOf(node.attachedTo)} -.- ${idOf(nodeId)}`);
   }
@@ -63,6 +77,8 @@ function detailOf(kind: NodeKind, config: Readonly<Record<string, unknown>>): st
   const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined);
   switch (kind) {
     case "serviceTask": return text(config.tool);
+    case "callProcess": return text(config.process);
+    case "loop": return typeof config.times === "number" ? `${config.times} times` : config.while !== undefined ? "while" : "for each";
     case "scheduleStart": return text(config.cron);
     case "eventStart":
     case "eventWait":

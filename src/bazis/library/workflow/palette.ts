@@ -17,6 +17,8 @@ export interface PaletteTool {
 export interface PaletteNodeKind {
   readonly kind: NodeKind;
   readonly role: NodeRole;
+  /** A container: other nodes name it as their `parent`. */
+  readonly container?: boolean;
   readonly config: JsonSchema;
 }
 
@@ -31,7 +33,7 @@ export interface ProcessPalette {
 /** The palette with the application's Tools: a new Tool appears in a designer without a release of the framework. */
 export function processPalette(tools: readonly PaletteTool[]): ProcessPalette {
   return {
-    nodeKinds: NODE_KINDS.map(({ kind, role, config }) => ({ kind, role, config })),
+    nodeKinds: NODE_KINDS.map(({ kind, role, container, config }) => ({ kind, role, ...(container === undefined ? {} : { container }), config })),
     functions: EXPRESSION_FUNCTIONS,
     paths: DATA_PATHS,
     tools,

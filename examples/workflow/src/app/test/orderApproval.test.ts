@@ -79,3 +79,29 @@ test.skipIf(!enabled)("a big order nobody looked at for two days is rejected", a
     expect((await wf.instance(await instanceOf(wf, id))).output).toEqual({ decision: "rejected" });
   });
 });
+
+test.skipIf(!enabled)("a batch calls the approval of each order and gives back the decisions in order", async () => {
+  await run(async (wf, place, status) => {
+    const small = await place(100);
+    const big = await place(5000);
+    await wf.drain();
+    const batch = await wf.start("order-batch", { input: { orders: [{ orderId: small, amount: 100 }, { orderId: big, amount: 5000 }] } });
+    await wf.drain();
+    expect((await wf.instance(batch.id)).status).toBe("running");
+
+    const scope = wf.app.container.createScope();
+    const children = await scope.resolve(IWorkflowRuntime).instances({ parentInstanceId: batch.id });
+    await scope.dispose();
+    expect(children.total).toBe(2);
+    // The batch acts for itself, and so do the approvals it called.
+    expect(children.items[0]!.startedBy).toEqual({ kind: "system", id: "process:order-batch" });
+
+    const waiting = children.items.find((item) => item.status === "running")!;
+    await wf.complete(waiting.id, "Review", { approved: false });
+    await wf.drain();
+    const done = await wf.instance(batch.id);
+    expect(done.status).toBe("completed");
+    expect(done.output).toEqual({ decisions: ["approved", "rejected"] });
+    expect(await status(big)).toBe("rejected");
+  });
+});

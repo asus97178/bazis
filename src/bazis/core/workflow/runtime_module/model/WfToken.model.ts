@@ -2,8 +2,9 @@ import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
 /**
- * `active` passes a node, `waiting` waits for a Tool, a task or a join, `done`
- * moved on, `cancelled` was closed by a cancel, `failed` waits for a retry.
+ * `active` passes a node, `waiting` waits for a Tool, a task, a join, a loop or a
+ * called process, `done` moved on, `cancelled` was closed by a cancel, `failed`
+ * waits for a retry.
  */
 export type TokenStatus = "active" | "waiting" | "done" | "cancelled" | "failed";
 
@@ -28,10 +29,11 @@ export class WfToken {
   @Column({ type: "text" })
   status: TokenStatus = "active";
 
+  /** A step's result; a loop keeps its progress here while it runs. */
   @Column({ type: "json", nullable: true })
   output: unknown = null;
 
-  /** The loop token this one runs inside, with its iteration and what only the body sees (stage 3). */
+  /** The loop token this one runs inside, with its iteration and what only the body sees: `Locals` of the engine. */
   @Column({ type: "text", nullable: true })
   parentTokenId: string | null = null;
 
