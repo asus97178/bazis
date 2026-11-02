@@ -4,6 +4,42 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.134.0 — 2026-11-03
+
+How processes start and what they wait for (stage 4 of WORKFLOW-002): time zones,
+partitions, delivery in the application's transaction, deleting a process and Tools
+made from entities. Stores stay as they are.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01340).
+
+### Added
+
+- `scheduleStart`: `timezone`, `from`, `until`, `overlap` (`skip`, `queue`, `parallel`),
+  `catchUp`, `partitions` (`none`, `all`, a list). `$trigger.scheduledAt` names the firing.
+  `parseCron(expression, timezone?)`, `isTimeZone`, `ISO_MOMENT`.
+- `eventStart`: `filter`, `debounce`, `delay`, `ignoreOwn`. `eventWait`: `until`.
+  `EmitOptions.cause`, `EmitResult.deferred`.
+- `WorkflowPartitions`: where a process works, with the time zone of a partition.
+- `emitLater(tx, eventKey, payload, options)`: an event written in the application's
+  transaction and delivered by the worker; each process starts once.
+- `DELETE /workflow/processes/:key`, `IWorkflowDefinitions.remove`, `partitionsOf`,
+  the error code `in_use`, the change `deleted`.
+- `bazis/core/tools`: `ormEntityTools` with `partitionField`, `StandardToolsModule` with
+  the reference kinds `orm.entity` and `orm.field`.
+- `@Tool({ inputSchema, outputSchema })` for Tools made at run time; `context.dryRun`,
+  `ToolRunOptions.dryRun`.
+- `StartMany`, `StartManyItem`, `StartManyResult` are exported.
+
+### Changed (breaking)
+
+- An event with a partition starts only processes `WorkflowPartitions` connects to it.
+  The default port knows only the partition `null`.
+- `workflow.processes.read` has a scope, the partitions of the process: a check of it
+  in code passes `scope`.
+- `EmitResult.deferred` is required. `IWorkflowRuntime` has `emitLater`,
+  `IWorkflowDefinitions` has `remove` and `partitionsOf`.
+- Scheduled starts have a job per node and partition: a firing overdue at the moment
+  of the upgrade does not run.
+
 ## 0.133.0 — 2026-11-02
 
 Loops, called processes and run settings (stage 3 of WORKFLOW-002). Documents,
