@@ -65,8 +65,6 @@ export type ProcessIssueCode =
 export const PROCESS_LIMITS = Object.freeze({ nodes: 500, flows: 1000, bytes: 1_000_000 });
 
 const ID = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
-/** Paths that come with later stages of WORKFLOW-002: until then they are an error, not a silent literal. */
-const NOT_YET = /^\$secrets(\.|$)/;
 /** Who a boundary error may hang on: the steps that fail by an error of their own. */
 const CAN_FAIL: ReadonlySet<string | undefined> = new Set(["serviceTask", "callProcess", "loop"]);
 
@@ -447,7 +445,7 @@ function configExpressionProblems(kind: string, config: Json, scope: ExpressionS
       if (problem) out.push(`config.assignments[${index}].value: ${problem}`);
     }
   }
-  if ((kind === "serviceTask" || kind === "callProcess") && config.input !== undefined) walkInput(config.input, "config.input", scope, out);
+  if ((kind === "serviceTask" || kind === "callProcess") && config.input !== undefined) walkInput(config.input, "config.input", kind === "serviceTask" ? { ...scope, secrets: true } : scope, out);
   if (kind === "loop" && config.over !== undefined) {
     const problem = checkExpression(config.over, scope);
     if (problem) out.push(`config.over: ${problem}`);
@@ -475,8 +473,10 @@ function configExpressionProblems(kind: string, config: Json, scope: ExpressionS
 
 function walkInput(value: unknown, at: string, scope: ExpressionScope, out: string[]): void {
   if (typeof value === "string") {
-    if (NOT_YET.test(value)) out.push(`${at}: ${value} is not supported`);
-    else if (isPath(value)) {
+    if (value === "$secrets" || value.startsWith("$secrets.")) {
+      const problem = checkPath(value, scope);
+      if (problem) out.push(`${at}: ${problem}`);
+    } else if (isPath(value)) {
       const problem = checkPath(value, scope);
       if (problem) out.push(`${at}: ${problem}`);
     }

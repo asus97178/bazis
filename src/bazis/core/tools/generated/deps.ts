@@ -2,9 +2,14 @@
 // Do not edit manually.
 import { registerFrameworkClassDeps } from "../../di/module/autoDeps";
 import { ServiceProvider } from "../../di/ServiceProvider";
+import { Configuration } from "../../kernel/config/Configuration";
+import { HttpRequestTool } from "../http/HttpRequest.tool";
 import { OrmEntityReferences, OrmFieldReferences } from "../orm/OrmEntity.references";
+import { ConfigSecretStore } from "../secrets/SecretStore";
 
 registerFrameworkClassDeps([
+  [ConfigSecretStore, [Configuration]],
+  [HttpRequestTool, ["Config:tools"]],
   [OrmEntityReferences, [ServiceProvider]],
   [OrmFieldReferences, [ServiceProvider]],
 ]);

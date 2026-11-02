@@ -29,5 +29,5 @@ test("bazis workflow check tells of a kind no module owns", () => {
   class With {}
   const inspection = inspectProcesses(With);
   expect(inspection.errors).toEqual([]);
-  expect(inspection.tools).toEqual(["orm.note.find"]);
+  expect([...inspection.tools].sort()).toEqual(["http.request", "orm.note.find"]);
 });

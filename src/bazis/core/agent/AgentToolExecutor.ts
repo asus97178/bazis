@@ -62,6 +62,8 @@ export interface AgentToolExecutionContext {
   readonly actor?: ToolActor;
   /** A trial: the Tool, one with `dryRun: "supported"`, changes nothing (WORKFLOW-002 §5.4). */
   readonly dryRun?: boolean;
+  /** Who calls: `"agent"` or the caller id of `ToolRunner.as`. */
+  readonly caller?: string;
   readonly metadata: JsonObject;
   readonly signal: AbortSignal;
 }
@@ -1672,6 +1674,7 @@ export class AgentToolExecutor {
       approval,
       ...(options.actor !== undefined ? { actor: options.actor } : {}),
       ...(options.dryRun === true ? { dryRun: true } : {}),
+      ...(callerOf(options) === undefined ? {} : { caller: callerOf(options)! }),
       metadata,
       signal,
     });

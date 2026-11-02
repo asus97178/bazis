@@ -1,7 +1,7 @@
 # WorkflowModule
 
 Passport version: 1.2. Check date: 2026-11-03.
-Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md) and stages 0–5 of [WORKFLOW-002](../../../../docs/architecture/WORKFLOW_BUILDER.md); checks below.
+Status: implemented for stages 1–5 of [WORKFLOW-001](../../../../docs/architecture/WORKFLOW.md) and stages 0–6 of [WORKFLOW-002](../../../../docs/architecture/WORKFLOW_BUILDER.md); checks below.
 Type: composite.
 Path: `src/bazis/core/workflow`.
 Connection point: [Workflow.module.ts](Workflow.module.ts), class `WorkflowModule`; public entry `bazis/core/workflow`.

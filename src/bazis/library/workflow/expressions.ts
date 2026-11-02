@@ -267,6 +267,8 @@ export interface ExpressionScope {
   readonly nodes?: ReadonlySet<string>;
   /** Whether it is read inside a loop body: `$item` and `$index` exist only there. */
   readonly loop?: boolean;
+  /** Whether it is the input of a Tool: `$secrets` exists only there, a value must go nowhere else. */
+  readonly secrets?: boolean;
 }
 
 /** What is wrong with an expression, or `null`: its shape, functions, argument types, paths and limits. */
@@ -333,11 +335,16 @@ function literalArgumentProblem(name: ExprFunctionName, args: readonly unknown[]
 
 /** What is wrong with a `$` path, or `null`. */
 export function checkPath(path: unknown, scope: ExpressionScope = {}): string | null {
-  if (typeof path !== "string" || !DATA_PATH.test(path)) return `path ${JSON.stringify(path)} must look like $input.field, $vars.name, $nodes.Node.field, $event.field, $trigger, $run.id, $now, $item.field or $index`;
+  if (typeof path !== "string" || !DATA_PATH.test(path)) return `path ${JSON.stringify(path)} must look like $input.field, $vars.name, $nodes.Node.field, $event.field, $trigger, $run.id, $now, $item.field, $index or $secrets.NAME`;
   const [root, first] = path.split(".");
   if (root === "$now" && first !== undefined) return "$now has no fields";
   if (root === "$index" && first !== undefined) return "$index has no fields";
   if ((root === "$item" || root === "$index") && scope.loop === false) return `path ${path}: ${root} exists only inside a loop body`;
+  if (root === "$secrets") {
+    if (scope.secrets !== true) return `path ${path}: $secrets exists only in the input of a Tool`;
+    if (first === undefined || path.split(".").length !== 2) return "$secrets needs a name: $secrets.NAME";
+    return null;
+  }
   if (root === "$nodes" && first === undefined) return "$nodes needs a node: $nodes.Node.field";
   if (first === undefined) return null;
   if (root === "$input" && scope.input && !scope.input.has(first)) return `path ${path}: the input has no field ${first}`;

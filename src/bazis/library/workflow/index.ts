@@ -22,7 +22,7 @@ export {
 } from "./ProcessDocument";
 export { NODE_KINDS, nodeKindOf, ISO_DURATION, MAX_ITERATIONS, MAX_LOOP_PARALLEL, PROCESS_KEY, ISO_MOMENT, type JsonSchema, type NodeKindDefinition, type NodeRole } from "./nodeKinds";
 export { PROCESS_LIMITS, validateProcess, hasErrors, type ProcessIssue, type ProcessIssueCode, type ValidateProcessOptions } from "./validateProcess";
-export { DATA_PATH, DATA_PATHS, isPath, readPath, resolveInput, type InstanceData } from "./paths";
+export { DATA_PATH, DATA_PATHS, isPath, readPath, resolveInput, secretNames, type InstanceData } from "./paths";
 export {
   EXPRESSION_FUNCTIONS,
   EXPRESSION_LIMITS,

@@ -1,5 +1,8 @@
 import type { AgentSchemaContract, AgentToolResult } from "../../../agent";
-import { durationMs, inputReferences, maskByMapping, maskBySchema, masksPersonal, personalPaths, resolveInput, type ProcessDocument } from "../../../../library/workflow";
+import { redactValues, rememberSecretValue } from "../../../../library/redaction";
+import { durationMs, inputReferences, maskByMapping, maskBySchema, masksPersonal, personalPaths, resolveInput, secretNames, type ProcessDocument } from "../../../../library/workflow";
+import type { ServiceProvider } from "../../../di";
+import { SecretStore } from "../../../tools/secrets/SecretStore";
 import type { WorkflowToolMetadata } from "../../contracts/types";
 import type { WorkflowLanguages } from "../../internal/WorkflowLanguages";
 import type { WorkflowReferences } from "../../internal/WorkflowReferences";
@@ -27,6 +30,8 @@ export class ToolStep {
     private readonly tools: WorkflowTools,
     private readonly references: WorkflowReferences,
     private readonly languages: WorkflowLanguages,
+    /** The scope: the application's own `SecretStore` replaces the default. */
+    private readonly services: ServiceProvider,
   ) {}
 
   async run(job: WfJob, signal: AbortSignal): Promise<void> {
@@ -39,7 +44,9 @@ export class ToolStep {
     const graph = await this.engine.graphOf(instance.versionId);
     const node = graph.document.nodes[token.nodeId];
     const name = String(node?.config?.tool ?? "");
-    const input = resolveInput(node?.config?.input ?? {}, dataOf(instance, this.engine.now(), token));
+    const { values: secrets, missing: noSecret } = await this.secretsOf(node?.config?.input, instance.partition);
+    const revealed = Object.values(secrets);
+    const input = resolveInput(node?.config?.input ?? {}, { ...dataOf(instance, this.engine.now(), token), secrets });
     const timeoutMs = stepTimeoutMs(node?.config?.timeout, graph.document);
     // A step may run longer than the lease: another worker must not take the job and call the Tool again meanwhile.
     if (timeoutMs !== undefined && timeoutMs >= LEASE_MS) {
@@ -48,8 +55,10 @@ export class ToolStep {
     const runner = this.tools.bound;
     const trial = instance.test ? runner?.getTool(name)?.metadata.dryRun : undefined;
     const missing = await this.references.missing(inputReferences(this.references.inputSchemaOf(name), input), { scope: instance.partition, language: this.languages.default });
-    const result: AgentToolResult = runner === undefined
+    const raw: AgentToolResult = runner === undefined
       ? { callId: token.id, name, status: "error", error: { code: "TOOL_NOT_FOUND", message: `Tool ${name} is not available to processes` }, metadata: {} } as AgentToolResult
+      : noSecret !== undefined
+      ? { callId: token.id, name, status: "error", error: { code: "secret_not_found", message: `There is no secret ${noSecret}`, details: { reason: "secret_not_found" } }, metadata: {} } as AgentToolResult
       : missing.length > 0
       // A value computed by the process, or one that is gone since the publication (WORKFLOW-002 §6.3).
       ? { callId: token.id, name, status: "error", error: { code: "ref_not_found", message: `${missing[0]!.kind} ${JSON.stringify(missing[0]!.id)} does not exist`, details: { reason: "ref_not_found", path: missing[0]!.path } }, metadata: {} } as AgentToolResult
@@ -65,9 +74,11 @@ export class ToolStep {
         ...(timeoutMs === undefined ? {} : { timeoutMs }),
       });
 
+    // What the Tool got back from the outside may echo a secret: it goes no further than the Tool.
+    const result = redactValues(raw, revealed);
     const timedOut = TIMEOUT_CODES.has(result.error?.code ?? "");
     const reason = timedOut ? "timeout" : reasonOf(result);
-    const payloads = graph.document.settings?.log?.toolPayloads === true ? this.payloads(graph.document, name, node?.config?.input, input, result) : {};
+    const payloads = graph.document.settings?.log?.toolPayloads === true ? redactValues(this.payloads(graph.document, name, node?.config?.input, input, result), revealed) : {};
     await this.engine.inStep(instance.id, async (step) => {
       const current = step.tokens.find((t) => t.id === token.id);
       const retryAt = current?.status === "waiting" && step.instance.status === "running" && result.status === "error" && (reason === undefined || timedOut)
@@ -101,6 +112,21 @@ export class ToolStep {
         });
       }
     });
+  }
+
+  /** The values of `$secrets` this input names, and the first one there is not. Remembered, so that a log masks them too. */
+  private async secretsOf(input: unknown, partition: string | null): Promise<{ readonly values: Record<string, string>; readonly missing?: string }> {
+    const values: Record<string, string> = {};
+    const names = secretNames(input);
+    if (names.length === 0) return { values };
+    const store = this.services.tryResolve(SecretStore);
+    for (const name of names) {
+      const value = await store?.get(name, { partition });
+      if (value === undefined) return { values, missing: name };
+      rememberSecretValue(value);
+      values[name] = value;
+    }
+    return { values };
   }
 
   /** The input and output for the history under `log.toolPayloads`; personal data is masked unless `log.maskPersonal` is `false`. */

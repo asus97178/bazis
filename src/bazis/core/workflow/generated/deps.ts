@@ -65,7 +65,7 @@ registerFrameworkClassDeps([
   [TasksController, [IWorkflowTasks]],
   [TasksDbContext, [DbContextOptions]],
   [TimerStep, [RuntimeDbContext, WorkflowEngine]],
-  [ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools, WorkflowReferences, WorkflowLanguages]],
+  [ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools, WorkflowReferences, WorkflowLanguages, ServiceProvider]],
   [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowReferences, ServiceProvider]],
   [WorkflowEngine, [RuntimeDbContext, IWorkflowDefinitions, GraphCache, WorkflowEvents, WorkflowClock]],
   [WorkflowEvents, [EventBus, ServiceProvider, "optional:Logger"]],

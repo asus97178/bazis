@@ -272,6 +272,7 @@ class CmsExtensions extends WorkflowExtensions {
 | `timezone`, `from`, `until`, `overlap`, `catchUp`, `partitions` в `scheduleStart` | [Расписание](#расписание) | 0.134.0 |
 | `filter`, `debounce`, `delay`, `ignoreOwn` в `eventStart`; `until` в `eventWait` | [Запуск по событию](#запуск-по-событию) | 0.134.0 |
 | `test` при запуске | [Пробный запуск](#пробный-запуск) | 0.135.0 |
+| `$secrets.NAME` во входе инструмента, `http.request` | [HTTP-запрос и секреты](#http-запрос-и-секреты) | 0.136.0 |
 | `assign` | Записывает значения выражений в переменные | 0.132.0 |
 | `loop` | Повторяет свои шаги: по списку, по условию, сколько-то раз | 0.133.0 |
 | `callProcess` | Запускает другой процесс и ждёт его конца | 0.133.0 |
@@ -802,6 +803,95 @@ history: timer Late {"firedAt":"…:39:09.571Z","interrupting":true}
 > [!WARNING]
 > Вызванный с `maxConcurrent` занимает место как любой экземпляр. Процесс с
 > `maxConcurrent: 1`, который вызывает сам себя, будет ждать сам себя вечно.
+
+## HTTP-запрос и секреты
+
+Модуль `StandardToolsModule` даёт шаг `http.request`. Без настройки он никуда не ходит:
+
+```ts
+import { StandardToolsModule } from "bazis/core/tools";
+
+@Module({ imports: [StandardToolsModule, WorkflowModule] })
+export class AppModule {}
+```
+
+```sh
+BAZIS_TOOLS__HTTP__ALLOW=api.example.com,*.example.org
+BAZIS_SECRETS__CRM_TOKEN=…
+```
+
+```json
+"Notify": { "kind": "serviceTask", "title": "Сообщить в CRM", "config": {
+  "tool": "http.request",
+  "input": {
+    "method": "POST",
+    "url": { "op": "concat", "args": ["https://api.example.com/orders/", { "path": "$input.orderId" }] },
+    "auth": { "type": "bearer", "token": "$secrets.CRM_TOKEN" },
+    "body": { "status": "approved" },
+    "successCodes": [200, 201]
+  },
+  "saveTo": "crm",
+  "retry": { "maxAttempts": 3 }
+} }
+```
+
+| Поле входа | Что значит |
+| --- | --- |
+| `method` | `GET` (по умолчанию), `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE` |
+| `url` | Адрес; пароля в нём быть не может, он идёт в `auth` |
+| `headers` | Заголовки |
+| `body` | Уходит как JSON |
+| `auth` | `{ "type": "none" }`, `bearer` с `token`, `basic` с `username` и `password`, `apiKey` с `header` и `value` |
+| `successCodes` | Какие коды считать успехом; по умолчанию 2xx |
+| `timeoutMs` | Срок; не больше `tools.http.timeoutMs` |
+
+Результат — `{ status, headers, body }`: `body` — JSON, если ответ в JSON, иначе текст; `set-cookie` не отдаётся.
+
+**Ошибки.** Код вне успешных — ошибка с причиной `http_<код>`: её ловит `boundaryError` с `errorCode: "http_404"`, а `retry` не повторяет.
+5xx, 429, сеть и срок — обычная ошибка, `retry` их повторяет. Остальные причины: `host_not_allowed`, `address_not_allowed`, `too_many_redirects`,
+`response_too_large`, `invalid_input`, `caller_not_allowed`.
+
+**Защита.**
+
+- Пустой `tools.http.allow` — запросов нет. Записи: `api.example.com`, `*.example.com` (только поддомены), `localhost:8080`, `[::1]`.
+- После DNS проверяется адрес: частные, loopback, link-local, multicast и служебные запрещены, даже если хост в списке. Обычный `http` идёт на уже проверенный адрес, поэтому имя не подменить между проверкой и запросом; `https` держит сертификат.
+- Редиректы — не больше пяти, каждый проверяется так же. На другой хост не уходят `authorization`, `cookie` и ключ `apiKey`.
+- Ответ — не больше `tools.http.maxResponseBytes` (1 МБ), срок — `tools.http.timeoutMs` (30 секунд).
+- В [пробном запуске](#пробный-запуск) уходят только `GET` и `HEAD`, остальное возвращает `{ "dryRun": true }`.
+
+`tools.http.allowPrivateNetworks` разрешает частные адреса хостов из списка: для сервисов внутри своей сети и тестов.
+`tools.http.callers` — кто может вызывать: по умолчанию `workflow`, для агентов добавьте `agent`.
+
+### Секреты
+
+`$secrets.ИМЯ` работает только во входе инструмента, строкой или внутри выражения. В документе остаётся имя, значение подставляет исполнитель
+перед самым вызовом и вырезает его из того, что вернулось: результата шага, `saveTo`, истории, `log.toolPayloads`, сообщения об ошибке. Поэтому
+ответ сервера, повторивший токен, в процесс его не принесёт. В `assign`, `callProcess`, `until` и других местах `$secrets` — ошибка документа: значение
+осело бы в переменных.
+
+Нет такого секрета — ошибка шага `secret_not_found` с именем. По умолчанию значения берутся из конфигурации: `BAZIS_SECRETS__CRM_TOKEN` даёт `$secrets.CRM_TOKEN`.
+Своё хранилище, например у каждого арендатора свои ключи:
+
+```ts
+import { SecretStore, type SecretContext } from "bazis/core/tools";
+
+class VaultSecrets extends SecretStore {
+  constructor(private readonly vault: VaultClient) {
+    super();
+  }
+
+  async get(name: string, context: SecretContext): Promise<string | undefined> {
+    return await this.vault.read(`${context.partition ?? "common"}/${name}`);
+  }
+}
+
+@Module({ imports: [StandardToolsModule], providers: [singleton(SecretStore, VaultSecrets)] })
+export class SecretsModule {}
+```
+
+> [!WARNING]
+> Журнал приложения маскирует значение по [общему правилу](../security/secrets.md#что-маскируется-в-логах): только от 10 символов.
+> Секрет короче из процесса всё равно вырезается, но в журнал приложения может попасть, если инструмент напишет его в ошибке.
 
 ## Пробный запуск
 
