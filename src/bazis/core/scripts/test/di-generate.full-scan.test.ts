@@ -55,7 +55,7 @@ test("codegen declares isolated production and test targets", async () => {
         ],
       },
     },
-    framework: { packs: ["src/bazis/core/access", "src/bazis/core/workflow"] },
+    framework: { packs: ["src/bazis/core/access", "src/bazis/core/tools", "src/bazis/core/workflow"] },
   });
 });
 

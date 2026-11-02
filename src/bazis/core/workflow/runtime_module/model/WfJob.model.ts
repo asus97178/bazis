@@ -7,9 +7,10 @@ import { WfInstance } from "./WfInstance.model";
  * `call` starts a called process, `returned` tells the caller it ended,
  * `cancelChildren` closes what a closed step called. `runTimeout` ends a run that
  * took too long, `release` starts instances that wait for a place, `errorHandler`
- * starts the process that handles a failure.
+ * starts the process that handles a failure. `event` delivers what `emitLater`
+ * wrote, `eventStart` starts a process by an event after `delay` or `debounce`.
  */
-export type JobKind = "tool" | "timer" | "schedule" | "loop" | "call" | "returned" | "cancelChildren" | "runTimeout" | "release" | "errorHandler";
+export type JobKind = "tool" | "timer" | "schedule" | "loop" | "call" | "returned" | "cancelChildren" | "runTimeout" | "release" | "errorHandler" | "event" | "eventStart";
 
 /**
  * Deferred work of the worker, created in the same transaction as the waiting
@@ -26,7 +27,7 @@ export class WfJob {
   @Column({ type: "text" })
   kind: JobKind = "tool";
 
-  /** `null` for a `schedule` job: its instance does not exist yet. */
+  /** `null` for `schedule`, `event` and `eventStart` jobs: the instance does not exist yet. */
   @Index()
   @Column({ type: "text", nullable: true })
   instanceId: string | null = null;
@@ -35,7 +36,7 @@ export class WfJob {
   @Column({ type: "text", nullable: true })
   tokenId: string | null = null;
 
-  /** The version a `schedule` job starts. */
+  /** The version a `schedule` or `eventStart` job starts. */
   @Column({ type: "text", nullable: true })
   versionId: string | null = null;
 
@@ -47,12 +48,12 @@ export class WfJob {
   @Column({ type: "json", nullable: true })
   payload: unknown = null;
 
-  /** Jobs with one key merge into the last: `debounce` of an event start (stage 4). */
+  /** Jobs with one key merge into the last: `debounce` of an event start. */
   @Index()
   @Column({ type: "text", nullable: true })
   dedupeKey: string | null = null;
 
-  /** The partition and the start node of a `schedule` job (stage 4). */
+  /** The partition and the start node of a `schedule` or `eventStart` job. */
   @Column({ type: "text", nullable: true })
   partition: string | null = null;
 

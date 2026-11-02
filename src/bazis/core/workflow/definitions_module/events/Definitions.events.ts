@@ -1,7 +1,7 @@
 import { createEventToken } from "../../../kernel";
 import type { WorkflowActor, WorkflowRequest } from "../../contracts/types";
 
-export type ProcessChange = "created" | "updated" | "draftSaved" | "published" | "archived" | "restored";
+export type ProcessChange = "created" | "updated" | "draftSaved" | "published" | "archived" | "restored" | "deleted";
 
 /** A process of the catalog changed, for the application's audit. Published after the commit. */
 export interface WorkflowProcessChanged {

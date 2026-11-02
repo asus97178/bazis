@@ -102,6 +102,8 @@ export abstract class IWorkflowDefinitions {
   abstract get(key: string): Promise<ProcessDetails>;
   /** The folder of a process, for a check of rights; `null` also for a process that does not exist. */
   abstract folderOf(key: string): Promise<string | null>;
+  /** The partitions a process works in, for a check of rights. */
+  abstract partitionsOf(key: string): Promise<readonly (string | null)[]>;
   /** Every finding of a document, with the application's `extensions` checks; nothing is stored. */
   abstract validate(document: unknown, options?: ValidateOptions): Promise<readonly ProcessIssue[]>;
   /** What a designer builds its forms from: node kinds, functions, paths and Tools. */
@@ -109,6 +111,12 @@ export abstract class IWorkflowDefinitions {
   abstract create(process: CreateProcess, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<ProcessDetails>;
   /** A process declared in code takes only `archived`; other fields give `conflict`. */
   abstract update(key: string, changes: UpdateProcess, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<ProcessDetails>;
+  /**
+   * Deletes an archived process with its versions: `wrong_status` when it is not
+   * archived, `conflict` when it is declared in code, `in_use` when it has unfinished
+   * instances or partitions. Finished instances and their history stay.
+   */
+  abstract remove(key: string, actor: WorkflowActor, options?: WorkflowAuditOptions): Promise<void>;
   /** Stores the draft even with errors; `conflict` for a process declared in code and when `expected` is out of date. */
   abstract saveDraft(key: string, document: unknown, actor: WorkflowActor, options?: SaveDraftOptions): Promise<SavedDraft>;
   /**

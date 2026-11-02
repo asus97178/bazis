@@ -49,6 +49,10 @@ export interface BeginOptions {
   readonly parent?: { readonly instanceId: string; readonly tokenId: string; readonly depth: number };
   /** What led to the start: `$trigger.cause`. */
   readonly cause?: Readonly<Record<string, unknown>>;
+  /** It waits as `pending` whatever the limits say: `overlap: "queue"`. */
+  readonly queued?: boolean;
+  /** The firing a scheduled start belongs to: `$trigger.scheduledAt`. */
+  readonly scheduledAt?: Date;
 }
 
 /** Why a step failed. `reason` is the business reason an error boundary may name. */
@@ -160,7 +164,8 @@ export class WorkflowEngine {
     return await this.db.transactionScope(async (transaction) => {
       const admission = await this.admit(graph, options.businessKey);
       if (typeof admission === "object") return { id: admission.skippedBy, skipped: true };
-      const instance = this.newInstance(graph, options, admission === "queue" ? "pending" : "running");
+      const waits = admission === "queue" || options.queued === true;
+      const instance = this.newInstance(graph, options, waits ? "pending" : "running");
       this.db.instances.add(instance);
       await this.db.saveChanges();
       const step = this.stepOf(instance, [], graph);
@@ -170,7 +175,7 @@ export class WorkflowEngine {
         payload: { instanceId: instance.id, processKey: graph.processKey, version: graph.version, partition: options.partition, businessKey: options.businessKey, startedVia: options.startedVia, actor: options.actor, request: options.request ?? null },
       });
       const first = this.spawn(step, startNodeId, null, TOP);
-      if (admission === "queue") {
+      if (waits) {
         first.status = "waiting";
         this.history(step, first, startNodeId, "queued", null);
       } else {
@@ -222,6 +227,13 @@ export class WorkflowEngine {
     return await this.db.instances.asNoTracking().where((i) => i.processKey.eq(processKey).and(i.status.eq("running"))).count();
   }
 
+  /** Scheduled runs of a process that still go on in a partition, for `overlap`. A failed one waits for a person and takes no place. */
+  async scheduledLive(processKey: string, partition: string | null): Promise<number> {
+    return await this.db.instances.asNoTracking()
+      .where((i) => i.processKey.eq(processKey).and(i.startedVia.eq("schedule")).and(i.status.in(["pending", "running"])).and(partition === null ? i.partition.isNull() : i.partition.eq(partition)))
+      .count();
+  }
+
   /** A `pending` instance got its place: its token moves from the start. */
   async release(step: Step): Promise<void> {
     if (step.instance.status !== "pending") return;
@@ -253,6 +265,7 @@ export class WorkflowEngine {
         ...(options.event === undefined ? {} : { eventKey: options.event.key }),
         ...(options.cause === undefined ? {} : { cause: options.cause }),
         ...(options.parent === undefined ? {} : { depth: options.parent.depth }),
+        ...(options.scheduledAt === undefined ? {} : { scheduledAt: options.scheduledAt.toISOString() }),
       },
       businessKey: options.businessKey,
       startedVia: options.startedVia,
@@ -418,6 +431,14 @@ export class WorkflowEngine {
     return await this.fireBoundary(step, token, node, { firedAt }, "timer");
   }
 
+  /** Whether the step takes this event: `eventWait.until` may leave it waiting for the next one. */
+  eventAccepted(step: Step, tokenId: string, payload: Record<string, unknown>): boolean {
+    const token = step.tokens.find((t) => t.id === tokenId);
+    const node = token === undefined ? undefined : step.graph.document.nodes[token.nodeId];
+    if (token === undefined || node?.kind !== "eventWait" || node.config?.until === undefined || token.status !== "waiting") return true;
+    return isTruthy(evaluateExpression(node.config.until as Expr, { ...dataOf(step.instance, this.now(), token), event: payload }));
+  }
+
   /**
    * An event the token waits for arrived. An `eventWait` step moves on with
    * the payload (and `saveTo`); a `boundaryEvent` takes its flow like a
@@ -553,7 +574,7 @@ export class WorkflowEngine {
     const { instance, graph } = step;
     const settings = graph.document.settings;
     if (instance.parentInstanceId !== null) this.addJob(step, "returned", { payload: { parentInstanceId: instance.parentInstanceId, parentTokenId: instance.parentTokenId } });
-    if (settings?.maxConcurrent !== undefined || settings?.sameKey === "queue") this.addJob(step, "release", { payload: { processKey: instance.processKey } });
+    if (settings?.maxConcurrent !== undefined || settings?.sameKey === "queue" || (instance.startedVia === "schedule" && queuesSchedule(graph.document))) this.addJob(step, "release", { payload: { processKey: instance.processKey } });
     // A handler that fails does not start a handler: a chain of them would never end.
     if ((instance.status === "failed" || instance.status === "timedOut") && settings?.errorHandler !== undefined && instance.startedVia !== "errorHandler") {
       this.addJob(step, "errorHandler", { payload: { process: settings.errorHandler } });
@@ -958,6 +979,11 @@ export function dataOf(instance: WfInstance, now: Date, token?: Pick<Frame, "loc
 /** Who the steps of an instance act for: `settings.runAs`. */
 export function runActorOf(document: ProcessDocument, instance: WfInstance): WorkflowActor {
   return document.settings?.runAs === "process" ? { kind: "system", id: `process:${instance.processKey}` } : { kind: instance.startedByKind, id: instance.startedById };
+}
+
+/** Whether a scheduled run of the process waits for the one before it: `overlap: "queue"`. */
+export function queuesSchedule(document: ProcessDocument): boolean {
+  return Object.values(document.nodes).some((node) => node.kind === "scheduleStart" && node.config?.overlap === "queue");
 }
 
 function isLoopState(value: unknown): value is LoopState {

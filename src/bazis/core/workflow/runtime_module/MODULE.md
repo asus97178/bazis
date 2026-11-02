@@ -1,6 +1,6 @@
 # WorkflowRuntimeModule
 
-Passport version: 1.1. Check date: 2026-11-01.
+Passport version: 1.2. Check date: 2026-11-03.
 Status: implemented for stage 1 of WORKFLOW-001; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/runtime_module`.
@@ -32,7 +32,8 @@ concerns another one goes through a job.
 | `TimerStep` (scoped) | [internal/TimerStep.ts](internal/TimerStep.ts) | `RuntimeDbContext`, `WorkflowEngine` | one `timer` job: `timerCatch` moves on, `boundaryTimer` takes its flow; one `loop` job: the next batch of iterations |
 | `ChildCalls` (scoped) | [internal/ChildCalls.ts](internal/ChildCalls.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions`, `WorkflowInputValidator`, `WorkflowLanguages` | `callProcess`: jobs `call` (starts or resumes the child), `returned` (the child stopped), `cancelChildren` |
 | `RunLimits` (scoped) | [internal/RunLimits.ts](internal/RunLimits.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions` | jobs `runTimeout`, `release` (`pending` instances get their place under the lock of the process, also from `reconcile`), `errorHandler` |
-| `Schedules` (scoped) | [internal/Schedules.ts](internal/Schedules.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions` | one `schedule` job per scheduled latest version (reconciled at start and every minute under an advisory lock); a firing starts instances and plans the next from now in one transaction: missed firings are not caught up |
+| `Schedules` (scoped) | [internal/Schedules.ts](internal/Schedules.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions`, `WorkflowPartitions` | one `schedule` job per node and partition of a latest version (reconciled at start and every minute under an advisory lock); a firing starts an instance under `overlap` and plans the next in one transaction, from now or with `catchUp` from itself |
+| `EventDelivery` (scoped) | [internal/EventDelivery.ts](internal/EventDelivery.ts) | `RuntimeDbContext`, `WorkflowEngine`, `IWorkflowDefinitions`, `WorkflowPartitions`, `WorkflowInputValidator` | `emit`: the waits (`until`), then the starts (partition, `ignoreOwn`, `filter`, input), at once or by an `eventStart` job (`delay`, `debounce`); an `event` job from `emitLater` becomes such jobs in one transaction |
 | `EventsController` | [http/Events.controller.ts](http/Events.controller.ts) | `IWorkflowRuntime`, `IAccess` | `POST /workflow/events/:eventKey` |
 | `IWorkflowRuntime` / `WorkflowRuntime` (scoped) | [services](services) | engine, `IWorkflowDefinitions`, `WorkflowInputValidator` (`DefaultWorkflowInputValidator`, replaced by the application's own registration) | start, cancel, retry, completeToken, lists, history |
 | `InstancesController` | [http/Instances.controller.ts](http/Instances.controller.ts) | `IWorkflowRuntime`, `IAccess` | `/workflow/instances…` |
@@ -64,7 +65,7 @@ exports: `[IWorkflowRuntime]`. config: `workflowConfig`.
 | `GET /workflow/instances/:id/history` | `workflow.instances.read` | `{ data }` in order |
 | `POST /workflow/instances/:id/cancel` `{ reason? }` | `workflow.instances.manage` | 200 / 409 `wrong_status` |
 | `POST /workflow/instances/:id/retry` | `workflow.instances.manage` | 200 / 409 `wrong_status` (not `failed`) |
-| `POST /workflow/events/:eventKey` `{ payload?, correlation?, partition? }` | `workflow.events.emit` (partition of the request, event) | 202 `{ started, continued, rejected }` |
+| `POST /workflow/events/:eventKey` `{ payload?, correlation?, partition? }` | `workflow.events.emit` (partition of the request, event) | 202 `{ started, skipped, deferred, continued, rejected }` |
 
 The tasks HTTP is the [Tasks part](../tasks_module/MODULE.md).
 

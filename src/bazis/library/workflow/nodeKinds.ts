@@ -1,4 +1,4 @@
-import { parseCron } from "./cron";
+import { isTimeZone, parseCron } from "./cron";
 import { FIELD_NAME, checkFormSpec } from "./formFields";
 import { DATA_PATH } from "./paths";
 import type { NodeKind } from "./ProcessDocument";
@@ -52,11 +52,42 @@ function first(...checks: (string | null)[]): string | null {
   return checks.find((check) => check !== null) ?? null;
 }
 
-/** Five cron fields: minute, hour, day of month, month, day of week. */
-function cron(config: Record<string, unknown>): string | null {
-  const value = config.cron;
-  if (typeof value !== "string") return "config.cron is required";
-  return parseCron(value) === undefined ? "config.cron must be five valid fields: minute hour day month weekday (UTC)" : null;
+/** A moment with its zone: `2026-11-01T09:00:00+03:00`. */
+export const ISO_MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+function moment(config: Record<string, unknown>, key: string): string | null {
+  const value = config[key];
+  if (value === undefined) return null;
+  return typeof value === "string" && ISO_MOMENT.test(value) && !Number.isNaN(Date.parse(value)) ? null : `config.${key} must be a moment with its zone: 2026-11-01T09:00:00+03:00`;
+}
+
+/** A scheduled start: five cron fields (minute, hour, day of month, month, day of week), where and when it runs. */
+function schedule(config: Record<string, unknown>): string | null {
+  const { cron, timezone, from, until, overlap, partitions } = config;
+  if (typeof cron !== "string") return "config.cron is required";
+  if (parseCron(cron) === undefined) return "config.cron must be five valid fields: minute hour day month weekday";
+  if (timezone !== undefined && !isTimeZone(timezone)) return "config.timezone must be an IANA time zone: Europe/Moscow";
+  const period = first(moment(config, "from"), moment(config, "until"), boolean(config, "catchUp"));
+  if (period !== null) return period;
+  if (typeof from === "string" && typeof until === "string" && Date.parse(from) >= Date.parse(until)) return "config.from must be before config.until";
+  if (overlap !== undefined && overlap !== "skip" && overlap !== "queue" && overlap !== "parallel") return "config.overlap must be skip, queue or parallel";
+  if (partitions !== undefined && partitions !== "none" && partitions !== "all") {
+    if (!Array.isArray(partitions) || partitions.length === 0 || partitions.length > 1000 || !partitions.every((item) => typeof item === "string" && item !== "" && item.length <= 200)) return "config.partitions must be none, all or a list of partitions";
+  }
+  return null;
+}
+
+/** An event start; its expressions are checked with the whole document. */
+function eventStart(config: Record<string, unknown>): string | null {
+  const { debounce } = config;
+  if (debounce !== undefined) {
+    if (typeof debounce !== "object" || debounce === null || Array.isArray(debounce)) return "config.debounce must be an object";
+    const { key } = debounce as { key?: unknown };
+    if (key === undefined) return "config.debounce.key is required";
+    const problem = string(debounce as Record<string, unknown>, "window", ISO_DURATION);
+    if (problem !== null) return problem.replace("config.", "config.debounce.");
+  }
+  return first(string(config, "event", DOTTED_KEY), string(config, "delay", ISO_DURATION, false), boolean(config, "ignoreOwn"));
 }
 
 /** A timer: either `duration` (ISO 8601) or `at`, a path to a date in instance data. */
@@ -158,8 +189,32 @@ const fields = { type: "object", properties: { fields: { type: "array", items: {
 
 export const NODE_KINDS: readonly NodeKindDefinition[] = Object.freeze([
   { kind: "manualStart", role: "start", check: none, config: object({}) },
-  { kind: "scheduleStart", role: "start", check: cron, config: object({ cron: text }, ["cron"]) },
-  { kind: "eventStart", role: "start", check: (c) => string(c, "event", DOTTED_KEY), config: object({ event: text }, ["event"]) },
+  {
+    kind: "scheduleStart",
+    role: "start",
+    check: schedule,
+    config: object({
+      cron: text,
+      timezone: { type: "string", description: "An IANA time zone; UTC by default" },
+      from: { type: "string", format: "date-time" },
+      until: { type: "string", format: "date-time" },
+      overlap: { enum: ["skip", "queue", "parallel"] },
+      catchUp: flag,
+      partitions: { description: "none, all or a list of partitions", oneOf: [{ enum: ["none", "all"] }, { type: "array", items: text }] },
+    }, ["cron"]),
+  },
+  {
+    kind: "eventStart",
+    role: "start",
+    check: eventStart,
+    config: object({
+      event: text,
+      filter: expression,
+      debounce: object({ key: expression, window: duration }, ["key", "window"]),
+      delay: duration,
+      ignoreOwn: flag,
+    }, ["event"]),
+  },
   {
     kind: "userTask",
     role: "activity",
@@ -218,7 +273,7 @@ export const NODE_KINDS: readonly NodeKindDefinition[] = Object.freeze([
     kind: "eventWait",
     role: "activity",
     check: (c) => first(string(c, "event", DOTTED_KEY), string(c, "correlation", DATA_PATH, false), string(c, "saveTo", FIELD_NAME, false)),
-    config: object({ event: text, correlation: dataPath, saveTo }, ["event"]),
+    config: object({ event: text, correlation: dataPath, saveTo, until: expression }, ["event"]),
   },
   { kind: "exclusiveGateway", role: "gateway", check: none, config: object({}) },
   { kind: "parallelGateway", role: "gateway", check: none, config: object({}) },

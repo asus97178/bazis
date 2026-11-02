@@ -33,6 +33,7 @@ export {
 export {
   IWorkflowRuntime,
   type CancelInstance,
+  type EmitCause,
   type EmitOptions,
   type EmitResult,
   type HistoryEntry,
@@ -41,6 +42,9 @@ export {
   type InstanceSummary,
   type RetryInstance,
   type StartInstance,
+  type StartMany,
+  type StartManyItem,
+  type StartManyResult,
   type TokenDetails,
 } from "./runtime_module/services/IWorkflowRuntime.service";
 export {
@@ -65,6 +69,7 @@ export type { InstanceStatus, StartedVia } from "./runtime_module/model/WfInstan
 export type { TokenStatus } from "./runtime_module/model/WfToken.model";
 export { WorkflowInputValidator, DefaultWorkflowInputValidator, type WorkflowInputContext } from "./contracts/WorkflowInputValidator";
 export { WorkflowExtensions, DefaultWorkflowExtensions, type ExtensionTarget, type WorkflowPortContext } from "./contracts/WorkflowExtensions";
+export { WorkflowPartitions, DefaultWorkflowPartitions, type ProcessPartition } from "./contracts/WorkflowPartitions";
 export { WorkflowError, type WorkflowErrorCode } from "./contracts/WorkflowError";
 export type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging, WorkflowRequest, WorkflowToolMetadata } from "./contracts/types";
 

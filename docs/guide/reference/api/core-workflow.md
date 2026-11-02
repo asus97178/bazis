@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.133.0.
+Список — по пакету 0.134.0.
 
 ## Модули
 
@@ -16,8 +16,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `IWorkflowDefinitions` | Каталог: `list`, `get`, `folderOf`, `validate`, `palette`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
-| `IWorkflowRuntime` | Исполнение: `start`, `startMany`, `emit`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowDefinitions` | Каталог: `list`, `get`, `folderOf`, `partitionsOf`, `validate`, `palette`, `create`, `update`, `remove`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
+| `IWorkflowRuntime` | Исполнение: `start`, `startMany`, `emit`, `emitLater`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowTasks` | Входящие задачи: `list`, `get`, `claim`, `release`, `complete` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
 | `defineProcess({ key, title, description?, folder?, owner?, retentionDays?, document })` | Процесс в коде модуля: перечисляется в `@Module({ processes })`, публикуется при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
 | `WorkflowSetupError` | Ошибка конфигурации процессов в коде: при сборке и при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
@@ -37,6 +37,7 @@
 | --- | --- | --- |
 | `WorkflowInputValidator`, `DefaultWorkflowInputValidator` | Проверка входа процесса и форм задач; встроенная — по полям документа | [Данные приложения](../../workflow/processes.md#данные-приложения) |
 | `WorkflowExtensions`, `DefaultWorkflowExtensions` | Проверка `extensions` своего пространства имён; по умолчанию пространств нет | [Данные приложения](../../workflow/processes.md#данные-приложения) |
+| `WorkflowPartitions`, `DefaultWorkflowPartitions` | Где работает процесс: разделы с часовым поясом и включённостью; по умолчанию один раздел `null` | [Разделы](../../workflow/processes.md#разделы) |
 
 ## События
 
@@ -54,7 +55,7 @@
   в метаданных `@Module`.
 - **Каталог:** `ProcessSummary` (с `module` — модулем-владельцем процесса из кода), `ProcessDetails`, `VersionSummary`,
   `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`, `ValidateOptions`.
-- **Исполнение:** `StartInstance`, `StartMany`, `StartManyItem`, `StartManyResult`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
+- **Исполнение:** `StartInstance`, `StartMany`, `StartManyItem`, `StartManyResult`, `EmitCause`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,
   `TokenDetails`, `HistoryEntry`, `InstanceListQuery`, `InstanceStatus`,
   `TokenStatus`, `StartedVia`, `HistoryType`.
 - **Задачи:** `TaskDetails`, `TaskListQuery`, `TaskStatus`.

@@ -105,3 +105,53 @@ test.skipIf(!enabled)("a batch calls the approval of each order and gives back t
     expect(await status(big)).toBe("rejected");
   });
 });
+
+test.skipIf(!enabled)("the digest runs on weekday mornings in Moscow and counts what waits", async () => {
+  await run(async (wf, place) => {
+    await wf.drain();
+    const digests = async () => {
+      const scope = wf.app.container.createScope();
+      try {
+        return (await scope.resolve(IWorkflowRuntime).instances({ processKey: "order-digest" })).items;
+      } finally {
+        await scope.dispose();
+      }
+    };
+    // Monday, 9:00 in Moscow is 6:00 UTC. The tests share a database: a firing due from before comes first.
+    wf.clock.set("2026-12-07T05:59:00Z");
+    await wf.drain();
+    const before = (await digests()).length;
+    await place(5000);
+    await wf.drain();
+    wf.clock.set("2026-12-07T06:00:00Z");
+    await wf.drain();
+    const after = await digests();
+    expect(after.length).toBe(before + 1);
+    const output = (await wf.instance(after[0]!.id)).output;
+    expect(output?.waiting).toBeGreaterThanOrEqual(1);
+  });
+});
+
+test.skipIf(!enabled)("big orders of one customer make one alert about the last of them", async () => {
+  await run(async (wf, place) => {
+    const alerts = async () => {
+      const scope = wf.app.container.createScope();
+      try {
+        return (await scope.resolve(IWorkflowRuntime).instances({ processKey: "big-order-alert" })).items;
+      } finally {
+        await scope.dispose();
+      }
+    };
+    const small = await place(100);
+    const first = await place(100000);
+    const last = await place(200000);
+    await wf.drain();
+    expect(await alerts()).toEqual([]);
+    await wf.advance("PT10M");
+    const [alert, ...rest] = await alerts();
+    expect(rest).toEqual([]);
+    const about = (await wf.instance(alert!.id)).output?.about;
+    expect(about).toBe(last);
+    expect([small, first]).not.toContain(about);
+  });
+});

@@ -20,7 +20,7 @@ export {
   type ProcessNode,
   type ProcessSettings,
 } from "./ProcessDocument";
-export { NODE_KINDS, nodeKindOf, ISO_DURATION, MAX_ITERATIONS, MAX_LOOP_PARALLEL, PROCESS_KEY, type JsonSchema, type NodeKindDefinition, type NodeRole } from "./nodeKinds";
+export { NODE_KINDS, nodeKindOf, ISO_DURATION, MAX_ITERATIONS, MAX_LOOP_PARALLEL, PROCESS_KEY, ISO_MOMENT, type JsonSchema, type NodeKindDefinition, type NodeRole } from "./nodeKinds";
 export { PROCESS_LIMITS, validateProcess, hasErrors, type ProcessIssue, type ProcessIssueCode, type ValidateProcessOptions } from "./validateProcess";
 export { DATA_PATH, DATA_PATHS, isPath, readPath, resolveInput, type InstanceData } from "./paths";
 export {
@@ -42,7 +42,7 @@ export {
 } from "./expressions";
 export { ExpressionSyntaxError, parseExpression, printExpression } from "./expressionSyntax";
 export { durationMs } from "./duration";
-export { parseCron, type CronSchedule } from "./cron";
+export { isTimeZone, parseCron, type CronSchedule } from "./cron";
 export { processToMermaid } from "./mermaid";
 export { PERSONAL_MASK, maskByMapping, maskBySchema, masksPersonal, personalPaths, personalVariables, readsPersonal } from "./masking";
 export { allTexts, checkLocalizedText, textOf, type LocalizedText } from "./localized";

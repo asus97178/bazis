@@ -3,6 +3,7 @@ import { HOSTED_SERVICE, Module, scoped, singleton } from "../../di";
 import { SystemWorkflowClock, WorkflowClock } from "../contracts/WorkflowClock";
 import { workflowConfig } from "../contracts/Workflow.config";
 import { DefaultWorkflowExtensions, WorkflowExtensions } from "../contracts/WorkflowExtensions";
+import { DefaultWorkflowPartitions, WorkflowPartitions } from "../contracts/WorkflowPartitions";
 import { WorkflowEvents } from "../internal/WorkflowEvents";
 import { WorkflowLanguages } from "../internal/WorkflowLanguages";
 import { WorkflowTools } from "../internal/WorkflowTools";
@@ -10,6 +11,7 @@ import { definitionsPermissions } from "./access/Definitions.permissions";
 import { FolderReferences } from "./access/Folder.references";
 import { ProcessReferences } from "./access/Process.references";
 import { ProcessFolderLookup } from "./access/ProcessFolder.lookup";
+import { ProcessPartitionLookup } from "./access/ProcessPartition.lookup";
 import { CatalogImport } from "./code/CatalogImport";
 import { CodeProcessCatalog } from "./code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "./code/CodeProcessPublisher";
@@ -23,7 +25,8 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
 /**
  * The process catalog: drafts and published versions, and the processes
  * declared in code ([passport](MODULE.md)). The application checks its own
- * `extensions` by registering its `WorkflowExtensions`.
+ * `extensions` by registering its `WorkflowExtensions` and says where processes
+ * work by registering its `WorkflowPartitions`.
  */
 @Module({
   imports: [AccessModule],
@@ -37,15 +40,17 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     singleton(CodeProcessCatalog),
     singleton(WorkflowLanguages),
     singleton(WorkflowExtensions, DefaultWorkflowExtensions),
+    singleton(WorkflowPartitions, DefaultWorkflowPartitions),
     scoped(WorkflowEvents),
     scoped(CatalogImport),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
     scoped(ProcessReferences),
     scoped(FolderReferences),
     scoped(ProcessFolderLookup),
+    scoped(ProcessPartitionLookup),
     singleton(HOSTED_SERVICE, CodeProcessPublisher),
   ],
   controllers: [ProcessesController],
-  exports: [IWorkflowDefinitions, WorkflowTools, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowExtensions, ProcessFolderLookup],
+  exports: [IWorkflowDefinitions, WorkflowTools, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowExtensions, WorkflowPartitions, ProcessFolderLookup],
 })
 export class WorkflowDefinitionsModule {}

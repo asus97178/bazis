@@ -8,6 +8,8 @@ import { isUuid, pageQueryOf, type WorkflowActor, type WorkflowAuditOptions, typ
 import type { WorkflowClock } from "../../contracts/WorkflowClock";
 import { WorkflowError } from "../../contracts/WorkflowError";
 import { WorkflowExtensions, type ExtensionTarget, type WorkflowPortContext } from "../../contracts/WorkflowExtensions";
+import { WorkflowPartitions } from "../../contracts/WorkflowPartitions";
+import { WorkflowProcessUsage } from "../../contracts/WorkflowProcessUsage";
 import { canonicalJson } from "../../internal/canonicalJson";
 import type { WorkflowEvents } from "../../internal/WorkflowEvents";
 import type { WorkflowLanguages } from "../../internal/WorkflowLanguages";
@@ -83,6 +85,15 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     return row?.folder ?? null;
   }
 
+  async partitionsOf(key: string): Promise<readonly (string | null)[]> {
+    const partitions = await this.partitions(key, null);
+    return partitions.filter((item) => item.enabled).map((item) => item.partition);
+  }
+
+  private async partitions(key: string, actor: WorkflowActor | null) {
+    return await this.services.resolve(WorkflowPartitions).of(key, { partition: null, language: this.languages.default, actor });
+  }
+
   async validate(document: unknown, options: ValidateOptions = {}): Promise<readonly ProcessIssue[]> {
     const port = this.services.resolve(WorkflowExtensions);
     const namespaces = new Set(port.namespaces());
@@ -151,6 +162,19 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     if (card() !== before.card) await this.changed("updated", key, actor, options);
     if (archived !== undefined && archived !== before.archived) await this.changed(archived ? "archived" : "restored", key, actor, options);
     return this.detailsOf(row);
+  }
+
+  async remove(key: string, actor: WorkflowActor, options: WorkflowAuditOptions = {}): Promise<void> {
+    const row = await this.process(key, false);
+    this.assertNotCode(key);
+    if (row.archivedAt === null) throw new WorkflowError("wrong_status", `Process ${key} is not archived`);
+    // An archived process starts nothing more, so what is counted here cannot grow.
+    const connected = (await this.partitions(key, actor)).filter((item) => item.partition !== null).map((item) => item.partition);
+    if (connected.length > 0) throw new WorkflowError("in_use", `Process ${key} is connected to partitions: ${connected.join(", ")}`);
+    const live = await this.services.tryResolve(WorkflowProcessUsage)?.liveInstances(key) ?? 0;
+    if (live > 0) throw new WorkflowError("in_use", `Process ${key} has ${live} unfinished instances`);
+    await this.db.processes.asNoTracking().where((p) => p.key.eq(key)).executeDelete();
+    await this.changed("deleted", key, actor, options);
   }
 
   async saveDraft(key: string, document: unknown, actor: WorkflowActor, options: SaveDraftOptions = {}): Promise<SavedDraft> {

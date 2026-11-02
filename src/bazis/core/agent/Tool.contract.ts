@@ -13,8 +13,8 @@ export function describeTool(tool: ToolDefinition) {
   };
   return agentToolContract({
     name: tool.metadata.name, description: tool.metadata.description,
-    input: tool.metadata.input ? schema(tool.metadata.input) : undefined,
-    output: tool.metadata.output ? schema(tool.metadata.output) : undefined,
+    input: tool.metadata.input ? schema(tool.metadata.input) : tool.metadata.inputSchema ? agentJsonSchema(`${tool.metadata.name}.input`, tool.metadata.inputSchema) : undefined,
+    output: tool.metadata.output ? schema(tool.metadata.output) : tool.metadata.outputSchema ? agentJsonSchema(`${tool.metadata.name}.output`, tool.metadata.outputSchema) : undefined,
     sideEffect: tool.metadata.sideEffect, approval: tool.metadata.approval, timeoutMs: tool.metadata.timeoutMs, dryRun: tool.metadata.dryRun,
   });
 }

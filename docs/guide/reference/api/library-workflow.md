@@ -1,7 +1,7 @@
 # `bazis/library/workflow`
 
 Формат документа процесса `bazis.workflow/v2`: чистые функции без DI и
-базы — для дизайнера, CLI, браузера. Список — по пакету 0.133.0.
+базы — для дизайнера, CLI, браузера. Список — по пакету 0.134.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -15,6 +15,7 @@
 | `parseExpression`, `printExpression`, `ExpressionSyntaxError` | Текст выражения ↔ дерево | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
 | `toStructure`, `fromStructure`, `isStructured` | Граф ↔ список шагов | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
 | `processPalette`, `formOf` | Палитра; форма настройки шага | [Свой дизайнер](../../workflow/processes.md#свой-дизайнер) |
+| `isTimeZone`, `ISO_MOMENT` | Часовой пояс IANA; момент с поясом | [Расписание](../../workflow/processes.md#расписание) |
 | `MAX_ITERATIONS`, `MAX_LOOP_PARALLEL` | Пределы цикла | [Цикл](../../workflow/processes.md#цикл) |
 | `PROCESS_KEY` | Формат ключа процесса | [Вызов другого процесса](../../workflow/processes.md#вызов-другого-процесса) |
 | `textOf`, `allTexts`, `checkLocalizedText` | Текст на нужном языке | [Карточка и язык](../../workflow/processes.md#карточка-и-язык) |
@@ -22,7 +23,7 @@
 | `masksPersonal`, `personalPaths`, `personalVariables`, `readsPersonal`, `maskByMapping`, `maskBySchema`, `PERSONAL_MASK` | Маска персональных данных | [Настройки процесса и журнал](../../workflow/processes.md#настройки-процесса-и-журнал) |
 | `durationMs` | Миллисекунды длительности `P1D`, `PT2H` | — |
 | `processToMermaid(document, direction?)` | Процесс как Mermaid `flowchart` | [Проверка и схема](../../workflow/processes.md#проверка-и-схема-bazis-workflow) |
-| `parseCron` | Разбор cron из пяти полей в UTC: `matches(date)`, `next(after)` | [Расписание](../../workflow/processes.md#расписание) |
+| `parseCron(expression, timezone?)` | Разбор cron из пяти полей, UTC или пояс: `matches(date)`, `next(after)` | [Расписание](../../workflow/processes.md#расписание) |
 
 Типы: `ProcessDocument`, `ProcessNode`, `ProcessFlow`, `ProcessDiagram`,
 `ProcessSettings`, `ProcessLogSettings`, `Bounds`, `Point`, `NodeKind`, `NodeRole`,

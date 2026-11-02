@@ -1,5 +1,6 @@
 import type { AccessFilter } from "../../../access";
 import type { FormIssue } from "../../../../library/workflow";
+import type { OrmTransaction } from "../../../orm";
 import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { HistoryType } from "../model/WfHistory.model";
 import type { InstanceStatus, StartedVia } from "../model/WfInstance.model";
@@ -99,13 +100,23 @@ export interface HistoryEntry {
   readonly at: Date;
 }
 
+/** What led to an event: `$trigger.cause` of the instances it starts. `instanceId` makes `ignoreOwn` work. */
+export interface EmitCause {
+  readonly instanceId?: string;
+  readonly [key: string]: unknown;
+}
+
 export interface EmitOptions extends WorkflowAuditOptions {
   /** Which waits it is for: `order:42`. Waits without a correlation take any event of the key. */
   readonly correlation?: string | null;
-  /** Only the waits of this partition; it is also the partition of instances the event starts. */
+  /**
+   * Only the waits of this partition; it is also the partition of instances the
+   * event starts, and only processes `WorkflowPartitions` connects to it start.
+   */
   readonly partition?: string | null;
   /** On whose behalf started instances run; `{ kind: "system", id: "event:<key>" }` by default. */
   readonly actor?: WorkflowActor;
+  readonly cause?: EmitCause | null;
 }
 
 export interface EmitResult {
@@ -113,6 +124,8 @@ export interface EmitResult {
   readonly started: readonly string[];
   /** Processes with `sameKey: "skip"` that did not start: an instance with the key is not finished. */
   readonly skipped: readonly { readonly processKey: string; readonly instanceId: string }[];
+  /** Processes that start later: `debounce` or `delay` of their `eventStart`. */
+  readonly deferred: readonly { readonly processKey: string }[];
   /** Instances whose `eventWait` or `boundaryEvent` took the event. */
   readonly continued: readonly string[];
   /** Processes with an `eventStart` whose input the payload did not pass. */
@@ -150,6 +163,13 @@ export abstract class IWorkflowRuntime {
    * `eventStart` for the key, and moves the instances waiting for it.
    */
   abstract emit(eventKey: string, payload?: unknown, options?: EmitOptions): Promise<EmitResult>;
+  /**
+   * Writes an event in the application's transaction: it is delivered as `emit`
+   * after the commit and is gone with a rollback. Needs the same `DatabaseProvider`
+   * as the process tables. Who it reached is not known at this point: a payload a
+   * process refuses goes to the log.
+   */
+  abstract emitLater(tx: OrmTransaction, eventKey: string, payload?: unknown, options?: EmitOptions): Promise<void>;
   /** Instances, newest first. */
   abstract instances(query?: InstanceListQuery): Promise<WorkflowPage<InstanceSummary>>;
   abstract instance(instanceId: string): Promise<InstanceDetails>;

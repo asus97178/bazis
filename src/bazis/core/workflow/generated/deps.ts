@@ -8,6 +8,7 @@ import { WorkflowClock } from "../contracts/WorkflowClock";
 import { FolderReferences } from "../definitions_module/access/Folder.references";
 import { ProcessReferences } from "../definitions_module/access/Process.references";
 import { ProcessFolderLookup } from "../definitions_module/access/ProcessFolder.lookup";
+import { ProcessPartitionLookup } from "../definitions_module/access/ProcessPartition.lookup";
 import { CatalogImport } from "../definitions_module/code/CatalogImport";
 import { CodeProcessCatalog } from "../definitions_module/code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "../definitions_module/code/CodeProcessPublisher";
@@ -23,8 +24,10 @@ import { WorkflowWorker } from "../runtime_module/background/WorkflowWorker";
 import { EventsController } from "../runtime_module/http/Events.controller";
 import { InstancesController } from "../runtime_module/http/Instances.controller";
 import { ChildCalls } from "../runtime_module/internal/ChildCalls";
+import { EventDelivery } from "../runtime_module/internal/EventDelivery";
 import { GraphCache } from "../runtime_module/internal/GraphCache";
 import { RunLimits } from "../runtime_module/internal/RunLimits";
+import { RuntimeProcessUsage } from "../runtime_module/internal/RuntimeProcessUsage";
 import { Schedules } from "../runtime_module/internal/Schedules";
 import { TimerStep } from "../runtime_module/internal/TimerStep";
 import { ToolStep } from "../runtime_module/internal/ToolStep";
@@ -44,15 +47,18 @@ registerFrameworkClassDeps([
   [CodeProcessCatalog, [ServiceProvider]],
   [CodeProcessPublisher, [ServiceProvider]],
   [DefinitionsDbContext, [DbContextOptions]],
+  [EventDelivery, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions, WorkflowLanguages, ServiceProvider]],
   [EventsController, [IWorkflowRuntime]],
   [FolderReferences, [DefinitionsDbContext]],
   [InstancesController, [IWorkflowRuntime, IWorkflowDefinitions]],
   [ProcessesController, [IWorkflowDefinitions]],
   [ProcessFolderLookup, [DefinitionsDbContext]],
+  [ProcessPartitionLookup, [DefinitionsDbContext, WorkflowLanguages, ServiceProvider]],
   [ProcessReferences, [DefinitionsDbContext]],
   [RunLimits, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions]],
   [RuntimeDbContext, [DbContextOptions]],
-  [Schedules, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions]],
+  [RuntimeProcessUsage, [RuntimeDbContext]],
+  [Schedules, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions, WorkflowLanguages, ServiceProvider]],
   [TaskEvents, [TasksDbContext]],
   [TasksController, [IWorkflowTasks]],
   [TasksDbContext, [DbContextOptions]],
@@ -63,7 +69,7 @@ registerFrameworkClassDeps([
   [WorkflowEvents, [EventBus, ServiceProvider, "optional:Logger"]],
   [WorkflowLanguages, ["Config:workflow"]],
   [WorkflowRetention, [ServiceProvider, "Config:workflow"]],
-  [WorkflowRuntime, [RuntimeDbContext, WorkflowEngine, IWorkflowDefinitions, ServiceProvider, WorkflowLanguages]],
+  [WorkflowRuntime, [RuntimeDbContext, WorkflowEngine, EventDelivery, IWorkflowDefinitions, ServiceProvider, WorkflowLanguages]],
   [WorkflowTasks, [TasksDbContext, IWorkflowRuntime, WorkflowClock, WorkflowEvents]],
   [WorkflowTools, [ServiceProvider]],
   [WorkflowWorker, [ServiceProvider, "Config:workflow"]],

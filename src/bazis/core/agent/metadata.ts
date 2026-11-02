@@ -29,6 +29,13 @@ export interface ToolOptions {
   /** `"unsupported"` by default. */
   readonly dryRun?: ToolDryRun;
   /**
+   * The contract of a Tool made at run time, which has no class to generate a
+   * schema from, instead of `input` and `output`. It describes the Tool to callers;
+   * such a Tool checks its input itself.
+   */
+  readonly inputSchema?: Readonly<Record<string, unknown>>;
+  readonly outputSchema?: Readonly<Record<string, unknown>>;
+  /**
    * Who may call the Tool: `"agent"` for LLM agents, any other id for code that
    * runs Tools itself (`ToolRunner.as("workflow")`). Required and non-empty;
    * a caller not listed is refused with TOOL_CALLER_NOT_ALLOWED.
@@ -47,6 +54,8 @@ export interface ToolMetadata {
   readonly approval: ToolApproval;
   readonly timeoutMs?: number;
   readonly dryRun: ToolDryRun;
+  readonly inputSchema?: Readonly<Record<string, unknown>>;
+  readonly outputSchema?: Readonly<Record<string, unknown>>;
   readonly callers: readonly string[];
   readonly tags: readonly string[];
 }
@@ -120,6 +129,8 @@ export function defineToolMetadata(_target: object, metadata: object, options: T
     approval: approvalFor(sideEffect, options.approval),
     timeoutMs: positiveInteger(options.timeoutMs, "@Tool.timeoutMs"),
     dryRun: options.dryRun ?? "unsupported",
+    ...(options.inputSchema === undefined ? {} : { inputSchema: options.inputSchema }),
+    ...(options.outputSchema === undefined ? {} : { outputSchema: options.outputSchema }),
     // Checked when the module registers the Tool, so a missing list prints as
     // one configuration-error line at start instead of failing the import.
     callers: Array.isArray(options.callers) ? Object.freeze(options.callers.map((caller) => callerId(caller))) : Object.freeze([]),

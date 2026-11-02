@@ -269,6 +269,8 @@ class CmsExtensions extends WorkflowExtensions {
 | `boundaryEvent` | Событие во время шага: прерывает его или запускает ветвь рядом | 0.126.0 |
 | `eventStart` | Запуск по событию | 0.126.0 |
 | `scheduleStart` | Запуск по расписанию cron | 0.126.0 |
+| `timezone`, `from`, `until`, `overlap`, `catchUp`, `partitions` в `scheduleStart` | [Расписание](#расписание) | 0.134.0 |
+| `filter`, `debounce`, `delay`, `ignoreOwn` в `eventStart`; `until` в `eventWait` | [Запуск по событию](#запуск-по-событию) | 0.134.0 |
 | `assign` | Записывает значения выражений в переменные | 0.132.0 |
 | `loop` | Повторяет свои шаги: по списку, по условию, сколько-то раз | 0.133.0 |
 | `callProcess` | Запускает другой процесс и ждёт его конца | 0.133.0 |
@@ -854,13 +856,13 @@ history: timer Late {"firedAt":"…:39:09.571Z","interrupting":true}
 
 ```text
 POST /workflow/events/payments.received  {"payload":{"amount":500,"method":"card"},"correlation":"50"}
-→ 202 {"started":[],"continued":["01a18f8a-07e2-…"],"rejected":[]}
+→ 202 {"started":[],"skipped":[],"deferred":[],"continued":["01a18f8a-07e2-…"],"rejected":[]}
 
 POST /workflow/events/orders.cancelled   {"payload":{"by":"client"},"correlation":"51"}
-→ 202 {"started":[],"continued":["01a18f8a-0835-…"],"rejected":[]}
+→ 202 {"started":[],"skipped":[],"deferred":[],"continued":["01a18f8a-0835-…"],"rejected":[]}
 
 POST /workflow/events/payments.received  {"payload":{"amount":1},"correlation":"999"}
-→ 202 {"started":[],"continued":[],"rejected":[]}
+→ 202 {"started":[],"skipped":[],"deferred":[],"continued":[],"rejected":[]}
 ```
 
 ```text
@@ -902,11 +904,11 @@ export class PaymentsBridge {
 
 ```text
 POST /workflow/events/customers.registered  {"payload":{"name":"Иван","phone":"+7900"},"partition":"shop-1"}
-→ 202 {"started":["01a18f8a-08d7-…"],"continued":[],"rejected":[]}
+→ 202 {"started":["01a18f8a-08d7-…"],"skipped":[],"deferred":[],"continued":[],"rejected":[]}
 manager: Иван
 
 POST /workflow/events/customers.registered  {"payload":{"phone":"+7900"}}
-→ 202 {"started":[],"continued":[],"rejected":[{"processKey":"welcome",
+→ 202 {"started":[],"skipped":[],"deferred":[],"continued":[],"rejected":[{"processKey":"welcome",
        "issues":[{"field":"name","code":"required","message":"field name is required"}]}]}
 ```
 
@@ -914,14 +916,78 @@ POST /workflow/events/customers.registered  {"payload":{"phone":"+7900"}}
 (`phone`), отбрасываются. Экземпляр получает `partition` события,
 `businessKey` — его корреляцию, а выполняется от имени того, кто прислал
 событие, или `{"kind":"system","id":"event:customers.registered"}` при
-вызове из кода без `actor`.
+вызове из кода без `actor`. Запускаются только процессы, [подключённые к разделу](#разделы)
+события: событие без раздела запускает процессы без разделов.
+
+Настройки узла решают, на какие события и когда он запускается:
+
+```json
+"Start": { "kind": "eventStart", "title": "Крупный заказ", "config": {
+  "event": "orders.placed",
+  "filter": { "op": "gte", "args": [{ "path": "$event.amount" }, 100000] },
+  "debounce": { "key": { "path": "$event.customerId" }, "window": "PT10M" },
+  "delay": "PT1M",
+  "ignoreOwn": true
+} }
+```
+
+| Настройка | Что делает |
+| --- | --- |
+| `filter` | Выражение над `$event`, `$trigger`, `$now`: ложно — процесс не запускается. Переменных и шагов ещё нет |
+| `debounce` | События одного значения `key` за окно `window` сливаются в последнее. Окно считается от первого события и не продлевается, поэтому поток событий всё равно запускает процесс раз в окно |
+| `delay` | Запуск позже на этот срок. С `debounce` — после конца окна |
+| `ignoreOwn` | Не запускать, если событие вызвал экземпляр этого же процесса: `emit(…, { cause: { instanceId } })`. Защита от лавины, когда шаг сам меняет то, на что процесс подписан |
+
+С `debounce` и `delay` ответ говорит `{"deferred":[{"processKey":"…"}]}`: вход проверен сейчас,
+экземпляр появится позже. Версия та, что была при событии, а архивный процесс к
+этому времени уже не запустится. `cause` попадает в `$trigger.cause`.
+
+### Событие в транзакции приложения
+
+`emit` идёт сразу, поэтому событие о записи, которая потом откатилась, уйдёт зря, а упавший
+между записью и `emit` процесс потеряет его. `emitLater` пишет событие в той же транзакции:
+
+```ts
+await this.db.transactionScope(async (tx) => {
+  this.db.orders.add(order);
+  await this.db.saveChanges();
+  await this.workflow.emitLater(tx, "orders.placed", { orderId: order.id, amount });
+});
+```
+
+Откатилась транзакция — события нет; закоммитилась — воркер доставит его как `emit`, даже после
+падения приложения, и один раз запустит каждый процесс. Нужно, чтобы таблицы приложения и процессов лежали в одной базе:
+иначе `OrmProviderIdentityMismatchError`. Кого достигло событие, в этот момент неизвестно: данные, которые процесс
+не принял, уходят в журнал приложения как предупреждение.
+
+### Ждать нужного события
+
+`until` у `eventWait` оставляет шаг ждать, пока условие не станет истинным. Остальные события
+ключа шаг пропускает:
+
+```json
+"WaitApproved": { "kind": "eventWait", "title": "Ждём одобрения", "config": {
+  "event": "records.changed", "correlation": "$input.recordId", "saveTo": "record",
+  "until": { "op": "eq", "args": [{ "path": "$event.status" }, "approved"] }
+} }
+```
+
+Выражение видит то же, что и шаг, а `$event` — пришедшее событие. Срок ожидания — `boundaryTimer`, как обычно.
 
 ## Расписание
 
-`scheduleStart` запускает процесс по cron — пять полей, время UTC:
+`scheduleStart` запускает процесс по cron — пять полей:
 
 ```json
-"Start": { "kind": "scheduleStart", "title": "Каждую минуту", "config": { "cron": "* * * * *" } }
+"Start": { "kind": "scheduleStart", "title": "Сводка", "config": {
+  "cron": "0 9 * * 1-5",
+  "timezone": "Europe/Moscow",
+  "from": "2026-11-01T00:00:00+03:00",
+  "until": "2027-01-01T00:00:00+03:00",
+  "overlap": "skip",
+  "catchUp": false,
+  "partitions": "none"
+} }
 ```
 
 ```text
@@ -931,15 +997,110 @@ GET /workflow/instances?filter[processKey]=report
 manager: Отчёт за минуту
 ```
 
-- Поля: минута, час, день месяца, месяц, день недели (0 и 7 — воскресенье);
-  `*`, числа, диапазоны `9-17`, шаг `*/15`, списки `1,15`: `0 9 * * 1-5` —
-  по будням в 9:00 UTC.
+- **Поля:** минута, час, день месяца, месяц, день недели (0 и 7 — воскресенье);
+  `*`, числа, диапазоны `9-17`, шаг `*/15`, списки `1,15`.
+- **`timezone`** — пояс IANA, по умолчанию UTC. Расписание с указанным часом срабатывает раз в
+  сутки, что бы ни делали часы: время, которого нет при переводе вперёд, срабатывает сразу после
+  перевода, а повторившееся при переводе назад — только в первый раз. Расписание со `*` в часе
+  просто идёт по часам.
+- **`from`, `until`** — момент с поясом: `2026-11-01T09:00:00+03:00`. Вне периода не срабатывает.
+- **`overlap`** — что делать, если прошлый запуск по расписанию ещё идёт в этом разделе:
+
+  | Значение | Что происходит |
+  | --- | --- |
+  | `parallel` | Запускается рядом. По умолчанию |
+  | `skip` | Срабатывание пропадает |
+  | `queue` | Экземпляр ждёт в статусе `pending`, запустится, когда закончатся прошлые |
+
+  Запуск в статусе `failed` места не занимает: он ждёт человека, а следующий отчёт ждать не должен.
+- **`catchUp`** — запуски, пропущенные, пока приложение не работало. По умолчанию `false`: один
+  запуск с опозданием, следующий — от текущего момента. С `true` запускается каждый пропущенный, а
+  `$trigger.scheduledAt` говорит, к какому моменту он относится. Расписание раз в минуту после недели простоя —
+  это десять тысяч запусков, поэтому такое лучше сочетать с `overlap: "skip"`.
+- **`partitions`** — где работает: `none` — один запуск без раздела (по умолчанию), `all` — в каждом
+  включённом [разделе](#разделы) со своим часовым поясом, если у узла его нет, список — в перечисленных, кроме выключенных.
+  Разделов может быть тысячи, поэтому `all` выбирается явно.
 - Экземпляр стартует без входа, от имени `system` `schedule`.
-- Воркер сверяет расписания с каталогом при старте и раз в минуту: новая
-  версия или архивный процесс вступают в силу в течение минуты.
-- Запуски, пропущенные, пока приложение не работало, не догоняются:
-  следующий — по расписанию от текущего момента.
+- Воркер сверяет расписания с каталогом и разделами при старте и раз в минуту: новая
+  версия или архивный процесс вступают в силу в течение минуты. Новая версия планирует
+  срабатывания от текущего момента.
 - На нескольких экземплярах приложения срабатывание одно.
+
+## Разделы
+
+Раздел — область приложения: арендатор, организация, пространство. Где работает процесс, говорит порт:
+
+```ts
+import { WorkflowPartitions, type ProcessPartition } from "bazis/core/workflow";
+
+class ShopPartitions extends WorkflowPartitions {
+  constructor(private readonly db: ShopDbContext) {
+    super();
+  }
+
+  async of(processKey: string): Promise<readonly ProcessPartition[]> {
+    const rows = await this.db.links.asNoTracking().where((link) => link.processKey.eq(processKey)).toList();
+    return rows.map((link) => ({ partition: link.shopId, timezone: link.timezone, enabled: link.enabled }));
+  }
+}
+
+@Module({ providers: [scoped(WorkflowPartitions, ShopPartitions)] })
+export class ShopsModule {}
+```
+
+Без своего порта у процесса одно место работы: без раздела. Порт решает четыре вещи:
+
+- **События.** `eventStart` запускается только в разделе события и только если процесс в нём включён.
+- **Расписания.** `partitions: "all"` и часовой пояс раздела.
+- **Удаление.** Процесс, подключённый к разделу, не удалить.
+- **Право `workflow.processes.read`.** Грант с `scopes: ["shop-1"]` видит процессы, подключённые к `shop-1`.
+
+Ручной запуск и `eventWait` порт не спрашивают: право на запуск — `workflow.instances.start` в разделе запроса,
+а ожидание принадлежит уже идущему экземпляру.
+
+## Данные без своего инструмента
+
+`ormEntityTools` делает инструменты из сущности приложения: `orm.<сущность>.find`, `create`, `update`, `delete`.
+Само ничего не открывается: операции и поля называет приложение.
+
+```ts
+import { ormEntityTools, StandardToolsModule } from "bazis/core/tools";
+
+@Module({
+  imports: [StandardToolsModule],
+  tools: [...ormEntityTools(Order, {
+    context: OrderDbContext,
+    ops: ["find", "create", "update"],
+    fields: ["status", "amount"],
+    partitionField: "shopId",
+  })],
+})
+export class OrderModule {}
+```
+
+```json
+"Find": { "kind": "serviceTask", "title": "Новые заказы", "config": {
+  "tool": "orm.order.find",
+  "input": { "where": { "status": "new", "amount": { "gte": 1000 } }, "sort": [{ "field": "amount", "dir": "desc" }], "limit": 10 },
+  "saveTo": "found"
+} }
+```
+
+| Инструмент | Вход | Выход |
+| --- | --- | --- |
+| `find` | `where?`, `sort?`, `limit?`, `offset?` | `{ items, total }` |
+| `create` | `values` | `{ item }` |
+| `update` | `where`, `values` | `{ updated }` |
+| `delete` | `where` | `{ deleted }` |
+
+- **`where`** — `{ поле: значение }` или `{ поле: { оператор: значение } }`: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `contains`, `startsWith`, `isNull`.
+- **Поля.** Читать и фильтровать можно по `fields` и ключу, писать — только `fields`. Остальное — отказ с причиной `invalid_input`.
+- **`partitionField`** привязывает инструменты к разделу экземпляра: каждый запрос фильтруется по нему, новая запись получает его сама, а поле не читается и не пишется вручную. Без раздела у экземпляра — отказ `partition_required`. Иначе процесс одного арендатора видел бы и менял записи другого.
+- **Защита от массовых изменений.** `update` и `delete` требуют непустой `where`, а больше `maxChanges` записей (по умолчанию 100) — отказ `too_many_records`. `find` отдаёт не больше `maxRows` (по умолчанию 100).
+- **`callers`** — кто может вызывать, по умолчанию `["workflow"]`. **`name`** — средняя часть имени: `OrderItem` даёт `orm.order-item.find`.
+- **Пробный вызов.** С `context.dryRun` ничего не пишется: `create` возвращает запись, которая получилась бы, `update` и `delete` — сколько записей затронули бы.
+
+Причины — обычные причины ошибки: `boundaryError` с `errorCode: "too_many_records"` поймает отказ.
 
 ## Отмена
 
@@ -967,7 +1128,7 @@ instance 01a18f26-283b-77e3-85a2-642845bb66ac cancelled
 
 | Событие | Когда | Цель |
 | --- | --- | --- |
-| `WORKFLOW_PROCESS_CHANGED` | `change`: `created`, `updated`, `draftSaved`, `published`, `archived`, `restored` | `key`, `version` |
+| `WORKFLOW_PROCESS_CHANGED` | `change`: `created`, `updated`, `draftSaved`, `published`, `archived`, `restored`, `deleted` | `key`, `version` |
 | `WORKFLOW_INSTANCE_STARTED` | запуск вручную, по событию, по расписанию | `instanceId`, `processKey`, `version`, `partition`, `businessKey`, `startedVia` |
 | `WORKFLOW_INSTANCE_CANCELLED` | отмена | `instanceId`, `processKey`, `partition`, `reason` |
 | `WORKFLOW_INSTANCE_RETRIED` | повтор упавшего | `instanceId`, `processKey`, `partition` |
@@ -1042,7 +1203,7 @@ GET /workflow/instances               (Bearer, роль customer)             �
 
 | Право | Где | Раздел | Условия |
 | --- | --- | --- | --- |
-| `workflow.processes.read` | список и карточка процесса, версии, `/workflow/tools`, `/workflow/palette`, `/workflow/validate` | нет | `process`, `folder` |
+| `workflow.processes.read` | список и карточка процесса, версии, `/workflow/tools`, `/workflow/palette`, `/workflow/validate` | [разделы процесса](#разделы) | `process`, `folder` |
 | `workflow.processes.manage` | создание, изменение, черновик | нет | `process`, `folder` |
 | `workflow.processes.publish` | публикация | нет | `process`, `folder` |
 | `workflow.instances.start` | запуск | из запроса | `process`, `folder` |

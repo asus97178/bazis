@@ -1,13 +1,14 @@
 import { HttpError } from "../../http";
 import type { FormIssue, ProcessIssue } from "../../../library/workflow";
 
-export type WorkflowErrorCode = "not_found" | "conflict" | "wrong_status" | "invalid_document" | "invalid_input" | "archived";
+export type WorkflowErrorCode = "not_found" | "conflict" | "wrong_status" | "invalid_document" | "invalid_input" | "archived" | "in_use";
 
 const STATUS: Readonly<Record<WorkflowErrorCode, number>> = {
   not_found: 404,
   conflict: 409,
   wrong_status: 409,
   archived: 409,
+  in_use: 409,
   invalid_document: 422,
   invalid_input: 422,
 };
