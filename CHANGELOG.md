@@ -4,6 +4,31 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.136.0 — 2026-11-03
+
+HTTP requests and secrets for processes (stage 6 of WORKFLOW-002, the last one).
+Stores stay as they are.
+See [Upgrading](docs/guide/reference/upgrading.md#01360).
+
+### Added
+
+- `http.request` in `StandardToolsModule`, closed by default: an empty
+  `tools.http.allow` lets nothing through, every address must be public on each
+  redirect too, credentials do not follow a redirect to another host, limits on the size
+  of a response and on time. A trial sends only `GET` and `HEAD`. Settings
+  `tools.http.allow`, `callers`, `allowPrivateNetworks`, `maxResponseBytes`, `timeoutMs`.
+- `$secrets.NAME` in the input of a `serviceTask`, as a string or inside an expression.
+  `SecretStore`, by default `ConfigSecretStore` over `secrets.*` of the configuration.
+  A missing one fails the step with `secret_not_found`.
+- A value of a secret is cut out of the result of a step, `saveTo`, the history and errors.
+  `redactValues` in `bazis/library/redaction`, `secretNames` in `bazis/library/workflow`.
+- `context.caller` in a Tool.
+
+### Changed
+
+- `$secrets.NAME` in the input of a Tool was an error of the document and is now a value.
+  Anywhere else it stays an error.
+
 ## 0.135.0 — 2026-11-03
 
 Trial runs, references and the journal of runs (stage 5 of WORKFLOW-002). Stores
