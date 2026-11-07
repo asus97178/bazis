@@ -365,7 +365,7 @@
 Ломающих изменений нет. CLI теперь останавливается на Bun старше 1.4.0 —
 в том числе когда `bunx bazis` или `bun run` запускает его старым `bun`
 из `PATH`. Обновите его: `bun upgrade`
-([Старый Bun в PATH](../introduction/why-bun.md#старый-bun-в-path)).
+([Старый Bun в PATH](../introduction/why-bun.md#решение-проблем-старый-bun-в-path)).
 
 ## 0.105.1
 

@@ -26,7 +26,7 @@ bazis следует [Semantic Versioning](https://semver.org). До верси�
 
 | Что | Версия |
 | --- | --- |
-| Bun | 1.4.0 и новее; CLI проверяет это перед каждой командой ([Старый Bun](../introduction/why-bun.md#старый-bun-в-path)) |
+| Bun | 1.4.0 и новее; CLI проверяет это перед каждой командой ([Старый Bun](../introduction/why-bun.md#решение-проблем-старый-bun-в-path)) |
 | TypeScript | 5.9.3, 6 или 7. С TypeScript 7 нужен ещё `@typescript/typescript6`: кодогенерации нужен API компилятора ([`BAZIS_TYPESCRIPT_API_MISSING`](errors/codegen.md#bazis_typescript_api_missing)) |
 | Node.js | Не нужен: пакет поставляется исходниками TypeScript и работает на Bun |
 
