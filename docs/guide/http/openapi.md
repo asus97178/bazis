@@ -80,8 +80,9 @@ export class TasksController {
   }
 
   @Post()
-  create(body: CreateTaskRequest): Promise<TaskResponse> {
-    return Created(this.tasks.create(body));
+  async create(body: CreateTaskRequest) {
+    const task: TaskResponse = await this.tasks.create(body);
+    return Created(task);
   }
 }
 ```

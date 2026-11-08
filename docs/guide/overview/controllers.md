@@ -19,7 +19,8 @@ export class TaskController {
 
   @Post()
   async create(body: CreateTaskRequest) {
-    return Created(await this.tasks.create(body));
+    const task = await this.tasks.create(body);
+    return Created(task);
   }
 }
 ```

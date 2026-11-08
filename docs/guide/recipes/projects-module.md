@@ -182,7 +182,8 @@ export class ProjectsController {
 
   @Post()
   async create(body: CreateProjectRequest) {
-    return Created(await this.projects.create(body.name));
+    const project = await this.projects.create(body.name);
+    return Created(project);
   }
 
   @Delete(":id(uuid)")
