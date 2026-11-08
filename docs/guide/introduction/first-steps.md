@@ -142,14 +142,27 @@ export class AppModule {}
 
 Сервис хранит логику. Наш сервис хранит список пользователей.
 
-Создайте файл `src/app/modules/users/services/Users.service.ts`:
+Сначала опишем, **что** сервис умеет. Это контракт. Создайте файл
+`src/app/modules/users/services/IUsers.service.ts`:
 
 ```ts
 export interface User {
   name: string;
 }
 
-export class UsersService {
+export abstract class IUsersService {
+  abstract getAll(): readonly User[];
+  abstract find(name: string): User | undefined;
+  abstract create(name: string): User;
+}
+```
+
+Теперь напишем, **как** он это делает. Создайте рядом файл `Users.service.ts`:
+
+```ts
+import { IUsersService, type User } from "./IUsers.service";
+
+export class UsersService implements IUsersService {
   private readonly users: User[] = [];
 
   getAll(): readonly User[] {
@@ -169,6 +182,15 @@ export class UsersService {
 ```
 
 Это обычный класс. Никаких декораторов и регистрации не нужно.
+
+Зачем два файла? Контроллер будет знать только контракт `IUsersService`. Какой
+класс стоит за ним, решает модуль. Сегодня пользователи хранятся в памяти.
+Завтра вы напишете версию с базой данных, а в тестах подставите заглушку.
+Контроллер при этом не меняется ни на строчку.
+
+Контракт — это абстрактный класс, а не `interface`. Интерфейсы TypeScript
+пропадают при запуске, а абстрактный класс остаётся. По нему bazis и находит
+нужную реализацию.
 
 ## 5. Описываем, что приходит в запросе
 
@@ -204,12 +226,12 @@ export class CreateUserRequest {
 
 ```ts
 import { Controller, Created, Get, HttpContext, NotFound, Post } from "bazis/core/http";
-import { UsersService } from "../services/Users.service";
+import { IUsersService } from "../services/IUsers.service";
 import { CreateUserRequest } from "./contracts/Users.requests";
 
 @Controller("users")
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(private readonly users: IUsersService) {}
 
   @Get()
   getAll() {
@@ -246,7 +268,8 @@ export class UsersController {
 | `ctx: HttpContext` | сведения о текущем запросе |
 | простой тип, которого нет в адресе | из строки запроса: `?limit=10` |
 
-Сервис приходит в контроллер через конструктор. Его тоже передаёт bazis.
+Сервис приходит в контроллер через конструктор. Контроллер просит контракт
+`IUsersService`, а bazis передаёт реализацию, которую выбрал модуль.
 
 Если bazis не поймёт, откуда взять аргумент, он скажет об этом сразу, ещё до
 запуска. В ошибке `BAZIS_HTTP_BINDING_UNRESOLVED` будут метод и причина.
@@ -259,22 +282,25 @@ export class UsersController {
 ```ts
 import { Module, singleton } from "bazis/core/di";
 import { UsersController } from "./http/Users.controller";
+import { IUsersService } from "./services/IUsers.service";
 import { UsersService } from "./services/Users.service";
 
 @Module({
-  providers: [singleton(UsersService)],
+  providers: [singleton(IUsersService, UsersService)],
   controllers: [UsersController],
-  exports: [UsersService],
+  exports: [IUsersService],
 })
 export class UsersModule {}
 ```
 
 Три списка:
 
-- `providers` — сервисы модуля. `singleton` значит: один сервис на всё
-  приложение. Поэтому список пользователей не пропадает между запросами.
+- `providers` — сервисы модуля. `singleton(IUsersService, UsersService)`
+  читается так: «кто просит `IUsersService`, получит `UsersService`». Один на
+  всё приложение, поэтому список пользователей не пропадает между запросами.
 - `controllers` — контроллеры модуля.
-- `exports` — что можно брать из этого модуля в других модулях.
+- `exports` — что можно брать из этого модуля в других модулях. Отдаём
+  контракт, а не класс: соседям незачем знать, как сервис устроен внутри.
 
 ## 8. Проверяем
 
