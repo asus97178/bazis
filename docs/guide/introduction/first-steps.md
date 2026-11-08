@@ -3,7 +3,7 @@
 **15 минут — и у вас настоящий API: маршруты, проверка входных данных,
 документация, тесты и один исполняемый файл для сервера.**
 
-Соберём небольшой сервис приветствий. По дороге вы увидите главное в bazis:
+Соберём небольшой сервис пользователей. По дороге вы увидите главное в bazis:
 сервисы — обычные классы без декораторов, проверка запросов описывается
 одной строкой, документация API появляется сама, а результат собирается в
 один файл. Нужен только Bun 1.4.0+ — база данных не понадобится.
@@ -106,25 +106,25 @@ curl http://127.0.0.1:3000/health
 `--empty` — пустой модуль без примеров кода:
 
 ```sh
-bunx bazis g module Greeting --empty
+bunx bazis g module Users --empty
 ```
 
 ```text
-  ── FILES ─────────────────────────────────────────── src/app/modules/greeting
+  ── FILES ────────────────────────────────────────────── src/app/modules/users
   [OK  ]  files           3 changes
-    ├─ + src/app/modules/greeting/Greeting.module.ts
-    ├─ + src/app/modules/greeting/MODULE.md
+    ├─ + src/app/modules/users/Users.module.ts
+    ├─ + src/app/modules/users/MODULE.md
     └─ ~ src/app/modules/App.module.ts
   ↗  connected in src/app/modules/App.module.ts
 
-    ✔  SUCCESS   module Greeting is generated
+    ✔  SUCCESS   module Users is generated
 ```
 
 CLI создал модуль, его «паспорт» `MODULE.md` (описание ответственности и
 входов модуля) и добавил модуль в корневой:
 
 ```ts
-@Module({ imports: [GreetingModule], exports: [] })
+@Module({ imports: [UsersModule], exports: [] })
 export class AppModule {}
 ```
 
@@ -136,25 +136,28 @@ export class AppModule {}
 ## 4. Пишем сервис — обычный класс
 
 Бизнес-логика живёт в сервисах. Создайте
-`src/app/modules/greeting/services/Greeting.service.ts`:
+`src/app/modules/users/services/Users.service.ts`:
 
 ```ts
-export interface Greeting {
+export interface User {
   name: string;
-  message: string;
 }
 
-export class GreetingService {
-  private readonly history: Greeting[] = [];
+export class UsersService {
+  private readonly users: User[] = [];
 
-  getAll(): readonly Greeting[] {
-    return this.history;
+  getAll(): readonly User[] {
+    return this.users;
   }
 
-  create(name: string): Greeting {
-    const greeting = { name, message: `Hello, ${name}!` };
-    this.history.push(greeting);
-    return greeting;
+  find(name: string): User | undefined {
+    return this.users.find((user) => user.name === name);
+  }
+
+  create(name: string): User {
+    const user = { name };
+    this.users.push(user);
+    return user;
   }
 }
 ```
@@ -165,14 +168,14 @@ export class GreetingService {
 ## 5. Описываем модель запроса — проверка в одну строку
 
 Данные, которые приходят в теле запроса, описываются классом с проверками.
-Создайте `src/app/modules/greeting/http/contracts/Greeting.requests.ts`:
+Создайте `src/app/modules/users/http/contracts/Users.requests.ts`:
 
 ```ts
 import { RequestModel } from "bazis/core/http";
 import { Validator } from "bazis/library/validation";
 
 @RequestModel()
-export class CreateGreetingRequest {
+export class CreateUserRequest {
   @Validator({ required: true, minLength: 1, maxLength: 50 })
   name!: string;
 }
@@ -186,42 +189,46 @@ export class CreateGreetingRequest {
 ## 6. Пишем контроллер — без декораторов на параметрах
 
 Контроллер принимает HTTP-запросы и вызывает сервис. Создайте
-`src/app/modules/greeting/http/Greeting.controller.ts`:
+`src/app/modules/users/http/Users.controller.ts`:
 
 ```ts
-import { Controller, Created, Get, HttpContext, Post } from "bazis/core/http";
-import { GreetingService } from "../services/Greeting.service";
-import { CreateGreetingRequest } from "./contracts/Greeting.requests";
+import { Controller, Created, Get, HttpContext, NotFound, Post } from "bazis/core/http";
+import { UsersService } from "../services/Users.service";
+import { CreateUserRequest } from "./contracts/Users.requests";
 
-@Controller("greetings")
-export class GreetingController {
-  constructor(private readonly greetings: GreetingService) {}
+@Controller("users")
+export class UsersController {
+  constructor(private readonly users: UsersService) {}
 
   @Get()
   getAll() {
-    return this.greetings.getAll();
+    return this.users.getAll();
   }
 
   @Get(":name")
   getByName(name: string) {
-    return { message: `Hello, ${name}!` };
+    return this.users.find(name) ?? NotFound({ error: `User ${name} not found` });
   }
 
   @Post()
-  create(body: CreateGreetingRequest, ctx: HttpContext) {
-    const greeting = this.greetings.create(body.name);
-    return Created(`${ctx.path}/${encodeURIComponent(greeting.name)}`, greeting);
+  create(body: CreateUserRequest, ctx: HttpContext) {
+    const user = this.users.create(body.name);
+    return Created(`${ctx.path}/${encodeURIComponent(user.name)}`, user);
   }
 }
 ```
+
+Метод может вернуть данные — они уйдут клиенту как JSON — или готовый ответ
+с кодом: `Created` даёт 201 с заголовком `Location`, `NotFound` — 404, если
+такого пользователя нет.
 
 Откуда берутся аргументы методов — фреймворк определяет по их именам и
 типам, без декораторов на параметрах:
 
 | Параметр | Откуда значение |
 | --- | --- |
-| `name: string`, а в маршруте есть `:name` | из пути: `/greetings/world` → `"world"` |
-| `body: CreateGreetingRequest` | из JSON-тела запроса, с проверкой `@Validator` |
+| `name: string`, а в маршруте есть `:name` | из пути: `/users/Anna` → `"Anna"` |
+| `body: CreateUserRequest` | из JSON-тела запроса, с проверкой `@Validator` |
 | `ctx: HttpContext` | контекст текущего запроса |
 | простой тип, которого нет в маршруте | из строки запроса: `?limit=10` |
 
@@ -232,64 +239,67 @@ export class GreetingController {
 
 ## 7. Собираем модуль
 
-Откройте `src/app/modules/greeting/Greeting.module.ts`:
+Откройте `src/app/modules/users/Users.module.ts`:
 
 ```ts
 import { Module, singleton } from "bazis/core/di";
-import { GreetingController } from "./http/Greeting.controller";
-import { GreetingService } from "./services/Greeting.service";
+import { UsersController } from "./http/Users.controller";
+import { UsersService } from "./services/Users.service";
 
 @Module({
-  providers: [singleton(GreetingService)],
-  controllers: [GreetingController],
-  exports: [GreetingService],
+  providers: [singleton(UsersService)],
+  controllers: [UsersController],
+  exports: [UsersService],
 })
-export class GreetingModule {}
+export class UsersModule {}
 ```
 
 - `providers` — сервисы модуля. `singleton` значит «один экземпляр на всё
-  приложение»: история приветствий сохраняется между запросами. Для сервисов
+  приложение»: список пользователей сохраняется между запросами. Для сервисов
   без состояния обычно выбирают `scoped` — новый экземпляр на каждый запрос.
 - `controllers` — контроллеры модуля, их регистрировать как провайдеры не
   нужно.
-- `exports` — что модуль отдаёт другим модулям. Здесь `GreetingService`
-  смогут внедрять модули, которые импортируют `GreetingModule`.
+- `exports` — что модуль отдаёт другим модулям. Здесь `UsersService`
+  смогут внедрять модули, которые импортируют `UsersModule`.
 
 ## 8. Проверяем — и смотрим документацию
 
 Если `bunx bazis dev` всё ещё запущен без `--watch`, перезапустите его.
 
 ```sh
-curl http://127.0.0.1:3000/greetings/world
-# {"message":"Hello, world!"}
+curl http://127.0.0.1:3000/users/Anna
+# 404 {"error":"User Anna not found"}
 
-curl -i -X POST http://127.0.0.1:3000/greetings \
+curl -i -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":"Anna"}'
 # HTTP/1.1 201 Created
-# Location: /greetings/Anna
-# {"name":"Anna","message":"Hello, Anna!"}
+# Location: /users/Anna
+# {"name":"Anna"}
 
-curl http://127.0.0.1:3000/greetings
-# [{"name":"Anna","message":"Hello, Anna!"}]
+curl http://127.0.0.1:3000/users/Anna
+# {"name":"Anna"}
+
+curl http://127.0.0.1:3000/users
+# [{"name":"Anna"}]
 ```
 
 Неверные данные отклоняются до вызова контроллера:
 
 ```sh
-curl -X POST http://127.0.0.1:3000/greetings \
+curl -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":""}'
 # 400 {"error":"Validation failed","details":[{"property":"name",
 #   "message":"Field \"name\" must be at least 1 characters long","code":"minLength"}]}
 
-curl -X POST http://127.0.0.1:3000/greetings \
+curl -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":42}'
 # 400 {"error":"Validation failed","details":[{"property":"name",
 #   "message":"Field \"name\" must be of type string, got: number","code":"type"}]}
 ```
 
 Теперь откройте в браузере <http://127.0.0.1:3000/docs>. Там уже описаны все
-три маршрута `/greetings`: параметры, тело запроса с правилами проверки и ответы. bazis
-строит документацию из кода при кодогенерации, поэтому она не расходится с
+три маршрута `/users`: параметры, тело запроса с правилами проверки и ответы.
+bazis строит документацию из кода при кодогенерации, поэтому она не расходится с
 API. В `production` страница по умолчанию выключена, подробнее — в
 [«OpenAPI»](../http/openapi.md).
 
