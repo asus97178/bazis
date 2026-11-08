@@ -91,15 +91,15 @@ export class ${n.moduleClass} {}
 function controllerFile(n: ModuleNaming, profile: ModuleTemplateProfile, authImportPath: string | null): string {
   const auth = profile === "full" && authImportPath !== null;
   const fullImports = profile !== "full"
-    ? "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from \"bazis/core/http\";\n"
+    ? "import { Controller, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from \"bazis/core/http\";\n"
     : auth
       ? `import { OutputCache } from "bazis/core/cache";
-import { Authorize, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
+import { Authorize, Controller, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 import { TokenKind } from "${authImportPath}/tokenKinds";
 import { requireTokenKind } from "${authImportPath}/jwtAuth";
 `
       : `import { OutputCache } from "bazis/core/cache";
-import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
+import { Controller, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 // No host auth helpers (src/app/modules/auth) were found: these routes are public.
 // Add @Authorize(...) from "bazis/core/http" with your policy before exposing them.
 `;
@@ -131,10 +131,9 @@ ${authRead}  @Get(":id(uuid)")
     return item ? Ok(item) : NotFound({ error: \`${n.entity.toLowerCase()} \${id} not found\` });
   }
 
-${authWrite}  @Post()
-  async create(body: FromBody<Create${n.entity}Request>, ctx: HttpContext) {
-    const item = await this.${n.collection}.create(body);
-    return Created(\`\${ctx.path.replace(/\\/$/, "")}/\${item.id}\`, item);
+${authWrite}  @Post({ code: 201 })
+  async create(body: FromBody<Create${n.entity}Request>) {
+    return this.${n.collection}.create(body);
   }
 
 ${authWrite}  @Put(":id(uuid)")

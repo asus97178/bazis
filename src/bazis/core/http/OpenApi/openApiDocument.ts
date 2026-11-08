@@ -87,7 +87,42 @@ function collectOpenApiOperations(
       }
     }
   }
-  return operations;
+  return withCreatedLocation(operations);
+}
+
+/**
+ * Documents the automatic `Location` of a 201: the server sets it when the
+ * body has `id` and a GET route answers `<path>/<id>`.
+ */
+function withCreatedLocation(operations: OpenApiCatalogOperation[]): OpenApiCatalogOperation[] {
+  const itemPaths = new Set<string>();
+  for (const operation of operations) {
+    const parent = /^(.*)\/\{[^{}/]+\}$/u.exec(operation.path)?.[1];
+    if (operation.httpMethod === "GET" && parent !== undefined) {
+      itemPaths.add(parent);
+    }
+  }
+  return operations.map((operation) => {
+    const created = operation.responses["201"];
+    if (!created || !itemPaths.has(operation.path.replace(/\/+$/u, ""))) {
+      return operation;
+    }
+    return {
+      ...operation,
+      responses: {
+        ...operation.responses,
+        "201": {
+          ...created,
+          headers: {
+            Location: {
+              description: "Address of the created item, when the response has `id`.",
+              schema: { type: "string" },
+            },
+          },
+        },
+      },
+    };
+  });
 }
 
 interface CreateOperationInput {

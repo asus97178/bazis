@@ -164,7 +164,7 @@ export class CreateProjectRequest {
 
 ```ts
 // src/app/modules/projects/http/Projects.controller.ts
-import { Authorize, Controller, Created, Delete, Get, NoContent, NotFound, Post } from "bazis/core/http";
+import { Authorize, Controller, Delete, Get, NoContent, NotFound, Post } from "bazis/core/http";
 import { requireTokenKind } from "../../auth/jwtAuth";
 import { TokenKind } from "../../auth/tokenKinds";
 import { IProjectsService } from "../services/IProjects.service";
@@ -180,10 +180,9 @@ export class ProjectsController {
     return this.projects.list();
   }
 
-  @Post()
+  @Post({ code: 201 })
   async create(body: CreateProjectRequest) {
-    const project = await this.projects.create(body.name);
-    return Created(`/projects/${project.id}`, project);
+    return this.projects.create(body.name);
   }
 
   @Delete(":id(uuid)")
@@ -267,11 +266,11 @@ export class TasksService implements ITasksService {
 
 ```ts
 // tasks/http/Tasks.controller.ts
-  @Post()
-  async create(body: CreateTaskRequest, ctx: HttpContext) {
+  @Post({ code: 201 })
+  async create(body: CreateTaskRequest) {
     const task = await this.tasks.create(body);
     if (task === "unknown-project") return StatusCode(422, { error: `project ${body.projectId} not found` });
-    return Created(`${ctx.path}/${task.id}`, task);
+    return task;
   }
 ```
 

@@ -30,17 +30,16 @@ async getById(id: string) {
   return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
 }
 
-@Post()
-async create(body: CreateTaskRequest, ctx: HttpContext) {
-  const task = await this.tasks.create(body);
-  return Created(`${ctx.path}/${task.id}`, task);   // 201 + Location
+@Post({ code: 201 })
+async create(body: CreateTaskRequest) {
+  return this.tasks.create(body);   // 201 + Location
 }
 ```
 
 | Помощник | Код |
 | --- | --- |
 | `Ok(body?)` | 200; без тела — пустой ответ |
-| `Created(location?, body?)` | 201 и заголовок `Location` |
+| `Created(location?, body?)` | 201 и заголовок `Location` с указанным адресом |
 | `Accepted(body?)` | 202 |
 | `NoContent()` | 204 |
 | `BadRequest(body?)` | 400 |
@@ -50,6 +49,32 @@ async create(body: CreateTaskRequest, ctx: HttpContext) {
 | `Redirect(url, permanent?)` | 302, или 301 при `permanent = true` |
 | `StatusCode(code, body?)` | Любой код |
 | `File(path \| Blob \| Uint8Array, contentType?)` | 200, файл или байты |
+
+## `Location` для 201
+
+Адрес нового объекта bazis ставит сам. Достаточно ответить кодом 201 и
+вернуть объект с полем `id`:
+
+```ts
+@Post({ code: 201 })
+create(body: CreateTaskRequest) {
+  return this.tasks.create(body);   // { id: 7, ... }
+}
+// POST /tasks → 201, Location: /tasks/7
+```
+
+Правила:
+
+- адрес — путь запроса, `/` и `id`. Слэш в конце пути убирается, `id`
+  кодируется, поэтому подходят и строки с кириллицей;
+- заголовок ставится, только если в приложении есть маршрут `GET` на этот
+  адрес, например `@Get(":id")`. `POST /tasks/5/complete` без
+  `GET /tasks/5/complete/:id` адреса не получит;
+- без поля `id`, у массива или у ответа с другим кодом заголовка нет;
+- заданный вручную адрес важнее: `Created("/elsewhere/7", task)` или
+  `ctx.res.header("location", ...)`.
+
+Автоматический `Location` появился в версии 0.137.0.
 
 ## Код и заголовки: `ResponseBuilder`
 
