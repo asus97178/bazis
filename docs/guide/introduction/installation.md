@@ -45,23 +45,70 @@ Node.js не нужен и не поддерживается — почему, �
 
 ## Уже есть проект на Bun? Подключите bazis
 
+Три шага: поставить пакеты, добавить четыре файла и один раз запустить
+кодогенерацию.
+
+### Шаг 1. Пакеты: выберите свою версию TypeScript
+
+bazis работает с TypeScript 5.9, 6 и 7. Возьмите ту, что уже стоит в проекте.
+Если TypeScript ещё нет, ставьте 6: её получает проект от `bazis new`.
+
+> **Если проект создан через `bun init`.** Он записывает `typescript` в
+> `peerDependencies`. Тогда `bun add -d typescript@…` ничего не ставит, а Bun
+> подтягивает самый новый TypeScript, седьмой. Сначала уберите запись:
+>
+> ```sh
+> bun remove typescript
+> ```
+
+#### TypeScript 6 — рекомендуем
+
 ```sh
 bun add bazis
 bun add -d typescript@^6 @types/bun
 ```
 
-Подойдёт TypeScript 5.9, 6 или 7. Проект, созданный `bazis new`, получает `"typescript": "^6"`.
+Больше ничего не нужно.
 
-> **Важно, если проект создан через `bun init`.** Он записывает `typescript` в `peerDependencies`. Тогда `bun add -d typescript@^6` ничего не ставит, Bun подтягивает самый новый TypeScript — седьмой, — и кодогенерация остановится с `BAZIS_TYPESCRIPT_API_MISSING`. Сначала уберите запись:
->
-> ```sh
-> bun remove typescript
-> bun add -d typescript@^6
-> ```
+#### TypeScript 5.9 — если проект уже на нём
 
-Дальше проекту нужны четыре небольших файла. Проще всего взять их из проекта, созданного `bazis new`; вот минимальное содержимое.
+```sh
+bun add bazis
+bun add -d typescript@~5.9 @types/bun
+```
 
-`tsconfig.json` — строка `"types": ["bun"]` обязательна: TypeScript 6 не подключает типы Bun сам:
+Подходит 5.9.3 и новее в ветке 5.9. Более старые TypeScript не
+поддерживаются: обновитесь до 5.9 или сразу до 6.
+
+#### TypeScript 7
+
+```sh
+bun add bazis
+bun add -d typescript@^7 @typescript/typescript6 @types/bun
+```
+
+Здесь нужен ещё пакет `@typescript/typescript6`. Кодогенерация bazis читает
+исходники через программный API компилятора, а в TypeScript 7 его нет. Microsoft
+выпускает этот API отдельным пакетом. Проверку типов при этом делает сам
+TypeScript 7.
+
+Забыли пакет? Кодогенерация остановится и подскажет команду:
+
+```text
+[bazis] BAZIS_TYPESCRIPT_API_MISSING: TypeScript 7 has no compiler API, and bazis codegen needs one.
+Install the TypeScript 6 API next to it: bun add -d @typescript/typescript6
+```
+
+Учтите: `bun add -d typescript` без версии ставит именно TypeScript 7.
+TypeScript 7 поддерживается с bazis 0.97.5.
+
+### Шаг 2. Четыре файла
+
+Файлы одинаковые для всех версий TypeScript. Проще всего взять их из проекта,
+созданного `bazis new`. Вот минимальное содержимое.
+
+`tsconfig.json`. Оставьте строку `"types": ["bun"]`: с TypeScript 6 и 7 без неё
+типы Bun могут не подключиться.
 
 ```json
 {
@@ -111,28 +158,16 @@ import { Module } from "bazis/core/di";
 export class AppModule {}
 ```
 
-`src/generated/bazis/runtime.ts` создаёт кодогенерация. Запустите её один раз и добавьте `src/generated/` в `.gitignore`:
+### Шаг 3. Кодогенерация
 
 ```sh
 bunx bazis codegen
 ```
 
-### TypeScript 7 — тоже поддерживается
+Она создаст `src/generated/bazis/runtime.ts`. Добавьте `src/generated/` в
+`.gitignore`: папка каждый раз строится заново из исходников.
 
-В TypeScript 7 нет программного API компилятора, через который кодогенерация bazis читает исходники: `import ts from "typescript"` отдаёт только номер версии. Microsoft выпускает этот API отдельно, пакетом `@typescript/typescript6`. Поставьте его рядом:
-
-```sh
-bun add -d typescript@^7 @typescript/typescript6 @types/bun
-```
-
-Проверка типов (`bazis build`) идёт самим TypeScript 7, а кодогенерация читает исходники через API шестой версии. Если пакет забыть, кодогенерация остановится и сама подскажет команду:
-
-```text
-[bazis] BAZIS_TYPESCRIPT_API_MISSING: TypeScript 7 has no compiler API, and bazis codegen needs one.
-Install the TypeScript 6 API next to it: bun add -d @typescript/typescript6
-```
-
-Учтите: `bun add -d typescript` без версии ставит именно TypeScript 7 — тогда нужен и `@typescript/typescript6`. TypeScript 7 поддерживается с bazis 0.97.5.
+Готово. `bunx bazis dev` запустит приложение.
 
 ## Обновление — одной командой
 
