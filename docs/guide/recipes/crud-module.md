@@ -337,9 +337,9 @@ export class TasksController {
   }
 
   @Post()
-  async create(body: FromBody<CreateTaskRequest>, ctx: HttpContext) {
-    const task = await this.tasks.create(body);
-    return Created(`${ctx.path}/${task.id}`, task);
+  async create(body: FromBody<CreateTaskRequest>) {
+    const result = await this.tasks.create(body);
+    return Created(result);
   }
 
   @Put(":id(uuid)")

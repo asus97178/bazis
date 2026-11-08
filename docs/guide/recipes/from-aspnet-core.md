@@ -52,7 +52,7 @@
 | Model state: все ошибки привязки и проверки в одном `400` | Так же: `Validation failed` и все нарушения в `details` | [Контроллеры](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
 | `HttpContext` | `ctx: HttpContext` | [Контроллеры](../overview/controllers.md#httpcontext) |
 | DataAnnotations, автоматический `400` | `@Validator` на полях класса, тоже `400`; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
-| `Ok()`, `CreatedAtAction()`, `NoContent()` | `Ok`, `Created`, `NoContent` | [Ответы](../overview/responses.md#помощники) |
+| `Ok()`, `CreatedAtAction()`, `NoContent()` | `Ok`, `Created` с автоматическим `Location`, `NoContent` | [Ответы](../overview/responses.md#помощники) |
 | `IOptions<T>` + `ValidateOnStart` | `defineConfig` + `ConfigView<T>`, проверка всегда при запуске | [Конфигурация](../fundamentals/configuration.md) |
 | `appsettings.{Environment}.json` | Разделы `default`, `development`, `test`, `production` в `defineConfig` | [Конфигурация](../fundamentals/configuration.md#окружения) |
 | `ASPNETCORE_ENVIRONMENT` | `BAZIS_ENV` | [Конфигурация](../fundamentals/configuration.md#окружения) |
@@ -257,9 +257,9 @@ export class BooksController {
 
   @Post()
   @Authorize(adminKey)
-  add(body: AddBookRequest, ctx: HttpContext) {
-    const book = this.books.add(body.title, body.author);
-    return Created(`${ctx.path}/${book.id}`, book);
+  add(body: AddBookRequest) {
+    const result = this.books.add(body.title, body.author);
+    return Created(result);
   }
 }
 ```

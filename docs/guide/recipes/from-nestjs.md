@@ -202,9 +202,9 @@ export class BooksController {
 
   @Post()
   @Authorize(adminKey)
-  add(body: AddBookRequest, ctx: HttpContext) {
-    const book = this.books.add(body.title, body.author);
-    return Created(`${ctx.path}/${book.id}`, book);
+  add(body: AddBookRequest) {
+    const result = this.books.add(body.title, body.author);
+    return Created(result);
   }
 }
 ```

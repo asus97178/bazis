@@ -32,7 +32,7 @@ export class InstancesController {
       language,
       ...(request.test === true ? { test: true } : {}),
     });
-    return Created(`${ctx.path}/${instance.id}`, instance);
+    return Created(instance, `${ctx.path}/${instance.id}`);
   }
 
   /** A start per element, for an action over many records (WORKFLOW-002 §5.1). */

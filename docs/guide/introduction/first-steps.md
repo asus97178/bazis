@@ -1,8 +1,18 @@
 # Первые шаги
 
-За 15 минут создадим приложение с одним модулем: оно принимает имя,
-отвечает приветствием, проверяет входные данные и собирается в один
-исполняемый файл. Нужен только Bun 1.4.0+ — база данных не понадобится.
+**15 минут — и у вас готовый API.**
+
+Мы сделаем маленький сервис пользователей. Он умеет три вещи: добавить
+пользователя, найти его по номеру и показать всех.
+
+Что будет в конце:
+
+- маршруты `GET` и `POST`, которые сами проверяют входные данные;
+- страница с документацией API — её не нужно писать;
+- тесты, которые запускаются одной командой;
+- один файл, который можно скопировать на сервер.
+
+Нужен только Bun 1.4.0 или новее. База данных не понадобится.
 
 ## 1. Создаём проект
 
@@ -12,7 +22,7 @@ cd my-app
 bun install
 ```
 
-CLI создаёт папку `my-app` с такой структурой:
+Готово. В папке `my-app` уже лежит рабочий проект:
 
 ```text
 my-app/
@@ -31,7 +41,7 @@ my-app/
         └── test/health.test.ts     тест: приложение стартует и отвечает на /health
 ```
 
-Точка входа `src/index.ts`:
+Посмотрим на точку входа `src/index.ts`:
 
 ```ts
 import { runApp } from "bazis/core/app";
@@ -42,11 +52,15 @@ await registerBazisGeneratedRuntime();
 await runApp(AppModule, { http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });
 ```
 
-- `registerBazisGeneratedRuntime()` подключает код, созданный кодогенерацией:
-  связи зависимостей и привязки HTTP-параметров. Папку `src/generated/` не
-  редактируют руками и не хранят в Git.
-- `runApp(AppModule, ...)` собирает модули, поднимает HTTP-сервер и включает
-  маршрут `/health`.
+Здесь две строки:
+
+- `registerBazisGeneratedRuntime()` подключает код из папки `src/generated/`.
+- `runApp(AppModule, ...)` запускает приложение и включает адрес `/health`.
+
+> **Что за папка `src/generated/`?** Её создаёт сам bazis при каждом запуске.
+> Там записано, какой класс от какого зависит. Руками её не меняют: при
+> следующем запуске bazis всё равно перезапишет её. В Git её тоже не кладут:
+> она восстанавливается сама. В `.gitignore` нового проекта она уже есть.
 
 Корневой модуль пока пустой:
 
@@ -63,8 +77,7 @@ export class AppModule {}
 bunx bazis dev
 ```
 
-Команда запускает кодогенерацию, а затем приложение в окружении
-`development`. В консоли появится строка вида:
+В консоли появится строка:
 
 ```text
 info: bazis started {"environment":"development","debug":true,...}
@@ -77,190 +90,271 @@ curl http://127.0.0.1:3000/health
 # {"healthy":true,"checks":[]}
 ```
 
-Порт и адрес меняются переменными `PORT` и `HOST`, например
-`PORT=3100 bunx bazis dev`. С флагом `--watch` приложение перезапускается
-при изменениях в `src/`. Остановка — `Ctrl+C`.
+Приложение уже работает, а вы ещё не написали ни строчки кода.
+
+Что пригодится при разработке:
+
+| Задача | Как сделать |
+| --- | --- |
+| Запустить на другом порту | `PORT=3100 bunx bazis dev` |
+| Слушать другой адрес | переменная `HOST`, например `HOST=0.0.0.0` |
+| Перезапускать при изменениях в `src/` | `bunx bazis dev --watch` |
+| Остановить приложение | `Ctrl+C` |
 
 ## 3. Создаём модуль
 
-Модули создаются только через CLI — так они сразу получают правильную
-структуру и подключаются к приложению:
+Модуль — это папка с кодом про одну тему. У нас тема — пользователи.
+
+Модули создают через CLI. Он сам делает нужные файлы и подключает модуль к
+приложению. Сервис и контроллер мы напишем сами, поэтому просим пустой модуль
+— флаг `--empty`:
 
 ```sh
-bunx bazis g module Greeting --empty
+bunx bazis g module Users --empty
 ```
 
 ```text
-  ── FILES ─────────────────────────────────────────── src/app/modules/greeting
+  ── FILES ────────────────────────────────────────────── src/app/modules/users
   [OK  ]  files           3 changes
-    ├─ + src/app/modules/greeting/Greeting.module.ts
-    ├─ + src/app/modules/greeting/MODULE.md
+    ├─ + src/app/modules/users/Users.module.ts
+    ├─ + src/app/modules/users/MODULE.md
     └─ ~ src/app/modules/App.module.ts
   ↗  connected in src/app/modules/App.module.ts
 
-    ✔  SUCCESS   module Greeting is generated
+    ✔  SUCCESS   module Users is generated
 ```
 
-CLI создал модуль, его «паспорт» `MODULE.md` (описание ответственности и
-входов модуля) и добавил модуль в корневой:
+CLI сделал три вещи:
+
+- создал файл модуля `Users.module.ts`;
+- создал `MODULE.md` — короткое описание: за что отвечает модуль;
+- подключил модуль к корневому:
 
 ```ts
-@Module({ imports: [GreetingModule], exports: [] })
+@Module({ imports: [UsersModule], exports: [] })
 export class AppModule {}
 ```
 
-Профиль `--empty` даёт пустой модуль. Есть ещё `--minimal` (учебный CRUD с
-базой данных) и `--full` — о них в разделе про CLI.
+Без `--empty` CLI сразу кладёт в модуль пример кода. Какие бывают варианты —
+в [«Командах CLI»](../cli/commands.md#bazis-g-module).
 
 ## 4. Пишем сервис
 
-Бизнес-логика живёт в сервисах. Создайте
-`src/app/modules/greeting/services/Greeting.service.ts`:
+Сервис хранит логику. Наш сервис хранит список пользователей.
+
+Сначала опишем, **что** сервис умеет. Это контракт. Создайте файл
+`src/app/modules/users/services/IUsers.service.ts`:
 
 ```ts
-export interface Greeting {
+export interface User {
+  id: number;
   name: string;
-  message: string;
 }
 
-export class GreetingService {
-  private readonly history: Greeting[] = [];
+export abstract class IUsersService {
+  abstract getAll(): readonly User[];
+  abstract find(id: number): User | undefined;
+  abstract create(name: string): User;
+}
+```
 
-  getAll(): readonly Greeting[] {
-    return this.history;
+Теперь напишем, **как** он это делает. Создайте рядом файл `Users.service.ts`:
+
+```ts
+import { IUsersService, type User } from "./IUsers.service";
+
+export class UsersService implements IUsersService {
+  private readonly users: User[] = [];
+
+  getAll(): readonly User[] {
+    return this.users;
   }
 
-  create(name: string): Greeting {
-    const greeting = { name, message: `Hello, ${name}!` };
-    this.history.push(greeting);
-    return greeting;
+  find(id: number): User | undefined {
+    return this.users.find((user) => user.id === id);
+  }
+
+  create(name: string): User {
+    const user = { id: this.users.length + 1, name };
+    this.users.push(user);
+    return user;
   }
 }
 ```
 
-Сервис — обычный класс. Никаких декораторов не нужно.
+Это обычный класс. Никаких декораторов и регистрации не нужно.
 
-## 5. Описываем модель запроса
+Зачем два файла? Контроллер будет знать только контракт `IUsersService`. Какой
+класс стоит за ним, решает модуль. Сегодня пользователи хранятся в памяти.
+Завтра вы напишете версию с базой данных, а в тестах подставите заглушку.
+Контроллер при этом не меняется ни на строчку.
 
-Данные, которые приходят в теле запроса, описываются классом с проверками.
-Создайте `src/app/modules/greeting/http/contracts/Greeting.requests.ts`:
+Контракт — это абстрактный класс, а не `interface`. Интерфейсы TypeScript
+пропадают при запуске, а абстрактный класс остаётся. По нему bazis и находит
+нужную реализацию.
+
+## 5. Описываем, что приходит в запросе
+
+Клиент присылает имя нового пользователя. Опишем, каким оно должно быть.
+
+Создайте файл `src/app/modules/users/http/contracts/Users.requests.ts`:
 
 ```ts
 import { RequestModel } from "bazis/core/http";
 import { Validator } from "bazis/library/validation";
 
 @RequestModel()
-export class CreateGreetingRequest {
+export class CreateUserRequest {
   @Validator({ required: true, minLength: 1, maxLength: 50 })
   name!: string;
 }
 ```
 
-`@Validator` задаёт правила: поле обязательно, длина от 1 до 50 символов.
-Тип `string` тоже проверяется: число вместо строки вернёт ошибку 400.
+Строка `@Validator` — это все правила:
+
+- имя обязательно;
+- длина от 1 до 50 символов;
+- это строка, а не число.
+
+Если запрос нарушает правила, bazis сам ответит ошибкой 400. Ваш код даже не
+запустится. Отдельная библиотека для проверок не нужна.
 
 ## 6. Пишем контроллер
 
-Контроллер принимает HTTP-запросы и вызывает сервис. Создайте
-`src/app/modules/greeting/http/Greeting.controller.ts`:
+Контроллер принимает запросы и передаёт их сервису.
+
+Создайте файл `src/app/modules/users/http/Users.controller.ts`:
 
 ```ts
-import { Controller, Created, Get, HttpContext, Post } from "bazis/core/http";
-import { GreetingService } from "../services/Greeting.service";
-import { CreateGreetingRequest } from "./contracts/Greeting.requests";
+import { Controller, Created, Get, NotFound, Post } from "bazis/core/http";
+import { IUsersService } from "../services/IUsers.service";
+import { CreateUserRequest } from "./contracts/Users.requests";
 
-@Controller("greetings")
-export class GreetingController {
-  constructor(private readonly greetings: GreetingService) {}
+@Controller("users")
+export class UsersController {
+  constructor(private readonly users: IUsersService) {}
 
   @Get()
   getAll() {
-    return this.greetings.getAll();
+    return this.users.getAll();
   }
 
-  @Get(":name")
-  getByName(name: string) {
-    return { message: `Hello, ${name}!` };
+  @Get(":id")
+  getById(id: number) {
+    return this.users.find(id) ?? NotFound({ error: `User ${id} not found` });
   }
 
   @Post()
-  create(body: CreateGreetingRequest, ctx: HttpContext) {
-    const greeting = this.greetings.create(body.name);
-    return Created(`${ctx.path}/${encodeURIComponent(greeting.name)}`, greeting);
+  create(body: CreateUserRequest) {
+    const result = this.users.create(body.name);
+    return Created(result);
   }
 }
 ```
 
-Откуда берутся аргументы методов — фреймворк определяет по их именам и
-типам, без декораторов на параметрах:
+Как это читать:
 
-| Параметр | Откуда значение |
+- `@Controller("users")` — все адреса начинаются с `/users`.
+- `getAll()` отдаёт всех пользователей.
+- `getById(id)` ищет одного по номеру. Нет такого — ответ 404 (`NotFound`).
+- `create(...)` добавляет пользователя и возвращает его через `Created`. Это
+  ответ 201 Created. Адрес нового пользователя, например `/users/1`, bazis сам
+  положит в заголовок `Location`: он знает путь запроса и видит `id` в ответе.
+
+Методы просто возвращают значение. bazis сам превратит его в ответ: объект или
+массив уйдёт как JSON с кодом 200, а «ничего» — пустым ответом 204.
+
+Откуда берутся аргументы? bazis смотрит на их имена и типы:
+
+| Аргумент | Откуда bazis его берёт |
 | --- | --- |
-| `name: string`, а в маршруте есть `:name` | из пути: `/greetings/world` → `"world"` |
-| `body: CreateGreetingRequest` | из JSON-тела запроса, с проверкой `@Validator` |
-| `ctx: HttpContext` | контекст текущего запроса |
-| простой тип, которого нет в маршруте | из строки запроса: `?limit=10` |
+| `id: number`, в адресе есть `:id` | из адреса: `/users/1` → `1`, уже числом |
+| `body: CreateUserRequest` | из тела запроса, сразу с проверкой |
+| простой тип, которого нет в адресе | из строки запроса: `?limit=10` |
 
-Сервис попадает в контроллер через конструктор. Если фреймворк не может
-понять, откуда взять параметр, кодогенерация останавливается с ошибкой
-`BAZIS_HTTP_BINDING_UNRESOLVED` и называет метод и причину.
+Сервис приходит в контроллер через конструктор. Контроллер просит контракт
+`IUsersService`, а bazis передаёт реализацию, которую выбрал модуль.
 
-## 7. Регистрируем всё в модуле
+Если bazis не поймёт, откуда взять аргумент, он скажет об этом сразу, ещё до
+запуска. В ошибке `BAZIS_HTTP_BINDING_UNRESOLVED` будут метод и причина.
 
-Откройте `src/app/modules/greeting/Greeting.module.ts`:
+## 7. Собираем модуль
+
+Осталось сказать модулю, что в нём есть. Откройте
+`src/app/modules/users/Users.module.ts` и замените содержимое:
 
 ```ts
 import { Module, singleton } from "bazis/core/di";
-import { GreetingController } from "./http/Greeting.controller";
-import { GreetingService } from "./services/Greeting.service";
+import { UsersController } from "./http/Users.controller";
+import { IUsersService } from "./services/IUsers.service";
+import { UsersService } from "./services/Users.service";
 
 @Module({
-  providers: [singleton(GreetingService)],
-  controllers: [GreetingController],
-  exports: [GreetingService],
+  providers: [singleton(IUsersService, UsersService)],
+  controllers: [UsersController],
+  exports: [IUsersService],
 })
-export class GreetingModule {}
+export class UsersModule {}
 ```
 
-- `providers` — сервисы модуля. `singleton` значит «один экземпляр на всё
-  приложение»: история приветствий сохраняется между запросами. Для сервисов
-  без состояния обычно выбирают `scoped` — новый экземпляр на каждый запрос.
-- `controllers` — контроллеры модуля, их регистрировать как провайдеры не
-  нужно.
-- `exports` — что модуль отдаёт другим модулям. Здесь `GreetingService`
-  смогут внедрять модули, которые импортируют `GreetingModule`.
+Три списка:
+
+- `providers` — сервисы модуля. `singleton(IUsersService, UsersService)`
+  читается так: «кто просит `IUsersService`, получит `UsersService`». Один на
+  всё приложение, поэтому список пользователей не пропадает между запросами.
+- `controllers` — контроллеры модуля.
+- `exports` — что можно брать из этого модуля в других модулях. Отдаём
+  контракт, а не класс: соседям незачем знать, как сервис устроен внутри.
 
 ## 8. Проверяем
 
-Если `bunx bazis dev` всё ещё запущен без `--watch`, перезапустите его.
+Если `bunx bazis dev` запущен без `--watch`, перезапустите его.
 
 ```sh
-curl http://127.0.0.1:3000/greetings/world
-# {"message":"Hello, world!"}
+curl http://127.0.0.1:3000/users/1
+# 404 {"error":"User 1 not found"}
 
-curl -i -X POST http://127.0.0.1:3000/greetings \
+curl -i -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":"Anna"}'
 # HTTP/1.1 201 Created
-# Location: /greetings/Anna
-# {"name":"Anna","message":"Hello, Anna!"}
+# Location: /users/1
+# {"id":1,"name":"Anna"}
 
-curl http://127.0.0.1:3000/greetings
-# [{"name":"Anna","message":"Hello, Anna!"}]
+curl http://127.0.0.1:3000/users/1
+# {"id":1,"name":"Anna"}
+
+curl http://127.0.0.1:3000/users
+# [{"id":1,"name":"Anna"}]
 ```
 
-Неверные данные отклоняются до вызова контроллера:
+Теперь пошлём плохие данные. Пустое имя и число вместо имени:
 
 ```sh
-curl -X POST http://127.0.0.1:3000/greetings \
+curl -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":""}'
 # 400 {"error":"Validation failed","details":[{"property":"name",
 #   "message":"Field \"name\" must be at least 1 characters long","code":"minLength"}]}
 
-curl -X POST http://127.0.0.1:3000/greetings \
+curl -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":42}'
 # 400 {"error":"Validation failed","details":[{"property":"name",
 #   "message":"Field \"name\" must be of type string, got: number","code":"type"}]}
 ```
+
+И буквы вместо номера в адресе:
+
+```sh
+curl http://127.0.0.1:3000/users/abc
+# 400 {"error":"Validation failed","details":[{"property":"id",
+#   "message":"Field \"id\" must be of type number, got: string","code":"type"}]}
+```
+
+Все три запроса остановлены. Ни одной строчки проверок в нашем коде нет.
+
+А теперь откройте в браузере <http://127.0.0.1:3000/docs>. Там уже описаны
+все три адреса `/users`: что принимают и что отвечают. bazis строит эту
+страницу из вашего кода, поэтому она всегда совпадает с API. В `production`
+страница выключена. Подробнее — в [«OpenAPI»](../http/openapi.md).
 
 ## 9. Запускаем тесты
 
@@ -268,35 +362,77 @@ curl -X POST http://127.0.0.1:3000/greetings \
 bunx bazis test
 ```
 
-Команда запускает кодогенерацию и `bun test`. В проекте уже есть тест
-`src/app/test/health.test.ts`: он запускает приложение и проверяет `/health`.
-Свои тесты кладите рядом в файлы `*.test.ts`.
+В проекте уже есть тест `src/app/test/health.test.ts`. Он запускает
+приложение и проверяет `/health`. Свои тесты кладите рядом, в файлы
+`*.test.ts`. Ничего дополнительно ставить не нужно.
 
-## 10. Собираем один исполняемый файл
+## 10. Собираем один файл для сервера
 
 ```sh
 bunx bazis build --bin
 ```
 
-Получится `bin/my-app` — около 62 МБ, внутри приложение и сам Bun. На
-сервере не нужны ни Bun, ни `node_modules`, ни исходники:
+Получится файл `bin/my-app`, около 62 МБ. Внутри — ваше приложение и сам Bun.
+Копируете его на сервер и запускаете:
 
 ```sh
-BAZIS_ENV=production ./bin/my-app
+./bin/my-app
 ```
 
-`BAZIS_ENV` выбирает окружение: `development`, `test` или `production`.
-Без этой переменной (и без `NODE_ENV`) приложение работает как `production`.
+Больше на сервере ничего не нужно: ни Bun, ни Node.js, ни `node_modules`.
 
-> [!WARNING]
-> В версиях до 0.96.3 бинарник без `BAZIS_ENV` по ошибке запускался как
-> `development` — с подробностями ошибок в ответах и страницей OpenAPI. Если
-> у вас бинарник, собранный старой версией, задавайте
-> `BAZIS_ENV=production` явно.
+Сервер на Linux, а вы на Mac? Соберите файл для Linux прямо у себя:
+
+```sh
+bunx bazis build --bin --platform linux-x64
+```
+
+### Три режима: один код ведёт себя правильно везде
+
+Пока вы пишете код, вам нужны подробные ошибки и страница `/docs`. На сервере
+это опасно: подробности ошибки подсказывают злоумышленнику, как устроено
+приложение. В тестах нужна своя база, чтобы не испортить рабочие данные.
+
+Обычно для этого пишут `if (isProduction)` по всему коду, и рано или поздно
+где-то забывают. В bazis это делает режим:
+
+| Режим | Где включается | Что получаете |
+| --- | --- | --- |
+| `development` | `bunx bazis dev` | Подробные ошибки прямо в ответе, страница `/docs`, подробный журнал, пароли-заглушки из кода — можно начать без настроек |
+| `test` | `bunx bazis test` | Свои настройки для тестов, например отдельная база, чтобы тесты не трогали рабочие данные |
+| `production` | Собранный файл | Ошибки без подробностей, `/docs` закрыта. Без настоящих паролей и ключей файл не запустится и назовёт, какой переменной не хватает |
+
+Переключать руками ничего не нужно: команда сама выбирает режим. Поэтому
+на сервер не уедет режим разработки, даже если вы забыли что-то настроить.
+
+Разные значения для режимов пишутся в одном месте, рядом с настройкой:
+
+```ts
+export const mailConfig = defineConfig("mail", {
+  default: { host: "localhost", apiKey: secret("dev-key") },
+  production: { apiKey: secret() },   // на сервере ключ обязателен
+});
+```
+
+Если нужен другой режим, задайте его переменной `BAZIS_ENV`. Например, чтобы
+посмотреть подробную ошибку в собранном файле на своей машине:
+
+```sh
+BAZIS_ENV=development ./bin/my-app
+```
+
+Подробнее — в [«Настройках»](../fundamentals/configuration.md) и
+[«Одном исполняемом файле»](../deployment/single-executable.md).
+
+## Что получилось
+
+За десять шагов у вас готов сервис. Вы не регистрировали классы руками, не
+писали проверки, не описывали API и не настраивали Docker. Это сделал bazis.
+На сервер едет один файл.
 
 ## Что дальше
 
-- [Основные понятия](essentials.md) — модули, DI, контроллеры, кодогенерация
-  и конфигурация подробнее
-- [Учебный проект](tutorial.md) — планировщик задач с PostgreSQL, входом по
-  JWT и двумя модулями, до исполняемого файла
+- [Основные понятия](essentials.md) — модули, сервисы, контроллеры и настройки
+  подробнее.
+- [Учебный проект](tutorial.md) — планировщик задач с базой данных, входом по
+  паролю и двумя модулями.

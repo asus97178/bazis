@@ -13,7 +13,7 @@ export class OrderController {
     const access = await ctx.services.resolve(IAccess).for(ctx);
     const [id = access.subject.sub] = await access.ownerIds();
     const order = await this.orders.place(body.amount, { kind: "user", id });
-    return Created(`${ctx.path}/${order.id}`, order);
+    return Created(order);
   }
 
   @Get()

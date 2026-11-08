@@ -21,11 +21,11 @@ export class ProjectController {
   }
 
   @Post()
-  async create(body: CreateProjectRequest, ctx: HttpContext) {
+  async create(body: CreateProjectRequest) {
     const item = await this.projects.create(body);
     return item === "conflict"
       ? Conflict({ error: `project "${body.name}" already exists` })
-      : Created(`${ctx.path.replace(/\/$/, "")}/${item.id}`, item);
+      : Created(item);
   }
 
   @Put(":id(uuid)")

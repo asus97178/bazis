@@ -23,7 +23,7 @@ export interface RegisteredRoute {
   readonly anonymous: boolean;
 }
 import { Router, type RouteAction } from "./Router";
-import { joinPaths, parseTemplate } from "./template";
+import { joinPaths, parseRequestPath, parseTemplate } from "./template";
 
 type ControllerInstance = Record<string | symbol, (...args: unknown[]) => unknown>;
 
@@ -43,6 +43,8 @@ export class RouterBuilder {
   private readonly authorizeComposer: RouteMiddlewareComposer;
   /** Every route of the last {@link build}, in registration order. */
   readonly routes: RegisteredRoute[] = [];
+  /** Router of the last {@link build}: automatic `Location` looks up GET routes in it. */
+  private router?: Router;
 
   constructor(
     /** Middleware prepended to every route: [logger?, cors?, errorHandler, ...global]. */
@@ -58,6 +60,7 @@ export class RouterBuilder {
 
   build(controllers: readonly Class<object>[]): Router {
     const router = new Router();
+    this.router = router;
     for (const controllerClass of controllers) {
       const meta = controllerMetaOf(controllerClass);
       if (!meta?.isController) {
@@ -123,6 +126,23 @@ export class RouterBuilder {
   }
 
   /**
+   * Address of an item created by a request: the request path plus `/<id>`,
+   * but only when a GET route of this application answers it.
+   */
+  private locateCreated(ctx: HttpContext, id: string | number): string | undefined {
+    const segments = parseRequestPath(ctx.url.pathname);
+    if (!segments || !this.router) {
+      return undefined;
+    }
+    const value = String(id);
+    const match = this.router.match("GET", [...segments, value], ctx.apiVersion);
+    if (match.kind !== "matched") {
+      return undefined;
+    }
+    return `${ctx.url.pathname.replace(/\/+$/u, "")}/${encodeURIComponent(value)}`;
+  }
+
+  /**
    * Precompiles binding + ActionFilter.before as a boundary middleware and
    * controller execution + ActionFilter.after as the terminal. This lets
    * output cache short-circuit only the latter. Errors first get a chance at
@@ -138,7 +158,11 @@ export class RouterBuilder {
     const catches = meta.catches;
     const bindings = resolveGeneratedBindings(controllerClass, methodName);
     assertBindingsFresh(controllerClass, methodName, bindings);
-    const responseDefaults = { httpCode: action.httpCode, produces: action.produces };
+    const responseDefaults = {
+      httpCode: action.httpCode,
+      produces: action.produces,
+      locate: (ctx: HttpContext, id: string | number) => this.locateCreated(ctx, id),
+    };
     const bindingDefaults = { consumes: action.consumes };
     const token = controllerClass as unknown as Token<object>;
     const boundArguments = new WeakMap<HttpContext, readonly unknown[]>();

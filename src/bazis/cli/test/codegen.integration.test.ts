@@ -48,7 +48,7 @@ test("CLI scaffolds feed the real codegen: context DI, HTTP bindings and AI cata
     // the request models as bodies, id from the path.
     const [controllerPath] = await Array.fromAsync(new Bun.Glob("**/CliGuest.controller.ts").scan({ cwd: modules, absolute: true }));
     const controller = await Bun.file(controllerPath!).text();
-    for (const signature of ["list(query: FromQuery<CliGuestListQuery>, ctx: HttpContext)", "getById(id: FromRoute<string>)", "create(body: FromBody<CreateCliGuestRequest>, ctx: HttpContext)", "update(id: FromRoute<string>, body: FromBody<UpdateCliGuestRequest>)", "delete(id: FromRoute<string>)"]) expect(controller).toContain(signature);
+    for (const signature of ["list(query: FromQuery<CliGuestListQuery>, ctx: HttpContext)", "getById(id: FromRoute<string>)", "create(body: FromBody<CreateCliGuestRequest>)", "update(id: FromRoute<string>, body: FromBody<UpdateCliGuestRequest>)", "delete(id: FromRoute<string>)"]) expect(controller).toContain(signature);
     expect(bindings).toContain('"list":[{"source":"list","model":"CliGuestListQuery","optional":false},{"source":"context"');
     expect(bindings).toContain('"create":[{"source":"body","model":"CreateCliGuestRequest","optional":false}');
     expect(bindings).toContain('"update":[{"source":"route","name":"id","optional":false},{"source":"body","model":"UpdateCliGuestRequest","optional":false}]');

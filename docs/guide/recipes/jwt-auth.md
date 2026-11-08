@@ -327,7 +327,7 @@ export class AuthController {
   @AllowAnonymous()
   async register(body: CredentialsRequest) {
     const user = await this.auth.register(body.email, body.password);
-    return Created(`/auth/me`, user);
+    return Created(user, "/auth/me");
   }
 
   @Post("login")

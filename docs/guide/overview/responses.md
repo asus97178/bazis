@@ -31,16 +31,16 @@ async getById(id: string) {
 }
 
 @Post()
-async create(body: CreateTaskRequest, ctx: HttpContext) {
-  const task = await this.tasks.create(body);
-  return Created(`${ctx.path}/${task.id}`, task);   // 201 + Location
+async create(body: CreateTaskRequest) {
+  const result = await this.tasks.create(body);
+  return Created(result);   // 201 + Location
 }
 ```
 
 | Помощник | Код |
 | --- | --- |
 | `Ok(body?)` | 200; без тела — пустой ответ |
-| `Created(location?, body?)` | 201 и заголовок `Location` |
+| `Created(body?, location?)` | 201. Тело — любое значение, как у обычного `return`. `Location` — указанный адрес, а без него bazis ставит адрес сам, см. [ниже](#location-для-201) |
 | `Accepted(body?)` | 202 |
 | `NoContent()` | 204 |
 | `BadRequest(body?)` | 400 |
@@ -50,6 +50,34 @@ async create(body: CreateTaskRequest, ctx: HttpContext) {
 | `Redirect(url, permanent?)` | 302, или 301 при `permanent = true` |
 | `StatusCode(code, body?)` | Любой код |
 | `File(path \| Blob \| Uint8Array, contentType?)` | 200, файл или байты |
+
+## `Location` для 201
+
+Адрес нового объекта bazis ставит сам. Достаточно вернуть `Created(...)`
+с объектом, у которого есть поле `id`:
+
+```ts
+@Post()
+async create(body: CreateTaskRequest) {
+  const result = await this.tasks.create(body);   // { id: 7, ... }
+  return Created(result);
+}
+// POST /tasks → 201, Location: /tasks/7
+```
+
+Правила:
+
+- адрес — путь запроса, `/` и `id`. Слэш в конце пути убирается, `id`
+  кодируется, поэтому подходят и строки с кириллицей;
+- заголовок ставится, только если в приложении есть маршрут `GET` на этот
+  адрес, например `@Get(":id")`. `POST /tasks/5/complete` без
+  `GET /tasks/5/complete/:id` адреса не получит;
+- без поля `id`, у массива, строки или числа заголовка нет;
+- то же работает для `@Post({ code: 201 })` и обычного `return` объекта;
+- заданный вручную адрес важнее: `Created(task, "/elsewhere/7")` или
+  `ctx.res.header("location", ...)`.
+
+Автоматический `Location` появился в версии 0.137.0.
 
 ## Код и заголовки: `ResponseBuilder`
 

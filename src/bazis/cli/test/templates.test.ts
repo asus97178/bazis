@@ -86,7 +86,7 @@ test("full service evicts list and item caches after successful mutations, prese
   cache.dispose();
 });
 
-test("generated controllers derive Location and list basePath from the active HTTP prefix", async () => {
+test("generated controllers return the created item and derive list basePath from the active HTTP prefix", async () => {
   const { CliGuestController } = await import(path.join(guestDir, "http/CliGuest.controller.ts"));
   const item = { id: "123e4567-e89b-42d3-a456-426614174000", name: "Guest", email: "guest@example.com" };
   const service = { create: async () => item };
@@ -95,9 +95,10 @@ test("generated controllers derive Location and list basePath from the active HT
   const scope = provider.createScope();
   const url = new URL("http://localhost/custom/v2/cli-guests/");
   const ctx = new HttpContext(new Request(url.toString()), url, {}, scope);
-  const result = await controller.create(item, ctx);
+  // Location comes from the server (http.created-location.test.ts).
+  const result = await controller.create(item);
   expect(result.status).toBe(201);
-  expect(new Headers(result.headers).get("Location")).toBe(`/custom/v2/cli-guests/${item.id}`);
+  expect(result.body).toBe(item);
 
   const { CliCatalogController } = await import(path.join(catalogDir, "http/CliCatalog.controller.ts"));
   const calls: unknown[][] = [];

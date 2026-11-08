@@ -5,7 +5,7 @@
 тонкой: разбирает запрос, вызывает сервис и возвращает результат.
 
 ```ts
-import { Controller, Created, Get, HttpContext, NotFound, Post } from "bazis/core/http";
+import { Controller, Created, Get, NotFound, Post } from "bazis/core/http";
 
 @Controller("tasks")
 export class TaskController {
@@ -18,9 +18,9 @@ export class TaskController {
   }
 
   @Post()
-  async create(body: CreateTaskRequest, ctx: HttpContext) {
-    const task = await this.tasks.create(body);
-    return Created(`${ctx.path}/${task.id}`, task);
+  async create(body: CreateTaskRequest) {
+    const result = await this.tasks.create(body);
+    return Created(result);
   }
 }
 ```
@@ -253,7 +253,7 @@ GET /catalog/search?q=dune&page_size=5&page_size=50
 | Помощник | Код |
 | --- | --- |
 | `Ok(body)` | 200 |
-| `Created(location, body)` | 201 + заголовок `Location` |
+| `Created(body, location?)` | 201. Адрес для `Location` bazis ставит сам по `id` объекта, см. [«Ответы»](responses.md#location-для-201) |
 | `Accepted(body)` | 202 |
 | `NoContent()` | 204 |
 | `BadRequest(body)` · `Unauthorized(body)` · `Forbidden(body)` · `NotFound(body)` · `Conflict(body)` | 400 · 401 · 403 · 404 · 409 |

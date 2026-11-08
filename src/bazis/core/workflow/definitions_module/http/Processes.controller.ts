@@ -45,7 +45,7 @@ export class ProcessesController {
       owner: optionalString(request.owner, "owner") ?? null,
       retentionDays: optionalInteger(request.retentionDays, "retentionDays") ?? null,
     }, actor, { request: from });
-    return Created(`${ctx.path}/${process.key}`, withTitleText(process, language, defaultLanguage(ctx)));
+    return Created(withTitleText(process, language, defaultLanguage(ctx)), `${ctx.path}/${process.key}`);
   }
 
   @Get("processes/:key")
@@ -105,7 +105,7 @@ export class ProcessesController {
     const key = param(ctx, "key");
     const { actor, request, language } = await callerOf(ctx, "workflow.processes.publish", await this.objectOf(key));
     const version = await this.definitions.publish(key, actor, { request, language });
-    return Created(`${ctx.path.replace(/\/publish$/, "")}/versions/${version.version}`, version);
+    return Created(version, `${ctx.path.replace(/\/publish$/, "")}/versions/${version.version}`);
   }
 
   @Get("processes/:key/versions")

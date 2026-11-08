@@ -80,8 +80,9 @@ export class TasksController {
   }
 
   @Post()
-  create(body: CreateTaskRequest, ctx: HttpContext) {
-    return Created(`${ctx.path}/${task.id}`, task);
+  async create(body: CreateTaskRequest) {
+    const result: TaskResponse = await this.tasks.create(body);
+    return Created(result);
   }
 }
 ```
@@ -158,6 +159,11 @@ POST /tasks       201 400 401 403  summary: "POST /tasks"
 Код из помощника берётся, если все успешные `return` метода используют
 один и тот же помощник. Если метод в одной ветке возвращает
 `Created(...)`, а в другой — обычный объект, в документе будет `200`.
+
+У ответа `201` в документе есть заголовок `Location`, если у того же пути
+есть маршрут `GET` на один объект, например `GET /tasks/{id}` для
+`POST /tasks`. Как сервер его ставит — в
+[«Ответах»](../overview/responses.md#location-для-201).
 
 ### Ошибки
 

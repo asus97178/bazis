@@ -182,8 +182,8 @@ export class ProjectsController {
 
   @Post()
   async create(body: CreateProjectRequest) {
-    const project = await this.projects.create(body.name);
-    return Created(`/projects/${project.id}`, project);
+    const result = await this.projects.create(body.name);
+    return Created(result);
   }
 
   @Delete(":id(uuid)")
@@ -268,10 +268,10 @@ export class TasksService implements ITasksService {
 ```ts
 // tasks/http/Tasks.controller.ts
   @Post()
-  async create(body: CreateTaskRequest, ctx: HttpContext) {
+  async create(body: CreateTaskRequest) {
     const task = await this.tasks.create(body);
     if (task === "unknown-project") return StatusCode(422, { error: `project ${body.projectId} not found` });
-    return Created(`${ctx.path}/${task.id}`, task);
+    return Created(task);
   }
 ```
 

@@ -7,6 +7,24 @@ export interface ResponseDefaults {
   httpCode?: number;
   /** `@Produces(...)` value. */
   produces?: string;
+  /**
+   * Address of a created item for an automatic `Location` header: given the
+   * `id` of a 201 body, returns the address or `undefined` when the
+   * application has no GET route for it.
+   */
+  locate?: (ctx: HttpContext, id: string | number) => string | undefined;
+}
+
+/** `id` of a 201 body that can name the created item. */
+function createdItemId(body: unknown): string | number | undefined {
+  if (body === null || typeof body !== "object" || Array.isArray(body) || isBinaryBody(body)) {
+    return undefined;
+  }
+  const id = (body as { id?: unknown }).id;
+  if (typeof id === "number" && Number.isFinite(id)) {
+    return id;
+  }
+  return typeof id === "string" && id !== "" ? id : undefined;
 }
 
 type ResponseBody = ConstructorParameters<typeof Response>[0];
@@ -30,6 +48,9 @@ function isBinaryBody(body: unknown): body is Blob | Uint8Array | ArrayBuffer | 
  *
  * Status priority: result helper > `@HttpCode` > `ctx.res.status(...)` > default.
  * Headers from `ctx.res.header(...)` are merged into every non-raw response.
+ *
+ * A 201 without `Location` whose body is an object with `id` gets
+ * `Location: <request path>/<id>` when a GET route answers that address.
  */
 export function normalizeResult(result: unknown, ctx: HttpContext, defaults: ResponseDefaults): Response {
   if (result instanceof Response) {
@@ -62,6 +83,13 @@ export function normalizeResult(result: unknown, ctx: HttpContext, defaults: Res
   }
   for (const [name, value] of builderHeaders) {
     headers.append(name, value);
+  }
+  if (status === 201 && defaults.locate && !headers.has("location")) {
+    const id = createdItemId(body);
+    const location = id === undefined ? undefined : defaults.locate(ctx, id);
+    if (location !== undefined) {
+      headers.set("location", location);
+    }
   }
 
   let payload: ResponseBody = null;
