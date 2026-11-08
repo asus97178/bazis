@@ -433,6 +433,6 @@ $ bunx bazis test
 
 ## Дальше
 
-- [Учебный проект](../introduction/tutorial.md) — сборка и запуск в production
+- [Один исполняемый файл](../deployment/single-executable.md) — собрать планировщик и запустить в production с секретами
 - [Модули](../overview/modules.md) и [инкапсуляция](../fundamentals/encapsulation.md)
 - [События](../fundamentals/events.md)

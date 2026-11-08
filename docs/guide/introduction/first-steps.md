@@ -456,5 +456,5 @@ BAZIS_ENV=development ./bin/my-app
   [настройки](../fundamentals/configuration.md),
   [кодогенерация](../fundamentals/codegen.md) и
   [путь запроса через middleware](../overview/middleware.md#порядок-выполнения).
-- [Учебный проект](tutorial.md) — планировщик задач с базой данных, входом по
-  паролю и двумя модулями.
+- Настоящий проект с базой данных и входом: планировщик задач в трёх
+  рецептах. Начните с [«CRUD-модуля целиком»](../recipes/crud-module.md).

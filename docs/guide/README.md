@@ -14,7 +14,6 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Почему только Bun](introduction/why-bun.md)
 - ✅ [Установка](introduction/installation.md)
 - ✅ [Первые шаги](introduction/first-steps.md)
-- ✅ [Учебный проект: планировщик задач](introduction/tutorial.md) — от `bazis new` до исполняемого файла: CRUD, вход по JWT, второй модуль, сборка
 
 ## 2. Обзор: строительные блоки
 
