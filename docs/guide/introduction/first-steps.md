@@ -3,7 +3,7 @@
 **15 минут — и у вас готовый API.**
 
 Мы сделаем маленький сервис пользователей. Он умеет три вещи: добавить
-пользователя, найти его по имени и показать всех.
+пользователя, найти его по номеру и показать всех.
 
 Что будет в конце:
 
@@ -147,12 +147,13 @@ export class AppModule {}
 
 ```ts
 export interface User {
+  id: number;
   name: string;
 }
 
 export abstract class IUsersService {
   abstract getAll(): readonly User[];
-  abstract find(name: string): User | undefined;
+  abstract find(id: number): User | undefined;
   abstract create(name: string): User;
 }
 ```
@@ -169,12 +170,12 @@ export class UsersService implements IUsersService {
     return this.users;
   }
 
-  find(name: string): User | undefined {
-    return this.users.find((user) => user.name === name);
+  find(id: number): User | undefined {
+    return this.users.find((user) => user.id === id);
   }
 
   create(name: string): User {
-    const user = { name };
+    const user = { id: this.users.length + 1, name };
     this.users.push(user);
     return user;
   }
@@ -225,7 +226,7 @@ export class CreateUserRequest {
 Создайте файл `src/app/modules/users/http/Users.controller.ts`:
 
 ```ts
-import { Controller, Created, Get, HttpContext, NotFound, Post } from "bazis/core/http";
+import { Controller, Created, Get, NotFound, Post } from "bazis/core/http";
 import { IUsersService } from "../services/IUsers.service";
 import { CreateUserRequest } from "./contracts/Users.requests";
 
@@ -238,15 +239,15 @@ export class UsersController {
     return this.users.getAll();
   }
 
-  @Get(":name")
-  getByName(name: string) {
-    return this.users.find(name) ?? NotFound({ error: `User ${name} not found` });
+  @Get(":id")
+  getById(id: number) {
+    return this.users.find(id) ?? NotFound({ error: `User ${id} not found` });
   }
 
   @Post()
-  create(body: CreateUserRequest, ctx: HttpContext) {
+  create(body: CreateUserRequest) {
     const user = this.users.create(body.name);
-    return Created(`${ctx.path}/${encodeURIComponent(user.name)}`, user);
+    return Created(`/users/${user.id}`, user);
   }
 }
 ```
@@ -255,17 +256,16 @@ export class UsersController {
 
 - `@Controller("users")` — все адреса начинаются с `/users`.
 - `getAll()` отдаёт всех пользователей.
-- `getByName(name)` ищет одного. Нет такого — ответ 404 (`NotFound`).
+- `getById(id)` ищет одного по номеру. Нет такого — ответ 404 (`NotFound`).
 - `create(...)` добавляет пользователя. Ответ 201 (`Created`) и адрес нового
-  пользователя.
+  пользователя, например `/users/1`.
 
 Откуда берутся аргументы? bazis смотрит на их имена и типы:
 
 | Аргумент | Откуда bazis его берёт |
 | --- | --- |
-| `name: string`, в адресе есть `:name` | из адреса: `/users/Anna` → `"Anna"` |
+| `id: number`, в адресе есть `:id` | из адреса: `/users/1` → `1`, уже числом |
 | `body: CreateUserRequest` | из тела запроса, сразу с проверкой |
-| `ctx: HttpContext` | сведения о текущем запросе |
 | простой тип, которого нет в адресе | из строки запроса: `?limit=10` |
 
 Сервис приходит в контроллер через конструктор. Контроллер просит контракт
@@ -307,20 +307,20 @@ export class UsersModule {}
 Если `bunx bazis dev` запущен без `--watch`, перезапустите его.
 
 ```sh
-curl http://127.0.0.1:3000/users/Anna
-# 404 {"error":"User Anna not found"}
+curl http://127.0.0.1:3000/users/1
+# 404 {"error":"User 1 not found"}
 
 curl -i -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":"Anna"}'
 # HTTP/1.1 201 Created
-# Location: /users/Anna
-# {"name":"Anna"}
+# Location: /users/1
+# {"id":1,"name":"Anna"}
 
-curl http://127.0.0.1:3000/users/Anna
-# {"name":"Anna"}
+curl http://127.0.0.1:3000/users/1
+# {"id":1,"name":"Anna"}
 
 curl http://127.0.0.1:3000/users
-# [{"name":"Anna"}]
+# [{"id":1,"name":"Anna"}]
 ```
 
 Теперь пошлём плохие данные. Пустое имя и число вместо имени:
@@ -337,7 +337,15 @@ curl -X POST http://127.0.0.1:3000/users \
 #   "message":"Field \"name\" must be of type string, got: number","code":"type"}]}
 ```
 
-Оба запроса остановлены. Ни одной строчки проверок в нашем коде нет.
+И буквы вместо номера в адресе:
+
+```sh
+curl http://127.0.0.1:3000/users/abc
+# 400 {"error":"Validation failed","details":[{"property":"id",
+#   "message":"Field \"id\" must be of type number, got: string","code":"type"}]}
+```
+
+Все три запроса остановлены. Ни одной строчки проверок в нашем коде нет.
 
 А теперь откройте в браузере <http://127.0.0.1:3000/docs>. Там уже описаны
 все три адреса `/users`: что принимают и что отвечают. bazis строит эту
