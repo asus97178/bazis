@@ -226,7 +226,7 @@ export class CreateUserRequest {
 Создайте файл `src/app/modules/users/http/Users.controller.ts`:
 
 ```ts
-import { Controller, Created, Get, NotFound, Post } from "bazis/core/http";
+import { Controller, Get, NotFound, Post } from "bazis/core/http";
 import { IUsersService } from "../services/IUsers.service";
 import { CreateUserRequest } from "./contracts/Users.requests";
 
@@ -244,10 +244,9 @@ export class UsersController {
     return this.users.find(id) ?? NotFound({ error: `User ${id} not found` });
   }
 
-  @Post()
+  @Post({ code: 201 })
   create(body: CreateUserRequest) {
-    const user = this.users.create(body.name);
-    return Created(`/users/${user.id}`, user);
+    return this.users.create(body.name);
   }
 }
 ```
@@ -257,8 +256,11 @@ export class UsersController {
 - `@Controller("users")` — все адреса начинаются с `/users`.
 - `getAll()` отдаёт всех пользователей.
 - `getById(id)` ищет одного по номеру. Нет такого — ответ 404 (`NotFound`).
-- `create(...)` добавляет пользователя. Ответ 201 (`Created`) и адрес нового
-  пользователя, например `/users/1`.
+- `create(...)` добавляет пользователя и возвращает его. `{ code: 201 }`
+  меняет код ответа на 201 Created.
+
+Методы просто возвращают значение. bazis сам превратит его в ответ: объект или
+массив уйдёт как JSON с кодом 200, а «ничего» — пустым ответом 204.
 
 Откуда берутся аргументы? bazis смотрит на их имена и типы:
 
@@ -313,7 +315,6 @@ curl http://127.0.0.1:3000/users/1
 curl -i -X POST http://127.0.0.1:3000/users \
   -H 'content-type: application/json' -d '{"name":"Anna"}'
 # HTTP/1.1 201 Created
-# Location: /users/1
 # {"id":1,"name":"Anna"}
 
 curl http://127.0.0.1:3000/users/1
