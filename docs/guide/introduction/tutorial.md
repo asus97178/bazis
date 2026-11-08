@@ -99,5 +99,5 @@ info: bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":1.1}
 
 ## Дальше
 
-- [Основные понятия](essentials.md) — если что-то в шагах было непонятно
+- [Модули](../overview/modules.md), [провайдеры и DI](../overview/providers.md), [контроллеры](../overview/controllers.md) — если что-то в шагах было непонятно
 - [Кэширование](../realtime/caching.md), [фоновые службы](../realtime/background-services.md), [WebSocket](../realtime/websocket.md) — что добавить в планировщик

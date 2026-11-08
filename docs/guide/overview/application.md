@@ -15,7 +15,7 @@ await runApp(AppModule, {
 ```
 
 `registerBazisGeneratedRuntime()` подключает результат
-[кодогенерации](../introduction/essentials.md#кодогенерация), `runApp` —
+[кодогенерации](../fundamentals/codegen.md), `runApp` —
 запускает приложение и ждёт его остановки. Когда `await runApp(...)`
 завершается, приложение уже остановлено, а код выхода записан в
 `process.exitCode`.

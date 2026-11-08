@@ -142,7 +142,7 @@ constructor(private readonly appName: AppName) {}   // "my-app"
 constructor(private readonly config: ConfigView<GreetingConfig>) {}
 ```
 
-Подробнее — в [«Основных понятиях»](../introduction/essentials.md#конфигурация-и-окружения).
+Подробнее — в [«Настройках»](../fundamentals/configuration.md).
 
 ## Освобождение ресурсов
 
