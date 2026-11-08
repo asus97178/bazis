@@ -338,8 +338,8 @@ export class TasksController {
 
   @Post()
   async create(body: FromBody<CreateTaskRequest>) {
-    const task = await this.tasks.create(body);
-    return Created(task);
+    const result = await this.tasks.create(body);
+    return Created(result);
   }
 
   @Put(":id(uuid)")

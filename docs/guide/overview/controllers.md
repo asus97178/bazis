@@ -19,8 +19,8 @@ export class TaskController {
 
   @Post()
   async create(body: CreateTaskRequest) {
-    const task = await this.tasks.create(body);
-    return Created(task);
+    const result = await this.tasks.create(body);
+    return Created(result);
   }
 }
 ```

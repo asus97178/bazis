@@ -133,8 +133,8 @@ ${authRead}  @Get(":id(uuid)")
 
 ${authWrite}  @Post()
   async create(body: FromBody<Create${n.entity}Request>) {
-    const item = await this.${n.collection}.create(body);
-    return Created(item);
+    const result = await this.${n.collection}.create(body);
+    return Created(result);
   }
 
 ${authWrite}  @Put(":id(uuid)")

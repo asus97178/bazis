@@ -246,8 +246,8 @@ export class UsersController {
 
   @Post()
   create(body: CreateUserRequest) {
-    const user = this.users.create(body.name);
-    return Created(user);
+    const result = this.users.create(body.name);
+    return Created(result);
   }
 }
 ```

@@ -258,8 +258,8 @@ export class BooksController {
   @Post()
   @Authorize(adminKey)
   add(body: AddBookRequest) {
-    const book = this.books.add(body.title, body.author);
-    return Created(book);
+    const result = this.books.add(body.title, body.author);
+    return Created(result);
   }
 }
 ```

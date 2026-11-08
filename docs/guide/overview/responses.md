@@ -32,8 +32,8 @@ async getById(id: string) {
 
 @Post()
 async create(body: CreateTaskRequest) {
-  const task = await this.tasks.create(body);
-  return Created(task);   // 201 + Location
+  const result = await this.tasks.create(body);
+  return Created(result);   // 201 + Location
 }
 ```
 
@@ -59,8 +59,8 @@ async create(body: CreateTaskRequest) {
 ```ts
 @Post()
 async create(body: CreateTaskRequest) {
-  const task = await this.tasks.create(body);   // { id: 7, ... }
-  return Created(task);
+  const result = await this.tasks.create(body);   // { id: 7, ... }
+  return Created(result);
 }
 // POST /tasks → 201, Location: /tasks/7
 ```
