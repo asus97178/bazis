@@ -95,8 +95,10 @@ test("generated controllers return the created item and derive list basePath fro
   const scope = provider.createScope();
   const url = new URL("http://localhost/custom/v2/cli-guests/");
   const ctx = new HttpContext(new Request(url.toString()), url, {}, scope);
-  // 201 and Location come from the route options and the server (http.created-location.test.ts).
-  expect(await controller.create(item)).toBe(item);
+  // Location comes from the server (http.created-location.test.ts).
+  const result = await controller.create(item);
+  expect(result.status).toBe(201);
+  expect(result.body).toBe(item);
 
   const { CliCatalogController } = await import(path.join(catalogDir, "http/CliCatalog.controller.ts"));
   const calls: unknown[][] = [];

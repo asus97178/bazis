@@ -106,7 +106,7 @@ class MiscController {
 
   @Get("created")
   created() {
-    return Created("/misc/42", { id: 42 });
+    return Created({ id: 42 }, "/misc/42");
   }
 
   @Get("redirect")

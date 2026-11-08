@@ -226,7 +226,7 @@ export class CreateUserRequest {
 Создайте файл `src/app/modules/users/http/Users.controller.ts`:
 
 ```ts
-import { Controller, Get, NotFound, Post } from "bazis/core/http";
+import { Controller, Created, Get, NotFound, Post } from "bazis/core/http";
 import { IUsersService } from "../services/IUsers.service";
 import { CreateUserRequest } from "./contracts/Users.requests";
 
@@ -244,9 +244,9 @@ export class UsersController {
     return this.users.find(id) ?? NotFound({ error: `User ${id} not found` });
   }
 
-  @Post({ code: 201 })
+  @Post()
   create(body: CreateUserRequest) {
-    return this.users.create(body.name);
+    return Created(this.users.create(body.name));
   }
 }
 ```
@@ -256,10 +256,9 @@ export class UsersController {
 - `@Controller("users")` — все адреса начинаются с `/users`.
 - `getAll()` отдаёт всех пользователей.
 - `getById(id)` ищет одного по номеру. Нет такого — ответ 404 (`NotFound`).
-- `create(...)` добавляет пользователя и возвращает его. `{ code: 201 }`
-  меняет код ответа на 201 Created. Адрес нового пользователя, например
-  `/users/1`, bazis сам положит в заголовок `Location`: он знает путь запроса
-  и видит `id` в ответе.
+- `create(...)` добавляет пользователя и возвращает его через `Created`. Это
+  ответ 201 Created. Адрес нового пользователя, например `/users/1`, bazis сам
+  положит в заголовок `Location`: он знает путь запроса и видит `id` в ответе.
 
 Методы просто возвращают значение. bazis сам превратит его в ответ: объект или
 массив уйдёт как JSON с кодом 200, а «ничего» — пустым ответом 204.

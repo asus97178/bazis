@@ -26,7 +26,7 @@ class ThingsController {
   @Post()
   async create(ctx: HttpContext) {
     const body = await ctx.json();
-    return Created(undefined, body);
+    return Created(body);
   }
 
   @Get("stream")

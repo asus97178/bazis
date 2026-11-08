@@ -79,9 +79,9 @@ export class TasksController {
     return task;
   }
 
-  @Post({ code: 201 })
+  @Post()
   create(body: CreateTaskRequest): Promise<TaskResponse> {
-    return this.tasks.create(body);
+    return Created(this.tasks.create(body));
   }
 }
 ```

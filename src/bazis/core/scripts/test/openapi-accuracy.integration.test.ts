@@ -57,7 +57,7 @@ export class TasksController {
   }
 
   @Post() create(body: CreateTaskRequest, ctx: HttpContext) {
-    return Created(ctx.path + "/1", { id: "1", title: body.title });
+    return Created({ id: "1", title: body.title }, ctx.path + "/1");
   }
 
   @Put(":id") @Authorize(() => true)
@@ -67,7 +67,7 @@ export class TasksController {
     return { id, title: body.title };
   }
 
-  @Post("mixed") mixed(flag = false) { return flag ? Ok({ a: 1 }) : Created("/x", { a: 1 }); }
+  @Post("mixed") mixed(flag = false) { return flag ? Ok({ a: 1 }) : Created({ a: 1 }, "/x"); }
 
   @Delete(":id") delete(id: string) {}
 }

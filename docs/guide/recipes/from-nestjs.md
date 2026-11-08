@@ -200,10 +200,10 @@ export class BooksController {
     return this.books.get(id);
   }
 
-  @Post({ code: 201 })
+  @Post()
   @Authorize(adminKey)
   add(body: AddBookRequest) {
-    return this.books.add(body.title, body.author);
+    return Created(this.books.add(body.title, body.author));
   }
 }
 ```

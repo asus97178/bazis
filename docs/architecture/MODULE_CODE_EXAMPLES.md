@@ -241,7 +241,7 @@ saving. The application's existing authorization is used here.
 ```ts
 // file: src/app/modules/task/http/TaskController.ts
 import {
-  Authorize, Controller, Created, Get, HttpContext,
+  Authorize, Controller, Created, Get,
   ModelValidationError, NotFound, Ok, Post,
   type FromBody, type FromRoute,
 } from "bazis/core/http";
@@ -257,10 +257,10 @@ export class TaskController {
   constructor(private readonly tasks: ITaskService) {}
 
   @Post()
-  async create(input: FromBody<CreateTaskRequest>, ctx: HttpContext) {
+  async create(input: FromBody<CreateTaskRequest>) {
     try {
       const task = await this.tasks.create(input);
-      return Created(`${ctx.path}/${task.id}`, task);
+      return Created(task);
     } catch (error) {
       if (error instanceof TaskInputError) {
         throw new ModelValidationError(error.errors);
@@ -283,8 +283,8 @@ from the path. Every HTTP source is marked: `FromBody<…>`, `FromRoute<…>`,
 Codegen would infer the same sources from the types; the markers make the
 controller readable without knowing those rules, and generated controllers
 follow the same convention. Creation returns 201 and Location; reading returns 200 or 404.
-Field errors map to 400. `/api` comes from the host settings, and `ctx.path` keeps
-the actual prefix in Location.
+Field errors map to 400. `/api` comes from the host settings; `Created(task)` builds
+Location from the actual request path, prefix included.
 
 ### 1.7. Registering the atomic module
 

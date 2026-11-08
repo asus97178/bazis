@@ -314,7 +314,7 @@ export class TasksService implements ITasksService {
 
 ```ts
 // src/app/modules/tasks/http/Tasks.controller.ts
-import { Controller, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
+import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 import { buildListDocument } from "bazis/library/jsonapi";
 import { TasksListQuery } from "./contracts/TasksList.query";
 import { CreateTaskRequest, UpdateTaskRequest } from "./contracts/Tasks.requests";
@@ -336,9 +336,9 @@ export class TasksController {
     return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
   }
 
-  @Post({ code: 201 })
+  @Post()
   async create(body: FromBody<CreateTaskRequest>) {
-    return this.tasks.create(body);
+    return Created(await this.tasks.create(body));
   }
 
   @Put(":id(uuid)")

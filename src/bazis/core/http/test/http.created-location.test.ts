@@ -22,7 +22,7 @@ class UsersController {
 
   @Post("explicit")
   explicit(_ctx: HttpContext) {
-    return Created("/elsewhere/7", { id: 7 });
+    return Created({ id: 7 }, "/elsewhere/7");
   }
 
   @Post("no-id")
@@ -35,6 +35,11 @@ class UsersController {
   @HttpCode(201)
   list(_ctx: HttpContext) {
     return [{ id: 1 }];
+  }
+
+  @Post("text")
+  text(_ctx: HttpContext) {
+    return Created("created");
   }
 
   @Post("ok")
@@ -53,7 +58,21 @@ class TasksController {
 }
 contextOnlyController(TasksController);
 
-@Module({ controllers: [UsersController, TasksController] })
+@Controller("items")
+class ItemsController {
+  @Get(":id")
+  get(ctx: HttpContext) {
+    return { id: ctx.params.id };
+  }
+
+  @Post()
+  create(_ctx: HttpContext) {
+    return Created({ id: 3, name: "Ann" });
+  }
+}
+contextOnlyController(ItemsController);
+
+@Module({ controllers: [UsersController, TasksController, ItemsController] })
 class LocationApp {}
 
 test("201 with id gets Location from the request path when a GET route answers it", async () => {
@@ -73,6 +92,15 @@ test("201 with id gets Location from the request path when a GET route answers i
     expect((await app.fetch("/users/explicit", { method: "POST" })).headers.get("location")).toBe("/elsewhere/7");
     expect((await app.fetch("/users/no-id", { method: "POST" })).headers.get("location")).toBeNull();
     expect((await app.fetch("/users/list", { method: "POST" })).headers.get("location")).toBeNull();
+
+    const helper = await app.fetch("/items", { method: "POST" });
+    expect(helper.status).toBe(201);
+    expect(helper.headers.get("location")).toBe("/items/3");
+    expect(await helper.json()).toEqual({ id: 3, name: "Ann" });
+    const text = await app.fetch("/users/text", { method: "POST" });
+    expect(text.status).toBe(201);
+    expect(text.headers.get("location")).toBeNull();
+    expect(await text.text()).toBe("created");
 
     const ok = await app.fetch("/users/ok", { method: "POST" });
     expect(ok.status).toBe(200);

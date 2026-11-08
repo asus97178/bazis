@@ -333,7 +333,7 @@ export function createOpenApiCodegenAnalyzer(input: OpenApiCodegenAnalyzerInput)
           return schemaFromOptionalExpression(unwrapped.arguments[0]);
         }
         if (CREATED_RESULT_HELPERS.has(name)) {
-          return schemaFromOptionalExpression(unwrapped.arguments[1]);
+          return schemaFromOptionalExpression(unwrapped.arguments[0]);
         }
         if (name === "StatusCode") {
           return schemaFromStatusCodeCall(unwrapped);

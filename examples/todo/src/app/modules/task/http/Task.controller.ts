@@ -21,10 +21,10 @@ export class TaskController {
   }
 
   @Post()
-  async create(body: CreateTaskRequest, ctx: HttpContext) {
+  async create(body: CreateTaskRequest) {
     const item = await this.tasks.create(body);
     return item
-      ? Created(`${ctx.path.replace(/\/$/, "")}/${item.id}`, item)
+      ? Created(item)
       : BadRequest({ error: `project ${body.projectId} not found` });
   }
 

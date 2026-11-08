@@ -5,8 +5,11 @@ export function Ok(body?: unknown): HttpResult {
   return new HttpResult(200, body);
 }
 
-/** 201 Created with optional Location header. */
-export function Created(location?: string, body?: unknown): HttpResult {
+/**
+ * 201 Created. Without `location` the server derives it: a body with `id`
+ * gets `Location: <request path>/<id>` when a GET route answers that address.
+ */
+export function Created(body?: unknown, location?: string): HttpResult {
   return new HttpResult(201, body, location ? [["location", location]] : undefined);
 }
 
