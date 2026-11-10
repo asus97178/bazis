@@ -17,6 +17,7 @@ import { CatalogImport } from "./code/CatalogImport";
 import { CodeProcessCatalog } from "./code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "./code/CodeProcessPublisher";
 import { ProcessesController } from "./http/Processes.controller";
+import { PublishedVersions } from "./internal/PublishedVersions";
 import { DefinitionsDbContext, definitionsStore } from "./model/Definitions.dbContext";
 import { WfProcess } from "./model/WfProcess.model";
 import { WfVersion } from "./model/WfVersion.model";
@@ -39,6 +40,7 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     singleton(WorkflowClock, SystemWorkflowClock),
     singleton(WorkflowTools),
     singleton(CodeProcessCatalog),
+    singleton(PublishedVersions),
     singleton(WorkflowLanguages),
     singleton(WorkflowExtensions, DefaultWorkflowExtensions),
     singleton(WorkflowPartitions, DefaultWorkflowPartitions),

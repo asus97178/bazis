@@ -14,6 +14,7 @@ import { CatalogImport } from "../definitions_module/code/CatalogImport";
 import { CodeProcessCatalog } from "../definitions_module/code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "../definitions_module/code/CodeProcessPublisher";
 import { ProcessesController } from "../definitions_module/http/Processes.controller";
+import { PublishedVersions } from "../definitions_module/internal/PublishedVersions";
 import { DefinitionsDbContext } from "../definitions_module/model/Definitions.dbContext";
 import { IWorkflowDefinitions } from "../definitions_module/services/IWorkflowDefinitions.service";
 import { WorkflowDefinitions } from "../definitions_module/services/WorkflowDefinitions.service";
@@ -66,7 +67,7 @@ registerFrameworkClassDeps([
   [TasksDbContext, [DbContextOptions]],
   [TimerStep, [RuntimeDbContext, WorkflowEngine]],
   [ToolStep, [RuntimeDbContext, WorkflowEngine, WorkflowTools, WorkflowReferences, WorkflowLanguages, ServiceProvider]],
-  [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowReferences, ServiceProvider]],
+  [WorkflowDefinitions, [DefinitionsDbContext, WorkflowTools, CodeProcessCatalog, WorkflowClock, WorkflowEvents, WorkflowLanguages, WorkflowReferences, PublishedVersions, ServiceProvider]],
   [WorkflowEngine, [RuntimeDbContext, IWorkflowDefinitions, GraphCache, WorkflowEvents, WorkflowClock]],
   [WorkflowEvents, [EventBus, ServiceProvider, "optional:Logger"]],
   [WorkflowLanguages, ["Config:workflow"]],
