@@ -39,13 +39,13 @@ export class CatalogModule {}
 - новая таблица;
 - новый столбец, допускающий `NULL`;
 - новый обязательный столбец со значением по умолчанию в базе
-  (`@Column({ default: "new" }) @Required()`), которое получат старые строки;
+  (`@Required() @Column({ default: "new" })`), которое получат старые строки;
 - индекс, `@Check`, внешний ключ.
 
 Добавили в `Product` необязательное поле с уникальным индексом:
 
 ```ts
-@Index({ unique: true }) @Column({ type: "text" }) sku: string | null = null;
+@Index({ unique: true }) @Nullable() @Column({ type: "text" }) sku: string | null = null;
 ```
 
 ```text
@@ -213,7 +213,7 @@ remove the entity from the other context and refer to it by a plain id column.
 @Entity({ table: "orders" })
 export class Order {
   @Key() id = 0;
-  @Column({ type: "integer" }) productId = 0;   // id товара из CatalogModule
+  @Nullable() @Column({ type: "integer" }) productId = 0;   // id товара из CatalogModule
 }
 ```
 

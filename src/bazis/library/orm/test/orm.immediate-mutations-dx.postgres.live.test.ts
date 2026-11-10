@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Index, Key, UUID, postgres, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Index, Key, UUID, postgres, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -10,11 +10,11 @@ const live = url === undefined ? test.skip : test;
 @Entity({ table: articlesTable })
 class Article {
   @Key() id = 0;
-  @Index({ unique: true }) @Column({ type: "text" }) slug = "";
-  @Column({ type: "datetime", nullable: true }) publishedAt: Date | null = null;
+  @Index({ unique: true }) @Nullable() @Column({ type: "text" }) slug = "";
+  @Nullable() @Column({ type: "datetime" }) publishedAt: Date | null = null;
 }
 @Entity({ table: eventsTable })
-class Event { @UUID({ version: "v7" }) id = ""; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+class Event { @UUID({ version: "v7" }) id = ""; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) code = ""; }
 class Db extends DbContext { readonly articles = this.set(Article); readonly events = this.set(Event); }
 
 let shared: PostgresProvider | undefined;

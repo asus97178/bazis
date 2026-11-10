@@ -150,17 +150,19 @@ ${authWrite}  @Delete(":id(uuid)")
 function ormModelFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const schemaImport = profile === "full" ? ", Schema" : "";
   const schemaDecorator = profile === "full" ? `@Schema("${n.dbSchema}")\n` : "";
-  return `import { Column, Entity, Index, UUID${schemaImport} } from "bazis/core/orm";
+  return `import { Column, Entity, Index, Required, UUID${schemaImport} } from "bazis/core/orm";
 
 ${schemaDecorator}@Entity({ table: "${n.route}" })
 export class ${n.entity} {
   @UUID()
   id = "";
 
+  @Required()
   @Column({ type: "text" })
   name = "";
 
   @Index({ unique: true })
+  @Required()
   @Column({ type: "text" })
   email = "";
 

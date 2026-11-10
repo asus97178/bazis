@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "../../../orm";
+import { Column, Entity, Index, UUID, Nullable } from "../../../orm";
 import type { FormSpec, LocalizedText } from "../../../../library/workflow";
 
 /** `open` waits for someone, `claimed` is taken by one person, `completed` and `cancelled` are done. */
@@ -17,55 +17,71 @@ export class WfTask {
 
   /** The waiting token: one task per token. */
   @Index({ unique: true })
+  @Nullable()
   @Column({ type: "text" })
   tokenId = "";
 
   @Index()
+  @Nullable()
   @Column({ type: "text" })
   instanceId = "";
 
+  @Nullable()
   @Column({ type: "text" })
   processKey = "";
 
+  @Nullable()
   @Column({ type: "text" })
   nodeId = "";
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   partition: string | null = null;
 
+  @Nullable()
   @Column({ type: "json" })
   title: LocalizedText = "";
 
   /** The task of a trial run (WORKFLOW-002 §5.4, stage 5). */
+  @Nullable()
   @Column({ type: "boolean" })
   test = false;
 
   /** `role:<code>` or `user:<id>`. */
+  @Nullable()
   @Column({ type: "text" })
   assignee = "";
 
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   form: FormSpec | null = null;
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   dueAt: Date | null = null;
 
+  @Nullable()
   @Column({ type: "text" })
   status: TaskStatus = "open";
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   claimedById: string | null = null;
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   claimedAt: Date | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   completedById: string | null = null;
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   completedAt: Date | null = null;
 
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   output: Record<string, unknown> | null = null;
 
   @Column({ type: "createdAt" })

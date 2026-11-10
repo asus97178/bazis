@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, postgres, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, postgres, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -17,11 +17,11 @@ const commitTable = table("commit");
 const topLevelTable = table("top_level");
 const claimsTable = table("claims");
 @Entity({ table: commitTable })
-class CommitRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) value = ""; }
+class CommitRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) value = ""; }
 @Entity({ table: topLevelTable })
-class TopLevelRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) value = ""; }
+class TopLevelRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) value = ""; }
 @Entity({ table: claimsTable })
-class ClaimRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) value = ""; }
+class ClaimRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) value = ""; }
 class CommitContext extends DbContext { readonly records = this.set(CommitRecord); constructor(p: PostgresProvider) { super(new DbContextOptions({ provider: p, entities: [CommitRecord], validateOnSave: false })); } }
 class TopLevelContext extends DbContext { readonly records = this.set(TopLevelRecord); constructor(p: PostgresProvider) { super(new DbContextOptions({ provider: p, entities: [TopLevelRecord], validateOnSave: false })); } }
 class ClaimContext extends DbContext { readonly claims = this.set(ClaimRecord); constructor(p: PostgresProvider) { super(new DbContextOptions({ provider: p, entities: [ClaimRecord], validateOnSave: false })); } }

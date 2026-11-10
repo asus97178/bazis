@@ -7,7 +7,7 @@ import { DI, Module, singleton } from "@/core/di";
 import type { AuthorizeContext } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret, OnEvent, withEventSubscribers } from "@/core/kernel";
-import { Column, DbContext, Entity, ormBazisConnect, UUID } from "@/core/orm";
+import { Column, DbContext, Entity, ormBazisConnect, UUID, Nullable } from "@/core/orm";
 import { defineProcess, IWorkflowDefinitions, IWorkflowRuntime, WORKFLOW_PROCESS_CHANGED, WorkflowError, WorkflowModule, WorkflowPartitions, type CodeProcess, type EmitOptions, type EmitResult, type InstanceSummary, type ProcessPartition, type WorkflowProcessChanged } from "@/core/workflow";
 import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
 import { postgres } from "@/library/orm";
@@ -64,6 +64,7 @@ class TriggerRow {
   @UUID()
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }

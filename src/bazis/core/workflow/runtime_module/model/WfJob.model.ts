@@ -1,4 +1,4 @@
-import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
+import { Column, Entity, ForeignKey, Index, UUID, Nullable } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
 /**
@@ -24,50 +24,62 @@ export class WfJob {
   @UUID({ version: "v7" })
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   kind: JobKind = "tool";
 
   /** `null` for `schedule`, `event` and `eventStart` jobs: the instance does not exist yet. */
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   instanceId: string | null = null;
 
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   tokenId: string | null = null;
 
   /** The version a `schedule` or `eventStart` job starts. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   versionId: string | null = null;
 
   @Index()
+  @Nullable()
   @Column({ type: "datetime" })
   dueAt = new Date(0);
 
   /** What a job carries besides its token: the caller to tell, the process to release. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   payload: unknown = null;
 
   /** Jobs with one key merge into the last: `debounce` of an event start. */
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   dedupeKey: string | null = null;
 
   /** The partition and the start node of a `schedule` or `eventStart` job. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   partition: string | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   nodeId: string | null = null;
 
+  @Nullable()
   @Column({ type: "integer" })
   attempts = 0;
 
   /** The worker holds the job until then; if it dies, the job becomes free again. */
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   lockedUntil: Date | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   lastError: string | null = null;
 
   @Column({ type: "createdAt" })

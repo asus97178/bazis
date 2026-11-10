@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, ForeignKey, Schema, UUID, postgres } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, ForeignKey, Schema, UUID, postgres, Nullable } from "../index";
 
 /**
  * Live check of UUID v7 keys: exact `ensureCreated` admission (first run and
@@ -14,13 +14,13 @@ const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 @Schema(SCHEMA) @Entity({ table: "orders" })
 class Order {
   @UUID({ version: "v7" }) id = "";
-  @Column({ type: "text" }) name = "";
+  @Nullable() @Column({ type: "text" }) name = "";
 }
 
 @Schema(SCHEMA) @Entity({ table: "order_lines" })
 class OrderLine {
   @UUID({ version: "v7" }) id = "";
-  @ForeignKey(() => Order) @Column({ type: "text" }) orderId = "";
+  @ForeignKey(() => Order) @Nullable() @Column({ type: "text" }) orderId = "";
 }
 
 class Context extends DbContext {

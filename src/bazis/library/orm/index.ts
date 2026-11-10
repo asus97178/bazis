@@ -12,6 +12,7 @@ export {
   OneToMany,
   QueryFilter,
   Required,
+  Nullable,
   Schema,
   SoftDelete,
   UpdatedAt,

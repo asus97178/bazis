@@ -1,4 +1,4 @@
-import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
+import { Column, Entity, ForeignKey, Index, UUID, Nullable } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
 /** A token waiting for an event: `eventWait` or `boundaryEvent`. Matched by key and correlation. */
@@ -9,20 +9,25 @@ export class WfSubscription {
   @UUID({ version: "v7" })
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   instanceId = "";
 
   @Index()
+  @Nullable()
   @Column({ type: "text" })
   tokenId = "";
 
+  @Nullable()
   @Column({ type: "text" })
   eventKey = "";
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   correlation: string | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   partition: string | null = null;
 
   @Column({ type: "createdAt" })

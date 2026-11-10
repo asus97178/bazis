@@ -102,6 +102,7 @@ GET  /report      →  503 {"error":"Service Unavailable"}
 
 ```ts
 @Index({ unique: true, conflict: "This email is already registered" })
+@Required()
 @Column({ type: "text" })
 email = "";
 ```

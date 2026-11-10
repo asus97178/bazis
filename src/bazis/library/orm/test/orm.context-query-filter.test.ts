@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany, QueryFilter, type DatabaseProvider, type Row, type SqlDialect } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany, QueryFilter, type DatabaseProvider, type Row, type SqlDialect, Nullable } from "../index";
 
 const dialect: SqlDialect = { name: "postgres", supportsReturning: false, quoteId: (name) => `"${name}"`, qualifyTable: (model) => `"${model.tableName}"`, parameter: (index) => `$${index + 1}`, columnType: () => "text", encode: (value) => value as never, decode: (value) => value, rowLockClause: () => "", createTableSql: () => "", createIndexSql: () => [], createIndexSqlOne: () => "", addColumnSql: () => "", dropColumnSql: () => "" };
 const log: { sql: string; params: readonly unknown[] }[] = [];
@@ -11,7 +11,7 @@ class Owner { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @O
 @Entity({ table: "notes" })
 @QueryFilter<Note, NotesDb>((n, db) => n.tenantId.eq(db.tenant()))
 @QueryFilter<Note>((n) => n.archived.eq(false))
-class Note { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) tenantId = ""; @Column({ type: "boolean" }) archived = false; @Column({ type: "integer" }) ownerId = 0; @ManyToOne(() => Owner, { foreignKey: "ownerId" }) owner?: Owner; }
+class Note { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) tenantId = ""; @Nullable() @Column({ type: "boolean" }) archived = false; @Nullable() @Column({ type: "integer" }) ownerId = 0; @ManyToOne(() => Owner, { foreignKey: "ownerId" }) owner?: Owner; }
 class NotesDb extends DbContext {
   readonly notes = this.set(Note);
   readonly owners = this.set(Owner);

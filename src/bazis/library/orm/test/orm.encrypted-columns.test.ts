@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, DecryptionError, Entity, HasConversion, Index, Key, ModelBuilder, ModelBuildError, OrmError, ValueConverters, type DatabaseProvider, type Row, type SqlParam } from "../index";
+import { Column, DbContext, DbContextOptions, DecryptionError, Entity, HasConversion, Index, Key, ModelBuilder, ModelBuildError, OrmError, ValueConverters, type DatabaseProvider, type Row, type SqlParam, Nullable } from "../index";
 import { PostgresDialect } from "../Providers/PostgresDialect";
 
 class Context extends DbContext {}
@@ -21,7 +21,7 @@ const phone = ValueConverters.encrypted("test-key-0123456789abcdef0123456789");
 @Entity()
 class Customer {
   @Key({ generated: false }) id = 0;
-  @HasConversion(phone) @Column({ type: "text" }) phone = "";
+  @HasConversion(phone) @Nullable() @Column({ type: "text" }) phone = "";
 }
 
 test("a condition or an ordering on an encrypted column fails instead of matching nothing", async () => {
@@ -60,7 +60,7 @@ test("an encrypted key or unique index is refused when the model is built", () =
   @Entity()
   class EncryptedKey { @Key({ generated: false }) @HasConversion(phone) @Column({ type: "text" }) id = ""; }
   @Entity()
-  class UniquePhone { @Key({ generated: false }) id = 0; @HasConversion(phone) @Index({ unique: true }) @Column({ type: "text" }) phone = ""; }
+  class UniquePhone { @Key({ generated: false }) id = 0; @HasConversion(phone) @Index({ unique: true }) @Nullable() @Column({ type: "text" }) phone = ""; }
   expect(() => ModelBuilder.build(EncryptedKey)).toThrow(ModelBuildError);
   expect(() => ModelBuilder.build(EncryptedKey)).toThrow('Entity "EncryptedKey": key "id" cannot be encrypted: equal values are stored differently.');
   expect(() => ModelBuilder.build(UniquePhone)).toThrow('Entity "UniquePhone": a unique index on encrypted "phone" cannot work: equal values are stored differently. Put it on a keyed hash (HMAC) column.');
@@ -69,10 +69,10 @@ test("an encrypted key or unique index is refused when the model is built", () =
 @Entity()
 class Note {
   @Key({ generated: false }) id = 1;
-  @HasConversion(phone) @Column({ type: "text", nullable: true }) secret: string | null = null;
-  @HasConversion(ValueConverters.json<{ tags: string[] }>()) @Column({ type: "text", nullable: true }) meta: { tags: string[] } | null = null;
+  @HasConversion(phone) @Nullable() @Column({ type: "text" }) secret: string | null = null;
+  @HasConversion(ValueConverters.json<{ tags: string[] }>()) @Nullable() @Column({ type: "text" }) meta: { tags: string[] } | null = null;
   @HasConversion({ convertsNulls: true, toProvider: (value: string | null) => value ?? "", fromProvider: (value: string | null) => (value === "" || value === null ? null : value) })
-  @Column({ type: "text" }) nickname: string | null = null;
+  @Nullable() @Column({ type: "text" }) nickname: string | null = null;
 }
 
 test("null stays SQL NULL: converters are not called for it unless they declare convertsNulls", async () => {

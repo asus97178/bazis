@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, DbContextOptions, Entity, Index, Key, ManyToOne, OrmError, SchemaAdmissionError, type DatabaseProvider, type DbExecutor, type Row } from "../index";
+import { Column, DbContextOptions, Entity, Index, Key, ManyToOne, OrmError, SchemaAdmissionError, type DatabaseProvider, type DbExecutor, type Row, Nullable, Required } from "../index";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 import { physicalColumnTypes } from "../Schema/physicalColumnTypes";
 import { SchemaDiffer } from "../Schema/SchemaDiffer";
@@ -7,11 +7,11 @@ import { MigrationRunner } from "../Schema/MigrationRunner";
 import type { IntrospectedColumn, IntrospectedSchema } from "../Schema/introspection";
 
 @Entity({ table: "app_users" })
-class User { @Key() id = 0; @Index({ unique: true }) @Column({ type: "text" }) email = ""; }
+class User { @Key() id = 0; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) email = ""; }
 @Entity({ table: "dx_products" })
-class Product { @Key() id = 0; @Column({ type: "real" }) price = 0; @Column({ type: "text", nullable: false }) sku = ""; @Column({ type: "text" }) note: string | null = null; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+class Product { @Key() id = 0; @Nullable() @Column({ type: "real" }) price = 0; @Required() @Column({ type: "text" }) sku = ""; @Nullable() @Column({ type: "text" }) note: string | null = null; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) code = ""; }
 @Entity({ table: "dx_orders" })
-class Order { @Key() id = 0; @Column({ type: "integer" }) productId = 0; @ManyToOne(() => Product, { foreignKey: "productId" }) product?: Product; }
+class Order { @Key() id = 0; @Nullable() @Column({ type: "integer" }) productId = 0; @ManyToOne(() => Product, { foreignKey: "productId" }) product?: Product; }
 @Entity({ table: "dx_products" })
 class ProductCopy { @Key() id = 0; }
 

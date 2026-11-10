@@ -3,7 +3,7 @@ import {
   Column, DbContext, DbContextOptions, Entity, EntityState, ForeignKey,
   HasConversion, Key, ManyToOne, OneToMany, OrmModel, PostgresProvider, UUID,
   Schema, ExecutionStrategy, withRetry, buildDynamicModel,
-  type DatabaseProvider, type Row, type SqlParam,
+  type DatabaseProvider, type Row, type SqlParam, Nullable, Required,
 } from "../index";
 import { PostgresDialect } from "../Providers/PostgresDialect";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
@@ -52,13 +52,13 @@ function mockPostgres(read: (sql: string) => Row[] = () => []) {
 @Entity({ table: "audit_items" })
 class Item {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "text" }) name = "before";
+  @Nullable() @Column({ type: "text" }) name = "before";
 }
 @Entity({ table: "audit_broken" })
 class Broken {
   @Key({ generated: false }) id = 2;
   @HasConversion({ toProvider() { throw new Error("conversion failed"); }, fromProvider(value: unknown) { return value; } })
-  @Column({ type: "text" }) name = "broken";
+  @Nullable() @Column({ type: "text" }) name = "broken";
 }
 
 test("caught SaveChanges failure must not commit earlier statements of that failed save", async () => {
@@ -108,7 +108,7 @@ class UuidParent { @UUID() id = ""; }
 @ForeignKey(() => UuidParent, { properties: ["parentId"] })
 class UuidChild {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "uuid", nullable: false }) parentId = "00000000-0000-4000-8000-000000000001";
+  @Required() @Column({ type: "uuid" }) parentId = "00000000-0000-4000-8000-000000000001";
 }
 test("a declared FK to UUID must compile to compatible physical column types", () => {
   const expected = compileExpectedSchema(new OrmModel([UuidParent, UuidChild]));
@@ -143,13 +143,13 @@ test("control: ensureCreated accepts matching BY DEFAULT identity", async () => 
 @Entity({ table: "audit_big_parents" })
 class BigParent {
   @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = "a";
-  @Column({ type: "integer" }) id = 9223372036854775806n;
+  @Nullable() @Column({ type: "integer" }) id = 9223372036854775806n;
 }
 @Entity({ table: "audit_big_children" })
 class BigChild {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "text" }) tenant = "a";
-  @Column({ type: "integer" }) parentId = 9223372036854775806n;
+  @Nullable() @Column({ type: "text" }) tenant = "a";
+  @Nullable() @Column({ type: "integer" }) parentId = 9223372036854775806n;
   @ManyToOne(() => BigParent, { foreignKey: ["tenant", "parentId"] }) parent?: BigParent;
 }
 test("include supports bigint composite keys", async () => {
@@ -168,7 +168,7 @@ class DateParent {
 @Entity({ table: "audit_date_children" })
 class DateChild {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "datetime" }) parentId = new Date(0);
+  @Nullable() @Column({ type: "datetime" }) parentId = new Date(0);
   @ManyToOne(() => DateParent, { foreignKey: "parentId" }) parent?: DateParent;
 }
 test("include matches equal Date keys by value", async () => {
@@ -196,7 +196,7 @@ test("control: one row with only a generated key can be saved", async () => {
 @Entity({ table: "audit_dotted" })
 class Dotted {
   @Key({ generated: false }) id = 1;
-  @Column({ name: "external.name", type: "text" }) externalName = "x";
+  @Nullable() @Column({ name: "external.name", type: "text" }) externalName = "x";
 }
 test("query quotes the same literal column identifier as ensureCreated", async () => {
   const { provider, statements } = recording(); const context = ctx(provider, [Dotted]);
@@ -263,8 +263,8 @@ test("a failed joined save poisons only its containing savepoint and never retri
 @Entity({ table: "audit_mutable" })
 class Mutable {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "json" }) data = { nested: { value: 1 } };
-  @Column({ type: "datetime" }) at = new Date(0);
+  @Nullable() @Column({ type: "json" }) data = { nested: { value: 1 } };
+  @Nullable() @Column({ type: "datetime" }) at = new Date(0);
 }
 for (const mutation of ["json", "date", "explicit", "key"] as const) {
   test(`A2: locking reload rejects ${mutation} changes before overwriting them`, async () => {
@@ -289,7 +289,7 @@ class QualifiedUuidParent { @UUID() id = ""; }
 @Entity({ table: "uuid.children" })
 class NavigationUuidChild {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "uuid" }) parentId: string | null = null;
+  @Nullable() @Column({ type: "uuid" }) parentId: string | null = null;
   @ManyToOne(() => QualifiedUuidParent, { foreignKey: "parentId" }) parent?: QualifiedUuidParent;
 }
 
@@ -336,7 +336,7 @@ class DateGroup {
 @Entity({ table: "audit_date_members" })
 class DateMember {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "datetime" }) groupId: Date | null = new Date(0);
+  @Nullable() @Column({ type: "datetime" }) groupId: Date | null = new Date(0);
 }
 for (const noTracking of [false, true]) {
   test(`A5: collection Date keys compare by value (noTracking=${noTracking})`, async () => {
@@ -361,7 +361,7 @@ class BinaryGroup {
 @Entity({ table: "audit_binary_members" })
 class BinaryMember {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "text" }) @HasConversion(bytesConversion) groupId = new Uint8Array([1, 2]);
+  @Nullable() @Column({ type: "text" }) @HasConversion(bytesConversion) groupId = new Uint8Array([1, 2]);
   @ManyToOne(() => BinaryGroup, { foreignKey: "groupId" }) group?: BinaryGroup;
 }
 test("reference and collection use the identity map's binary key semantics", async () => {
@@ -476,14 +476,14 @@ test("custom retry classifiers cannot replay an unknown outcome hidden by cleanu
 @Entity({ table: "audit_big_groups" })
 class BigGroup {
   @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = "a";
-  @Column({ type: "integer" }) id = 9223372036854775806n;
+  @Nullable() @Column({ type: "integer" }) id = 9223372036854775806n;
   @OneToMany(() => BigMember, { foreignKey: ["tenant", "groupId"] }) members?: BigMember[];
 }
 @Entity({ table: "audit_big_members" })
 class BigMember {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "text" }) tenant = "a";
-  @Column({ type: "integer" }) groupId: bigint | null = 9223372036854775806n;
+  @Nullable() @Column({ type: "text" }) tenant = "a";
+  @Nullable() @Column({ type: "integer" }) groupId: bigint | null = 9223372036854775806n;
 }
 test("composite bigint collection keys support chunking and ignore incomplete foreign keys", async () => {
   const { provider, statements } = recording((sql, params) => sql.includes('FROM "audit_big_groups"')
@@ -558,7 +558,7 @@ class TextParent { @Key({ generated: false }) @Column({ type: "text" }) id = "";
 @ForeignKey(() => TextParent, { properties: ["parentId"] })
 class ConflictingForeignKeys {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "text" }) parentId = "";
+  @Nullable() @Column({ type: "text" }) parentId = "";
 }
 test("incompatible physical FK types fail before any additive schema DDL", async () => {
   const models = [UuidParent, TextParent, ConflictingForeignKeys];

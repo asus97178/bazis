@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, OrmTransactionScopeError, postgres, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, OrmTransactionScopeError, postgres, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -7,7 +7,7 @@ const tableName = `ormtxdx_${run}_accounts`;
 const live = url === undefined ? test.skip : test;
 
 @Entity({ table: tableName })
-class Account { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "integer" }) balance = 0; }
+class Account { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "integer" }) balance = 0; }
 class Db extends DbContext { readonly accounts = this.set(Account); }
 
 const sql: string[] = [];

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Module } from "@/core/di";
-import { Column, DbContext, Entity, UUID } from "@/core/orm";
+import { Column, DbContext, Entity, UUID, Nullable } from "@/core/orm";
 import { ormEntityTools, StandardToolsModule } from "@/core/tools";
 import { WorkflowModule } from "@/core/workflow";
 import { inspectProcesses } from "@/core/workflow/definitions_module/code/inspectProcesses";
@@ -10,6 +10,7 @@ class Note {
   @UUID()
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   text = "";
 }

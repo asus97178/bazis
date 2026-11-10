@@ -7,7 +7,7 @@ import { DI, Module, singleton } from "@/core/di";
 import type { AuthorizeContext } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret } from "@/core/kernel";
-import { Column, DbContext, Entity, ormBazisConnect, UUID } from "@/core/orm";
+import { Column, DbContext, Entity, ormBazisConnect, UUID, Nullable } from "@/core/orm";
 import { ormEntityTools, StandardToolsModule } from "@/core/tools";
 import { defineProcess, IWorkflowDefinitions, WorkflowModule, WorkflowPartitions, type ProcessPartition } from "@/core/workflow";
 import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
@@ -27,19 +27,24 @@ class ToolOrder {
   @UUID()
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   shopId = "";
 
+  @Nullable()
   @Column({ type: "text" })
   status = "new";
 
+  @Nullable()
   @Column({ type: "integer" })
   amount = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   secretNote = "";
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   paidAt: Date | null = null;
 }
 
@@ -48,6 +53,7 @@ class ToolNote {
   @UUID()
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   text = "";
 }

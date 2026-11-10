@@ -1,24 +1,24 @@
 import { expect, test } from "bun:test";
 import {
   Column, DbContext, DbContextOptions, DbUpdateError, Entity, EntityState, Key,
-  PostCommitError, PostgresDialect, PostgresProvider, type DatabaseProvider, type Row, type SqlParam,
+  PostCommitError, PostgresDialect, PostgresProvider, type DatabaseProvider, type Row, type SqlParam, Nullable,
 } from "../index";
 
 @Entity({ table: "identity_manual" })
 class Manual {
   @Key({ generated: false }) id = 0;
-  @Column({ type: "text" }) name = "initial";
+  @Nullable() @Column({ type: "text" }) name = "initial";
 }
 @Entity({ table: "identity_generated" })
 class Generated {
   @Key() id = 0;
-  @Column({ type: "text" }) name = "initial";
+  @Nullable() @Column({ type: "text" }) name = "initial";
 }
 @Entity({ table: "identity_composite" })
 class Composite {
   @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = "tenant";
-  @Column({ type: "integer" }) id = 0;
-  @Column({ type: "text" }) name = "initial";
+  @Nullable() @Column({ type: "integer" }) id = 0;
+  @Nullable() @Column({ type: "text" }) name = "initial";
 }
 class Context extends DbContext {
   readonly manual = this.set(Manual);

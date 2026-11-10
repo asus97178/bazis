@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, Entity, Key, ModelBuilder, PostgresDialect, Schema } from "@/library/orm";
+import { Column, Entity, Key, ModelBuilder, PostgresDialect, Schema, Nullable } from "@/library/orm";
 
 @Schema("billing")
 @Entity()
@@ -7,6 +7,7 @@ class InSchema {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }
@@ -17,6 +18,7 @@ class EmptySchema {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }
@@ -26,6 +28,7 @@ class NoSchema {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }

@@ -4,7 +4,7 @@ import {
   Entity,
   Key,
   ModelBuilder,
-  UUID,
+  UUID, Nullable,
 } from "@/library/orm";
 
 @Entity()
@@ -13,6 +13,7 @@ class AuditedEntity {
   @Column({ type: "uuid" })
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 

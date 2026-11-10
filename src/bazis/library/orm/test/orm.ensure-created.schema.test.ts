@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { Column, Entity, Key, OrmModel, Schema, UUID } from "../index";
+import { Column, Entity, Key, OrmModel, Schema, UUID, Nullable } from "../index";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 
 @Schema("admission")
 @Entity({ table: "schema_vectors" })
 class SchemaVectors {
   @Key({ name: "pk_schema_vectors" }) @Column({ type: "integer" }) id = 0;
-  @Column({ type: "datetime" }) createdAt = new Date();
+  @Nullable() @Column({ type: "datetime" }) createdAt = new Date();
 }
 @Entity({ table: "schema_uuid_vectors" })
 class SchemaUuidVectors { @UUID() id = ""; }

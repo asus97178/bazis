@@ -18,10 +18,10 @@
 @Entity({ table: "jobs" })
 export class Job {
   @Key() id = 0;
-  @Column({ type: "text" }) kind = "";
-  @Column({ type: "text" }) payload = "";
-  @Column({ type: "text" }) status: "new" | "done" | "failed" = "new";
-  @Column({ type: "integer" }) attempts = 0;
+  @Nullable() @Column({ type: "text" }) kind = "";
+  @Nullable() @Column({ type: "text" }) payload = "";
+  @Nullable() @Column({ type: "text" }) status: "new" | "done" | "failed" = "new";
+  @Nullable() @Column({ type: "integer" }) attempts = 0;
 }
 ```
 
@@ -136,7 +136,7 @@ SELECT … WHERE id = 25            → 25 | slow | new | 0
 @Entity({ table: "report_runs" })
 export class ReportRun {
   @Key() id = 0;
-  @Index({ unique: true }) @Column({ type: "text" }) period = "";
+  @Index({ unique: true }) @Nullable() @Column({ type: "text" }) period = "";
 }
 
 @Background({ intervalMs: 60_000 })

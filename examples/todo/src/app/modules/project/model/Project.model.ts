@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "bazis/core/orm";
+import { Column, Entity, Index, UUID, Required } from "bazis/core/orm";
 
 @Entity({ table: "projects" })
 export class Project {
@@ -7,6 +7,7 @@ export class Project {
 
   /** Two concurrent requests cannot both take a name: the index decides, and a taken one answers 409 with this text. */
   @Index({ unique: true, conflict: "A project with this name already exists" })
+  @Required()
   @Column({ type: "text" })
   name = "";
 

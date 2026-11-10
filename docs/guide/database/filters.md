@@ -131,7 +131,7 @@ DELETE FROM "notes" WHERE "id" = $1
 export class List {
   @Key() id = 0;
   @Required() @Column({ type: "text" }) name = "";
-  @Column({ type: "datetime" }) removedAt: Date | null = null;
+  @Nullable() @Column({ type: "datetime" }) removedAt: Date | null = null;
 }
 ```
 
@@ -205,14 +205,14 @@ CREATE UNIQUE INDEX "ix_users_email" ON "public"."users" ("email") WHERE "delete
 `@QueryFilter` добавляет условие ко всем запросам сущности:
 
 ```ts
-import { Column, Entity, Key, QueryFilter, Required, SoftDelete } from "bazis/core/orm";
+import { Column, Entity, Key, QueryFilter, Required, SoftDelete, Nullable } from "bazis/core/orm";
 
 @Entity({ table: "posts" })
 @QueryFilter<Post>((p) => p.archived.eq(false))
 export class Post {
   @Key() id = 0;
   @Required() @Column({ type: "text" }) title = "";
-  @Column({ type: "boolean" }) archived = false;
+  @Nullable() @Column({ type: "boolean" }) archived = false;
   @SoftDelete() deletedAt: Date | null = null;
 }
 ```

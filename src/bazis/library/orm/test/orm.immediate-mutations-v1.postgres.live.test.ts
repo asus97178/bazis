@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, EntityState, HasConversion, Index, Key, OrmTrackedMutationConflictError, UUID, postgres, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, EntityState, HasConversion, Index, Key, OrmTrackedMutationConflictError, UUID, postgres, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
@@ -10,9 +10,9 @@ const quote = () => { if (!owned.test(name)) throw new Error("foreign cleanup re
 const quoteUuid = () => { if (!/^ormim_[a-f0-9]{16}_uuid$/.test(uuidName)) throw new Error("foreign cleanup rejected"); return `"${uuidName}"`; };
 const live = url === undefined ? test.skip : test;
 @Entity({ table: name }) @Index(["code"], { unique: true })
-class Row { @Key() @Column({ type: "integer" }) id = 0; @Column() code = ""; @Column() value = ""; @HasConversion({ toProvider: (value: string) => `enc:${value}`, fromProvider: (value: string) => value.slice(4) }) @Column() secret = ""; }
+class Row { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column() code = ""; @Nullable() @Column() value = ""; @HasConversion({ toProvider: (value: string) => `enc:${value}`, fromProvider: (value: string) => value.slice(4) }) @Nullable() @Column() secret = ""; }
 @Entity({ table: uuidName })
-class UuidRow { @UUID() id = ""; @Column() value = ""; }
+class UuidRow { @UUID() id = ""; @Nullable() @Column() value = ""; }
 class Context extends DbContext { readonly rows = this.set(Row); readonly uuidRows = this.set(UuidRow); constructor(p: PostgresProvider) { super(new DbContextOptions({ provider: p, entities: [Row, UuidRow], validateOnSave: false })); } }
 async function makeProvider(): Promise<PostgresProvider> { return postgres({ url: url! }); }
 async function cleanup(p: PostgresProvider): Promise<void> { await p.execute(`DROP TABLE IF EXISTS ${quote()}`, []); await p.execute(`DROP TABLE IF EXISTS ${quoteUuid()}`, []); }

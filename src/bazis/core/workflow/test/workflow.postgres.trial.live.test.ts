@@ -13,7 +13,7 @@ import { ormEntityTools } from "@/core/tools";
 import { defineProcess, IWorkflowDefinitions, IWorkflowRuntime, IWorkflowTasks, WORKFLOW_INSTANCE_FINISHED, WORKFLOW_INSTANCE_STARTED, WORKFLOW_PROCESS_CHANGED, WORKFLOW_TASK_COMPLETED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, WorkflowModule, WorkflowSetupError, type CodeProcess } from "@/core/workflow";
 import { WorkflowRetention } from "@/core/workflow/runtime_module/background/WorkflowRetention";
 import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
-import { Column, DbContext, Entity, UUID, postgres } from "@/library/orm";
+import { Column, DbContext, Entity, UUID, postgres, Nullable } from "@/library/orm";
 import type { ProcessDocument, ProcessFlow, VariableSpec } from "@/library/workflow";
 
 /**
@@ -403,6 +403,7 @@ test.skipIf(!enabled)("the start stops when a Tool refers to a kind no module ow
     @UUID()
     id = "";
 
+    @Nullable()
     @Column({ type: "text" })
     text = "";
   }

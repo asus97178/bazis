@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
-import { Check, Column, Entity, ForeignKey, Index, Key, OrmModel, postgres, withRetry } from "../index";
+import { Check, Column, Entity, ForeignKey, Index, Key, OrmModel, postgres, withRetry, Nullable } from "../index";
 import { OrmOwnedStoreAdmissionError } from "../errors";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 import { defineOrmOwnedStoreV1 } from "../Schema/OrmOwnedStore";
@@ -20,8 +20,8 @@ const safeName = /^c3(?:os|ext)_[a-f0-9]{16}_[a-z0-9_]+$/u;
 for (const name of Object.values(names)) if (!safeName.test(name)) throw new Error("invalid C3 run-owned name");
 let providerConstructed = 0, workerConstructed = 0;
 
-@Entity({ table: names.parent }) class C3Parent { @Key({ name: `${prefix}parent_pkey`, generated: true }) @Column({ type: "integer" }) id = 0; @Index({ name: names.supportIndex }) @Column({ type: "text" }) code = ""; @Column({ type: "text" }) payload = ""; }
-@Entity({ table: names.child }) @ForeignKey(() => C3Parent, { name: `${prefix}child_parent_fk`, properties: ["parentId"], onDelete: "noAction", onUpdate: "noAction" }) @Check<C3Child>(`${prefix}child_value_ck`, f => f.value.gte(0)) class C3Child { @Key({ name: `${prefix}child_pkey` }) @Column({ type: "integer" }) id = 0; @Column({ type: "integer" }) parentId = 0; @Column({ type: "integer" }) value = 0; @Column({ type: "text" }) payload = ""; }
+@Entity({ table: names.parent }) class C3Parent { @Key({ name: `${prefix}parent_pkey`, generated: true }) @Column({ type: "integer" }) id = 0; @Index({ name: names.supportIndex }) @Nullable() @Column({ type: "text" }) code = ""; @Nullable() @Column({ type: "text" }) payload = ""; }
+@Entity({ table: names.child }) @ForeignKey(() => C3Parent, { name: `${prefix}child_parent_fk`, properties: ["parentId"], onDelete: "noAction", onUpdate: "noAction" }) @Check<C3Child>(`${prefix}child_value_ck`, f => f.value.gte(0)) class C3Child { @Key({ name: `${prefix}child_pkey` }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "integer" }) parentId = 0; @Nullable() @Column({ type: "integer" }) value = 0; @Nullable() @Column({ type: "text" }) payload = ""; }
 
 const definition = defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey: `c3-${run}`, formatVersion: 1, ownedScope: { schema: "public", tablePrefix: prefix }, rejectIfPresent: [{ schema: "public", tablePrefix: names.blocker }] });
 const expected = compileExpectedSchema(new OrmModel([C3Parent, C3Child]));

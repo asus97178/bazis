@@ -224,7 +224,8 @@ export class ProjectsModule {}
 ```ts
 // tasks/model/Tasks.model.ts — новое поле
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   projectId: string | null = null;
 ```
 

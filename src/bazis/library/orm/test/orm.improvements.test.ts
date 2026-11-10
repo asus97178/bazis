@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ChangeTracker, Column, DbUpdateError, Entity, EntityState, ForeignKey, HasConversion, Key, ModelBuilder } from "../index";
+import { ChangeTracker, Column, DbUpdateError, Entity, EntityState, ForeignKey, HasConversion, Key, ModelBuilder, Nullable } from "../index";
 
 const bytesAsText = {
   toProvider: (value: Uint8Array) => [...value].join(","),
@@ -7,37 +7,37 @@ const bytesAsText = {
 };
 
 @Entity()
-class Account { @Key() id = 0; @Column({ type: "json" }) meta: Record<string, unknown> = {}; }
+class Account { @Key() id = 0; @Nullable() @Column({ type: "json" }) meta: Record<string, unknown> = {}; }
 
 @Entity()
-class TimestampedAccount { @Key({ generated: false }) id = 0; @Column({ type: "datetime" }) changedAt = new Date(0); }
+class TimestampedAccount { @Key({ generated: false }) id = 0; @Nullable() @Column({ type: "datetime" }) changedAt = new Date(0); }
 
 @Entity()
-class CompositeAccount { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) name = ""; }
+class CompositeAccount { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) name = ""; }
 
 @Entity()
 @ForeignKey(() => SelfReference, { properties: ["parentId"] })
-class SelfReference { @Key({ generated: false }) id = 0; @Column({ type: "integer", nullable: true }) parentId: number | null = null; }
+class SelfReference { @Key({ generated: false }) id = 0; @Nullable() @Column({ type: "integer" }) parentId: number | null = null; }
 
 @Entity()
 @ForeignKey(() => MutualRight, { properties: ["rightId"] })
-class MutualLeft { @Key({ generated: false }) id = 0; @Column({ type: "integer" }) rightId = 0; }
+class MutualLeft { @Key({ generated: false }) id = 0; @Nullable() @Column({ type: "integer" }) rightId = 0; }
 
 @Entity()
 @ForeignKey(() => MutualLeft, { properties: ["leftId"] })
-class MutualRight { @Key({ generated: false }) id = 0; @Column({ type: "integer" }) leftId = 0; }
+class MutualRight { @Key({ generated: false }) id = 0; @Nullable() @Column({ type: "integer" }) leftId = 0; }
 
 @Entity()
-class ByteKeyAccount { @Key({ generated: false }) @HasConversion(bytesAsText) @Column({ type: "text" }) id = new Uint8Array([1]); @Column({ type: "text" }) name = ""; }
+class ByteKeyAccount { @Key({ generated: false }) @HasConversion(bytesAsText) @Column({ type: "text" }) id = new Uint8Array([1]); @Nullable() @Column({ type: "text" }) name = ""; }
 
 @Entity()
-class CompositeByteKeyAccount { @Key(["tenant", "id"]) @HasConversion(bytesAsText) @Column({ type: "text" }) tenant = new Uint8Array([1]); @Column({ type: "text" }) id = "one"; @Column({ type: "text" }) name = ""; }
+class CompositeByteKeyAccount { @Key(["tenant", "id"]) @HasConversion(bytesAsText) @Column({ type: "text" }) tenant = new Uint8Array([1]); @Nullable() @Column({ type: "text" }) id = "one"; @Nullable() @Column({ type: "text" }) name = ""; }
 
 @Entity()
-class BlobPayloadAccount { @Key({ generated: false }) id = 0; @HasConversion(bytesAsText) @Column({ type: "text" }) payload = new Uint8Array([1, 2]); }
+class BlobPayloadAccount { @Key({ generated: false }) id = 0; @HasConversion(bytesAsText) @Nullable() @Column({ type: "text" }) payload = new Uint8Array([1, 2]); }
 
 @Entity()
-class ConvertedDateAccount { @Key({ generated: false }) id = 0; @HasConversion({ toProvider: (value: Date) => value.toISOString(), fromProvider: (value: string) => new Date(value) }) @Column({ type: "text" }) at = new Date("2026-01-01T00:00:00Z"); }
+class ConvertedDateAccount { @Key({ generated: false }) id = 0; @HasConversion({ toProvider: (value: Date) => value.toISOString(), fromProvider: (value: string) => new Date(value) }) @Nullable() @Column({ type: "text" }) at = new Date("2026-01-01T00:00:00Z"); }
 
 test("detectChanges reuses JSON snapshot signatures", () => {
   const tracker = new ChangeTracker(); const account = new Account(); account.id = 1; account.meta = { items: [{ index: 1 }] };

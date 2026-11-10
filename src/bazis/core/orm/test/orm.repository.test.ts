@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { DI, Module, ModuleEncapsulationError, createContainer } from "@/core/di";
-import { Column, DbContext, Entity, IRepository, Key, registerRepositories, repositoryFor } from "@/core/orm";
+import { Column, DbContext, Entity, IRepository, Key, registerRepositories, repositoryFor, Nullable } from "@/core/orm";
 
 @Entity()
 class RepoContractEntity {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }

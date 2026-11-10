@@ -1,4 +1,4 @@
-import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
+import { Column, Entity, ForeignKey, Index, UUID, Nullable } from "../../../orm";
 import { WfProcess } from "./WfProcess.model";
 
 /** A published version of a process: an immutable snapshot of its document. */
@@ -10,25 +10,31 @@ export class WfVersion {
   id = "";
 
   /** A reference: the foreign key makes the column a native uuid. A non-key `type: "uuid"` would generate a value. */
+  @Nullable()
   @Column({ type: "text" })
   processId = "";
 
+  @Nullable()
   @Column({ type: "integer" })
   version = 0;
 
+  @Nullable()
   @Column({ type: "json" })
   document: unknown = null;
 
   /** sha-256 of the document: publishing the same document again adds no version. */
+  @Nullable()
   @Column({ type: "text" })
   documentHash = "";
 
   @Column({ type: "createdAt" })
   publishedAt = new Date(0);
 
+  @Nullable()
   @Column({ type: "text" })
   publishedByKind = "";
 
+  @Nullable()
   @Column({ type: "text" })
   publishedById = "";
 }

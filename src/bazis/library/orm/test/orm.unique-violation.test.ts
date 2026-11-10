@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { databaseHttpError } from "@/core/orm";
-import { Column, Entity, Index, ModelBuildError, OrmModel, UniqueViolationError, UUID } from "@/library/orm";
+import { Column, Entity, Index, ModelBuildError, OrmModel, UniqueViolationError, UUID, Nullable } from "@/library/orm";
 import { describeViolation } from "@/library/orm/errors";
 
 @Index(["shopId", "code"], { unique: true })
@@ -8,9 +8,9 @@ import { describeViolation } from "@/library/orm/errors";
 class Product {
   @UUID() id = "";
   @Index({ unique: true, conflict: "A product with this name already exists" })
-  @Column({ type: "text", name: "product_name" }) name = "";
-  @Column({ type: "text" }) shopId = "";
-  @Column({ type: "text" }) code = "";
+  @Nullable() @Column({ type: "text", name: "product_name" }) name = "";
+  @Nullable() @Column({ type: "text" }) shopId = "";
+  @Nullable() @Column({ type: "text" }) code = "";
 }
 
 const models = new OrmModel([Product]);
@@ -47,7 +47,7 @@ test("conflict is only for a unique index", () => {
   class Bad {
     @UUID() id = "";
     @Index({ conflict: "taken" })
-    @Column({ type: "text" }) name = "";
+    @Nullable() @Column({ type: "text" }) name = "";
   }
   expect(() => new OrmModel([Bad])).toThrow(ModelBuildError);
 });

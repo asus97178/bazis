@@ -20,6 +20,7 @@ bunx bazis <команда> [опции]
 | `bazis g process <Имя> --module <Имя>` | Создаёт процесс в коде модуля и добавляет его в `processes` |
 | `bazis workflow check` | Проверяет процессы модулей вместе с инструментами, без запуска |
 | `bazis workflow diagram <ключ>` | Печатает процесс как схему Mermaid |
+| `bazis upgrade columns [--dry-run]` | Для 0.137.0: ставит столбцам `@Required()` или `@Nullable()`, схема не меняется |
 | `bazis codegen` | Обновляет сгенерированный код в `src/generated/bazis` |
 | `bazis dev [--watch]` | Кодогенерация, затем запуск приложения из исходников |
 | `bazis test [аргументы]` | Кодогенерация, затем `bun test` |
@@ -268,6 +269,30 @@ bunx bazis workflow diagram delivery > delivery.mmd
 можно перенаправить в файл. Обе берут `src/app/modules/App.module.ts`, другой
 файл — `--app-module <путь>`. Подробно — в главе
 [Бизнес-процессы](../workflow/processes.md#проверка-и-схема-bazis-workflow).
+
+## `bazis upgrade`
+
+Переводит код приложения на новую версию там, где это можно сделать механически.
+
+```sh
+bunx bazis upgrade columns --dry-run   # показать, что изменится
+bunx bazis upgrade columns             # изменить файлы в src
+bunx bazis upgrade columns --path packages/shop/src
+```
+
+`columns` — для версии 0.137.0: каждому столбцу сущности ставит `@Required()` или `@Nullable()` по тому,
+чем он был, и убирает опцию `nullable`. Схема базы после этого та же.
+
+```text
+changed src/app/modules/task/model/Task.model.ts: 3 @Nullable()
+Changed 1 file: 3 columns marked @Nullable(), 0 marked @Required(). The schema stays as it was.
+Review the diff: where a column must not be empty, write @Required() instead and migrate the data.
+```
+
+- Ключи, `@CreatedAt`, `@UpdatedAt` и `@SoftDelete` команда не трогает.
+- Повторный запуск ничего не меняет.
+- Столбец, чьи опции записаны не на месте (`@Column(options)`), команда называет строкой `look at …`:
+  пометьте его сами.
 
 ## `bazis codegen`
 

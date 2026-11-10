@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Column, Entity, Key, OrmModel, OrmError } from "../index";
+import { Column, Entity, Key, OrmModel, OrmError, Nullable } from "../index";
 import { PostgresDialect } from "../Providers/PostgresDialect";
 import { canonicalPostgresType, exactPostgresType } from "../Providers/PostgresSchema.decoder";
 import { assertDecimalFits } from "../Providers/decimalValue";
@@ -10,8 +10,8 @@ import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 @Entity({ table: "prices" })
 class Price {
   @Key() id = 0;
-  @Column({ type: "decimal", precision: 12, scale: 2 }) amount = "0";
-  @Column({ type: "decimal" }) rate: string | null = null;
+  @Nullable() @Column({ type: "decimal", precision: 12, scale: 2 }) amount = "0";
+  @Nullable() @Column({ type: "decimal" }) rate: string | null = null;
 }
 const model = new OrmModel([Price]).entities[0]!;
 const amount = model.propertyByName("amount")!;
@@ -45,8 +45,8 @@ test("a value that would lose digits is refused before the write", () => {
 });
 
 test("precision and scale are checked when the model is built", () => {
-  @Entity({ table: "bad_a" }) class BadScale { @Key() id = 0; @Column({ type: "decimal", precision: 2, scale: 3 }) v = "0"; }
-  @Entity({ table: "bad_b" }) class NotDecimal { @Key() id = 0; @Column({ type: "real", precision: 5 }) v = 0; }
+  @Entity({ table: "bad_a" }) class BadScale { @Key() id = 0; @Nullable() @Column({ type: "decimal", precision: 2, scale: 3 }) v = "0"; }
+  @Entity({ table: "bad_b" }) class NotDecimal { @Key() id = 0; @Nullable() @Column({ type: "real", precision: 5 }) v = 0; }
   @Entity({ table: "bad_c" }) class DecimalKey { @Key() @Column({ type: "decimal" }) id = "0"; }
   expect(() => new OrmModel([BadScale])).toThrow("scale must be an integer from 0 to precision (2).");
   expect(() => new OrmModel([NotDecimal])).toThrow('precision and scale need @Column({ type: "decimal" }).');
