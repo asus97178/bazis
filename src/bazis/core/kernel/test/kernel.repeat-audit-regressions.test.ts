@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, createToken, type BazisModuleRef } from "../../di";
+import { HOSTED_SERVICE, createToken, type BazisModuleRef } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { LIFECYCLE_HOOK, Bazis, ShutdownTimeoutError, StartupAbortedError, SupervisedHostedService, type LifecycleHook } from "../index";
 
 const builder = (root: BazisModuleRef) => Bazis.createBuilder(root)

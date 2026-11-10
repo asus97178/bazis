@@ -1,4 +1,4 @@
-import { DI } from "../../../di";
+import { DI } from "../../../di/lowLevel";
 import { Bazis, LIFECYCLE_HOOK, type LifecycleHook } from "../../index";
 
 // An onInit that never settles: the start can only fail by timeout or signal.

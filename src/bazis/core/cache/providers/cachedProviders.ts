@@ -1,11 +1,11 @@
 import {
-  DI,
   type Class,
   type ProviderDefinition,
   type ProviderDependencyList,
   type ServiceResolver,
   type Token,
 } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { randomUUID } from "node:crypto";
 import { ICache } from "../ICache";
 import { CACHE_POLICIES } from "../tokens/CACHE_POLICIES";

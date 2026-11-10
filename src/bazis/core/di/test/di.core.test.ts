@@ -4,7 +4,6 @@ import {
   CLASS_PROVIDER_HOOK,
   ClassDependenciesMismatchError,
   collectModuleControllers,
-  DI,
   ProviderNotFoundError,
   createContainer,
   createToken,
@@ -17,6 +16,7 @@ import {
   type BazisModuleRef,
   type ServiceResolver,
 } from "../index";
+import { DI } from "../lowLevel";
 import { namedDependency } from "../provider";
 import {
   AppService,

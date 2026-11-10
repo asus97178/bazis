@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module, ServiceCollection, createContainer } from "../../di";
+import { Module, ServiceCollection, createContainer } from "../../di";
+import { DI } from "../../di/lowLevel";
 import {
   EventBus,
   EventHandlerTimeoutError,

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DI,
   createContainer,
   createInstance,
   createToken,
   keyedDependency,
   type BazisModuleRef,
 } from "../index";
+import { DI } from "../lowLevel";
 
 interface IGreeting {
   text(): string;

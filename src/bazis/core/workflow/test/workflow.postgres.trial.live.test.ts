@@ -3,7 +3,8 @@ import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 setDefaultTimeout(60_000);
 import { AccessPolicy, References, type AccessSubject, type Grants, type ReferenceContext, type ReferenceItem, type Scope, type ScopePrincipals } from "@/core/access";
 import { TOOL_EXECUTION_OPTIONS, Tool, type AgentToolExecutionContext } from "@/core/agent";
-import { DI, Module, scoped, singleton } from "@/core/di";
+import { Module, scoped, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import type { AuthorizeContext } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, OnEvent, secret, withEventSubscribers } from "@/core/kernel";
@@ -409,7 +410,7 @@ test.skipIf(!enabled)("the start stops when a Tool refers to a kind no module ow
   @Module({
     imports: [TestInfra, WorkflowModule],
     ormBazis: { context: NotesDbContext, entities: [Note], ensureCreated: true },
-    tools: [...ormEntityTools(Note, { context: NotesDbContext, ops: ["find"], fields: ["text"] })],
+    tools: [ormEntityTools(Note, { context: NotesDbContext, ops: ["find"], fields: ["text"] })],
     providers: [singleton(AccessPolicy, OpenPolicy)],
   })
   class WithoutOwner {}

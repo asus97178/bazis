@@ -2,7 +2,8 @@
  * Fixture for runApp.language.test.ts: the file is NOT *.test.ts, so
  * di:generate scans it and infers the argument bindings.
  */
-import { DI, Module } from "@/core/di";
+import { Module } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Authorize, Controller, Get, NotFoundError, Post, RequestModel, UnauthorizedError } from "@/core/http";
 import { Validator } from "@/library/validation";
 

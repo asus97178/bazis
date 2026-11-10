@@ -12,7 +12,6 @@ import { definitionsPermissions } from "./access/Definitions.permissions";
 import { FolderReferences } from "./access/Folder.references";
 import { ProcessReferences } from "./access/Process.references";
 import { ProcessFolderLookup } from "./access/ProcessFolder.lookup";
-import { ProcessPartitionLookup } from "./access/ProcessPartition.lookup";
 import { CatalogImport } from "./code/CatalogImport";
 import { CodeProcessCatalog } from "./code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "./code/CodeProcessPublisher";
@@ -48,8 +47,8 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     scoped(WorkflowReferences),
     scoped(CatalogImport),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
+    // Shared with the Runtime and Tasks parts: owned and exported here.
     scoped(ProcessFolderLookup),
-    scoped(ProcessPartitionLookup),
     singleton(HOSTED_SERVICE, CodeProcessPublisher),
   ],
   controllers: [ProcessesController],

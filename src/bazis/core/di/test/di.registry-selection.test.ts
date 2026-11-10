@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DI,
   ModuleEncapsulationError,
   ProviderNotFoundError,
   ScopeDisposedError,
@@ -11,6 +10,7 @@ import {
   createToken,
   type ServiceKey,
 } from "../index";
+import { DI } from "../lowLevel";
 import { ServiceRegistry } from "../internal/ServiceRegistry";
 
 describe("DI cached registration selection", () => {

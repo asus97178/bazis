@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, createToken, Global, markGlobal, Module, singleton, type BazisModuleMetadata } from "../index";
+import { DI } from "../lowLevel";
 
 /** Decorators assign module metadata at runtime without changing the class's static type. */
 const meta = (moduleClass: unknown): BazisModuleMetadata => moduleClass as BazisModuleMetadata;
@@ -60,7 +61,7 @@ describe("@Global", () => {
 
     @Module({
       imports: [GlobalConfigModule],
-      providers: [singleton(createToken<ConsumerService>("Consumer"), ConsumerService, [CONFIG] as const)],
+      providers: [DI.singleton(DI.classProvider(createToken<ConsumerService>("Consumer"), ConsumerService, [CONFIG] as const))],
     })
     class ConsumerModule {}
 

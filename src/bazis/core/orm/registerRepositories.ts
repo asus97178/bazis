@@ -1,4 +1,5 @@
-import { DI, type DiRegistrar } from "../di";
+import { type DiRegistrar } from "../di";
+import { DI } from "../di/lowLevel";
 import { Repository, type DbContext, type DbContextOptions } from "../../library/orm";
 import { repositoryFor } from "./repository";
 

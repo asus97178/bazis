@@ -70,8 +70,6 @@ export {
   createToken,
   scoped,
   singleton,
-  singletonFactory,
-  singletonFactoryWithResolver,
   singletonValue,
   transient,
   type ModuleConfig,

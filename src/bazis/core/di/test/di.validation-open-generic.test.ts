@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   CircularDependencyError,
-  DI,
   ScopedServiceFromRootError,
   ServiceCollection,
   ServiceValidationError,
@@ -11,6 +10,7 @@ import {
   type BazisModuleRef,
   type ServiceResolver,
 } from "../index";
+import { DI } from "../lowLevel";
 import {
   AppService,
   CounterService,

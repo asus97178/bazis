@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createContainer, createToken, DI, HOSTED_SERVICE, isConfigurationError } from "../../di";
+import { createContainer, createToken, HOSTED_SERVICE, isConfigurationError } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { Bazis, defineConfig, secret } from "../../kernel";
 import { infraModule, InfraLifecycle, llmProfile, llmRouter, type InfraConnector } from "../index";
 

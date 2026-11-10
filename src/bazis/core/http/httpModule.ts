@@ -1,4 +1,5 @@
-import { DI, HOSTED_SERVICE, Module, SERVICE_PROVIDER, collectModuleControllers, type BazisModule, type ProviderDefinition } from "../di";
+import { HOSTED_SERVICE, Module, SERVICE_PROVIDER, collectModuleControllers, type BazisModule, type ProviderDefinition } from "../di";
+import { DI } from "../di/lowLevel";
 import { HttpServer } from "./HttpServer";
 import { httpConfig } from "./Http.config";
 import type { HttpModuleOptions, HttpServerOptions } from "./options";

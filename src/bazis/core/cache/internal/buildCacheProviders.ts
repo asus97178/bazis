@@ -1,15 +1,14 @@
 import {
-  DI,
   CLASS_PROVIDER_HOOK,
   OptionsValidationError,
   singleton,
-  singletonFactoryWithResolver,
   singletonValue,
   type InjectionToken,
   type Options,
   type BazisModuleRef,
   type ProviderDefinition,
 } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { ROUTE_MIDDLEWARE_COMPOSER, type RouteMiddlewareComposerRegistration } from "../../http";
 import { HEALTH_CHECK } from "../../kernel";
 import { cacheableClassProviderHook } from "../di/classProviderHook";
@@ -82,7 +81,7 @@ function buildCacheProviders(config: CacheModuleConfig): ProviderDefinition[] {
     singletonValue(CLASS_PROVIDER_HOOK, cacheableClassProviderHook),
     cacheOptionsProvider(config),
     DI.singleton(DI.valueProvider(CACHE_POLICIES, policies)),
-    singleton(token, MemoryCache, [CACHE_OPTIONS] as const),
+    DI.singleton(DI.classProvider(token, MemoryCache, [CACHE_OPTIONS] as const)),
     outputCacheComposerProvider(config),
   ];
 
@@ -115,7 +114,7 @@ function cacheOptionsProvider(config: CacheModuleConfig): ProviderDefinition {
 /** Registers the `@OutputCache` / `@OutputRedisCache` middleware via the HTTP DI token. */
 function outputCacheComposerProvider(config: CacheModuleConfig): ProviderDefinition {
   const token = config.token ?? ICache;
-  return singletonFactoryWithResolver(ROUTE_MIDDLEWARE_COMPOSER, [], (resolver) => ({
+  return DI.singleton(DI.factoryProviderWithResolver(ROUTE_MIDDLEWARE_COMPOSER, [], (resolver) => ({
     order: OUTPUT_CACHE_COMPOSER_ORDER,
     compose: createRouteOutputCacheComposerWithOptions({
       policies: config.policies ?? {},
@@ -129,7 +128,7 @@ function outputCacheComposerProvider(config: CacheModuleConfig): ProviderDefinit
       // start fails and names the route instead of every request failing.
       distributedEnabled: resolver.has(DISTRIBUTED_OUTPUT_CACHE),
     }),
-  } satisfies RouteMiddlewareComposerRegistration));
+  } satisfies RouteMiddlewareComposerRegistration)));
 }
 
 function outputCacheSecurityBehavior(options: CacheOutputCacheOptions | undefined): "throw" | "warn" | "ignore" {

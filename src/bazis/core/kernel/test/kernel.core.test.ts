@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, Module, ServiceValidationError, createToken, type HostedService, type BazisModuleRef } from "../../di";
+import { HOSTED_SERVICE, Module, ServiceValidationError, createToken, type HostedService, type BazisModuleRef } from "../../di";
+import { DI } from "../../di/lowLevel";
 import {
   ApplicationLifetime,
   Environment,

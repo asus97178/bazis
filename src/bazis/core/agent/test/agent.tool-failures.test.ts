@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import type { ToolExecutionOptions } from "../toolExecutionOptions";
 import { withToolExecution } from "./toolExecution.fixture";
-import { DI, Module, createContainer, scoped } from "@/core/di";
+import { Module, createContainer, scoped } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { defineConfig, secret } from "@/core/kernel";
 import { LOGGER, type LogFields, type Logger } from "@/core/kernel/logging/Logger";
 import { Infra, llmConnect } from "@/core/infra";

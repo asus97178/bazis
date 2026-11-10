@@ -1,5 +1,4 @@
 import {
-  DI,
   collectModuleGateways,
   markGlobal,
   Module,
@@ -8,6 +7,7 @@ import {
   type ProviderDefinition,
   type ServiceResolver,
 } from "../di";
+import { DI } from "../di/lowLevel";
 import { WEBSOCKET_UPGRADE } from "../http";
 import { LOGGER } from "../kernel";
 import { WebSocketService } from "./WebSocketService";

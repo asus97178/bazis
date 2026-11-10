@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { withToolExecution } from "./toolExecution.fixture";
-import { DI, createContainer, Module, scoped } from "@/core/di";
+import { createContainer, Module, scoped } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { defineConfig, secret } from "@/core/kernel";
 import { Infra, llmConnect, llmProfile, llmRouter, openAiCompatibleAdapter, type LlmProviderAdapter } from "@/core/infra";
 import {
@@ -897,9 +898,9 @@ describe("agent runtime", () => {
       providers: [
         scoped(InvalidCommittedOutputTool),
         scoped(ThrowingCommittedState),
-        scoped(ThrowingCommittedDisposeTool, ThrowingCommittedDisposeTool, [ThrowingCommittedState]),
+        DI.scoped(DI.classProvider(ThrowingCommittedDisposeTool, ThrowingCommittedDisposeTool, [ThrowingCommittedState])),
         scoped(SlowCommittedState),
-        scoped(SlowCommittedDisposeTool, SlowCommittedDisposeTool, [SlowCommittedState]),
+        DI.scoped(DI.classProvider(SlowCommittedDisposeTool, SlowCommittedDisposeTool, [SlowCommittedState])),
         scoped(CommitThenThrowTool),
       ],
     })

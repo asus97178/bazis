@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, Module, createContainer, createToken } from "../index";
+import { Module, createContainer, createToken } from "../index";
+import { DI } from "../lowLevel";
 import { redactSensitiveText } from "../../../library/redaction";
 
 // A singleton that takes a scoped service says what to do about it (0.98.15).

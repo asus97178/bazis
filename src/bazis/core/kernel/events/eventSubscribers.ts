@@ -1,5 +1,4 @@
 import {
-  DI,
   Module,
   singleton,
   type Class,
@@ -7,6 +6,7 @@ import {
   type ProviderDefinition,
   type ServiceResolver,
 } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { EVENT_HANDLER, type EventSubscription } from "./EventBus";
 import type { EventHandler, EventToken } from "./EventToken";
 

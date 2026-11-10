@@ -1,5 +1,6 @@
 import type { InjectionToken, Options, ProviderDefinition, ServiceCollection, ServiceResolver } from "../../di";
-import { DI, OPTIONS_STARTUP_VALIDATOR, OptionsValidationError } from "../../di";
+import { OPTIONS_STARTUP_VALIDATOR, OptionsValidationError } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { ConfigKeyMissingError } from "../errors";
 import { Configuration } from "./Configuration";
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, type BazisModuleRef, type HostedService } from "../../di";
+import { HOSTED_SERVICE, type BazisModuleRef, type HostedService } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { APPLICATION_STARTED, APPLICATION_STOPPING, Bazis, LIFECYCLE_HOOK, onEvent, type LifecycleHook } from "../index";
 
 function hosted(log: string[], name: string, phase: number): HostedService {

@@ -82,14 +82,15 @@ export class Explicit extends BaseService {}
 export class Bound extends BaseService {}
 export class Override extends A { override readonly value = "A"; }
 `,
-    "src/index.ts": `import { createContainer, DI, singleton, singletonValue, lazyDependency } from "bazis/core/di";
+    "src/index.ts": `import { createContainer, singleton, singletonValue, lazyDependency } from "bazis/core/di";
+import { DI } from "bazis/core/di/lowLevel";
 import { Dependency as A } from "./a";
 import { Dependency as B } from "./b";
 import { IContract } from "./contract";
 import Grandchild, { Inherited, GenericChild, LocalChild, DefaultChild, ContractChild, OwnConstructor, OwnEmpty, Explicit, Bound, Override } from "./services";
 // Register providers before bootstrap; late normalization must remain supported.
 DI.bindDeps(Bound, Override, lazyDependency(Override));
-const providers = [singleton(A), singleton(B), singleton(Override), singleton(Inherited), singleton(Grandchild), singleton(GenericChild), singleton(LocalChild), singleton(DefaultChild), singleton(ContractChild), singletonValue(IContract, {value: "contract"}), singleton(OwnConstructor), singleton(OwnEmpty), singleton(Bound), singleton(Explicit, Explicit, [Override, lazyDependency(Override)])];
+const providers = [singleton(A), singleton(B), singleton(Override), singleton(Inherited), singleton(Grandchild), singleton(GenericChild), singleton(LocalChild), singleton(DefaultChild), singleton(ContractChild), singletonValue(IContract, {value: "contract"}), singleton(OwnConstructor), singleton(OwnEmpty), singleton(Bound), DI.singleton(DI.classProvider(Explicit, Explicit, [Override, lazyDependency(Override)]))];
 const { registerBazisGeneratedRuntime } = await import("./generated/bazis/runtime");
 await registerBazisGeneratedRuntime();
 const container = createContainer({ providers }, { validateOnBuild: true });
@@ -131,7 +132,8 @@ test("private helpers and explicitly bound private services need no generated im
 const { registerBazisGeneratedRuntime } = await import("./generated/bazis/runtime");
 await registerBazisGeneratedRuntime();
 await verify();`,
-    "src/services.ts": `import { createContainer, DI, singleton, singletonValue, createToken } from "bazis/core/di";
+    "src/services.ts": `import { createContainer, singleton, singletonValue, createToken } from "bazis/core/di";
+import { DI } from "bazis/core/di/lowLevel";
 export class Dependency {}
 class InternalHelper { constructor(readonly dependency: Dependency) {} }
 class TypeOnlyHelper { constructor(readonly dependency: Dependency) {} }
@@ -150,7 +152,7 @@ class ExplicitValue extends ValueBase {}
 class StaticValue extends ValueBase { static inject = [VALUE]; }
 DI.bindDeps(Bound, Dependency);
 export async function verify() {
-const container = createContainer({ providers: [singleton(Dependency), singleton(Mixed), singleton(Explicit, Explicit, [Dependency]), singleton(Bound), singleton(Static), singletonValue(VALUE, "bound-value"), singleton(ExplicitValue, ExplicitValue, [VALUE]), singleton(StaticValue)] }, { validateOnBuild: true });
+const container = createContainer({ providers: [singleton(Dependency), singleton(Mixed), DI.singleton(DI.classProvider(Explicit, Explicit, [Dependency])), singleton(Bound), singleton(Static), singletonValue(VALUE, "bound-value"), DI.singleton(DI.classProvider(ExplicitValue, ExplicitValue, [VALUE])), singleton(StaticValue)] }, { validateOnBuild: true });
 try {
   for (const type of [Explicit, Bound, Static, Mixed]) if (container.resolve(type).dependency !== container.resolve(Dependency)) throw Error("private explicit binding failed");
   if (!(new InternalHelper(new Dependency()).dependency instanceof Dependency)) throw Error("helper failed");
@@ -201,7 +203,8 @@ test.each([
   'export type { InternalService }; export const registration = addScoped(InternalService);',
 ])("private inferred DI classes fail before generated publication: %s", async registration => {
   const root = await project({
-    "src/index.ts": `import { scoped as addScoped, DI, Module, createContainer, ServiceCollection } from "bazis/core/di";
+    "src/index.ts": `import { scoped as addScoped, Module, createContainer, ServiceCollection } from "bazis/core/di";
+import { DI } from "bazis/core/di/lowLevel";
 export class Dependency {}
 class InternalService { constructor(readonly dependency: Dependency) {} start() {} stop() {} }
 ${registration}

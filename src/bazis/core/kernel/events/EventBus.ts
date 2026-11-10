@@ -1,4 +1,5 @@
 import { createToken, type ServiceResolver } from "../../di";
+import { DI } from "../../di/lowLevel";
 import type { EventHandler, EventToken } from "./EventToken";
 import { awaitAbortable } from "../internal/awaitAbortable";
 

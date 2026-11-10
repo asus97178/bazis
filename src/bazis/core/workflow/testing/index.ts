@@ -1,4 +1,4 @@
-import { DI } from "../../di";
+import { DI } from "../../di/lowLevel";
 import "../generated/deps";
 import { startTestApp, type TestApp, type TestAppOptions } from "../../testing";
 import { postgres } from "../../../library/orm";

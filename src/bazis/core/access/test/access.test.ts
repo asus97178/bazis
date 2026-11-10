@@ -95,15 +95,27 @@ test("declarations are checked when the application is built", async () => {
   expect((await buildError(LooseModule)).message).toBe("LooseModule: permissions must be a definePermissions(...) result.");
 });
 
-test("the graph must import AccessModule, own every reference kind and register the lookups", async () => {
+test("the graph must import AccessModule and own every reference kind; the lookups of permissions register themselves", async () => {
   @Module({ permissions: definePermissions({ "a.read": { title: "x" } }) }) class LonelyModule {}
   expect((await buildError(LonelyModule)).message).toBe("LonelyModule declares access (permissions, references or roles), but the application does not import AccessModule (bazis/core/access).");
 
   @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", on: { table: { ref: "dm.table" } } } }) }) class NoKindModule {}
   expect((await buildError(NoKindModule)).message).toContain('attribute "table" refers to kind "dm.table", which no module declares in references');
 
-  @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", scope: { lookup: FolderLookup } } }) }) class NoLookupModule {}
-  expect((await buildError(NoLookupModule)).message).toBe('NoLookupModule: FolderLookup of permission "a.read" is not registered: add it to the module\'s providers.');
+  // 0.138.0: the permission names its lookup, and that is enough: no line in `providers`.
+  @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", scope: { lookup: FolderLookup } } }) }) class LookupModule {}
+  const container = await createTestContainer(LookupModule);
+  const scope = container.createScope();
+  expect(scope.resolve(FolderLookup)).toBeInstanceOf(FolderLookup);
+  await scope.dispose();
+  await container.dispose();
+
+  // A lookup an imported module owns and exports is taken from it, not registered again.
+  @Module({ providers: [singleton(FolderLookup)], exports: [FolderLookup] }) class SharedLookupModule {}
+  @Module({ imports: [AccessModule, SharedLookupModule], permissions: definePermissions({ "b.read": { title: "x", scope: { lookup: FolderLookup } } }) }) class BorrowingModule {}
+  const borrowing = await createTestContainer(BorrowingModule);
+  expect(borrowing.resolve(FolderLookup)).toBe(borrowing.resolve(FolderLookup));
+  await borrowing.dispose();
 
   @Module({ imports: [AccessModule], permissions: definePermissions({ "orders.read": { title: "again" } }) }) class TwiceModule {}
   @Module({ imports: [OrdersModule, TwiceModule] }) class AppModule {}
