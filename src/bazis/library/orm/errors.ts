@@ -103,7 +103,7 @@ export class EntityNotMappedError extends OrmError {
         ? `No entity or dynamic model named "${name}" is registered in this DbContext. Register a dynamic table first: options.model.registerModel(buildDynamicModel({ name: "${name}", fields: [...] })).`
         : kind === "plain"
           ? `A plain object is not an entity class. For a dynamic table add the row through its set: db.setByName("Table").add(row).`
-          : `Type "${name}" is not mapped in this DbContext. Add it to ormModule({ entities: [...] }) and annotate it with @Entity().`,
+          : `Type "${name}" is not mapped in this DbContext. Declare a set for it in the context (this.set(${name})) or add it to entities of ormBazis, and annotate it with @Entity().`,
     );
   }
 }

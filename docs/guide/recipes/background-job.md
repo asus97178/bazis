@@ -197,7 +197,6 @@ export class NotificationsController {
   imports: [AuthModule],
   ormBazis: {
     context: TasksDbContext,
-    entities: [Task, Notification],
     ensureCreated: true,
   },
   controllers: [TasksController, NotificationsController],

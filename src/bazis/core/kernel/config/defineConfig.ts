@@ -90,13 +90,23 @@ export interface ConfigInspection {
   readonly source: string;
   readonly value: Primitive;
 }
-export interface ConfigView<T extends object> extends AppConfig<T> {
+/** The settings of one section as a service reads them. */
+export interface ResolvedConfigView<T extends object> extends AppConfig<T> {
   readonly environment: Stand;
   inspect(): readonly ConfigInspection[];
 }
-export interface ConfigDefinition<T extends object> extends AppConfig<T> {
-  readonly token: InjectionToken<ConfigView<T>>;
-  resolve(environment?: Stand, configuration?: Configuration): ConfigView<T>;
+/**
+ * The settings a service takes in its constructor. `T` is the declaration
+ * itself, `ConfigView<typeof mailConfig>`, so the settings are described once,
+ * by their defaults; or the shape of the settings, `ConfigView<MailConfig>`, for a
+ * declaration with an explicit type.
+ */
+export type ConfigView<T extends object> = ResolvedConfigView<T extends ConfigDefinition<infer Shape, string> ? Shape : T>;
+export interface ConfigDefinition<T extends object, P extends string = string> extends AppConfig<T> {
+  /** The name of the section: `mail`; `default` for a declaration without one. */
+  readonly prefix: P;
+  readonly token: InjectionToken<ResolvedConfigView<T>>;
+  resolve(environment?: Stand, configuration?: Configuration): ResolvedConfigView<T>;
 }
 const definitions = new WeakSet<object>();
 export function isConfigDefinition(config: ValidatableConfig): config is ConfigDefinition<object> {
@@ -158,8 +168,8 @@ function safeValue(key: string, value: ConfigValueType): Primitive {
   } catch { /* Most strings are not URLs. */ }
   return redactSensitiveText(value);
 }
-export function defineConfig<const D extends Defaults>(schema: ConfigSchema<D>): ConfigDefinition<ResolveAll<D>>;
-export function defineConfig<const D extends Defaults>(prefix: string, schema: ConfigSchema<D>): ConfigDefinition<ResolveAll<D>>;
+export function defineConfig<const D extends Defaults>(schema: ConfigSchema<D>): ConfigDefinition<ResolveAll<D>, "default">;
+export function defineConfig<const P extends string, const D extends Defaults>(prefix: P, schema: ConfigSchema<D>): ConfigDefinition<ResolveAll<D>, P>;
 export function defineConfig<T extends object>(schema: SchemaFor<T>): ConfigDefinition<T>;
 export function defineConfig<T extends object>(prefix: string, schema: SchemaFor<T>): ConfigDefinition<T>;
 export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, maybeSchema?: ConfigSchema<Defaults>): ConfigDefinition<ConfigShape> {
@@ -176,6 +186,7 @@ export function defineConfig(prefixOrSchema: string | ConfigSchema<Defaults>, ma
     // errors, instead of crashing the import of the file that declares it.
     const fail = (): never => { throw error; };
     definition = Object.freeze({
+      prefix: prefix || "default",
       token: Object.freeze(createToken<ConfigView<ConfigShape>>(`Config:${prefix || "default"}`)),
       resolve: fail,
       get: fail,
@@ -297,6 +308,7 @@ function createDefinition(prefix: string, input: ConfigSchema<Defaults>, declare
     });
   };
   return Object.freeze({
+    prefix: prefix || "default",
     token: Object.freeze(createToken<ConfigView<ConfigShape>>(`Config:${prefix || "default"}`)),
     resolve,
     get: <K extends keyof ConfigShape>(key: K): ConfigShape[K] => resolve().get(key),

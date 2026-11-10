@@ -1,5 +1,5 @@
 import { errorMessage, InfraError, reader, requireValue, postgresConnectionOptions, settingNames, type InfraConnector, type PostgresConfigShape } from "../infra";
-import { postgresAddress, serverVersion } from "../infra/connectors/postgres";
+import { POSTGRES_SSL_MODES, postgresAddress, serverVersion, type PostgresSslMode } from "../infra/connectors/postgres";
 import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
 import { singletonValue } from "../di";
@@ -16,7 +16,7 @@ export interface PostgresOrmConfigShape extends PostgresConfigShape {
   readonly connectionTimeout?: number;
   readonly idleTimeout?: number;
   readonly maxLifetime?: number;
-  readonly tls?: "disable" | "allow" | "prefer" | "require" | "verify-ca" | "verify-full";
+  readonly tls?: PostgresSslMode;
   readonly tlsCa?: string;
   readonly operationTimeoutMs?: number;
   readonly cancellationTimeoutMs?: number;
@@ -46,7 +46,7 @@ function buildPostgresProvider<T extends PostgresOrmConfigShape>(config: AppConf
   // defineConfig keys are always present, so an empty tlsCa means "no additional CA".
   const tls = optional("tls"), configuredCa = optional("tlsCa"), ca = configuredCa === "" ? undefined : configuredCa;
   if (tls !== undefined) {
-    if (typeof tls !== "string" || !["disable", "allow", "prefer", "require", "verify-ca", "verify-full"].includes(tls)) throw new InfraError("Invalid PostgreSQL configuration field: tls.");
+    if (typeof tls !== "string" || !(POSTGRES_SSL_MODES as readonly string[]).includes(tls)) throw new InfraError("Invalid PostgreSQL configuration field: tls.");
     options.tls = tls;
   }
   if (ca !== undefined) {

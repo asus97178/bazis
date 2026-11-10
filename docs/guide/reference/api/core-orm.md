@@ -10,7 +10,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `ormBazisConnect(dbConfig, options)` | Коннектор PostgreSQL для `@Infra`: подключение, схема при запуске, здоровье | [Подключение PostgreSQL](../../database/postgresql.md#инфраструктура) |
-| `ormModule(config)` | Регистрация контекста модуля: `context`, `entities`, `ensureCreated`, `migrations` | [DbContext](../../database/dbcontext.md) |
+| `ormModule(config)` | Регистрация контекста модуля: `context`, `ensureCreated`, `migrations`; `entities` — только для сущностей без набора | [DbContext](../../database/dbcontext.md) |
 | `postgres(options)` | Подключение для `ormModule({ provider: postgres(...) })` без `@Infra` | — |
 | `DATABASE_PROVIDER` | Токен общего подключения | — |
 | `OrmLifecycle`, `OrmConnectionLifecycle`, `OrmProviderReadyLifecycle` | Службы запуска схемы и закрытия подключения; создаёт `ormModule` | — |

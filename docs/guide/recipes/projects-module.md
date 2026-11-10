@@ -205,7 +205,7 @@ import { ProjectsService } from "./services/Projects.service";
 
 @Module({
   imports: [AuthModule],
-  ormBazis: { context: ProjectsDbContext, entities: [Project], ensureCreated: true },
+  ormBazis: { context: ProjectsDbContext, ensureCreated: true },
   controllers: [ProjectsController],
   providers: [scoped(IProjectsService, ProjectsService)],
   exports: [IProjectsService],

@@ -21,6 +21,7 @@ export {
   type AppConfig,
   type ConfigDefinition,
   type ConfigView,
+  type ResolvedConfigView,
   type ConfigInspection,
   type ConfigEnum,
   type ConfigList,

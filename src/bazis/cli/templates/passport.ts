@@ -83,7 +83,7 @@ and an LLM connector, which registers AgentRuntime. The CLI does not create them
 ` : ""}Constructor dependencies, including ${m}DbContext, are wired by codegen.
 No manual deps arrays. UI, events and own configuration are not used.
 
-ORM: context ${m}DbContext, entities [${e}], shared host provider.
+ORM: context ${m}DbContext with the set of ${e}, shared host provider.
 Table ${n.route}${profile === "full" ? `, schema ${n.dbSchema}` : ""}.
 Only the module decides how tables are created: \`ensureCreated: true\` or
 \`migrateOnStart: true\` in \`ormBazis\`. The scaffold sets neither, so the host

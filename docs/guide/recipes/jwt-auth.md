@@ -371,7 +371,6 @@ import { AuthService } from "./services/Auth.service";
   config: authConfig,
   ormBazis: {
     context: AuthDbContext,
-    entities: [User],
     ensureCreated: true,
   },
   controllers: [AuthController],
@@ -407,7 +406,7 @@ export class AuthModule {}
 // tasks/Tasks.module.ts
 @Module({
   imports: [AuthModule],
-  ormBazis: { context: TasksDbContext, entities: [Task], ensureCreated: true },
+  ormBazis: { context: TasksDbContext, ensureCreated: true },
   …
 })
 ```

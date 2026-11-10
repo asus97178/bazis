@@ -845,6 +845,8 @@ function collectTokenDescriptions(source: ts.SourceFile): void {
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.arguments.length > 0) {
       const firstArg = node.arguments[0];
+      // defineConfig({ default: … }) without a section: its token is Config:default.
+      if (node.expression.text === "defineConfig" && firstArg && !ts.isStringLiteralLike(firstArg)) tokenDescriptions.add("Config:default");
       if (firstArg && ts.isStringLiteralLike(firstArg)) {
         if (node.expression.text === "createToken" || node.expression.text === "createOpenGenericTokenFamily") {
           tokenDescriptions.add(firstArg.text);
@@ -886,7 +888,9 @@ function resolveConfigViewDeps(): void {
       if (prefixes.length !== 1) {
         classDeps.delete(declaration);
         if (needsInferredDiDeps(declaration)) {
-          fatalErrors.push(prefixes.length === 0
+          fatalErrors.push(typeName.startsWith("typeof ")
+            ? `BAZIS_DI_CONFIG_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", but ${typeName.slice(7)} is not a declaration whose section codegen can read. Declare it as defineConfig("name", { default: {...} }) with a literal name and without a type argument.`
+            : prefixes.length === 0
             ? `BAZIS_DI_CONFIG_UNKNOWN: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", but no defineConfig<${typeName}>(...) declaration was found. Declare the configuration with an explicit type argument, for example defineConfig<${typeName}>("name", { default: {...} }).`
             : `BAZIS_DI_CONFIG_AMBIGUOUS: ${sourceLocation(declaration)}: constructor parameter ${index + 1} of "${declaration.name?.text}" has type "ConfigView<${typeName}>", which matches several declarations: ${prefixes.map((prefix) => `"${prefix}"`).join(", ")}. Give each declaration its own type.`);
         }
@@ -1219,6 +1223,13 @@ function readInheritedConstructorDeps(node: ts.ClassDeclaration): ConstructorDep
   return { deps };
 }
 
+/** The section of a `defineConfig("mail", …)` declaration by its type: the literal of its `prefix`. */
+function configPrefixOf(type: ts.Type): string | undefined {
+  const prefix = type.getProperty("prefix");
+  const literal = prefix && checker.getTypeOfSymbol(prefix);
+  return literal?.isStringLiteral() ? literal.value : undefined;
+}
+
 function dependencyFromType(type: ts.Type): CollectedDependency | undefined {
   if (type.flags & ts.TypeFlags.TypeParameter) return undefined;
   const symbol = type.getSymbol();
@@ -1228,8 +1239,11 @@ function dependencyFromType(type: ts.Type): CollectedDependency | undefined {
   const name = declaration?.name?.text ?? type.aliasSymbol?.name ?? symbol?.name;
   if (!name || BUILTIN_DEPENDENCY_NAMES.has(name)) return undefined;
   const arguments_ = type.flags & ts.TypeFlags.Object ? checker.getTypeArguments(type as ts.TypeReference) : [];
-  if (name === "ConfigView") {
-    const configType = arguments_[0];
+  if (name === "ConfigView" || name === "ResolvedConfigView") {
+    // ConfigView<typeof mailConfig>: the declaration carries the name of its section in its type.
+    const declared = type.aliasTypeArguments?.[0] && configPrefixOf(type.aliasTypeArguments[0]);
+    if (declared !== undefined) return { name: `Config:${declared}` };
+    const configType = type.aliasTypeArguments?.[0] ?? arguments_[0];
     const configTypeName = configType && (configType.aliasSymbol?.name ?? configType.getSymbol()?.name);
     return configTypeName ? { name: `ConfigView<${configTypeName}>` } : undefined;
   }
@@ -1281,6 +1295,12 @@ function readConstructorTypeNames(node: ts.ClassDeclaration): ConstructorDepende
 
     if (refName === "ConfigView" && paramType && ts.isTypeReferenceNode(paramType)) {
       const configType = paramType.typeArguments?.[0];
+      if (configType && ts.isTypeQueryNode(configType)) {
+        // ConfigView<typeof mailConfig>: the declaration carries the name of its section in its type.
+        const declared = configPrefixOf(checker.getTypeFromTypeNode(configType));
+        deps.push({ name: declared === undefined ? `ConfigView<${configType.getText()}>` : `Config:${declared}`, ...optionalFlag });
+        continue;
+      }
       const configTypeName = configType ? getDependencyTypeName(configType) : undefined;
       if (configTypeName) {
         deps.push({ name: `ConfigView<${configTypeName}>`, ...optionalFlag });

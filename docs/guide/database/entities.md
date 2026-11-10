@@ -380,7 +380,7 @@ export class Customer {
 }
 
 // customers/Customers.module.ts
-@Module({ config: cryptoConfig, ormBazis: { context: Customers, entities: [Customer] }, exports: [] })
+@Module({ config: cryptoConfig, ormBazis: { context: Customers }, exports: [] })
 export class CustomersModule {}
 ```
 

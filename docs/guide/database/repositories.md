@@ -30,7 +30,7 @@ export class ProductsService {
 }
 
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Category, Product], ensureCreated: true },
+  ormBazis: { context: CatalogDbContext, ensureCreated: true },
   providers: [scoped(ProductsService)],
 })
 export class CatalogModule {}
@@ -75,7 +75,7 @@ await this.products.saveChanges();   // 2 — сохранены и катего
 import { IRepository, repositoryFor } from "bazis/core/orm";
 
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Category, Product] },
+  ormBazis: { context: CatalogDbContext },
   exports: [repositoryFor(Product)],   // только товары
   // exports: [IRepository],           // репозитории всех сущностей каталога
 })
@@ -119,7 +119,7 @@ imports of "OrdersModule".
 ## Выключить
 
 ```ts
-ormBazis: { context: CatalogDbContext, entities: [Category, Product], registerRepositories: false }
+ormBazis: { context: CatalogDbContext, registerRepositories: false }
 ```
 
 Тогда внедрить репозиторий нельзя:

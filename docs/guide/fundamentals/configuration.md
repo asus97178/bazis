@@ -12,18 +12,9 @@
 
 ```ts
 // mail/Mail.config.ts
-import { configEnum, defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { configEnum, defineConfig, secret } from "bazis/core/kernel";
 
-export interface MailConfig {
-  host: string;
-  port: number;
-  useTls: boolean;
-  maxRetries: number;
-  provider: "smtp" | "ses";
-  apiKey: Secret;
-}
-
-export const mailConfig = defineConfig<MailConfig>("mail", {
+export const mailConfig = defineConfig("mail", {
   default: {
     host: "localhost",
     port: 1025,
@@ -59,23 +50,31 @@ export const mailConfig = defineConfig<MailConfig>("mail", {
 | Список строк | `configList(["a.example.com"])` | `readonly string[]`. В переменной окружения — через запятую: `BAZIS_MAIL__HOSTS=a.example.com,b.example.com`; пробелы вокруг и пустые элементы убираются. В секции окружения пишется массивом. С версии 0.137.0 |
 | Секрет | `secret("dev-key")` или `secret()` | Непустая строка |
 
+Отдельный интерфейс настроек писать не нужно: типы ключей выводятся из `default`.
+
 Модуль подключает объявление полем `config`, сервис получает настройки по
-типу:
+типу самого объявления:
 
 ```ts
 @Module({ config: mailConfig, providers: [scoped(MailService)], exports: [MailService] })
 export class MailModule {}
 
 export class MailService {
-  constructor(private readonly config: ConfigView<MailConfig>) {}
+  constructor(private readonly config: ConfigView<typeof mailConfig>) {}
 
   send() {
     const host = this.config.get("host");          // string
     const port = this.config.get("port");          // number
+    const provider = this.config.get("provider");  // "smtp" | "ses"
     const key = this.config.get("apiKey").reveal(); // строка секрета
   }
 }
 ```
+
+`ConfigView<typeof mailConfig>` — с версии 0.137.0. Имя секции должно быть строкой в самом вызове
+`defineConfig("mail", …)`: по нему codegen находит настройки. Прежняя форма с интерфейсом работает как раньше:
+`defineConfig<MailConfig>("mail", …)` и `ConfigView<MailConfig>`; она нужна, когда тип настроек описан отдельно,
+например общий для нескольких секций.
 
 Настройки, которые не принадлежат ни одному модулю, передают в
 `runApp(AppModule, { config: [appConfig] })`.

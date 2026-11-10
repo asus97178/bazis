@@ -9,6 +9,7 @@ import {
 } from "../../library/orm";
 import { HTTP_ERROR_MAPPER } from "../http/middlewareTokens";
 import { databaseHttpError } from "./databaseHttpError";
+import { contextEntities } from "./contextEntities";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
 import { IRepository } from "./repository";
 import { registerRepositories } from "./registerRepositories";
@@ -42,7 +43,12 @@ type ContextClass<TContext extends DbContext> = new (options: DbContextOptions, 
 export interface OrmModuleConfig<TContext extends DbContext> {
   /** Context class (a DbContext subclass). Omitted in the "connection" mode. */
   readonly context?: ContextClass<TContext>;
-  /** Entities mapped by this context. */
+  /**
+   * Entities of the context besides those of its sets: by default the context
+   * maps what it declares with `this.set(...)`. List here only an entity without
+   * a set, or every entity of a context whose constructor cannot run without its
+   * dependencies.
+   */
   readonly entities?: readonly EntityClass[];
   /**
    * Database provider value (`postgres(...)`). Without it the context connects
@@ -88,7 +94,7 @@ function defineFeatureOrmModule<TContext extends DbContext>(
     providers,
     exports: withRepositories ? [config.context, IRepository] : [config.context],
     configure: withRepositories
-      ? (di) => registerRepositories(di, config.context, config.entities ?? [])
+      ? (di) => registerRepositories(di, config.context, contextEntities(config))
       : undefined,
   };
 }
@@ -116,7 +122,7 @@ function defineConnectionModule(provider: DatabaseProvider, healthCheck: boolean
 /** Single ORM registration entry point (see {@link OrmModuleConfig}). */
 export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TContext>): BazisModuleRef {
   if (config.ownedStore !== undefined) {
-    if (!config.context || !config.entities || config.entities.length === 0) {
+    if (!config.context || contextEntities(config).length === 0) {
       throw new OrmError("ORM owned store requires a context and entities.");
     }
     if (config.provider) {
@@ -128,7 +134,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
     // Provider factories outlive this call. Keep their context/entity view
     // registration-local so a caller cannot mutate the descriptor afterwards
     // and silently change the runtime graph behind its owned receipt.
-    const buildConfig = Object.freeze({ ...config, context: config.context, entities: Object.freeze([...config.entities]) }) as OrmBuildConfig<TContext>;
+    const buildConfig = Object.freeze({ ...config, context: config.context, entities: Object.freeze([...contextEntities(config)]) }) as OrmBuildConfig<TContext>;
     const module = defineFeatureOrmModule(buildConfig, buildOrmModuleProviders(buildConfig, DATABASE_PROVIDER));
     attachOwnedStoreRegistration(module, buildConfig.context, buildConfig.entities ?? [], config.ownedStore);
     return module;
@@ -152,7 +158,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
     // may replace them with a container-local snapshot.
     const standaloneOptions = new DbContextOptions({
       provider: config.provider,
-      entities: config.entities ?? [],
+      entities: contextEntities(config),
       validateOnSave: config.validateOnSave,
       executionStrategy: config.executionStrategy,
     });
@@ -162,7 +168,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
       providers.push(buildOrmHealthCheck(config.provider));
     }
     const module = defineFeatureOrmModule(buildConfig, providers);
-    attachOrmGraphContribution(module, buildConfig.context, buildConfig.entities ?? [], config, registration);
+    attachOrmGraphContribution(module, buildConfig.context, contextEntities(buildConfig), config, registration);
     return module;
   }
 
@@ -178,7 +184,7 @@ export function ormModule<TContext extends DbContext>(config: OrmModuleConfig<TC
   const module = defineFeatureOrmModule(buildConfig, providers);
   // `registration` is deliberately per ormModule call, not a token or public
   // identity. It links this factory to its container-local graph snapshot.
-  attachOrmGraphContribution(module, buildConfig.context, buildConfig.entities ?? [], config, registration);
+  attachOrmGraphContribution(module, buildConfig.context, contextEntities(buildConfig), config, registration);
   return module;
 }
 

@@ -41,7 +41,7 @@ export class AppModule {}
 | `exports` | Что доступно модулям, которые импортируют этот | `[TaskService]` |
 | `config` | Объявления настроек модуля (`defineConfig`) — одно или массив | `taskConfig` |
 | `background` | Фоновые службы с управляемым запуском и остановкой | `[ReportScheduler]` |
-| `ormBazis` | Контекст базы данных и сущности модуля | `{ context: TaskDbContext, entities: [Task] }` |
+| `ormBazis` | Контекст базы данных модуля | `{ context: TaskDbContext }` |
 | `gateways` | WebSocket-шлюзы | `[ChatGateway]` |
 | `grpcControllers` | gRPC-контроллеры | `[TaskGrpcController]` |
 | `tools`, `agentToolHooks` | Инструменты агентов и хуки вокруг их вызовов | `[TaskSummaryTool]` |
