@@ -19,10 +19,10 @@ import { defaultAuthorizeChecks } from "./Authorization/metadata";
 import type { Router } from "./Routing/Router";
 import { parseRequestPath } from "./Routing/template";
 import { assertVersioningOptions, createVersionReader, type VersionReader } from "./Versioning/VersionReader";
-import { HTTP_ERROR_HOOK, ROUTE_MIDDLEWARE_COMPOSER, SERVER_MIDDLEWARE, sortByOrder } from "./middlewareTokens";
+import { HTTP_ERROR_HOOK, HTTP_ERROR_MAPPER, ROUTE_MIDDLEWARE_COMPOSER, SERVER_MIDDLEWARE, sortByOrder } from "./middlewareTokens";
 import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions, HttpServerOptions } from "./options";
 import { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
-import { HttpSetupError } from "./Errors/HttpError";
+import { HttpSetupError, type HttpError } from "./Errors/HttpError";
 import { clientAddress, trustedProxies, type TrustedProxies } from "./HttpContext/clientAddress";
 import { EN_HTTP_MESSAGES, formatMessage, languageHeaders, type HttpMessageKey, type MessageParams, type SelectedLanguage } from "./Errors/messages";
 import { getModelValidator, type ModelValidator } from "./Binding/modelValidator";
@@ -180,6 +180,7 @@ export class HttpServer implements HostedService {
         ...(this.options.languages ? { languages: this.options.languages } : {}),
         ...this.options.errorHandler,
         onUnexpectedError: this.collectErrorHook(),
+        map: this.collectErrorMapper(),
       }),
     );
     this.shortCircuitChain = [...serverChain];
@@ -329,6 +330,22 @@ export class HttpServer implements HostedService {
       for (const hook of hooks) {
         hook(ctx, error);
       }
+    };
+  }
+
+  /** Explicit `options.errorHandler.map` first, then DI {@link HTTP_ERROR_MAPPER} mappers; the first answer wins. */
+  private collectErrorMapper(): ((error: unknown) => HttpError | undefined) | undefined {
+    const explicit = this.options.errorHandler?.map;
+    const mappers = [...(explicit === undefined ? [] : [explicit]), ...this.resolver.resolveAll(HTTP_ERROR_MAPPER)];
+    if (mappers.length === 0) {
+      return undefined;
+    }
+    return (error) => {
+      for (const mapper of mappers) {
+        const mapped = mapper(error);
+        if (mapped !== undefined) return mapped;
+      }
+      return undefined;
     };
   }
 

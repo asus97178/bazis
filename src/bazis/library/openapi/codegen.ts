@@ -47,7 +47,7 @@ const ERROR_HELPER_STATUS: Readonly<Record<string, number>> = {
   BadRequest: 400, Unauthorized: 401, Forbidden: 403, NotFound: 404, Conflict: 409,
 };
 const ERROR_CLASS_STATUS: Readonly<Record<string, number>> = {
-  BadRequestError: 400, UnauthorizedError: 401, ForbiddenError: 403, NotFoundError: 404,
+  BadRequestError: 400, UnauthorizedError: 401, ForbiddenError: 403, NotFoundError: 404, ConflictError: 409,
   PayloadTooLargeError: 413, UnsupportedMediaTypeError: 415, TooManyRequestsError: 429,
 };
 const OPENAPI_EMPTY_TYPE_NAMES = new Set(["HttpResult", "Response", "Blob", "ReadableStream", "Uint8Array"]);

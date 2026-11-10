@@ -5,7 +5,8 @@ export class Project {
   @UUID()
   id = "";
 
-  @Index({ unique: true })
+  /** Two concurrent requests cannot both take a name: the index decides, and a taken one answers 409 with this text. */
+  @Index({ unique: true, conflict: "A project with this name already exists" })
   @Column({ type: "text" })
   name = "";
 

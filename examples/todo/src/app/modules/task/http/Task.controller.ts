@@ -1,4 +1,4 @@
-import { BadRequest, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "bazis/core/http";
+import { BadRequest, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Post, Put } from "bazis/core/http";
 import { buildListDocument } from "bazis/library/jsonapi";
 import { TaskListQuery } from "./contracts/TaskList.query";
 import { CreateTaskRequest, UpdateTaskRequest } from "./contracts/Task.requests";
@@ -14,10 +14,9 @@ export class TaskController {
     return buildListDocument(items, query, total, { basePath: ctx.path });
   }
 
-  @Get(":id(uuid)")
-  async getById(id: string) {
-    const item = await this.tasks.getById(id);
-    return item ? Ok(item) : NotFound({ error: `task ${id} not found` });
+  @Get(":id(uuid)", { nullAs: NotFound })
+  getById(id: string) {
+    return this.tasks.getById(id);
   }
 
   @Post()
@@ -28,15 +27,13 @@ export class TaskController {
       : BadRequest({ error: `project ${body.projectId} not found` });
   }
 
-  @Put(":id(uuid)")
-  async update(id: string, body: UpdateTaskRequest) {
-    const item = await this.tasks.update(id, body);
-    return item ? Ok(item) : NotFound({ error: `task ${id} not found` });
+  @Put(":id(uuid)", { nullAs: NotFound })
+  update(id: string, body: UpdateTaskRequest) {
+    return this.tasks.update(id, body);
   }
 
   @Delete(":id(uuid)")
   async delete(id: string) {
-    const removed = await this.tasks.delete(id);
-    return removed ? NoContent() : NotFound({ error: `task ${id} not found` });
+    return await this.tasks.delete(id) ? NoContent() : NotFound();
   }
 }

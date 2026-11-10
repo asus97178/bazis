@@ -2,6 +2,9 @@ import { errorMessage, InfraError, reader, requireValue, postgresConnectionOptio
 import { postgresAddress, serverVersion } from "../infra/connectors/postgres";
 import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
+import { singletonValue } from "../di";
+import { HTTP_ERROR_MAPPER } from "../http/middlewareTokens";
+import { databaseHttpError } from "./databaseHttpError";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
 
 /** Connect before the servers and ORM features: open the database before anyone asks for it. */
@@ -96,6 +99,9 @@ export function ormBazisConnect(
     token: DATABASE_PROVIDER,
     config,
     phase: DATABASE_PHASE,
+    // Database errors answer by their meaning (409, 404, 422, 503) without a setting in the application.
+    providers: [singletonValue(HTTP_ERROR_MAPPER, databaseHttpError)],
+    exports: [HTTP_ERROR_MAPPER],
     create(configs) {
       const c = reader(config, configs);
       target = `PostgreSQL at ${String(c.get("host"))}:${String(c.get("port"))} (database "${String(c.get("database"))}", user "${String(c.get("username"))}")`;

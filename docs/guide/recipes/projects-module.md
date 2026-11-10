@@ -188,7 +188,7 @@ export class ProjectsController {
 
   @Delete(":id(uuid)")
   async delete(id: string) {
-    return (await this.projects.delete(id)) ? NoContent() : NotFound({ error: `project ${id} not found` });
+    return (await this.projects.delete(id)) ? NoContent() : NotFound();
   }
 }
 ```

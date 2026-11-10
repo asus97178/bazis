@@ -18,10 +18,12 @@ export type { OpenApiDocsOptions } from "../../library/openapi";
 export { composeRouteMiddlewareComposers } from "./composeRouteMiddlewareComposers";
 export {
   HTTP_ERROR_HOOK,
+  HTTP_ERROR_MAPPER,
   ROUTE_MIDDLEWARE_COMPOSER,
   SERVER_MIDDLEWARE,
   sortByOrder,
   type HttpErrorHook,
+  type HttpErrorMapper,
   type RouteMiddlewareComposerRegistration,
   type ServerMiddlewareRegistration,
 } from "./middlewareTokens";
@@ -131,6 +133,7 @@ export type { ActionFilterHooks, HttpMiddleware } from "./Middleware/types";
 // Errors
 export {
   BadRequestError,
+  ConflictError,
   ForbiddenError,
   HttpError,
   HttpSetupError,

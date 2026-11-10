@@ -41,7 +41,6 @@ export class AppInfra {}
 ```ts
 // src/index.ts
 import { runApp } from "bazis/core/app";
-import { databaseErrorStatus } from "bazis/core/orm";
 import { AppModule } from "./app/modules/App.module";
 import { AppInfra } from "./app/infra/App.infra";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
@@ -53,13 +52,12 @@ await runApp(AppModule, {
     hostname: process.env.HOST ?? "127.0.0.1",
     port: Number(process.env.PORT ?? 3000),
     health: true,
-    errorHandler: { status: databaseErrorStatus },
   },
 });
 ```
 
 Секция `test` направляет тесты в отдельную базу `planner_test`.
-`databaseErrorStatus` превращает ошибки базы в понятные коды: нарушение
+Ошибки базы отвечают понятными кодами сами: нарушение
 уникальности — `409`, а не `500` ([Ошибки базы данных](../database/errors.md#http-статусы)).
 
 ## 2. Модель
@@ -314,7 +312,7 @@ export class TasksService implements ITasksService {
 
 ```ts
 // src/app/modules/tasks/http/Tasks.controller.ts
-import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
+import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 import { buildListDocument } from "bazis/library/jsonapi";
 import { TasksListQuery } from "./contracts/TasksList.query";
 import { CreateTaskRequest, UpdateTaskRequest } from "./contracts/Tasks.requests";
@@ -330,10 +328,9 @@ export class TasksController {
     return buildListDocument(items, query, total, { basePath: ctx.path });
   }
 
-  @Get(":id(uuid)")
-  async get(id: FromRoute<string>) {
-    const task = await this.tasks.get(id);
-    return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
+  @Get(":id(uuid)", { nullAs: NotFound })
+  get(id: FromRoute<string>) {
+    return this.tasks.get(id);
   }
 
   @Post()
@@ -342,21 +339,19 @@ export class TasksController {
     return Created(result);
   }
 
-  @Put(":id(uuid)")
-  async update(id: FromRoute<string>, body: FromBody<UpdateTaskRequest>) {
-    const task = await this.tasks.update(id, body);
-    return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
+  @Put(":id(uuid)", { nullAs: NotFound })
+  update(id: FromRoute<string>, body: FromBody<UpdateTaskRequest>) {
+    return this.tasks.update(id, body);
   }
 
-  @Post(":id(uuid)/complete")
-  async complete(id: FromRoute<string>) {
-    const task = await this.tasks.complete(id);
-    return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
+  @Post(":id(uuid)/complete", { nullAs: NotFound })
+  complete(id: FromRoute<string>) {
+    return this.tasks.complete(id);
   }
 
   @Delete(":id(uuid)")
   async delete(id: FromRoute<string>) {
-    return (await this.tasks.delete(id)) ? NoContent() : NotFound({ error: `task ${id} not found` });
+    return (await this.tasks.delete(id)) ? NoContent() : NotFound();
   }
 }
 ```
@@ -420,7 +415,7 @@ $ curl -X POST localhost:3000/tasks/e30652ec-…/complete
 $ curl -g 'localhost:3000/tasks?filter[done][eq]=true'           → Review PR
 $ curl -X PUT localhost:3000/tasks/e30652ec-… -d '{"priority":1}'  → 200, "priority":1
 $ curl -X DELETE localhost:3000/tasks/e30652ec-…                   → 204
-$ curl localhost:3000/tasks/e30652ec-…                             → 404 {"error":"task e30652ec-… not found"}
+$ curl localhost:3000/tasks/e30652ec-…                             → 404 {"error":"Not Found"}
 $ curl localhost:3000/tasks/not-a-uuid                             → 404 {"error":"Not Found"}
 ```
 

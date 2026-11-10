@@ -1,4 +1,5 @@
 import { createToken } from "../di";
+import type { HttpError } from "./Errors/HttpError";
 import type { HttpContext } from "./HttpContext/HttpContext";
 import type { HttpMiddleware } from "./Middleware/types";
 import type { RouteMiddlewareComposer } from "./options";
@@ -38,6 +39,17 @@ export type HttpErrorHook = (ctx: HttpContext, error: unknown) => void;
 
 /** Enumerable token: register any number of unexpected-error hooks. */
 export const HTTP_ERROR_HOOK = createToken<HttpErrorHook>("BazisHttpErrorHook");
+
+/**
+ * Turns a failure that is not an {@link HttpError} into one: a module that owns
+ * a kind of errors says how they answer. `undefined` leaves the error to the
+ * next mapper and then to 500. The ORM registers one for database errors.
+ * Collected via `resolveAll`.
+ */
+export type HttpErrorMapper = (error: unknown) => HttpError | undefined;
+
+/** Enumerable token: register any number of error mappers. */
+export const HTTP_ERROR_MAPPER = createToken<HttpErrorMapper>("BazisHttpErrorMapper");
 
 /** Stable order by `order ?? 0` (registration order preserved within a tier). */
 export function sortByOrder<T extends { readonly order?: number }>(items: readonly T[]): T[] {

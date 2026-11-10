@@ -249,8 +249,7 @@ export class AuthService {
 - **Неизвестный email и неверный пароль** отвечают одинаково, `401`: по
   ответу нельзя узнать, есть ли такой пользователь.
 - **Повторная регистрация** нарушает уникальный индекс `email`, и
-  `databaseErrorStatus` из [рецепта CRUD](crud-module.md#1-проект-и-база)
-  отвечает `409`.
+  приложение отвечает `409` ([Ошибки базы данных](../database/errors.md#занятое-значение)).
 - **`refresh`** проверяет refresh-токен и что пользователь ещё есть, и
   выдаёт новую пару. Вид токена берётся из базы, а не из старого токена:
   сменили роль — следующее обновление её учтёт.
@@ -512,20 +511,18 @@ $ curl localhost:3000/auth/me -H "authorization: Bearer $ANN"
 
 ## 10. Тест
 
-Приложению в тесте нужны те же опции, что в `src/index.ts`: без
-`errorHandler` дубликат email дал бы в тесте `500`, а не `409`. Общий
+Приложению в тесте нужны те же опции, что в `src/index.ts`. Общий
 помощник:
 
 ```ts
 // src/app/test/testApp.ts
-import { databaseErrorStatus } from "bazis/core/orm";
 import { startTestApp, type TestApp } from "bazis/core/testing";
 import { AppModule } from "../modules/App.module";
 import { AppInfra } from "../infra/App.infra";
 
 /** The application as src/index.ts starts it, on a free port and the test database. */
 export function startPlanner(): Promise<TestApp> {
-  return startTestApp(AppModule, { infra: AppInfra, http: { errorHandler: { status: databaseErrorStatus } } });
+  return startTestApp(AppModule, { infra: AppInfra });
 }
 ```
 

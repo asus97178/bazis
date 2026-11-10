@@ -45,7 +45,12 @@ test.skipIf(!enabled)("projects, tasks and the report work together", async () =
   const created = await send("POST", "/projects", { name });
   expect(created.status).toBe(201);
   const project = await json<Item>(created);
-  expect((await send("POST", "/projects", { name })).status).toBe(409);
+  const taken = await send("POST", "/projects", { name });
+  expect(taken.status).toBe(409);
+  expect(await taken.json()).toEqual({ error: "A project with this name already exists", details: { code: "unique", fields: ["name"] } });
+  const missing = await send("GET", `/projects/${crypto.randomUUID()}`);
+  expect(missing.status).toBe(404);
+  expect(await missing.json()).toEqual({ error: "Not Found" });
 
   // The unique index decides under concurrency: exactly one request wins.
   const racing = `Race ${crypto.randomUUID()}`;

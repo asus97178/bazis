@@ -1,6 +1,6 @@
 import { KernelError } from "../../kernel";
 import type { ModelValidationIssue } from "../Binding/modelValidator";
-import { englishHttpMessage, type HttpMessageKey, type LocalizedMessage, type MessageParams } from "./messages";
+import { englishHttpMessage, STATUS_MESSAGE_KEYS, type HttpMessageKey, type LocalizedMessage, type MessageParams } from "./messages";
 
 /**
  * Base class for errors that map directly to an HTTP response.
@@ -56,6 +56,14 @@ export class NotFoundError extends HttpError {
   constructor(message?: string, details?: unknown) {
     const [text, localized] = textOf(message, "notFound");
     super(404, text, details, localized);
+  }
+}
+
+/** The request conflicts with what is stored: the name is taken, the record changed meanwhile. */
+export class ConflictError extends HttpError {
+  constructor(message?: string, details?: unknown) {
+    const [text, localized] = textOf(message, "conflict");
+    super(409, text, details, localized);
   }
 }
 
@@ -116,3 +124,9 @@ export function frameworkBadRequest(key: HttpMessageKey, params?: MessageParams,
  * KernelError: the start reports it as a configuration error of the code.
  */
 export class HttpSetupError extends KernelError {}
+
+/** An error of a status with the framework text for it, translated at the response: what an empty result helper stands for. */
+export function httpErrorOfStatus(status: number): HttpError {
+  const key = STATUS_MESSAGE_KEYS[status] ?? (status >= 500 ? "serverError" : "clientError");
+  return new HttpError(status, englishHttpMessage(key), undefined, { key });
+}

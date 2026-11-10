@@ -1,5 +1,6 @@
 import type { Class } from "../../di";
 import type { ActionFilterHooks, HttpMiddleware } from "../Middleware/types";
+import type { HttpResult } from "../Results/HttpResult";
 
 // Same one-line polyfill as the validation module: Bun executes TC39
 // decorators natively, Symbol.metadata may be missing in the runtime.
@@ -26,6 +27,8 @@ export interface CatchDeclaration {
 export interface ActionMeta {
   routes: RouteDeclaration[];
   httpCode?: number;
+  /** `nullAs` of the route options: the result that stands for `null`. */
+  nullAs?: () => HttpResult;
   produces?: string;
   consumes?: string;
   version?: string;
