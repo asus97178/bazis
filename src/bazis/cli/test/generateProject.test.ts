@@ -49,7 +49,7 @@ describe("new project", () => {
     const outputPath = path.join(root, "hello-app");
     const options = { name: "HelloApp", outputPath, frameworkPath, vendor: true };
     const planned = await generateProject({ ...options, dryRun: true });
-    expect(planned.files).toHaveLength(11);
+    expect(planned.files).toHaveLength(12);
     expect(await readdir(root)).toEqual([]);
     const result = await generateProject(options);
     expect(result.projectDir).toBe(await realpath(outputPath));
