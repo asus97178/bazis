@@ -1,4 +1,4 @@
-import { defineTool, ToolError, type AgentToolExecutionContext, type DefinedTool, type ToolSet } from "../../agent";
+import { defineTool, ToolError, type AgentToolExecutionContext, type DefinedTool } from "../../agent";
 import type { Class } from "../../di";
 import { ModelBuilder, type DbContext, type DbSet, type EntityModel, type FieldSelector, type Operand, type Predicate, type PropertyModel } from "../../orm";
 
@@ -26,6 +26,33 @@ export interface OrmEntityToolsOptions<Op extends OrmEntityOperation = OrmEntity
   /** The most records one `update` or `delete` touches, or it is refused with `too_many_records`; 100 by default. */
   readonly maxChanges?: number;
 }
+
+/** A filter of records: field → a value to equal, or `{ eq, ne, gt, gte, lt, lte, in, nin, contains, startsWith, isNull }`. */
+export type OrmEntityWhere = Readonly<Record<string, unknown>>;
+
+/** What each Tool takes, as a step of a process maps it. */
+export interface OrmEntityToolInputs {
+  readonly find: {
+    readonly where?: OrmEntityWhere;
+    readonly sort?: readonly { readonly field: string; readonly dir?: "asc" | "desc" }[];
+    readonly limit?: number;
+    readonly offset?: number;
+  };
+  readonly create: { readonly values: Readonly<Record<string, unknown>> };
+  readonly update: { readonly where: OrmEntityWhere; readonly values: Readonly<Record<string, unknown>> };
+  readonly delete: { readonly where: OrmEntityWhere };
+}
+
+/** What each Tool gives back; a trial run adds `dryRun: true` to what would have changed. */
+export interface OrmEntityToolOutputs {
+  readonly find: { readonly items: readonly Readonly<Record<string, unknown>>[]; readonly total: number };
+  readonly create: { readonly item: Readonly<Record<string, unknown>>; readonly dryRun?: boolean };
+  readonly update: { readonly updated: number; readonly dryRun?: boolean };
+  readonly delete: { readonly deleted: number; readonly dryRun?: boolean };
+}
+
+/** The Tools of the listed operations, by operation: `orderTools.find`. */
+export type OrmEntityToolSet<Op extends OrmEntityOperation = OrmEntityOperation> = { readonly [P in Op]: DefinedTool<OrmEntityToolInputs[P], OrmEntityToolOutputs[P]> };
 
 /** What the reference kinds `orm.entity` and `orm.field` read about a made Tool. */
 export interface OrmEntityToolInfo {
@@ -78,7 +105,7 @@ type Run = (set: DbSet<object>, input: Json, context: AgentToolExecutionContext,
  * serviceTask({ tool: orderTools.find, input: { where: { status: "new" } } })
  * ```
  */
-export function ormEntityTools<const Op extends OrmEntityOperation>(entity: EntityClass<object>, options: OrmEntityToolsOptions<Op>): ToolSet<Op> {
+export function ormEntityTools<const Op extends OrmEntityOperation>(entity: EntityClass<object>, options: OrmEntityToolsOptions<Op>): OrmEntityToolSet<Op> {
   const model = ModelBuilder.build(entity);
   const name = options.name ?? entity.name.replace(/(?<=[a-z0-9])[A-Z]/g, (letter) => `-${letter}`).toLowerCase();
   const fail = (problem: string) => new TypeError(`ormEntityTools(${entity.name}): ${problem}`);
@@ -110,7 +137,7 @@ export function ormEntityTools<const Op extends OrmEntityOperation>(entity: Enti
     if (!Object.hasOwn(OPERATIONS, op)) throw fail(`unknown operation ${JSON.stringify(op)}`);
     tools[op] = madeTool(spec, op, callers);
   }
-  return Object.freeze(tools) as ToolSet<Op>;
+  return Object.freeze(tools) as OrmEntityToolSet<Op>;
 }
 
 function limit(value: number | undefined, fallback: number, max: number, fail: (problem: string) => Error, name: string): number {

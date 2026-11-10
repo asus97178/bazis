@@ -2,6 +2,8 @@ import { expect, setDefaultTimeout, test } from "bun:test";
 import { IWorkflowRuntime } from "bazis/core/workflow";
 import { testWorkflow, type TestWorkflow } from "bazis/core/workflow/testing";
 import { OrdersApp } from "../App";
+import { orderApproval } from "../modules/order/process/OrderApproval.process";
+import { orderBatch } from "../modules/order/process/OrderBatch.process";
 import { IOrderService } from "../modules/order/services/IOrder.service";
 
 setDefaultTimeout(30_000);
@@ -66,7 +68,7 @@ test.skipIf(!enabled)("a batch calls the approval of each order and gives back t
     const small = await place(wf, 100);
     const big = await place(wf, 5000);
     await wf.drain();
-    const batch = await wf.start("order-batch", { input: { orders: [{ orderId: small, amount: 100 }, { orderId: big, amount: 5000 }] } });
+    const batch = await wf.start(orderBatch, { input: { orders: [{ orderId: small, amount: 100 }, { orderId: big, amount: 5000 }] } });
     await wf.drain();
     expect((await wf.instance(batch.id)).status).toBe("running");
 
@@ -125,7 +127,7 @@ test.skipIf(!enabled)("a trial of the approval changes no order and asks only wh
   await run(async (wf) => {
     const id = await place(wf, 5000);
     await wf.drain();
-    const trial = await wf.start("order-approval", { test: true, input: { orderId: id, amount: 100 }, actor: { kind: "user", id: "ann" } });
+    const trial = await wf.start(orderApproval, { test: true, input: { orderId: id, amount: 100 }, actor: { kind: "user", id: "ann" } });
     await wf.drain();
     const done = await wf.instance(trial.id);
     expect(done).toMatchObject({ status: "completed", test: true });

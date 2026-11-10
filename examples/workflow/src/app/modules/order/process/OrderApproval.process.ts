@@ -1,4 +1,5 @@
 import { defineProcess } from "bazis/core/workflow";
+import { SetOrderStatusTool } from "../tools/SetOrderStatus.tool";
 
 /**
  * A small order is approved at once; a manager decides on a big one within two
@@ -35,9 +36,9 @@ export const orderApproval = defineProcess({
       Late: { kind: "boundaryTimer", title: { en: "Two days", ru: "Два дня" }, attachedTo: "Review", config: { duration: "P2D" } },
       Decision: { kind: "exclusiveGateway", title: { en: "Approved?", ru: "Согласован?" } },
       Approved: { kind: "assign", title: { en: "Approved", ru: "Согласован" }, config: { assignments: [{ var: "decision", value: "approved" }] } },
-      Approve: { kind: "serviceTask", title: { en: "Approve", ru: "Подтвердить" }, config: { tool: "orders.set-status", input: { orderId: "$input.orderId", status: "approved" } } },
+      Approve: { kind: "serviceTask", title: { en: "Approve", ru: "Подтвердить" }, config: { tool: SetOrderStatusTool, input: { orderId: "$input.orderId", status: "approved" } } },
       Rejected: { kind: "assign", title: { en: "Rejected", ru: "Отклонён" }, config: { assignments: [{ var: "decision", value: "rejected" }] } },
-      Reject: { kind: "serviceTask", title: { en: "Reject", ru: "Отклонить" }, config: { tool: "orders.set-status", input: { orderId: "$input.orderId", status: "rejected" } } },
+      Reject: { kind: "serviceTask", title: { en: "Reject", ru: "Отклонить" }, config: { tool: SetOrderStatusTool, input: { orderId: "$input.orderId", status: "rejected" } } },
       End: { kind: "end", title: { en: "End", ru: "Конец" } },
     },
     flows: {

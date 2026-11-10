@@ -11,7 +11,20 @@ import type { tasksPermissions } from "./tasks_module/access/Tasks.permissions";
 import "./generated/deps";
 
 export { WorkflowModule } from "./Workflow.module";
-export { defineProcess, type CodeProcess, type ProcessDefinition } from "./definitions_module/code/defineProcess";
+export {
+  defineProcess,
+  type CodeNodeConfigs,
+  type CodeProcess,
+  type CodeProcessDocument,
+  type CodeProcessNode,
+  type CodeProcessSettings,
+  type ProcessDefinition,
+  type ProcessInput,
+  type ProcessOutput,
+  type ProcessRef,
+  type ToolClass,
+  type ToolRef,
+} from "./definitions_module/code/defineProcess";
 export { WorkflowSetupError } from "./definitions_module/code/codeProcesses";
 export { WorkflowClock, SystemWorkflowClock } from "./contracts/WorkflowClock";
 export { WorkflowDefinitionsModule } from "./definitions_module/WorkflowDefinitions.module";

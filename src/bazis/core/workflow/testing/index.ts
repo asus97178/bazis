@@ -4,6 +4,7 @@ import { startTestApp, type TestApp, type TestAppOptions } from "../../testing";
 import { postgres } from "../../../library/orm";
 import { durationMs } from "../../../library/workflow";
 import { WorkflowClock } from "../contracts/WorkflowClock";
+import type { CodeProcess } from "../definitions_module/code/defineProcess";
 import type { WorkflowActor } from "../contracts/types";
 import { WorkflowJobs } from "../runtime_module/internal/WorkflowJobs";
 import { IWorkflowRuntime, type EmitOptions, type EmitResult, type HistoryEntry, type InstanceDetails, type StartInstance } from "../runtime_module/services/IWorkflowRuntime.service";
@@ -58,7 +59,11 @@ export interface TestWorkflow {
   readonly app: TestApp;
   readonly clock: ManualWorkflowClock;
   now(): Date;
-  /** Starts the latest version of a process from its manual start; jobs wait for {@link drain}. */
+  /**
+   * Starts the latest version of a process from its manual start; jobs wait for {@link drain}.
+   * Given the `defineProcess` result, the input is checked by its variables.
+   */
+  start<Input>(process: CodeProcess<Input, unknown>, options?: Partial<StartInstance<Input>>): Promise<InstanceDetails>;
   start(processKey: string, options?: Partial<StartInstance>): Promise<InstanceDetails>;
   emit(eventKey: string, payload?: unknown, options?: EmitOptions): Promise<EmitResult>;
   /** Completes the user task waiting at `nodeId` (through its task when the Tasks part is there). */
@@ -132,7 +137,7 @@ export async function testWorkflow(root: Parameters<typeof startTestApp>[0], opt
     app,
     clock,
     now: () => clock.now(),
-    start: (processKey, start = {}) => inScope((scope) => scope.resolve(IWorkflowRuntime).start(processKey, { ...start, actor: start.actor ?? actor })),
+    start: (process: string | CodeProcess<unknown, unknown>, start: Partial<StartInstance> = {}) => inScope((scope) => scope.resolve(IWorkflowRuntime).start(typeof process === "string" ? process : process.key, { ...start, actor: start.actor ?? actor })),
     emit: (eventKey, payload, emitOptions = {}) => inScope((scope) => scope.resolve(IWorkflowRuntime).emit(eventKey, payload, { ...emitOptions, actor: emitOptions.actor ?? actor })),
     complete: (instanceId, nodeId, output = {}, by = actor) => inScope(async (scope) => {
       const runtime = scope.resolve(IWorkflowRuntime);

@@ -3,6 +3,7 @@ import { Module } from "@/core/di";
 import { createTestContainer } from "@/core/testing";
 import { defineProcess, WorkflowSetupError } from "@/core/workflow";
 import { ManualWorkflowClock } from "@/core/workflow/testing";
+import type { ProcessDocument } from "@/library/workflow";
 
 const simple = (key: string) => defineProcess({
   key,
@@ -34,7 +35,8 @@ test("a document with errors stops the build with the module, the key and every 
   const broken = defineProcess({
     key: "Bad Key",
     title: "",
-    document: { schemaVersion: "bazis.workflow/v2", nodes: { Start: { kind: "manualStart", title: "Start" } }, flows: { f: { source: "Start", target: "Nowhere" } } },
+    // Written as a literal, the missing node is a compile error; a document that came as data is checked here.
+    document: { schemaVersion: "bazis.workflow/v2", nodes: { Start: { kind: "manualStart", title: "Start" } }, flows: { f: { source: "Start", target: "Nowhere" } } } as ProcessDocument,
   });
   @Module({ processes: [broken] }) class OrdersModule {}
   const error = await buildError(OrdersModule);
