@@ -7,6 +7,8 @@ import {
   type DbContextOptionsConfig,
   type Migration,
 } from "../../library/orm";
+import { HTTP_ERROR_MAPPER } from "../http/middlewareTokens";
+import { databaseHttpError } from "./databaseHttpError";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
 import { IRepository } from "./repository";
 import { registerRepositories } from "./registerRepositories";
@@ -94,6 +96,8 @@ function defineFeatureOrmModule<TContext extends DbContext>(
 function defineConnectionModule(provider: DatabaseProvider, healthCheck: boolean): BazisModuleRef {
   const providers: ProviderDefinition[] = [
     singletonValue(DATABASE_PROVIDER, provider),
+    // Database errors answer by their meaning (409, 404, 422, 503) without a setting in the application.
+    singletonValue(HTTP_ERROR_MAPPER, databaseHttpError),
     DI.singleton(
       DI.factoryProvider(
         HOSTED_SERVICE,

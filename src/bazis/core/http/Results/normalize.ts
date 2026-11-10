@@ -1,4 +1,5 @@
 import type { HttpContext } from "../HttpContext/HttpContext";
+import { httpErrorOfStatus } from "../Errors/HttpError";
 import { HttpResult } from "./HttpResult";
 
 /** Per-action response defaults coming from decorators. */
@@ -7,6 +8,8 @@ export interface ResponseDefaults {
   httpCode?: number;
   /** `@Produces(...)` value. */
   produces?: string;
+  /** `nullAs` of the route: the result that stands for `null` and `undefined`. */
+  nullAs?: () => HttpResult;
   /**
    * Address of a created item for an automatic `Location` header: given the
    * `id` of a 201 body, returns the address or `undefined` when the
@@ -44,7 +47,7 @@ function isBinaryBody(body: unknown): body is Blob | Uint8Array | ArrayBuffer | 
  * - `string` — text/plain (unless `@Produces` says otherwise);
  * - `Blob`/bytes/stream — binary passthrough;
  * - any other object/array/number/boolean — JSON;
- * - `undefined`/`null` — empty body, 204 (or `@HttpCode`).
+ * - `undefined`/`null` — empty body, 204 (or `@HttpCode`), unless the route says `nullAs`.
  *
  * Status priority: result helper > `@HttpCode` > `ctx.res.status(...)` > default.
  * Headers from `ctx.res.header(...)` are merged into every non-raw response.
@@ -55,6 +58,12 @@ function isBinaryBody(body: unknown): body is Blob | Uint8Array | ArrayBuffer | 
 export function normalizeResult(result: unknown, ctx: HttpContext, defaults: ResponseDefaults): Response {
   if (result instanceof Response) {
     return result;
+  }
+  if ((result === null || result === undefined) && defaults.nullAs !== undefined) {
+    const instead = defaults.nullAs();
+    // An error goes through the error handler: the standard body, in the language of the request.
+    if (instead.status >= 400) throw httpErrorOfStatus(instead.status);
+    result = instead;
   }
 
   const builderStatus = ctx.res.statusOverride;

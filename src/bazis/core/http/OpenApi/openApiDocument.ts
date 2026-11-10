@@ -175,7 +175,7 @@ function createOperation(input: CreateOperationInput): OpenApiCatalogOperation {
             },
           }
         : { description: "Success" },
-      ...errorResponses(errorStatuses(input.bindings, authorized, generatedOperation?.errors)),
+      ...errorResponses(errorStatuses(input.bindings, authorized, generatedOperation?.errors, input.action)),
     },
     authorized,
     ...(version !== undefined ? { versions: [version] } : {}),
@@ -415,15 +415,19 @@ function successStatus(method: string, action: ActionMeta, generated: number | u
 /**
  * Errors the operation can answer with: 400 when the request carries values
  * that are converted or validated (body, list query, query and header values
- * and models, typed route parameters), 401/403 under @Authorize, and the
- * errors the method body returns or throws itself.
+ * and models, typed route parameters), 401/403 under @Authorize, the status of
+ * `nullAs`, and the errors the method body returns or throws itself.
  */
 function errorStatuses(
   bindings: readonly ParameterBinding[],
   authorized: boolean,
   generated: readonly number[] | undefined,
+  action: ActionMeta,
 ): number[] {
   const statuses = new Set(generated ?? []);
+  // `nullAs: NotFound` is an answer of the route the method body does not show.
+  const instead = action.nullAs?.().status;
+  if (instead !== undefined && instead >= 400) statuses.add(instead);
   const validated = bindings.some((binding) =>
     binding.source === "body" || binding.source === "list" || binding.source === "query" || binding.source === "header"
     || binding.source === "queryModel" || binding.source === "headerModel"

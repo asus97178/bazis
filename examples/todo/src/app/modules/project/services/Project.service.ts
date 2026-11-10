@@ -1,4 +1,4 @@
-import { paginate, UniqueViolationError, type PageResult } from "bazis/core/orm";
+import { paginate, type PageResult } from "bazis/core/orm";
 import type { ListQuery } from "bazis/library/jsonapi";
 import type { CreateProjectRequest, UpdateProjectRequest } from "../http/contracts/Project.requests";
 import { toProjectResponse, type ProjectResponse } from "../http/contracts/Project.responses";
@@ -23,13 +23,14 @@ export class ProjectService implements IProjectService {
     return this.db.projects.count();
   }
 
-  async create(body: CreateProjectRequest): Promise<ProjectResponse | "conflict"> {
+  async create(body: CreateProjectRequest): Promise<ProjectResponse> {
     const item = Object.assign(new Project(), { name: body.name });
     this.db.projects.add(item);
-    return await this.save() ? toProjectResponse(item) : "conflict";
+    await this.db.saveChanges();
+    return toProjectResponse(item);
   }
 
-  async update(id: string, body: UpdateProjectRequest): Promise<ProjectResponse | "conflict" | null> {
+  async update(id: string, body: UpdateProjectRequest): Promise<ProjectResponse | null> {
     const item = await this.db.projects.find(id);
     if (!item) {
       return null;
@@ -37,7 +38,8 @@ export class ProjectService implements IProjectService {
     if (body.name !== undefined) {
       item.name = body.name;
     }
-    return await this.save() ? toProjectResponse(item) : "conflict";
+    await this.db.saveChanges();
+    return toProjectResponse(item);
   }
 
   async delete(id: string): Promise<boolean> {
@@ -48,21 +50,5 @@ export class ProjectService implements IProjectService {
     this.db.projects.remove(item);
     await this.db.saveChanges();
     return true;
-  }
-
-  /**
-   * The unique index on `name` decides, so two concurrent requests cannot
-   * both win. False when it rejected the change.
-   */
-  private async save(): Promise<boolean> {
-    try {
-      await this.db.saveChanges();
-      return true;
-    } catch (error) {
-      if (error instanceof UniqueViolationError) {
-        return false;
-      }
-      throw error;
-    }
   }
 }

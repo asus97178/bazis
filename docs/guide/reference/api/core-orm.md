@@ -79,7 +79,8 @@ ORM: сущности, контекст, запросы, сохранение, �
 | Экспорт | Что это |
 | --- | --- |
 | `translateDatabaseError(error)` | Ошибка драйвера с известным SQLSTATE → класс ORM |
-| `databaseErrorStatus(error)` | HTTP-статус ошибки базы для `errorHandler.status`: 409, 422, 404, 503 |
+| `databaseErrorStatus(error)` | HTTP-статус ошибки базы: 409, 422, 404, 503. Приложение применяет его само |
+| `databaseHttpError(error)` | Ошибка базы как `HttpError`: статус, а для занятого значения текст `conflict` и свойства индекса. Зарегистрирована как `HTTP_ERROR_MAPPER` |
 
 Классы: `OrmError`, `DbUpdateError`, `UniqueViolationError`,
 `ForeignKeyViolationError`, `CheckViolationError`, `NotNullViolationError`,

@@ -24,10 +24,9 @@
 ```ts
 import { Created, NoContent, NotFound, Ok, Redirect, StatusCode } from "bazis/core/http";
 
-@Get(":id")
-async getById(id: string) {
-  const task = await this.tasks.getById(id);
-  return task ? Ok(task) : NotFound({ error: `task ${id} not found` });
+@Delete(":id")
+async delete(id: string) {
+  return (await this.tasks.delete(id)) ? NoContent() : NotFound();
 }
 
 @Post()
@@ -50,6 +49,25 @@ async create(body: CreateTaskRequest) {
 | `Redirect(url, permanent?)` | 302, или 301 при `permanent = true` |
 | `StatusCode(code, body?)` | Любой код |
 | `File(path \| Blob \| Uint8Array, contentType?)` | 200, файл или байты |
+
+
+## `null` как 404
+
+Метод, который ищет запись, обычно возвращает её или `null`. Что значит `null`, говорит маршрут:
+
+```ts
+@Get(":id(uuid)", { nullAs: NotFound })
+getById(id: string) {
+  return this.tasks.getById(id);   // запись → 200, null → 404 {"error":"Not Found"}
+}
+```
+
+- `nullAs` принимает помощник ответа без аргументов: `NotFound`, `NoContent`.
+- Ответ с ошибкой идёт через общий обработчик: стандартное тело, на языке запроса.
+- Статус попадает в OpenAPI.
+- Без `nullAs` `null` и `undefined` дают `204`, как и раньше.
+
+Опция — с версии 0.137.0.
 
 ## `Location` для 201
 

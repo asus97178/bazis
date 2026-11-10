@@ -48,8 +48,8 @@
 - [ ] **`/health` включён для оркестратора** — `http: { health: true }`.
   `exposeDetails` — только если адрес закрыт снаружи
   ([Health checks](../fundamentals/health-checks.md#подробности)).
-- [ ] **Ответы на ошибки БД — по смыслу**, а не `500`:
-  `errorHandler: { status: databaseErrorStatus }`
+- [ ] **Ответы на ошибки БД — по смыслу**, а не `500`: с версии 0.137.0 это
+  так без настройки; текст для занятого значения задаёт `conflict` индекса
   ([Ошибки базы данных](../database/errors.md#http-статусы)).
 
 ## HTTP

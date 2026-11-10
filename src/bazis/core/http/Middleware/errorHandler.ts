@@ -29,6 +29,12 @@ export interface ErrorHandlerOptions {
    */
   status?: (error: unknown) => number | undefined;
   /**
+   * Turns a non-{@link HttpError} failure into an HttpError, with its own text
+   * and details; `HTTP_ERROR_MAPPER` registrations are merged in. Asked before
+   * {@link status}. A mapped 5xx is still logged as unexpected.
+   */
+  map?: (error: unknown) => HttpError | undefined;
+  /**
    * Logger for unexpected errors when {@link logError} is absent: one `error`
    * line with the method, path, request id and the redacted error. The server
    * passes the application `LOGGER`; without either, `console.error` is used.
@@ -114,7 +120,16 @@ export function errorHandler(options: ErrorHandlerOptions = {}): HttpMiddleware 
   return async (ctx, next) => {
     try {
       await next();
-    } catch (error) {
+    } catch (thrown) {
+      let error = thrown;
+      if (!(thrown instanceof HttpError) && options.map !== undefined) {
+        let mapped: HttpError | undefined;
+        try { mapped = options.map(thrown); } catch { mapped = undefined; }
+        if (mapped instanceof HttpError) {
+          if (mapped.status >= 500) safelyReportUnexpected(options, log, ctx, thrown);
+          error = mapped;
+        }
+      }
       const selected = options.languages?.select(ctx.header("accept-language"));
       const text = textRenderer(selected?.localize);
       const language = languageHeaders(options.languages, selected);

@@ -39,7 +39,7 @@ Sequence contains no elements for entity "Product".
 ```
 
 `first()` не нашёл строку. Если строки может не быть —
-`firstOrDefault()`. С `databaseErrorStatus` — `404`.
+`firstOrDefault()`. Над HTTP — `404`.
 
 ### `EntityNotMappedError`
 

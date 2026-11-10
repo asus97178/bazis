@@ -17,7 +17,6 @@
 // src/index.ts
 import { runApp } from "bazis/core/app";
 import { argsSource, envSource, secretFilesSource } from "bazis/core/kernel";
-import { databaseErrorStatus } from "bazis/core/orm";
 import { AppModule } from "./app/modules/App.module";
 import { AppInfra } from "./app/infra/App.infra";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
@@ -31,7 +30,6 @@ await runApp(AppModule, {
     health: true,                                  // /health для оркестратора
     accessLog: true,                               // строка на каждый запрос
     securityHeaders: { hsts: true },               // TLS — на прокси перед приложением
-    errorHandler: { status: databaseErrorStatus }, // 409/422/404/503 вместо 500
   },
   kernel: { startupReport: true },                 // строка о старте и в production
   configure: (kernel) => kernel
@@ -47,7 +45,6 @@ await runApp(AppModule, {
 | `health: true` | Оркестратор знает, что приложение готово | [Плавная остановка и health](graceful-shutdown.md) |
 | `accessLog: true` | Запросы видны в журнале | [Журнал запросов](../fundamentals/logging.md#журнал-запросов) |
 | `securityHeaders: { hsts: true }` | Браузер ходит только по HTTPS | [Чек-лист](../security/production-checklist.md#http) |
-| `errorHandler.status` | Нарушение уникальности — `409`, а не `500` | [Ошибки базы данных](../database/errors.md#http-статусы) |
 | `startupReport: true` | В журнале видно, что приложение запустилось | [ниже](#журнал) |
 | `secretFilesSource` | Секреты Docker и Kubernetes из файлов | [Файлы секретов](../security/secrets.md#файлы-секретов) |
 

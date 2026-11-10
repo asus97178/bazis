@@ -7,9 +7,9 @@ export abstract class IProjectService {
   abstract getAll(query: ListQuery): Promise<PageResult<ProjectResponse>>;
   abstract getById(id: string): Promise<ProjectResponse | null>;
   abstract count(): Promise<number>;
-  /** `"conflict"` when another project already has this name. */
-  abstract create(body: CreateProjectRequest): Promise<ProjectResponse | "conflict">;
-  /** Null when not found; `"conflict"` when another project already has the new name. */
-  abstract update(id: string, body: UpdateProjectRequest): Promise<ProjectResponse | "conflict" | null>;
+  /** A name another project has is refused by the unique index: `UniqueViolationError`, 409 over HTTP. */
+  abstract create(body: CreateProjectRequest): Promise<ProjectResponse>;
+  /** Null when not found. */
+  abstract update(id: string, body: UpdateProjectRequest): Promise<ProjectResponse | null>;
   abstract delete(id: string): Promise<boolean>;
 }
