@@ -26,7 +26,10 @@ export class WorkflowJobs {
     private readonly report: JobFailureReport,
   ) {}
 
-  /** Takes up to `batchSize` due jobs with `FOR UPDATE SKIP LOCKED` and a lease, so instances never take one job twice. */
+  /**
+   * Takes up to `batchSize` due jobs with `FOR UPDATE SKIP LOCKED` and a lease, so
+   * instances never take one job twice. {@link run} renews the lease of each as it starts.
+   */
   async claim(batchSize: number): Promise<WfJob[]> {
     const scope = this.services.createScope();
     try {
@@ -51,7 +54,46 @@ export class WorkflowJobs {
     }
   }
 
+  /**
+   * The lease of a claimed job starts when the job does: a batch runs one job after
+   * another, and a job that waited for the ones before it longer than a lease may
+   * have been taken by another worker. `false` then: the job is not this worker's.
+   */
+  private async begin(job: WfJob): Promise<boolean> {
+    const scope = this.services.createScope();
+    try {
+      const db = scope.resolve(RuntimeDbContext);
+      const lockedUntil = new Date(scope.resolve(WorkflowClock).now().getTime() + LEASE_MS);
+      const held = job.lockedUntil;
+      const { affectedRows } = await db.jobs.asNoTracking()
+        .where((j) => j.id.eq(job.id).and(held === null ? j.lockedUntil.isNull() : j.lockedUntil.eq(held)))
+        .executeUpdate({ lockedUntil });
+      if (affectedRows === 0) return false;
+      job.lockedUntil = lockedUntil;
+      return true;
+    } finally {
+      await scope.dispose();
+    }
+  }
+
+  /** Gives back claimed jobs that will not run, a stopping worker's: they are free at once, and the claim does not count as an attempt. */
+  async release(jobs: readonly WfJob[]): Promise<void> {
+    if (jobs.length === 0) return;
+    const scope = this.services.createScope();
+    try {
+      const db = scope.resolve(RuntimeDbContext);
+      for (const job of jobs) {
+        const held = job.lockedUntil;
+        if (held === null) continue;
+        await db.jobs.asNoTracking().where((j) => j.id.eq(job.id).and(j.lockedUntil.eq(held))).executeUpdate({ lockedUntil: null, attempts: Math.max(job.attempts - 1, 0) });
+      }
+    } finally {
+      await scope.dispose();
+    }
+  }
+
   async run(job: WfJob, signal: AbortSignal): Promise<void> {
+    if (!await this.begin(job).catch((error: unknown) => { this.report("job could not begin", error, { job: job.id }); return false; })) return;
     const scope = this.services.createScope();
     try {
       switch (job.kind) {

@@ -19,6 +19,7 @@ import type { CodeProcessCatalog } from "../code/CodeProcessCatalog";
 import type { OwnedCodeProcess } from "../code/codeProcesses";
 import { WORKFLOW_PROCESS_CHANGED, type ProcessChange } from "../events/Definitions.events";
 import type { DefinitionsDbContext } from "../model/Definitions.dbContext";
+import type { PublishedVersions } from "../internal/PublishedVersions";
 import { WfProcess } from "../model/WfProcess.model";
 import { WfVersion } from "../model/WfVersion.model";
 import {
@@ -52,6 +53,7 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
     private readonly events: WorkflowEvents,
     private readonly languages: WorkflowLanguages,
     private readonly references: WorkflowReferences,
+    private readonly publishedVersions: PublishedVersions,
     /** The scope: the port is asked here, so that the application's own registration replaces the default. */
     private readonly services: ServiceProvider,
   ) {
@@ -351,13 +353,21 @@ export class WorkflowDefinitions extends IWorkflowDefinitions {
   }
 
   async published(): Promise<readonly VersionDetails[]> {
-    const processes = await this.db.processes.asNoTracking().where((p) => p.archivedAt.isNull().and(p.latestVersion.isNotNull())).toList();
-    if (processes.length === 0) return [];
-    const byId = new Map(processes.map((process) => [process.id, process]));
-    const versions = await this.db.versions.asNoTracking().where((v) => v.processId.in([...byId.keys()])).toList();
-    return versions
-      .filter((version) => byId.get(version.processId)?.latestVersion === version.version)
-      .map((version) => versionOf(byId.get(version.processId)!.key, version));
+    // Without the drafts and documents: this runs on every event and every firing of a schedule.
+    const rows = await this.db.processes.asNoTracking()
+      .where((p) => p.archivedAt.isNull().and(p.latestVersion.isNotNull()))
+      .select((p) => ({ id: p.id, key: p.key, latestVersion: p.latestVersion }))
+      .toList();
+    const heads = rows.map((row) => ({ id: row.id, key: row.key, latestVersion: row.latestVersion! }));
+    return await this.publishedVersions.resolve(heads, async (missing) => {
+      const versions = await this.db.versions.asNoTracking()
+        .where((v) => v.processId.in(missing.map((head) => head.id)).and(v.version.in([...new Set(missing.map((head) => head.latestVersion))])))
+        .toList();
+      const byId = new Map(missing.map((head) => [head.id, head]));
+      return versions
+        .filter((version) => byId.get(version.processId)?.latestVersion === version.version)
+        .map((version) => versionOf(byId.get(version.processId)!.key, version));
+    });
   }
 
   async versionById(id: string): Promise<VersionDetails | undefined> {

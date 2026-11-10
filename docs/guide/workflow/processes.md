@@ -964,7 +964,7 @@ export class FindRecordsInput {
 объявляет его в `@Module({ references })`, и `exists` получает область в `context.within`:
 
 ```ts
-@Module({ references: { "dm.table": TableReferences, "dm.field": FieldReferences }, providers: [scoped(TableReferences), scoped(FieldReferences)] })
+@Module({ references: { "dm.table": TableReferences, "dm.field": FieldReferences } })
 export class RecordsModule {}
 ```
 
@@ -1732,6 +1732,10 @@ manager: Доставка не согласована
 Воркер раз в `intervalMs` берёт до `batchSize` заданий; если пачка полная,
 сразу берёт следующую. `BAZIS_WORKFLOW__WORKER__ENABLED=false` — экземпляр
 только отвечает на HTTP, а шаги исполняют другие.
+
+Задание принадлежит взявшему его воркеру пять минут с момента, когда оно началось, а не когда
+взята пачка: задание, прождавшее своей очереди дольше, уходит другому экземпляру, и первый его уже
+не выполняет. Останавливаясь, воркер сразу возвращает задания, до которых не дошёл (с версии 0.137.0).
 
 > [!NOTE]
 > Модуль бизнес-процессов — с версии 0.124.0. До 0.124.1 приложение,

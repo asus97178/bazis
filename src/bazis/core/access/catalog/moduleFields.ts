@@ -1,5 +1,7 @@
 import {
   createModuleOwnedMetadataChannel,
+  createModuleOwnedProviderChannel,
+  scoped,
   registerModuleOwnedContributionValidator,
   registerModuleOwnedProviderContributor,
   DiContainer,
@@ -22,6 +24,8 @@ interface RolePayload { readonly name: string; readonly permissions: "all" | rea
 const PERMISSION_CHANNEL = createModuleOwnedMetadataChannel<PermissionPayload>("access.permission/v1");
 const REFERENCE_CHANNEL = createModuleOwnedMetadataChannel<ReferencePayload>("access.reference/v1");
 const ROLE_CHANNEL = createModuleOwnedMetadataChannel<RolePayload>("access.role/v1");
+/** The classes of `references`: the field registers them, like `tools` and `controllers`. */
+const REFERENCE_CLASS_CHANNEL = createModuleOwnedProviderChannel<{ readonly kind: string }, object>("access.reference-class/v1");
 
 /** The values of `in`/`notIn` a role may list; the run-time limit is `access.maxInList`. */
 const STARTUP_MAX_IN_LIST = 1000;
@@ -53,7 +57,17 @@ registerModuleOwnedProviderContributor((metadata: BazisModuleMetadata, context) 
       if (typeof type !== "function") problems.push(`reference kind "${kind}" must name a References class`);
     }
     if (problems.length > 0) throw setupError(module, "references", problems);
-    for (const [kind, type] of Object.entries(references)) context.addMetadata(REFERENCE_CHANNEL, { kind, type: type as Class<References> });
+    const registered = new Set<unknown>();
+    for (const [kind, type] of Object.entries(references)) {
+      context.addMetadata(REFERENCE_CHANNEL, { kind, type: type as Class<References> });
+      if (registered.has(type)) continue;
+      registered.add(type);
+      try {
+        context.registerScoped(REFERENCE_CLASS_CHANNEL, scoped(type as Class<object>), { kind });
+      } catch {
+        // The module registered the class its own way (a singleton): that registration stands.
+      }
+    }
   }
   if (fields.roles !== undefined) {
     if (!isDeclaredRoles(fields.roles)) throw new AccessSetupError(`${module}: roles must be a defineRoles(...) result.`);
@@ -93,7 +107,7 @@ registerModuleOwnedContributionValidator((snapshot) => {
     const other = kinds.get(payload.kind);
     if (other !== undefined) throw new AccessSetupError(`Reference kind "${payload.kind}" is declared twice: in ${other} and in ${ownerName}.`);
     kinds.set(payload.kind, ownerName);
-    if (snapshot.countProviders(payload.type) === 0) throw new AccessSetupError(`${ownerName}: ${payload.type.name} of reference kind "${payload.kind}" is not registered: add it to the module's providers.`);
+    if (snapshot.countProviders(payload.type) === 0) throw new AccessSetupError(`${ownerName}: ${payload.type.name} of reference kind "${payload.kind}" is not registered.`);
   }
 
   for (const { payload, ownerName } of permissions) {

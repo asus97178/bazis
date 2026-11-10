@@ -82,8 +82,7 @@ export class HttpRequestTool {
   constructor(private readonly config: ConfigView<ToolsSettings>) {}
 
   async execute(raw: unknown, context: AgentToolExecutionContext): Promise<unknown> {
-    const callers = this.config.get("http.callers").split(",").map((item) => item.trim());
-    if (context.caller !== undefined && !callers.includes(context.caller)) throw new ToolError(`tools.http.callers does not list ${context.caller}`, { reason: "caller_not_allowed" });
+    if (context.caller !== undefined && !this.config.get("http.callers").includes(context.caller)) throw new ToolError(`tools.http.callers does not list ${context.caller}`, { reason: "caller_not_allowed" });
     const request = this.requestOf(raw);
     if (context.dryRun === true && !SAFE_METHODS.has(request.method)) return { dryRun: true };
     const signal = AbortSignal.any([context.signal, AbortSignal.timeout(request.timeoutMs)]);

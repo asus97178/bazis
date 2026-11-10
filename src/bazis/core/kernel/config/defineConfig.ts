@@ -38,14 +38,23 @@ export function configEnum<const V extends readonly [string | number, ...(string
   return declared;
 }
 const invalidEnums = new WeakMap<object, KernelError>();
-type Cell = Primitive | SecretSpec | ConfigEnum;
+export interface ConfigList { readonly __list: true; readonly default: readonly string[] }
+/**
+ * A list of strings: `readonly string[]` in the code, comma-separated in the
+ * environment (`BAZIS_TOOLS__HTTP__ALLOW=api.example.com,*.example.org`). Items
+ * are trimmed, empty ones are dropped.
+ */
+export function configList(defaultValue: readonly string[] = []): ConfigList {
+  return Object.freeze({ __list: true, default: Object.freeze([...defaultValue]) });
+}
+type Cell = Primitive | SecretSpec | ConfigEnum | ConfigList;
 type Defaults = Record<string, Cell>;
-export type ConfigValueType = Primitive | Secret;
+export type ConfigValueType = Primitive | Secret | readonly string[];
 export type ConfigShape = Record<string, ConfigValueType>;
-type Resolved<V> = V extends SecretSpec ? Secret : V extends ConfigEnum<infer E> ? E : V extends number ? number : V extends boolean ? boolean : string;
+type Resolved<V> = V extends SecretSpec ? Secret : V extends ConfigList ? readonly string[] : V extends ConfigEnum<infer E> ? E : V extends number ? number : V extends boolean ? boolean : string;
 type ResolveAll<D extends Defaults> = { [K in keyof D]: Resolved<D[K]> };
-type WidenCell<V> = V extends SecretSpec ? SecretSpec : V extends ConfigEnum<infer E> ? E : V extends number ? number : V extends boolean ? boolean : string;
-type CellFor<T> = [T] extends [Secret] ? SecretSpec : [T] extends [string] ? (string extends T ? string : ConfigEnum<T & string>) : [T] extends [number] ? (number extends T ? number : ConfigEnum<T & number>) : [T] extends [boolean] ? (boolean extends T ? boolean : never) : never;
+type WidenCell<V> = V extends SecretSpec ? SecretSpec : V extends ConfigList ? readonly string[] : V extends ConfigEnum<infer E> ? E : V extends number ? number : V extends boolean ? boolean : string;
+type CellFor<T> = [T] extends [Secret] ? SecretSpec : [T] extends [readonly string[]] ? ConfigList : [T] extends [string] ? (string extends T ? string : ConfigEnum<T & string>) : [T] extends [number] ? (number extends T ? number : ConfigEnum<T & number>) : [T] extends [boolean] ? (boolean extends T ? boolean : never) : never;
 type Declaration<T extends object> = { [K in keyof T]: CellFor<T[K]> };
 type OverrideFor<T> = T extends Secret ? SecretSpec : T;
 interface Rules<T extends object> {
@@ -76,7 +85,7 @@ export interface AppConfig<T extends object> extends ValidatableConfig {
 }
 export interface ConfigInspection {
   readonly key: string;
-  readonly type: "string" | "number" | "boolean" | "secret";
+  readonly type: "string" | "number" | "boolean" | "secret" | "list";
   readonly env: readonly string[];
   readonly source: string;
   readonly value: Primitive;
@@ -118,8 +127,11 @@ function environmentNameProblem(name: string, claimed: ReadonlySet<string>): str
   return undefined;
 }
 
-function isSecret(cell: Cell): cell is SecretSpec { return typeof cell === "object" && cell !== null && "__secret" in cell; }
-function isEnum(cell: Cell): cell is ConfigEnum { return typeof cell === "object" && cell !== null && "__enum" in cell; }
+function isSecret(cell: unknown): cell is SecretSpec { return typeof cell === "object" && cell !== null && "__secret" in cell; }
+function isEnum(cell: unknown): cell is ConfigEnum { return typeof cell === "object" && cell !== null && "__enum" in cell; }
+function isList(cell: unknown): cell is ConfigList { return typeof cell === "object" && cell !== null && "__list" in cell; }
+/** `a, b,,c` → `["a", "b", "c"]`. */
+function listItems(raw: string): readonly string[] { return Object.freeze(raw.split(",").map((item) => item.trim()).filter((item) => item !== "")); }
 function copyCell(cell: Cell): Cell {
   if (isSecret(cell)) return secret(cell.default);
   if (isEnum(cell)) {
@@ -127,12 +139,19 @@ function copyCell(cell: Cell): Cell {
     if (problem !== undefined) throw problem;
     return Object.freeze({ ...cell, values: Object.freeze([...cell.values]) });
   }
+  if (isList(cell)) {
+    if (!Array.isArray(cell.default) || cell.default.some((item) => typeof item !== "string")) throw new KernelError("configList requires a list of strings.");
+    return configList(cell.default);
+  }
+  // A list in an environment section is written as it is read: `test: { hosts: ["a"] }`.
+  if (Array.isArray(cell)) return copyCell(configList(cell as readonly string[]));
   if (["string", "number", "boolean"].includes(typeof cell)) return cell;
-  throw new KernelError("Configuration supports only primitive values, secret() and configEnum().");
+  throw new KernelError("Configuration supports only primitive values, secret(), configEnum() and configList().");
 }
 function safeValue(key: string, value: ConfigValueType): Primitive {
-  if (value instanceof Secret || (typeof value === "string" && isSensitiveKey(key))) return "***";
-  if (typeof value !== "string") return value;
+  if (value instanceof Secret || ((typeof value === "string" || Array.isArray(value)) && isSensitiveKey(key))) return "***";
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value !== "string") return value as Primitive;
   try {
     const url = new URL(value);
     if (url.username || url.password) { url.username = "***"; url.password = "***"; return redactSensitiveText(url.toString()); }
@@ -209,7 +228,7 @@ function createDefinition(prefix: string, input: ConfigSchema<Defaults>, declare
       const base = schema.default[key]!;
       const override = schema[environment]?.[key];
       const cell = override ?? base;
-      const type = isSecret(base) ? "secret" : isEnum(base) ? typeof base.default : typeof base;
+      const type = isSecret(base) ? "secret" : isList(base) ? "list" : isEnum(base) ? typeof base.default : typeof base;
       const candidates: { raw: string; source: string; priority: number; name: string }[] = [];
       for (const name of names.get(key)!) {
         const sourceKey = name.slice(ENV_PREFIX.length).toLowerCase().replaceAll("__", ".");
@@ -226,7 +245,7 @@ function createDefinition(prefix: string, input: ConfigSchema<Defaults>, declare
         const variables = [...new Set(winners.map(candidate => candidate.name))];
         issue(key, "conflict", `conflicting environment aliases: ${variables.join(" and ")} are set to different values; set only one`);
       }
-      const raw = selected?.raw ?? (isSecret(cell) || isEnum(cell) ? cell.default : cell);
+      const raw: unknown = selected?.raw ?? (isSecret(cell) || isEnum(cell) || isList(cell) ? cell.default : cell);
       let value: ConfigValueType | undefined;
       if (type === "secret") {
         // secret("") reads like an empty default but would mean "required":
@@ -238,6 +257,11 @@ function createDefinition(prefix: string, input: ConfigSchema<Defaults>, declare
         // No "apiKey: …" in the hint: the console redaction would hide it.
         else if (environment === "production" && selected === undefined && override === undefined) issue(key, "development-secret", `production would use the development default secret from the code; set ${names.get(key)!.join(" or ")}, or declare ${key} in the production section`);
         else value = new Secret(raw);
+      } else if (type === "list") {
+        // From the environment a comma-separated string, from the code a list.
+        if (typeof raw === "string") value = listItems(raw);
+        else if (Array.isArray(raw) && (raw as unknown[]).every((item) => typeof item === "string")) value = Object.freeze([...(raw as string[])]);
+        else issue(key, "string", "expected a list of strings");
       } else if (type === "number") {
         const parsed = Number(raw);
         if (raw === undefined || (typeof raw === "string" && !raw.trim()) || !Number.isFinite(parsed)) issue(key, "number", `expected a finite number${got(key, raw)}${source(key, selected)}`, from(selected));

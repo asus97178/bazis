@@ -1,6 +1,7 @@
 import type { Class } from "../../di";
 import type { AttributeLookup } from "../contracts/AttributeLookup";
 import type { LocalizedText } from "../contracts/types";
+import type { BazisPermissions } from "../index";
 
 /** An attribute of the object of a permission: what a condition may test (ACCESS-001 §3). */
 export interface AttributeSpec {
@@ -38,6 +39,15 @@ export interface PermissionSpec {
 }
 
 export type PermissionDeclarations = Readonly<Record<string, PermissionSpec>>;
+
+/** The declarations of `definePermissions(...)` as a part of {@link BazisPermissions}. */
+export type PermissionsOf<T extends PermissionDeclarations> = { readonly [K in keyof T]: T[K] };
+
+/** A declared permission. */
+export type PermissionKey = Extract<keyof BazisPermissions, string>;
+
+/** A permission with an `owner`: the only kind `"<key>:own"` makes sense for. */
+export type OwnPermissionKey = { [K in keyof BazisPermissions]: BazisPermissions[K] extends { readonly owner: string } ? Extract<K, string> : never }[keyof BazisPermissions];
 
 const DECLARED = new WeakSet<object>();
 

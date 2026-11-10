@@ -13,6 +13,7 @@ import {
   grantsToWhere,
   maskFields,
   type AccessValue,
+  type PermissionsOf,
   type ReferenceItem,
 } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
@@ -47,6 +48,11 @@ const orderPermissions = definePermissions({
   "orders.create": { title: "Create orders", scope: "request", on: { process: { ref: "orders.process" } } },
   "orders.export": { title: "Export orders" },
 });
+// What `bazis codegen` writes for an application: the keys become the type of `can` and `defineRoles`.
+declare module "@/core/access" {
+  interface BazisPermissions extends PermissionsOf<typeof orderPermissions> {}
+}
+
 
 @Module({
   imports: [AccessModule],
@@ -105,7 +111,7 @@ test("the graph must import AccessModule, own every reference kind and register 
 });
 
 test("roles name declared permissions with valid conditions", async () => {
-  @Module({ imports: [OrdersModule], roles: defineRoles({ clerk: ["orders.delete"] }) }) class UnknownModule {}
+  @Module({ imports: [OrdersModule], roles: defineRoles({ clerk: ["orders.delete" as never] }) }) class UnknownModule {}
   expect((await buildError(UnknownModule)).message).toBe('UnknownModule: role "clerk" names permission "orders.delete", which no module declares.');
 
   @Module({ imports: [OrdersModule], roles: defineRoles({ clerk: [{ permission: "orders.export", where: { own: true } }] }) }) class OwnModule {}
@@ -137,7 +143,7 @@ test("can: partition, own, conditions in three-valued logic", async () => {
   expect(await access.can("orders.export", {})).toBe(true);
   expect(await access.can("orders.create")).toBe(false);
   await expect(access.can("orders.read", { customerId: 7 })).rejects.toThrow('can("orders.read") needs the object\'s partition');
-  await expect(access.can("orders.delete")).rejects.toThrow('Permission "orders.delete" is not declared');
+  await expect(access.can("orders.delete" as never)).rejects.toThrow('Permission "orders.delete" is not declared');
 });
 
 test("filter: grants become one column condition; lookups and limits apply", async () => {
@@ -259,5 +265,22 @@ test("the default rights system: roles from the token, permissions from @Module(
     expect(await scope.resolve(IAccess).as(subject, scope).principals(["s1"])).toEqual([{ scope: "s1", principals: ["user:5", "role:clerk"] }]);
   } finally {
     await app.stop();
+  }
+});
+
+test("a class of references needs no place in providers: the field registers it", async () => {
+  class TableReferences extends References {
+    async exists(ids: readonly string[]): Promise<ReadonlySet<string>> { return new Set(ids); }
+    async describe(): Promise<readonly ReferenceItem[]> { return []; }
+    async search(): Promise<readonly ReferenceItem[]> { return []; }
+  }
+  @Module({ imports: [AccessModule], references: { "docs.table": TableReferences, "docs.view": TableReferences } }) class DocsModule {}
+  const container = await createTestContainer(DocsModule);
+  const scope = container.createScope();
+  try {
+    expect(scope.resolve(TableReferences)).toBeInstanceOf(TableReferences);
+    expect([...await scope.resolve(TableReferences).exists(["a"])]).toEqual(["a"]);
+  } finally {
+    await scope.dispose();
   }
 });

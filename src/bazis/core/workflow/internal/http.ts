@@ -1,4 +1,4 @@
-import { IAccess, type AccessObject, type SubjectAccess } from "../../access";
+import { IAccess, type AccessObject, type SubjectAccess, type PermissionKey } from "../../access";
 import { ForbiddenError, type HttpContext } from "../../http";
 import { frameworkBadRequest } from "../../http/Errors/HttpError";
 import { ListQueryError, parseListQuery, type ListQuery, type ListQueryOptions, type ListQueryProblem } from "../../../library/jsonapi";
@@ -32,7 +32,7 @@ export function defaultLanguage(ctx: HttpContext): string {
  * right. The actor's id is the first owner id, so that `{ own: true }` means
  * the instances the subject started.
  */
-export async function callerOf(ctx: HttpContext, permission?: string, object?: AccessObject): Promise<WorkflowCaller> {
+export async function callerOf(ctx: HttpContext, permission?: PermissionKey, object?: AccessObject): Promise<WorkflowCaller> {
   const access = await ctx.services.resolve(IAccess).for(ctx);
   if (permission !== undefined && !await access.can(permission, object)) throw new ForbiddenError();
   const sub = access.subject.sub;

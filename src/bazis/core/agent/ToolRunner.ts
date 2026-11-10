@@ -42,6 +42,11 @@ export class ToolRunner {
     this.executor = new AgentToolExecutor(services, this.catalog, { schemaValidator: modelValidatorAdapter, ...executorOptions }, logger);
   }
 
+  /** Every Tool of the application, whoever may call it. */
+  listTools(): readonly ToolDefinition[] {
+    return this.catalog.listTools();
+  }
+
   /** A view of the Tools this caller may run. `"agent"` is refused: agents run through `AgentRuntime`. */
   as(caller: string): BoundToolRunner {
     let id: string;

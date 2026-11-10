@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { Secret } from "../Secret";
-import { configEnum, defineConfig, secret } from "../defineConfig";
+import { Configuration } from "../Configuration";
+import { configEnum, configList, defineConfig, secret } from "../defineConfig";
 
 const TOUCHED_ENV_KEYS = [
   "BAZIS_ENV",
@@ -167,4 +168,30 @@ describe("defineConfig", () => {
       expect(() => config.ensureValid()).toThrow(/db\.password/);
     });
   });
+});
+
+test("configList: a list in the code, comma-separated in the environment", () => {
+  const config = defineConfig("lists", {
+    default: { hosts: configList(), callers: configList(["workflow"]), name: "x" },
+    test: { hosts: ["test.local"] },
+    validate: { hosts: (value) => (value.every((item) => !item.includes(" ")) ? undefined : "no spaces") },
+  });
+  const empty = new Configuration(new Map(), new Map());
+  expect(config.resolve("production", empty).get("hosts")).toEqual([]);
+  expect(config.resolve("production", empty).get("callers")).toEqual(["workflow"]);
+  expect(config.resolve("test", empty).get("hosts")).toEqual(["test.local"]);
+  const fromEnv = new Configuration(new Map([["lists.hosts", " api.example.com, *.example.org ,,"], ["lists.callers", ""]]), new Map());
+  const view = config.resolve("test", fromEnv);
+  expect(view.get("hosts")).toEqual(["api.example.com", "*.example.org"]);
+  expect(view.get("callers")).toEqual([]);
+  expect(Object.isFrozen(view.get("hosts"))).toBe(true);
+  expect(view.inspect().find((row) => row.key === "lists.hosts")).toMatchObject({ type: "list", value: "api.example.com, *.example.org" });
+  const hosts: readonly string[] = view.get("hosts");
+  expect(hosts.length).toBe(2);
+});
+
+test("configList: a validator sees the list, and a wrong default is told", () => {
+  const config = defineConfig("lists2", { default: { hosts: configList() }, validate: { hosts: (value) => (value.every((item) => !item.includes("/")) ? undefined : "hosts only") } });
+  expect(() => config.resolve("test", new Configuration(new Map([["lists2.hosts", "a.example.com,https://b"]]), new Map()))).toThrow("hosts only");
+  expect(() => defineConfig("lists3", { default: { hosts: configList([1 as never]) } }).resolve("test", new Configuration(new Map(), new Map()))).toThrow("configList requires a list of strings");
 });

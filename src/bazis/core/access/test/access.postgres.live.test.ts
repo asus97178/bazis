@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema } from "@/library/orm";
-import { IAccess, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Grants } from "@/core/access";
+import { IAccess, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Grants, type PermissionsOf } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
 import { Module, singleton, singletonValue } from "@/core/di";
 import { createTestContainer } from "@/core/testing";
@@ -30,6 +30,10 @@ const permissions = definePermissions({
     owner: "ownerId",
   },
 });
+
+declare module "@/core/access" {
+  interface BazisPermissions extends PermissionsOf<typeof permissions> {}
+}
 
 describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
   test("every row passes the filter exactly when can() allows it", async () => {

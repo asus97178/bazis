@@ -29,7 +29,6 @@ import { SetOrderStatusTool } from "./tools/SetOrderStatus.tool";
   controllers: [OrderController],
   providers: [
     scoped(IOrderService, OrderService),
-    scoped(OrderReferences),
   ],
   exports: [IOrderService],
 })
