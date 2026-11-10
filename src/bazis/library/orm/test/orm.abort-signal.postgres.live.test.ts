@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, EntityState, Key, OrmTransactionScopeError, PostgresProvider, Schema } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, EntityState, Key, OrmTransactionScopeError, PostgresProvider, Schema, Nullable } from "../index";
 
 // Opt in only on the explicitly authorized disposable runner. Without the opt-in env it runs no SQL.
 const url = process.env.BAZIS_PG_URL;
@@ -20,7 +20,7 @@ async function fixture(max = 1) {
   const provider = new PostgresProvider({ options: { url, max }, cancellationMode: "close" });
   const observer = new PostgresProvider({ options: { url, max: 2 } });
   @Schema(schema) @Entity({ table: "records" })
-  class Record { @Key() id = 0; @Column({ type: "text" }) value = "pending"; }
+  class Record { @Key() id = 0; @Nullable() @Column({ type: "text" }) value = "pending"; }
   const context = (p = provider) => new Context(new DbContextOptions({ provider: p, entities: [Record], validateOnSave: false }));
   const quoted = provider.dialect.quoteId(schema);
   const close = async () => {

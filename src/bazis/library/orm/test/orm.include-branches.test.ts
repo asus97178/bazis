@@ -10,13 +10,13 @@ import {
   PostgresDialect,
   type DatabaseProvider,
   type Row,
-  type SqlParam,
+  type SqlParam, Nullable,
 } from "../index";
 
 @Entity({ table: "include_roots" })
 class IncludeRoot {
   @Key({ generated: false }) id = 0;
-  @Column({ type: "integer", nullable: true }) featuredId: number | null = null;
+  @Nullable() @Column({ type: "integer" }) featuredId: number | null = null;
   @OneToMany(() => IncludeChild, { foreignKey: "rootId" }) children: IncludeChild[] = [];
   @ManyToOne(() => IncludeChild, { foreignKey: "featuredId" }) featured: IncludeChild | null = null;
 }
@@ -24,8 +24,8 @@ class IncludeRoot {
 @Entity({ table: "include_children" })
 class IncludeChild {
   @Key({ generated: false }) id = 0;
-  @Column({ type: "integer" }) rootId = 0;
-  @Column({ type: "integer", nullable: true }) noteId: number | null = null;
+  @Nullable() @Column({ type: "integer" }) rootId = 0;
+  @Nullable() @Column({ type: "integer" }) noteId: number | null = null;
   @OneToMany(() => IncludeLeaf, { foreignKey: "childId" }) leaves: IncludeLeaf[] = [];
   @ManyToOne(() => IncludeNote, { foreignKey: "noteId" }) note: IncludeNote | null = null;
 }
@@ -33,7 +33,7 @@ class IncludeChild {
 @Entity({ table: "include_leaves" })
 class IncludeLeaf {
   @Key({ generated: false }) id = 0;
-  @Column({ type: "integer" }) childId = 0;
+  @Nullable() @Column({ type: "integer" }) childId = 0;
 }
 
 @Entity({ table: "include_notes" })

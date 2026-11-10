@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Global, HOSTED_SERVICE, Module, createContainer, singletonValue } from "@/core/di";
 import { Configuration, defineConfig, secret } from "@/core/kernel";
 import { Infra } from "@/core/infra";
-import { Column, DbContext, Entity, Key, DATABASE_PROVIDER, ormBazisConnect, paginate } from "@/core/orm";
+import { Column, DbContext, Entity, Key, DATABASE_PROVIDER, ormBazisConnect, paginate, Nullable } from "@/core/orm";
 import { postgres, type PostgresProvider } from "@/library/orm";
 import { parseListQuery, type ListQueryOptions } from "@/library/jsonapi";
 import { Validator } from "@/library/validation";
@@ -22,10 +22,12 @@ class LiveNote {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   @Validator({ required: true, minLength: 2 })
   text = "";
 
+  @Nullable()
   @Column({ type: "integer" })
   rank = 0;
 }

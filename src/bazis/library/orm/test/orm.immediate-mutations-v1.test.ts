@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { runInNewContext } from "node:vm";
-import { Column, CreatedAt, DbContext, DbContextOptions, Entity, EntityState, HasConversion, Index, Key, Operand, OrmError, OrmTrackedMutationConflictError, OrmTransactionScopeError, OrmUndeclaredConflictTargetError, OrmUnsafeImmediateMutationError, QueryFilter, SoftDelete, UpdatedAt, UUID, ValueConverters, withRetry, type DatabaseProvider, type DbExecutor, type ExecuteResult, type Row, type SqlDialect } from "../index";
+import { Column, CreatedAt, DbContext, DbContextOptions, Entity, EntityState, HasConversion, Index, Key, Operand, OrmError, OrmTrackedMutationConflictError, OrmTransactionScopeError, OrmUndeclaredConflictTargetError, OrmUnsafeImmediateMutationError, QueryFilter, SoftDelete, UpdatedAt, UUID, ValueConverters, withRetry, type DatabaseProvider, type DbExecutor, type ExecuteResult, type Row, type SqlDialect, Nullable, Required } from "../index";
 import { observeProviderDispatch, registerPostgresTransactionCapability } from "../Providers/ormTransactionRuntime";
 import { runPostCommitCallbacks, runRollbackCallbacks } from "../Providers/transactionCallbacks";
 import { assertTransactionCanCommit, beginChildTransactionScope, createTransactionCallbackScope, endChildTransactionScope, mergeTransactionScopeCallbacks, type TransactionCallbackScope } from "../Providers/transactionScopes";
@@ -12,9 +12,11 @@ class RowEntity {
   @Key()
   @Column({ type: "integer" })
   id!: number;
+  @Nullable()
   @Column()
   name!: string;
-  @Column({ nullable: true })
+  @Nullable()
+  @Column()
   note?: string | null;
 }
 let converterCalls = 0;
@@ -23,44 +25,44 @@ let reentrantContext: Context | undefined;
 class ConvertedRow {
   @Key({ generated: false }) id = 0;
   @HasConversion({ toProvider(value: Date | null) { converterCalls += 1; if (value === null) return null; reentrantContext?.attach(Object.assign(new ConvertedRow(), { id: 99, value: new Date(0) })); value.setTime(0); return value.toISOString(); }, fromProvider: (value: string) => new Date(value) })
-  @Column({ type: "text" }) value = new Date(1);
+  @Nullable() @Column({ type: "text" }) value = new Date(1);
 }
 @Entity({ table: "filtered_rows" })
 @QueryFilter<FilteredRow>((row) => row.tenant.eq("tenant"))
-class FilteredRow { @Key({ generated: false }) id = 0; @Column() tenant = "tenant"; @Column() name = ""; @SoftDelete() deletedAt: Date | null = null; }
+class FilteredRow { @Key({ generated: false }) id = 0; @Nullable() @Column() tenant = "tenant"; @Nullable() @Column() name = ""; @SoftDelete() deletedAt: Date | null = null; }
 @Entity({ table: "immediate_key_rows" })
 @Index(["externalKey", "tenantKey"], { unique: true })
 @Index(["tenantKey", "payload"], { unique: false })
 class KeyRow {
   @Key(["tenantKey", "sequence"]) @Column({ name: "tenant_key", type: "text" }) tenantKey = "";
-  @Column({ name: "sequence_no", type: "integer" }) sequence = 0;
-  @Column({ name: "external_key", type: "text" }) externalKey = "";
-  @Column({ name: "payload_text", type: "text" }) payload = "";
+  @Nullable() @Column({ name: "sequence_no", type: "integer" }) sequence = 0;
+  @Nullable() @Column({ name: "external_key", type: "text" }) externalKey = "";
+  @Nullable() @Column({ name: "payload_text", type: "text" }) payload = "";
 }
 @Entity({ table: "immediate_identity_rows" })
-class IdentityRow { @Key() @Column({ name: "identity_id", type: "integer" }) id = 0; @Column({ name: "identity_value", type: "text" }) value = ""; }
+class IdentityRow { @Key() @Column({ name: "identity_id", type: "integer" }) id = 0; @Nullable() @Column({ name: "identity_value", type: "text" }) value = ""; }
 @Entity({ table: "immediate_uuid_rows" })
-class UuidLiteralRow { @UUID() @Column({ name: "uuid_id", type: "uuid" }) id = ""; @Column({ name: "uuid_value", type: "text" }) value = ""; }
+class UuidLiteralRow { @UUID() @Column({ name: "uuid_id", type: "uuid" }) id = ""; @Nullable() @Column({ name: "uuid_value", type: "text" }) value = ""; }
 @Entity({ table: "immediate_rules_rows" })
-class RulesRow { @Key() @Column({ type: "integer" }) id = 0; @CreatedAt() createdAt = new Date(0); @UpdatedAt() updatedAt = new Date(0); @Column({ type: "text" }) plain = ""; }
+class RulesRow { @Key() @Column({ type: "integer" }) id = 0; @CreatedAt() createdAt = new Date(0); @UpdatedAt() updatedAt = new Date(0); @Nullable() @Column({ type: "text" }) plain = ""; }
 let jsonConverterCalls = 0; let jsonConverterInput: unknown;
 const controlledJsonConverter = { toProvider(value: { nested: { value: number | null }; items: unknown[] }) { jsonConverterCalls += 1; jsonConverterInput = value; value.nested.value = 99; value.items.push("converter"); return { stored: value }; }, fromProvider: (value: unknown) => value as { nested: { value: number | null }; items: unknown[] } };
 @Entity({ table: "immediate_json_rows" })
-class JsonRow { @Key({ generated: false }) id = 0; @HasConversion(controlledJsonConverter) @Column({ type: "json" }) payload: { nested: { value: number | null }; items: unknown[] } = { nested: { value: 0 }, items: [] }; }
+class JsonRow { @Key({ generated: false }) id = 0; @HasConversion(controlledJsonConverter) @Nullable() @Column({ type: "json" }) payload: { nested: { value: number | null }; items: unknown[] } = { nested: { value: 0 }, items: [] }; }
 let bytesConverterCalls = 0;
 const bytesConverter = { toProvider(value: Uint8Array) { bytesConverterCalls += 1; value[0] = 9; return `${value[0]},${value[1]}`; }, fromProvider: (value: string) => new Uint8Array(value.split(",").map(Number)) };
 @Entity({ table: "immediate_bytes_rows" })
-class BytesRow { @Key({ generated: false }) id = 0; @HasConversion(bytesConverter) @Column({ type: "text" }) payload = new Uint8Array([1, 2]); }
+class BytesRow { @Key({ generated: false }) id = 0; @HasConversion(bytesConverter) @Nullable() @Column({ type: "text" }) payload = new Uint8Array([1, 2]); }
 let dateOutput: Date | undefined;
 const datetimeConverter = { toProvider(value: Date) { dateOutput = new Date(value.getTime()); return dateOutput; }, fromProvider: (value: Date) => value };
 @Entity({ table: "immediate_datetime_rows" })
-class DatetimeRow { @Key({ generated: false }) id = 0; @HasConversion(datetimeConverter) @Column({ type: "datetime" }) at = new Date(0); }
+class DatetimeRow { @Key({ generated: false }) id = 0; @HasConversion(datetimeConverter) @Nullable() @Column({ type: "datetime" }) at = new Date(0); }
 let nullableConverterCalls = 0;
 const nullableConverter = { toProvider(value: string) { nullableConverterCalls += 1; return `enc:${value}`; }, fromProvider: (value: string) => value.slice(4) };
 @Entity({ table: "immediate_nullable_rows" })
-class NullableConvertedRow { @Key({ generated: false }) id = 0; @HasConversion(nullableConverter) @Column({ type: "text", nullable: true }) value: string | null = null; }
+class NullableConvertedRow { @Key({ generated: false }) id = 0; @HasConversion(nullableConverter) @Nullable() @Column({ type: "text" }) value: string | null = null; }
 @Entity({ table: "immediate_json_text_rows" })
-class JsonTextRow { @Key({ generated: false }) id = 0; @HasConversion(ValueConverters.json<{ nested: string[] }>()) @Column({ type: "text" }) payload: { nested: string[] } = { nested: [] }; }
+class JsonTextRow { @Key({ generated: false }) id = 0; @HasConversion(ValueConverters.json<{ nested: string[] }>()) @Nullable() @Column({ type: "text" }) payload: { nested: string[] } = { nested: [] }; }
 const dialect: SqlDialect = { name: "postgres", supportsReturning: false, quoteId: (name) => `"${name}"`, qualifyTable: (model) => `"${model.tableName}"`, parameter: (index) => `$${index + 1}`, columnType: () => "text", encode: (value) => value as never, decode: (value) => value, rowLockClause: () => "", createTableSql: () => "", createIndexSql: () => [], createIndexSqlOne: () => "", addColumnSql: () => "", dropColumnSql: () => "" };
 const queryLog: { sql: string; params: readonly unknown[] }[] = [];
 function provider(log: { sql: string; params: readonly unknown[] }[]): DatabaseProvider { return { name: "test", dialect, query: async (sql, params): Promise<Row[]> => { queryLog.push({ sql, params }); return []; }, execute: async (sql, params): Promise<ExecuteResult> => { log.push({ sql, params }); return { changes: sql.startsWith("INSERT") ? 1 : 2, lastInsertId: 0 }; }, transaction: async (work) => work({ query: async () => [], execute: async () => ({ changes: 0, lastInsertId: 0 }) }), ping: async () => true, introspect: async () => ({ tables: new Map() }), close: async () => {} }; }
@@ -545,16 +547,16 @@ test("throwing native cancel quarantines held dispatch and blocks late inherited
 @Entity({ table: "immediate_dx_rows" })
 class DxRow {
   @Key() id = 0;
-  @Column({ type: "text", nullable: false }) title = "";
-  @Index({ unique: true }) @Column({ type: "text" }) slug = "";
-  @Column({ type: "integer" }) views = 0;
-  @Column({ type: "datetime", nullable: true }) publishedAt: Date | null = null;
+  @Required() @Column({ type: "text" }) title = "";
+  @Index({ unique: true }) @Nullable() @Column({ type: "text" }) slug = "";
+  @Nullable() @Column({ type: "integer" }) views = 0;
+  @Nullable() @Column({ type: "datetime" }) publishedAt: Date | null = null;
   @CreatedAt() createdAt = new Date(0);
 }
 @Entity({ table: "immediate_dx_v7_rows" })
-class DxV7Row { @UUID({ version: "v7" }) id = ""; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+class DxV7Row { @UUID({ version: "v7" }) id = ""; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) code = ""; }
 @Entity({ table: "immediate_dx_v4_rows" })
-class DxV4Row { @UUID() id = ""; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+class DxV4Row { @UUID() id = ""; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) code = ""; }
 class DxContext extends DbContext {
   readonly rows = this.set(DxRow); readonly v7 = this.set(DxV7Row); readonly v4 = this.set(DxV4Row);
   constructor(value: DatabaseProvider) { super(new DbContextOptions({ provider: value, entities: [DxRow, DxV7Row, DxV4Row] })); }

@@ -15,12 +15,12 @@ Owned store — это **набор таблиц, которыми модуль 
 
 ```ts
 import { Module } from "bazis/core/di";
-import { Column, DbContext, Entity, Key, defineOrmOwnedStoreV1 } from "bazis/core/orm";
+import { Column, DbContext, Entity, Key, defineOrmOwnedStoreV1, Nullable } from "bazis/core/orm";
 
 @Entity({ table: "notes_items" })
 export class Note {
   @Key() id = 0;
-  @Column({ type: "text" }) text = "";
+  @Nullable() @Column({ type: "text" }) text = "";
 }
 
 export class NotesDbContext extends DbContext {

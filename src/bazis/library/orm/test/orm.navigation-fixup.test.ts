@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany, PostgresDialect, Required, type DatabaseProvider, type ExecuteResult, type Row } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany, PostgresDialect, Required, type DatabaseProvider, type ExecuteResult, type Row, Nullable } from "../index";
 
 // 0.98.17: saveChanges takes foreign keys from navigations. Before,
 // `article.author = bob` left authorId at 0 and the insert violated the FK.
@@ -12,8 +12,8 @@ class Author {
 @Entity({ table: "articles" })
 class Article {
   @Key() id = 0;
-  @Column({ type: "text" }) title = "";
-  @Column({ type: "integer" }) authorId = 0;
+  @Nullable() @Column({ type: "text" }) title = "";
+  @Nullable() @Column({ type: "integer" }) authorId = 0;
   @ManyToOne(() => Author, { foreignKey: "authorId" }) author?: Author;
 }
 class Db extends DbContext { readonly authors = this.set(Author); readonly articles = this.set(Article); }

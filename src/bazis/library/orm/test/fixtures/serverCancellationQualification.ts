@@ -1,7 +1,7 @@
 import { SQL } from "bun";
 import { readFileSync } from "node:fs";
 import { createServer, connect, type Socket } from "node:net";
-import { Column, DbContext, DbContextOptions, Entity, EntityState, Key, PostgresProvider, Schema } from "../../index";
+import { Column, DbContext, DbContextOptions, Entity, EntityState, Key, PostgresProvider, Schema, Nullable } from "../../index";
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 function gate() { let open!: () => void; const wait = new Promise<void>(resolve => { open = resolve; }); return { open, wait }; }
@@ -29,7 +29,7 @@ export function serverCancellationCases() {
     const schema = `sci_${crypto.randomUUID().replaceAll("-", "")}`;
     const provider = new PostgresProvider({ options: options(tls, max, extra.url), operationTimeoutMs: 10000, cancellationTimeoutMs: extra.cancellationTimeoutMs ?? 1000 });
     const observer = new SQL(options(tls, 2));
-    @Schema(schema) @Entity({ table: "records" }) class Record { @Key() id = 0; @Column({ type: "text" }) value = "pending"; }
+    @Schema(schema) @Entity({ table: "records" }) class Record { @Key() id = 0; @Nullable() @Column({ type: "text" }) value = "pending"; }
     const context = () => new Context(new DbContextOptions({ provider, entities: [Record], validateOnSave: false }));
     await context().database.ensureCreated();
     return { provider, observer, schema, Record, context, tls,

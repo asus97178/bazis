@@ -64,7 +64,7 @@ await runApp(AppModule, {
 
 ```ts
 // src/app/modules/tasks/model/Tasks.model.ts
-import { Column, Entity, Index, Required, UUID } from "bazis/core/orm";
+import { Column, Entity, Index, Required, UUID, Nullable } from "bazis/core/orm";
 
 @Entity({ table: "tasks" })
 export class Task {
@@ -84,7 +84,8 @@ export class Task {
   @Column({ type: "integer" })
   priority = 3;
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   dueAt: Date | null = null;
 
   @Column({ type: "createdAt" })

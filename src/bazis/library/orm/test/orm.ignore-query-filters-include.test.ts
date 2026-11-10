@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany, QueryFilter, SoftDelete, type DatabaseProvider, type Row, type SqlDialect } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany, QueryFilter, SoftDelete, type DatabaseProvider, type Row, type SqlDialect, Nullable } from "../index";
 
 // 0.114.0: ignoreQueryFilters() turned the filters off for the main query only;
 // included entities were still read with @QueryFilter and the soft-delete
@@ -13,7 +13,7 @@ const provider = { name: "test", dialect, query: async (sql: string) => { log.pu
 @QueryFilter<List, ListsDb>((l, db) => l.tenantId.eq(db.tenant()))
 class List {
   @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
-  @Column({ type: "text" }) tenantId = "";
+  @Nullable() @Column({ type: "text" }) tenantId = "";
   @SoftDelete() deletedAt: Date | null = null;
   @OneToMany(() => Item, { foreignKey: "listId" }) items: Item[] = [];
 }
@@ -21,8 +21,8 @@ class List {
 @QueryFilter<Item>((i) => i.archived.eq(false))
 class Item {
   @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
-  @Column({ type: "integer" }) listId = 0;
-  @Column({ type: "boolean" }) archived = false;
+  @Nullable() @Column({ type: "integer" }) listId = 0;
+  @Nullable() @Column({ type: "boolean" }) archived = false;
   @SoftDelete() deletedAt: Date | null = null;
   @ManyToOne(() => List, { foreignKey: "listId" }) list?: List;
 }

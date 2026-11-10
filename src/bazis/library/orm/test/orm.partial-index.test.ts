@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Column, Entity, Index, Key, OrmModel, Required, SoftDelete } from "../index";
+import { Column, Entity, Index, Key, OrmModel, Required, SoftDelete, Nullable } from "../index";
 import { PostgresDialect } from "../Providers/PostgresDialect";
 import { collectPostgresIndexes } from "../Providers/PostgresSchema.decoder";
 import { ExactSchemaVerifier } from "../Schema/ExactSchemaVerifier";
@@ -15,8 +15,8 @@ import type { IntrospectedIndex, IntrospectedSchema } from "../Schema/introspect
 class Member {
   @Key() id = 0;
   @Required() @Column({ type: "text" }) email = "";
-  @Index<Member>({ where: (m) => m.active.eq(true) }) @Column({ type: "text" }) nick = "";
-  @Column({ type: "boolean" }) active = true;
+  @Index<Member>({ where: (m) => m.active.eq(true) }) @Nullable() @Column({ type: "text" }) nick = "";
+  @Nullable() @Column({ type: "boolean" }) active = true;
   @SoftDelete() deletedAt: Date | null = null;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, PostgresProvider, Schema } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, PostgresProvider, Schema, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const enabled = !!url && process.env.BAZIS_ORM_QUALIFICATION_LIVE === "1";
@@ -13,12 +13,12 @@ async function fixture(max: number) {
   @Schema(schema) @Entity({ table: "counter" })
   class Counter {
     @Key({ generated: false }) @Column({ type: "integer" }) id = 1;
-    @Column({ type: "integer" }) value = 0;
+    @Nullable() @Column({ type: "integer" }) value = 0;
   }
   @Schema(schema) @Entity({ table: "ledger" })
   class Ledger {
     @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
-    @Column({ type: "text" }) payload = "";
+    @Nullable() @Column({ type: "text" }) payload = "";
   }
   const entities = [Counter, Ledger];
   const context = (p = provider) => new Context(new DbContextOptions({ provider: p, entities }));

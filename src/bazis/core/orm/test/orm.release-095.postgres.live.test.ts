@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseListQuery, type ListQueryOptions } from "@/library/jsonapi";
 import {
   Column, DbContext, DbContextOptions, Entity, Key, ManyToOne, OneToMany,
-  Schema, postgres,
+  Schema, postgres, Nullable,
 } from "@/library/orm";
 import { paginate } from "../listQuery";
 
@@ -45,7 +45,7 @@ async function createFixture() {
   @Schema(schema)
   class Root {
     @Key({ generated: false }) id = 0;
-    @Column({ type: "integer", nullable: true }) featuredId: number | null = null;
+    @Nullable() @Column({ type: "integer" }) featuredId: number | null = null;
     @OneToMany(() => Child, { foreignKey: "rootId" }) children: Child[] = [];
     @ManyToOne(() => Child, { foreignKey: "featuredId" }) featured: Child | null = null;
   }
@@ -54,8 +54,8 @@ async function createFixture() {
   @Schema(schema)
   class Child {
     @Key({ generated: false }) id = 0;
-    @Column({ type: "integer" }) rootId = 0;
-    @Column({ type: "integer" }) noteId = 0;
+    @Nullable() @Column({ type: "integer" }) rootId = 0;
+    @Nullable() @Column({ type: "integer" }) noteId = 0;
     @OneToMany(() => Leaf, { foreignKey: "childId" }) leaves: Leaf[] = [];
     @ManyToOne(() => Note, { foreignKey: "noteId" }) note: Note | null = null;
   }
@@ -64,7 +64,7 @@ async function createFixture() {
   @Schema(schema)
   class Leaf {
     @Key({ generated: false }) id = 0;
-    @Column({ type: "integer" }) childId = 0;
+    @Nullable() @Column({ type: "integer" }) childId = 0;
   }
 
   @Entity({ table: "notes" })
@@ -77,10 +77,10 @@ async function createFixture() {
   @Schema(schema)
   class Value {
     @Key({ generated: false }) id = 0;
-    @Column({ type: "text" }) text = "";
-    @Column({ type: "integer" }) amount = 0;
-    @Column({ type: "real" }) ratio = 0;
-    @Column({ type: "boolean" }) active = false;
+    @Nullable() @Column({ type: "text" }) text = "";
+    @Nullable() @Column({ type: "integer" }) amount = 0;
+    @Nullable() @Column({ type: "real" }) ratio = 0;
+    @Nullable() @Column({ type: "boolean" }) active = false;
   }
 
   class Context extends DbContext {

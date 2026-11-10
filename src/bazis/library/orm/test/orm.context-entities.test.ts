@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 import { Module } from "@/core/di";
 import { ormModule } from "@/core/orm";
 import { createTestContainer } from "@/core/testing";
-import { Column, DbContext, Entity, OrmError, UUID, type DatabaseProvider, type DbContextOptions } from "@/library/orm";
+import { Column, DbContext, Entity, OrmError, UUID, type DatabaseProvider, type DbContextOptions, Nullable } from "@/library/orm";
 
-@Entity({ table: "ce_users" }) class User { @UUID() id = ""; @Column({ type: "text" }) name = ""; }
-@Entity({ table: "ce_posts" }) class Post { @UUID() id = ""; @Column({ type: "text" }) title = ""; }
-@Entity({ table: "ce_tags" }) class Tag { @UUID() id = ""; @Column({ type: "text" }) name = ""; }
+@Entity({ table: "ce_users" }) class User { @UUID() id = ""; @Nullable() @Column({ type: "text" }) name = ""; }
+@Entity({ table: "ce_posts" }) class Post { @UUID() id = ""; @Nullable() @Column({ type: "text" }) title = ""; }
+@Entity({ table: "ce_tags" }) class Tag { @UUID() id = ""; @Nullable() @Column({ type: "text" }) name = ""; }
 
 class BlogDbContext extends DbContext {
   readonly users = this.set(User);

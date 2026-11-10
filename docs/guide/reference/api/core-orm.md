@@ -20,7 +20,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `Entity(options)` | Класс — таблица | [Сущности](../../database/entities.md#таблица) |
-| `Column(options)`, `Required()` | Столбец; `NOT NULL` | [Столбцы](../../database/entities.md#столбцы) |
+| `Column(options)`, `Required()`, `Nullable()` | Столбец; метка `NOT NULL` или «NULL можно», одна из двух обязательна | [Столбцы](../../database/entities.md#столбцы) |
 | `Key(options)`, `UUID(options)` | Первичный ключ; ключ UUID (v7) | [Ключи](../../database/entities.md#ключи) |
 | `CreatedAt()`, `UpdatedAt()` | Время создания и изменения | [Время создания и изменения](../../database/entities.md#время-создания-и-изменения) |
 | `Index(options)`, `Check(name, predicate)` | Индекс; условие `CHECK` | [Индексы и проверки](../../database/entities.md#индексы-и-проверки) |

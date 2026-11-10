@@ -92,9 +92,9 @@ const next = await issuer.rotate(refreshToken, { role: currentRole });
 @Entity({ table: "refresh_tokens" })
 export class RefreshToken {
   @Key({ generated: false }) @Column({ type: "text" }) jti = "";
-  @Column({ type: "text" }) subject = "";
-  @Column({ type: "datetime" }) expiresAt = new Date(0);
-  @Column({ type: "datetime" }) usedAt: Date | null = null;
+  @Nullable() @Column({ type: "text" }) subject = "";
+  @Nullable() @Column({ type: "datetime" }) expiresAt = new Date(0);
+  @Nullable() @Column({ type: "datetime" }) usedAt: Date | null = null;
 }
 
 export class SessionsService {

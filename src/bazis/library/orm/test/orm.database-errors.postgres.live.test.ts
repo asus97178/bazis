@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Check, CheckViolationError, Column, DbContext, DbContextOptions, Entity, ForeignKeyViolationError, Key, LockTimeoutError, ManyToOne, NotNullViolationError, postgres, Required, TransactionOutcomeUnknownError, UniqueViolationError, Index, type PostgresProvider } from "../index";
+import { Check, CheckViolationError, Column, DbContext, DbContextOptions, Entity, ForeignKeyViolationError, Key, LockTimeoutError, ManyToOne, NotNullViolationError, postgres, Required, TransactionOutcomeUnknownError, UniqueViolationError, Index, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const live = url === undefined ? test.skip : test;
@@ -14,8 +14,8 @@ class Category { @Key() id = 0; @Index({ unique: true }) @Column({ type: "text" 
 class Product {
   @Key() id = 0;
   @Column({ type: "text" }) @Required() title = "";
-  @Column({ type: "integer" }) price = 0;
-  @Column({ type: "integer" }) categoryId = 0;
+  @Nullable() @Column({ type: "integer" }) price = 0;
+  @Nullable() @Column({ type: "integer" }) categoryId = 0;
   @ManyToOne(() => Category, { foreignKey: "categoryId" }) category?: Category;
 }
 class Shop extends DbContext { readonly categories = this.set(Category); readonly products = this.set(Product); }

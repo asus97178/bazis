@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Index, Key, postgres, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Index, Key, postgres, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
@@ -9,17 +9,17 @@ const prices = `ormschdx_${run}_prices`;
 const live = url === undefined ? test.skip : test;
 
 @Entity({ table: items })
-class Item { @Key() id = 0; @Index({ unique: true }) @Column({ type: "text" }) code = ""; }
+class Item { @Key() id = 0; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) code = ""; }
 @Entity({ table: items })
-class ItemWithNote { @Key() id = 0; @Index({ unique: true }) @Column({ type: "text" }) code = ""; @Column({ type: "text" }) note: string | null = null; }
+class ItemWithNote { @Key() id = 0; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) code = ""; @Nullable() @Column({ type: "text" }) note: string | null = null; }
 @Entity({ table: tags })
-class Tag { @Key() id = 0; @Column({ type: "text" }) tag = ""; }
+class Tag { @Key() id = 0; @Nullable() @Column({ type: "text" }) tag = ""; }
 @Entity({ table: tags })
-class UniqueTag { @Key() id = 0; @Index({ unique: true }) @Column({ type: "text" }) tag = ""; }
+class UniqueTag { @Key() id = 0; @Index({ unique: true }) @Nullable() @Column({ type: "text" }) tag = ""; }
 @Entity({ table: prices })
-class IntegerPrice { @Key() id = 0; @Column({ type: "integer" }) price = 0; }
+class IntegerPrice { @Key() id = 0; @Nullable() @Column({ type: "integer" }) price = 0; }
 @Entity({ table: prices })
-class RealPrice { @Key() id = 0; @Column({ type: "real" }) price = 0; }
+class RealPrice { @Key() id = 0; @Nullable() @Column({ type: "real" }) price = 0; }
 
 let shared: PostgresProvider | undefined;
 const provider = () => shared ??= postgres({ url: url! });

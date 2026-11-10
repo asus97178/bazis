@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, Schema, postgres } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, Schema, postgres, Nullable } from "../index";
 
 const enabled = process.env.BAZIS_ORM_JSON_NATIVE_LIVE === "1";
 const values: unknown[] = ["123", "false", "null", '{"role":"reader"}', '[1,2]', '"quoted"', "ordinary text", "", 123, 0, -7, 3.25, false, true, null, [1, "false"], { value: "null" }];
@@ -31,7 +31,7 @@ async function createFixture() {
   @Entity({ table: "rows" }) @Schema(schema)
   class JsonRow {
     @Key({ generated: false }) id = 0;
-    @Column({ type: "json", nullable: true }) data: unknown = null;
+    @Nullable() @Column({ type: "json" }) data: unknown = null;
   }
   class Context extends DbContext { readonly rows = this.set(JsonRow); }
   try {

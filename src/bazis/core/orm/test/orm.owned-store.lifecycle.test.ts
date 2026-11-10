@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, DI, Global, HOSTED_SERVICE, Module, type HostedService } from "@/core/di";
 import { HEALTH_CHECK, LifecycleCoordinator } from "@/core/kernel";
-import { Column, DATABASE_PROVIDER, DbContext, DbContextOptions, defineOrmOwnedStoreV1, Entity, EntityNotMappedError, ForeignKey, Key, ormModule, type DatabaseProvider } from "bazis/core/orm";
+import { Column, DATABASE_PROVIDER, DbContext, DbContextOptions, defineOrmOwnedStoreV1, Entity, EntityNotMappedError, ForeignKey, Key, ormModule, type DatabaseProvider, Nullable } from "bazis/core/orm";
 import { canonicalOwnedStoreModelHashV1, canonicalOwnedStoreScopeHashV1 } from "../../../library/orm/Schema/OwnedStoreCanonical";
 import { registerPostgresOwnedStoreCapability, type OwnedStoreCreateOperationV1, type OwnedStoreIdentityInsertV1, type OwnedStoreSecondaryLockPlanV1, type RegistryLockedOwnedStoreSessionV1, type SecondaryLockedOwnedStoreSessionV1 } from "../../../library/orm/Providers/ormOwnedStoreRuntime";
 import { parseOwnedStoreCatalogSnapshotV1, parseOwnedStoreRegistrySnapshotV1, type OwnedStoreCatalogSnapshotV1 } from "../../../library/orm/Schema/OwnedStoreCatalog";
@@ -9,10 +9,10 @@ import { OrmOwnedStoreLifecycle } from "../OrmOwnedStoreLifecycle";
 import { attachOwnedStoreRegistration, readOwnedStoreRegistration } from "../ownedStoreContributions";
 
 @Entity({ table: "bazis_td_jobs" })
-class OwnedRow { @Key({ generated: false, name: "pk_jobs" }) @Column({ type: "integer", nullable: false }) id!: number; }
+class OwnedRow { @Key({ generated: false, name: "pk_jobs" }) @Column({ type: "integer" }) id!: number; }
 class OwnedContext extends DbContext { constructor(options: DbContextOptions) { super(options); } }
 @Entity({ table: "bazis_td_tasks" })
-class OwnedTask { @Key({ generated: false, name: "pk_tasks" }) @Column({ type: "integer", nullable: false }) id!: number; }
+class OwnedTask { @Key({ generated: false, name: "pk_tasks" }) @Column({ type: "integer" }) id!: number; }
 class OwnedTaskContext extends DbContext { constructor(options: DbContextOptions) { super(options); } }
 const definition = defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey: "owned.lifecycle", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "bazis_td_j" } });
 const taskDefinition = defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey: "owned.tasks", formatVersion: 1, ownedScope: { schema: "public", tablePrefix: "bazis_td_tasks" } });
@@ -151,7 +151,7 @@ describe("owned-store core lifecycle", () => {
 class ProbeContextA extends DbContext {}
 class ProbeContextB extends DbContext {}
 @Entity({ table: "outside_parent" }) class ForeignParent { @Key() @Column({ type: "integer" }) id = 0; }
-@Entity({ table: "probe_a_child" }) class ForeignChild { @Key() @Column({ type: "integer" }) id = 0; @ForeignKey(() => ForeignParent) @Column({ type: "integer" }) parentId = 0; }
+@Entity({ table: "probe_a_child" }) class ForeignChild { @Key() @Column({ type: "integer" }) id = 0; @ForeignKey(() => ForeignParent) @Nullable() @Column({ type: "integer" }) parentId = 0; }
 const probeDefinition = (storeKey = "probe-a", tablePrefix = "probe_a_") => defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey, formatVersion: 1, ownedScope: { schema: "public", tablePrefix } });
 function probeRoot(config: object) { @Module({ ormBazis: config as never }) class Root {} return Root; }
 function probeReject(work: () => unknown, code: string): void { let error: unknown; try { work(); } catch (caught) { error = caught; } expect((error as { code?: unknown })?.code).toBe(code); }
@@ -175,7 +175,7 @@ function generatedEntity(table: string): new () => object {
   const classContext = { metadata } as ClassDecoratorContext;
   const fieldContext = { metadata, name: "id", static: false, private: false } as ClassFieldDecoratorContext;
   Entity({ table })(GeneratedRow, classContext);
-  Column({ type: "integer", nullable: false })(undefined, fieldContext);
+  Column({ type: "integer" })(undefined, fieldContext);
   Key({ generated: false, name: `pk_${table}` })(undefined, fieldContext);
   return GeneratedRow;
 }

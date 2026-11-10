@@ -30,8 +30,6 @@ export interface ColumnOptions {
   readonly name?: string;
   /** Type: physical (`text`, `datetime`, …) or semantic (`uuid`, `createdAt`, `updatedAt`). */
   readonly type?: ColumnOptionsType;
-  /** Allow NULL (default true; `@Required` sets false). */
-  readonly nullable?: boolean;
   /** Closed physical PostgreSQL default. It is not an application initializer or SQL fragment. */
   readonly default?: ColumnDefaultValue;
   /**
@@ -303,16 +301,25 @@ export function Column(options: ColumnOptions = {}) {
     prop.default = options.default;
     prop.precision = options.precision;
     prop.scale = options.scale;
-    if (options.nullable !== undefined) {
-      prop.nullable = options.nullable;
-    }
   };
 }
 
-/** NOT NULL. */
+/**
+ * The column is NOT NULL. Every column says whether it may be empty, with this
+ * or with {@link Nullable}: a reader sees it on the column, and a column that
+ * says neither stops the start. Keys and the creation and change timestamps
+ * need no mark: they are always NOT NULL.
+ */
 export function Required() {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
     ownProperty(context.metadata, fieldName(context)).required = true;
+  };
+}
+
+/** The column allows NULL: the other of the two marks, see {@link Required}. */
+export function Nullable() {
+  return (_value: undefined, context: ClassFieldDecoratorContext): void => {
+    ownProperty(context.metadata, fieldName(context)).nullable = true;
   };
 }
 

@@ -7,21 +7,23 @@
 Все примеры проверены на bazis 0.109.0 и PostgreSQL 17, преобразование значений и шифрование — на 0.104.1.
 
 ```ts
-import { Column, CreatedAt, Entity, Index, Required, UpdatedAt, UUID } from "bazis/core/orm";
+import { Column, CreatedAt, Entity, Index, Nullable, Required, UpdatedAt, UUID } from "bazis/core/orm";
 
 @Entity({ table: "tasks" })
 export class Task {
   @UUID({ version: "v7" })
   id = "";
 
-  @Column({ type: "text" })
   @Required()
+  @Column({ type: "text" })
   title = "";
 
+  @Nullable()
   @Column({ type: "integer" })
   priority = 0;
 
   @Index({ unique: true })
+  @Nullable()
   @Column({ type: "text" })
   email = "";
 
@@ -126,16 +128,27 @@ export class Product {
 
 ### Пустые значения
 
-Столбец по умолчанию **допускает NULL**. Обязательный — `@Required()` или
-`nullable: false`:
+Каждый столбец сам говорит, может ли он быть пустым: `@Required()` или `@Nullable()`.
+Умолчания нет, поэтому тот, кто читает модель, видит это у самого поля:
 
 | Запись | Столбец |
 | --- | --- |
-| `@Column({ type: "text" }) title = ""` | `text`, NULL можно |
-| `@Column({ type: "text" }) @Required() title = ""` | `text NOT NULL` |
-| `@Column({ type: "datetime", nullable: true }) shippedAt: Date \| null = null` | `timestamp with time zone`, NULL можно |
+| `@Required() @Column({ type: "text" }) title = ""` | `text NOT NULL` |
+| `@Nullable() @Column({ type: "datetime" }) shippedAt: Date \| null = null` | `timestamp with time zone`, NULL можно |
+| `@Column({ type: "text" }) title = ""` | Ошибка при старте |
 
-Ключ, `@CreatedAt` и `@UpdatedAt` всегда `NOT NULL`.
+```text
+ModelBuildError: Entity "Task": property "title" does not say whether it may be empty.
+Mark it @Required() (NOT NULL) or @Nullable().
+```
+
+Ключ, `@CreatedAt`, `@UpdatedAt` и `@SoftDelete` помечать не нужно: первые три всегда `NOT NULL`, последний
+всегда допускает NULL. `@Nullable()` на ключе — ошибка.
+
+> [!NOTE]
+> Обязательная метка — с версии 0.137.0. До неё столбец без `@Required()` молча допускал NULL, а
+> разрешение записывалось опцией `nullable: true`; опции больше нет. Существующий код переводит команда
+> `bunx bazis upgrade columns` ([Обновление](../reference/upgrading.md#01370)).
 
 ### Остальные настройки
 
@@ -194,7 +207,7 @@ UUID v7 начинается с времени создания, поэтому 
 @Entity({ table: "countries" })
 export class Country {
   @Key() @Column({ type: "text" }) code = "";
-  @Column({ type: "text" }) name = "";
+  @Nullable() @Column({ type: "text" }) name = "";
 }
 ```
 
@@ -217,8 +230,8 @@ For a text key add @Column({ type: "text" }) next to @Key(); for a UUID key use 
 export class OrderLine {
   @Key(["orderId", "lineNo"])
   @Column({ type: "integer" }) orderId = 0;
-  @Column({ type: "integer" }) lineNo = 0;
-  @Column({ type: "integer" }) quantity = 1;
+  @Nullable() @Column({ type: "integer" }) lineNo = 0;
+  @Nullable() @Column({ type: "integer" }) quantity = 1;
 }
 ```
 
@@ -277,7 +290,7 @@ export class OrderLine { ... }
 `toProvider` — перед записью, `fromProvider` — после чтения.
 
 ```ts
-import { Column, Entity, HasConversion, Key, ValueConverters, type ValueConverter } from "bazis/core/orm";
+import { Column, Entity, HasConversion, Key, ValueConverters, type ValueConverter, Nullable } from "bazis/core/orm";
 
 /** В коде — копейки, в базе — рубли строкой. */
 const rubles: ValueConverter<number, string> = {
@@ -289,10 +302,11 @@ const rubles: ValueConverter<number, string> = {
 export class Profile {
   @Key({ generated: false }) id = 0;
 
-  @HasConversion(rubles) @Column({ type: "text" }) balance = 0;
+  @HasConversion(rubles) @Nullable() @Column({ type: "text" }) balance = 0;
 
   @HasConversion(ValueConverters.json<{ tags: string[] }>())
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   settings: { tags: string[] } | null = null;
 }
 ```
@@ -315,7 +329,7 @@ export class Profile {
 
 `null` в поле с конвертером остаётся NULL в столбце: конвертер для него не
 вызывается ни при записи, ни при чтении. Так `json()` и шифрование
-работают в столбцах с `nullable: true`:
+работают в столбцах с `@Nullable()`:
 
 ```text
 в коде    {"id":2,"settings":null}
@@ -333,7 +347,7 @@ const emptyAsNull: ValueConverter<string | null, string | null> = {
   fromProvider: (stored) => (stored === "" || stored === null ? null : stored),
 };
 
-@HasConversion(emptyAsNull) @Column({ type: "text" }) nickname: string | null = null;
+@Nullable() @HasConversion(emptyAsNull) @Column({ type: "text" }) nickname: string | null = null;
 ```
 
 ```text

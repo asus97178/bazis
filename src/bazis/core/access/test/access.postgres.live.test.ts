@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema } from "@/library/orm";
+import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema, Nullable } from "@/library/orm";
 import { IAccess, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Grants, type PermissionsOf } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
 import { Module, singleton, singletonValue } from "@/core/di";
@@ -41,10 +41,10 @@ describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
     @Schema(schema) @Entity({ table: "items" })
     class Item {
       @Key() id = 0;
-      @Column({ nullable: true }) shopId: string | null = null;
-      @Column({ nullable: true }) ownerId: string | null = null;
-      @Column({ nullable: true }) status: string | null = null;
-      @Column() kind = "";
+      @Nullable() @Column() shopId: string | null = null;
+      @Nullable() @Column() ownerId: string | null = null;
+      @Nullable() @Column() status: string | null = null;
+      @Nullable() @Column() kind = "";
     }
     class Db extends DbContext { readonly items = this.set(Item); }
     const provider = postgres({ url: url! });

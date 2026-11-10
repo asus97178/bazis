@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "bazis/core/orm";
+import { Column, Entity, Index, UUID, Required } from "bazis/core/orm";
 
 @Entity({ table: "tasks" })
 export class Task {
@@ -7,12 +7,15 @@ export class Task {
 
   /** Id of the owning project (owned by the Project module, checked on create). */
   @Index()
+  @Required()
   @Column({ type: "text" })
   projectId = "";
 
+  @Required()
   @Column({ type: "text" })
   title = "";
 
+  @Required()
   @Column({ type: "boolean" })
   done = false;
 

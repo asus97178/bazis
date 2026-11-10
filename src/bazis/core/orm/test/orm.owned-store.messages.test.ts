@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { createContainer, Module } from "@/core/di";
-import { Column, DbContext, defineOrmOwnedStoreV1, Entity, Index, Key, OrmOwnedStoreAdmissionError, ormModule, type DatabaseProvider } from "@/core/orm";
+import { Column, DbContext, defineOrmOwnedStoreV1, Entity, Index, Key, OrmOwnedStoreAdmissionError, ormModule, type DatabaseProvider, Nullable } from "@/core/orm";
 import { explainOwnedStoreFailureV1 } from "@/library/orm/Schema/OwnedStoreExplain";
 
 const provider = { name: "postgres", dialect: { name: "postgres" }, query: async () => [], execute: async () => ({ changes: 0, lastInsertId: 0 }), transaction: async <T>(work: never) => work as T, ping: async () => true, close: async () => undefined, introspect: async () => ({ tables: new Map() }) } as unknown as DatabaseProvider;
 const store = (storeKey: string, tablePrefix: string, extra: object = {}) => defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey, formatVersion: 1, ownedScope: { schema: "public", tablePrefix }, ...extra });
 
-@Entity({ table: "notes_items" }) class NoteItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
+@Entity({ table: "notes_items" }) class NoteItem { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; }
 @Entity({ table: "outside_items" }) class OutsideItem { @Key() id = 0; }
 @Entity({ table: "notesv2_items" }) class NoteV2Item { @Key() id = 0; }
 class NotesDb extends DbContext {}
@@ -62,13 +62,13 @@ describe("owned-store graph errors name stores and tables", () => {
     // 0.115.0: @Index({ where }) is for ordinary contexts; owned stores refuse it.
     @Entity({ table: "notes_flags" })
     @Index<{ id: number; done: boolean }>(["id"], { unique: true, where: (f) => f.done.eq(false) })
-    class NoteFlag { @Key() id = 0; @Column({ type: "boolean" }) done = false; }
+    class NoteFlag { @Key() id = 0; @Nullable() @Column({ type: "boolean" }) done = false; }
     expect(failure(app({ context: NotesDb, entities: [NoteFlag], ownedStore: store("acme.notes", "notes_"), registerRepositories: false })).message).toBe('ORM_OWNED_STORE_IDENTITY_MISMATCH: Owned store "acme.notes" (schema "public", prefix "notes_"): index "ix_notes_flags_id" on "notes_flags" has a where condition; owned stores do not support partial indexes.');
   });
   test("a decimal column in a store table", () => {
     // 0.117.0: decimal is for ordinary contexts; owned stores refuse it.
     @Entity({ table: "notes_prices" })
-    class NotePrice { @Key() id = 0; @Column({ type: "decimal", precision: 12, scale: 2 }) amount = "0"; }
+    class NotePrice { @Key() id = 0; @Nullable() @Column({ type: "decimal", precision: 12, scale: 2 }) amount = "0"; }
     expect(failure(app({ context: NotesDb, entities: [NotePrice], ownedStore: store("acme.notes", "notes_"), registerRepositories: false })).message).toBe('ORM_OWNED_STORE_IDENTITY_MISMATCH: Owned store "acme.notes" (schema "public", prefix "notes_"): column "amount" of "notes_prices" is decimal; owned stores do not support decimal columns.');
   });
   test("a store key declared twice", () => {

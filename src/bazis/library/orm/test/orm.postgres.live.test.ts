@@ -14,7 +14,7 @@ import {
   SoftDelete,
   ValueConverters,
   postgres,
-  type PostgresProvider,
+  type PostgresProvider, Nullable,
 } from "@/library/orm";
 
 /**
@@ -39,9 +39,11 @@ class Category {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 
+  @Nullable()
   @Column({ type: "json" })
   meta: Record<string, unknown> = {};
 
@@ -54,22 +56,28 @@ class Product {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   title = "";
 
   @Index({ unique: true })
+  @Nullable()
   @Column({ type: "text" })
   sku = "";
 
+  @Nullable()
   @Column({ type: "real" })
   price = 0;
 
+  @Nullable()
   @Column({ type: "boolean" })
   inStock = true;
 
+  @Nullable()
   @Column({ type: "datetime" })
   createdAt = new Date();
 
+  @Nullable()
   @Column({ type: "integer" })
   @ForeignKey(() => Category)
   categoryId = 0;
@@ -89,13 +97,16 @@ class PgDoc {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   tenantId = PG_TENANT;
 
+  @Nullable()
   @Column({ type: "text" })
   title = "";
 
   @HasConversion(ValueConverters.encrypted(PG_SECRET))
+  @Nullable()
   @Column({ type: "text" })
   secret = "";
 }
@@ -105,6 +116,7 @@ class PgSoftDoc {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 

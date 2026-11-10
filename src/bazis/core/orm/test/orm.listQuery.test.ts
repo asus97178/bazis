@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseListQuery, type ListQueryOptions } from "@/library/jsonapi";
 import {
   Column, DbContext, DbContextOptions, Entity, Key, PostgresDialect,
-  type DatabaseProvider, type SqlParam,
+  type DatabaseProvider, type SqlParam, Nullable,
 } from "@/library/orm";
 import { paginate } from "../listQuery";
 
@@ -36,10 +36,10 @@ describe("ListQuery parse contract", () => {
 @Entity({ table: "list_query_values" })
 class ListQueryValue {
   @Key({ generated: false }) id = 0;
-  @Column({ type: "text", name: "value_text" }) text = "";
-  @Column({ type: "integer" }) amount = 0;
-  @Column({ type: "real" }) ratio = 0;
-  @Column({ type: "boolean" }) active = false;
+  @Nullable() @Column({ type: "text", name: "value_text" }) text = "";
+  @Nullable() @Column({ type: "integer" }) amount = 0;
+  @Nullable() @Column({ type: "real" }) ratio = 0;
+  @Nullable() @Column({ type: "boolean" }) active = false;
 }
 
 class ListQueryContext extends DbContext {

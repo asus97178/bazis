@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { buildDynamicModel, Column, DbContext, DbContextOptions, Entity, Key, OrmError, postgres, Required, Schema } from "../index";
+import { buildDynamicModel, Column, DbContext, DbContextOptions, Entity, Key, OrmError, postgres, Required, Schema, Nullable } from "../index";
 
 // 0.117.0: decimal keeps every digit end to end; real (double precision) does not.
 const url = process.env.BAZIS_PG_URL;
@@ -19,7 +19,7 @@ describe.skipIf(!url)("PostgreSQL decimal (live)", () => {
     class Item {
       @Key() id = 0;
       @Required() @Column({ type: "decimal", precision: 12, scale: 2 }) price = "0";
-      @Column({ type: "real" }) approx = 0;
+      @Nullable() @Column({ type: "real" }) approx = 0;
     }
     class Db extends DbContext { readonly items = this.set(Item); }
     const provider = postgres({ url: url! });

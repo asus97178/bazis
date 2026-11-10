@@ -14,7 +14,8 @@
 
 ```ts
 // tasks/model/Tasks.model.ts — новое поле
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   remindedAt: Date | null = null;
 ```
 

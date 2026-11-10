@@ -256,12 +256,19 @@ export class ModelBuilder {
         `Entity "${entityName}": key "${raw.propertyName}" has keyGenerated=true but is not an integer identity key.`,
       );
     }
-    // The key and semantic timestamp fields are always NOT NULL.
-    const required =
-      isKey ||
-      raw.required === true ||
-      raw.nullable === false ||
-      resolved.impliedRequired === true;
+    // The key and semantic timestamp fields are always NOT NULL. Every other
+    // column says it itself: silence would be read as either by different readers.
+    const always = isKey || resolved.impliedRequired === true;
+    if (raw.required === true && raw.nullable === true) {
+      throw new ModelBuildError(`Entity "${entityName}": property "${raw.propertyName}" is marked both @Required() and @Nullable(). Keep one.`);
+    }
+    if (always && raw.nullable === true) {
+      throw new ModelBuildError(`Entity "${entityName}": property "${raw.propertyName}" is ${isKey ? "a key" : "a creation or change timestamp"} and cannot be @Nullable().`);
+    }
+    if (!always && raw.required !== true && raw.nullable !== true) {
+      throw new ModelBuildError(`Entity "${entityName}": property "${raw.propertyName}" does not say whether it may be empty. Mark it @Required() (NOT NULL) or @Nullable().`);
+    }
+    const required = always || raw.required === true;
     const databaseDefault = ModelBuilder.defaultFor(entityName, raw, storageType, isKey, generated, convention, required);
     const digits = ModelBuilder.decimalDigits(entityName, raw, storageType);
     return {

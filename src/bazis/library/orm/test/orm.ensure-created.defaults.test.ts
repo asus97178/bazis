@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Column, Entity, Key, ModelBuilder, Required } from "../index";
+import { Column, Entity, Key, ModelBuilder, Required, Nullable } from "../index";
 
 @Entity({ table: "default_vectors" })
 class DefaultVectors {
   @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
-  @Column({ type: "text", default: "new" }) state = "";
+  @Nullable() @Column({ type: "text", default: "new" }) state = "";
   @Required() @Column({ type: "integer", default: 7 }) attempts = 0;
 }
 
@@ -29,15 +29,15 @@ describe("PostgreSQL physical column defaults", () => {
   });
   test("accepts 1024 code units and rejects hostile or oversized default authoring", () => {
     expect(() => {
-      @Entity({ table: "default_1024" }) class Boundary { @Key() @Column({ type: "integer" }) id = 0; @Column({ type: "text", default: "x".repeat(1024) }) value = ""; }
+      @Entity({ table: "default_1024" }) class Boundary { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text", default: "x".repeat(1024) }) value = ""; }
       ModelBuilder.build(Boundary);
     }).not.toThrow();
     expect(() => {
-      @Entity({ table: "default_1025" }) class Oversized { @Key() @Column({ type: "integer" }) id = 0; @Column({ type: "text", default: "x".repeat(1025) }) value = ""; }
+      @Entity({ table: "default_1025" }) class Oversized { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text", default: "x".repeat(1025) }) value = ""; }
       ModelBuilder.build(Oversized);
     }).toThrow(/1024/);
     expect(() => {
-      @Entity({ table: "default_hostile" }) class Hostile { @Key() @Column({ type: "integer" }) id = 0; @Column({ type: "text", default: {} as never }) value = ""; }
+      @Entity({ table: "default_hostile" }) class Hostile { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text", default: {} as never }) value = ""; }
       ModelBuilder.build(Hostile);
     }).toThrow();
   });
@@ -55,7 +55,7 @@ function buildDatetimeDefault(value: string): void {
   @Entity({ table: "datetime_default_vector" })
   class DatetimeDefaultVector {
     @Key() @Column({ type: "integer" }) id = 0;
-    @Column({ type: "datetime", default: value }) createdAt = new Date(0);
+    @Nullable() @Column({ type: "datetime", default: value }) createdAt = new Date(0);
   }
   ModelBuilder.build(DatetimeDefaultVector);
 }
