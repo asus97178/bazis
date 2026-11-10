@@ -30,7 +30,9 @@ export interface PostgresConfigShape {
   readonly maxLifetime?: number;
 }
 
-export type PostgresSslMode = "disable" | "allow" | "prefer" | "require" | "verify-ca" | "verify-full";
+/** The TLS modes of a PostgreSQL connection, for `configEnum(POSTGRES_SSL_MODES, "disable")`. */
+export const POSTGRES_SSL_MODES = ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"] as const;
+export type PostgresSslMode = typeof POSTGRES_SSL_MODES[number];
 export interface PostgresConnectorOptions {
   readonly token?: InjectionToken<SQL>;
   /** Maximum pool drain before closing connections. Default 1000ms; 0 closes immediately. */
@@ -47,7 +49,7 @@ export function postgresConnectionOptions(config: AppConfig<PostgresConfigShape>
     return value;
   };
   const tls = c.has("tls") ? c.get("tls") : undefined;
-  if (tls !== undefined && !["disable", "allow", "prefer", "require", "verify-ca", "verify-full"].includes(String(tls))) throw new InfraError("postgres tls is invalid");
+  if (tls !== undefined && !(POSTGRES_SSL_MODES as readonly string[]).includes(String(tls))) throw new InfraError("postgres tls is invalid");
   return {
     hostname: requireValue(c.get("host"), "host", "postgres"),
     port: integer("port", 1, 65535),
