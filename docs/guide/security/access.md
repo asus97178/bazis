@@ -58,6 +58,24 @@ export class OrdersModule {}
 условия (`all`, `any`, `not`, `own`, `scope`) как имя атрибута, одно право в
 двух модулях, `AccessModule` не подключён.
 
+### Ключи проверяет компилятор
+
+`bazis codegen` собирает права всех модулей в один тип (`src/generated/bazis/permissions.ts`), поэтому
+`can`, `access.can`, `access.filter` и `defineRoles` принимают только объявленные ключи:
+
+```ts
+@Authorize(can("orders.raed"))                       // ошибка сборки: такого права нет
+defineRoles({ customer: ["orders.export:own"] })     // ошибка сборки: у права нет owner
+```
+
+- Права пакетов фреймворка (`workflow.*`, `access.catalog.read`) в типе уже есть.
+- Объявление должно быть экспортированной константой, а в модуле стоит её имя: `permissions: orderPermissions`.
+  `definePermissions({...})` прямо в `@Module` останавливает codegen с ошибкой `BAZIS_ACCESS_PERMISSIONS_FORM`.
+- Новое право видно компилятору после перегенерации; `bazis dev`, `bazis build` и `bazis test` делают её сами.
+- Гранты, которые отдаёт своя система прав, остаются строками: они приходят из базы.
+
+Проверка ключей — с версии 0.137.0.
+
 ## Проверить маршрут
 
 ```ts

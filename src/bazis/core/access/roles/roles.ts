@@ -1,3 +1,4 @@
+import type { OwnPermissionKey, PermissionKey } from "../catalog/permissions";
 import type { Condition, Grant, GrantFields, Scope } from "../contracts/types";
 
 /**
@@ -5,9 +6,10 @@ import type { Condition, Grant, GrantFields, Scope } from "../contracts/types";
  * grant with conditions.
  */
 export type RoleGrant =
-  | string
+  | PermissionKey
+  | `${OwnPermissionKey}:own`
   | {
-      readonly permission: string;
+      readonly permission: PermissionKey;
       readonly scopes?: "all" | readonly Scope[];
       readonly where?: Condition;
       readonly fields?: GrantFields;
