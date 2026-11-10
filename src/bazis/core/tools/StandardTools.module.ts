@@ -16,7 +16,7 @@ import { ConfigSecretStore, SecretStore } from "./secrets/SecretStore";
   config: [toolsConfig],
   references: { "orm.entity": OrmEntityReferences, "orm.field": OrmFieldReferences },
   tools: [HttpRequestTool],
-  providers: [singleton(OrmEntityReferences), singleton(OrmFieldReferences), singleton(SecretStore, ConfigSecretStore)],
+  providers: [singleton(SecretStore, ConfigSecretStore)],
   exports: [SecretStore],
 })
 export class StandardToolsModule {}

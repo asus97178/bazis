@@ -196,11 +196,11 @@ singleton(AccessPolicy, AppAccessPolicy)   // или scoped, если ей ну�
   imports: [AccessModule],
   permissions: orderPermissions,
   references: { "orders.process": ProcessReferences },
-  providers: [singleton(ProcessReferences)],
 })
 ```
 
-`ProcessReferences` наследует `References`: `exists`, `describe`, `search`.
+`ProcessReferences` наследует `References`: `exists`, `describe`, `search`. Поле само регистрирует
+класс, в `providers` его повторять не нужно (с версии 0.137.0).
 Каталог читается по HTTP с правом `access.catalog.read`:
 
 - `GET /access/catalog` — права всех модулей с атрибутами;

@@ -964,7 +964,7 @@ export class FindRecordsInput {
 объявляет его в `@Module({ references })`, и `exists` получает область в `context.within`:
 
 ```ts
-@Module({ references: { "dm.table": TableReferences, "dm.field": FieldReferences }, providers: [scoped(TableReferences), scoped(FieldReferences)] })
+@Module({ references: { "dm.table": TableReferences, "dm.field": FieldReferences } })
 export class RecordsModule {}
 ```
 

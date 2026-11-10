@@ -267,3 +267,20 @@ test("the default rights system: roles from the token, permissions from @Module(
     await app.stop();
   }
 });
+
+test("a class of references needs no place in providers: the field registers it", async () => {
+  class TableReferences extends References {
+    async exists(ids: readonly string[]): Promise<ReadonlySet<string>> { return new Set(ids); }
+    async describe(): Promise<readonly ReferenceItem[]> { return []; }
+    async search(): Promise<readonly ReferenceItem[]> { return []; }
+  }
+  @Module({ imports: [AccessModule], references: { "docs.table": TableReferences, "docs.view": TableReferences } }) class DocsModule {}
+  const container = await createTestContainer(DocsModule);
+  const scope = container.createScope();
+  try {
+    expect(scope.resolve(TableReferences)).toBeInstanceOf(TableReferences);
+    expect([...await scope.resolve(TableReferences).exists(["a"])]).toEqual(["a"]);
+  } finally {
+    await scope.dispose();
+  }
+});

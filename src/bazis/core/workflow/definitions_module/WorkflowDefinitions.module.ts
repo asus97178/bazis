@@ -48,8 +48,6 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     scoped(WorkflowReferences),
     scoped(CatalogImport),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
-    scoped(ProcessReferences),
-    scoped(FolderReferences),
     scoped(ProcessFolderLookup),
     scoped(ProcessPartitionLookup),
     singleton(HOSTED_SERVICE, CodeProcessPublisher),

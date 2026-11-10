@@ -1000,6 +1000,9 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
       const classes = properties.get(name);
       if (classes && ts.isArrayLiteralExpression(classes)) for (const entry of classes.elements) record(entry);
     }
+    // `references: { "orders.order": OrderReferences }`: the field registers the classes.
+    const references = objectFor(properties.get("references"));
+    if (references) for (const entry of propertiesOf(references).values()) record(entry);
     const imports = properties.get("imports");
     if (imports && ts.isArrayLiteralExpression(imports)) for (const entry of imports.elements) recordModule(entry);
   };
