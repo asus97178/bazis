@@ -1,15 +1,15 @@
-import { defineConfig } from "../../kernel";
+import { configList, defineConfig } from "../../kernel";
 
 /**
  * Settings of the workflow pack, from the application configuration:
  * `BAZIS_WORKFLOW__WORKER__ENABLED=false` keeps an instance from running jobs,
  * for example a web-only one (WORKFLOW-001 §4). `language` is the default
- * language of texts, `languages` the comma-separated list a request may ask for
+ * language of texts, `languages` the list a request may ask for (comma-separated in the environment)
  * with `Accept-Language` (WORKFLOW-002 §6).
  */
 export interface WorkflowSettings {
   readonly language: string;
-  readonly languages: string;
+  readonly languages: readonly string[];
   readonly "worker.enabled": boolean;
   readonly "worker.intervalMs": number;
   readonly "worker.batchSize": number;
@@ -23,7 +23,7 @@ const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 export const workflowConfig = defineConfig<WorkflowSettings>("workflow", {
   default: {
     language: "en",
-    languages: "en",
+    languages: configList(["en"]),
     "worker.enabled": true,
     "worker.intervalMs": 1000,
     "worker.batchSize": 10,
@@ -33,7 +33,7 @@ export const workflowConfig = defineConfig<WorkflowSettings>("workflow", {
   },
   validate: {
     language: (value) => (LANGUAGE.test(value) ? undefined : "must be a language: en, ru, pt-BR"),
-    languages: (value) => (value.split(",").every((item) => LANGUAGE.test(item.trim())) ? undefined : "must be a comma-separated list of languages"),
+    languages: (value) => (value.every((item) => LANGUAGE.test(item)) ? undefined : "must be a list of languages: en, ru, pt-BR"),
     "worker.intervalMs": (value) => positive(value, 3_600_000),
     "worker.batchSize": (value) => positive(value, 1000),
     "retention.intervalMs": (value) => positive(value, 86_400_000),

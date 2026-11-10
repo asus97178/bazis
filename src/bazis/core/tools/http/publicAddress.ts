@@ -82,9 +82,9 @@ export function isPublicAddress(address: string): boolean {
 }
 
 /** Whether `tools.http.allow` lets this host and port through: `api.example.com`, `*.example.com`, `localhost:8080`. */
-export function hostAllowed(allow: string, hostname: string, port: string): boolean {
+export function hostAllowed(allow: readonly string[], hostname: string, port: string): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, "");
-  return allow.split(",").map((item) => item.trim().toLowerCase()).filter((item) => item !== "").some((item) => {
+  return allow.map((item) => item.toLowerCase()).some((item) => {
     // An IPv6 address goes in brackets, as in a URL: [::1]:8080.
     const match = /^\[(.+)\](?::(\d+))?$/.exec(item) ?? /^(.*?)(?::(\d+))?$/.exec(item)!;
     const [name, wanted] = [match[1]!, match[2]];

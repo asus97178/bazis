@@ -16,7 +16,7 @@ export class WorkflowLanguages {
   /** The best language of an `Accept-Language` header: by weight, then by order; `ru-RU` also finds `ru`. */
   of(header: string | undefined): string {
     if (header === undefined) return this.default;
-    const known = new Set([this.default, ...this.config.get("languages").split(",").map((item) => item.trim())]);
+    const known = new Set([this.default, ...this.config.get("languages")]);
     const wanted = header.split(",")
       .map((part, index) => {
         const [tag = "", ...parameters] = part.trim().split(";");
