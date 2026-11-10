@@ -26,7 +26,7 @@ const build = (options: Parameters<typeof composeApp>[1]) =>
 test("a cached service without a cache module stops the start and says how to fix it", async () => {
   const error = await build({}).then(() => undefined, (e: unknown) => e as Error);
   expect(error?.message).toContain(`Missing dependency "ICache" for "Stock"`);
-  expect(error?.message).toContain("add cache: memory() to the runApp options");
+  expect(error?.message).toContain("add cache: memory() to @App");
 });
 
 test("with cache: memory() the services are cached as before", async () => {

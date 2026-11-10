@@ -23,7 +23,7 @@ export interface HttpOpenApiDocumentBuildInput {
   readonly versioning?: ApiVersioningOptions;
   readonly title: string;
   readonly version: string;
-  /** Default checks of `runApp({ http: { authorize } })`: such routes are secured too. */
+  /** Default checks of `@App({ http: { authorize } })`: such routes are secured too. */
   readonly authorize?: readonly AuthorizeCheck[];
 }
 

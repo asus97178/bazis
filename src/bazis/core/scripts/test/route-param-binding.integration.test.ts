@@ -37,7 +37,7 @@ test("codegen binds controller-prefix and wildcard route parameters", async () =
     // Serve the controller and call it over HTTP with the generated descriptors.
     await Bun.write(path.join(root, "server.ts"), `
 import { Module } from "bazis/core/di";
-import { runApp } from "bazis/core/app";
+import { App, runApp } from "bazis/core/app";
 import { ThingsController } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
@@ -46,7 +46,9 @@ await registerBazisGeneratedRuntime();
 const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
 const port = probe.port;
 probe.stop(true);
-void runApp(Root, { http: { hostname: "127.0.0.1", port } });
+@App({ modules: [Root], http: { hostname: "127.0.0.1", port } })
+class Application {}
+void runApp(Application);
 const base = "http://127.0.0.1:" + port;
 // A loaded CI runner can take several seconds to start the app: wait up to 20.
 for (let i = 0; i < 400 && !(await fetch(base + "/orgs/acme/things/1").then(() => true, () => false)); i++) await Bun.sleep(50);

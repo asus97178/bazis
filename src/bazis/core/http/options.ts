@@ -72,8 +72,12 @@ export interface HttpModuleOptions {
    * either listed here or exported by global modules.
    */
   readonly imports?: readonly import("../di").BazisModuleRef[];
-  /** Listen port (default 3000; 0 — random free port). */
+  /**
+   * Fixes the listen port in code (0 — a random free port). Leave it out: the
+   * port then comes from the `http.port` setting, 3000 unless `BAZIS_HTTP__PORT` says otherwise.
+   */
   readonly port?: number;
+  /** Fixes the listen address in code. Leave it out: it comes from the `http.host` setting (`BAZIS_HTTP__HOST`). */
   readonly hostname?: string;
   /** Global route prefix, e.g. "api". */
   readonly prefix?: string;

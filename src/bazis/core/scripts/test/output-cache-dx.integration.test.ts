@@ -65,6 +65,6 @@ console.log(JSON.stringify({ ...result, bare: [a, b] }));
   const warnings = probe.output.split("\n").filter((line) => line.includes("has no effect"));
   expect(warnings).toHaveLength(1);
   expect(warnings[0]).toContain(
-    "[cache] @OutputCache on TasksController.getAll has no effect: no cache module is installed, so every request runs the action. Add `cache: memory()` to the runApp options.",
+    "[cache] @OutputCache on TasksController.getAll has no effect: no cache module is installed, so every request runs the action. Add `cache: memory()` to @App.",
   );
 }, 60_000);

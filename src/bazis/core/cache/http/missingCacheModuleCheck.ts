@@ -43,7 +43,7 @@ export function missingCacheModuleCheck(): ProviderDefinition {
         if (requirement === undefined || requirement.enabled === false) return [];
         const message = `[cache] @OutputCache on ${controllerClass.name}.${String(methodName)} has no effect: `
           + "no cache module is installed, so every request runs the action. "
-          + "Add `cache: memory()` to the runApp options.";
+          + "Add `cache: memory()` to @App.";
         if (logger) logger.warn(message);
         else console.warn(message);
         return [];

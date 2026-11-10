@@ -10,7 +10,7 @@ import { defineConfig, secret } from "@/core/kernel";
 import { ormBazisConnect } from "@/core/orm";
 import { SecretStore, StandardToolsModule } from "@/core/tools";
 import { defineProcess, IWorkflowDefinitions, WorkflowModule, type CodeProcess, type InstanceDetails } from "@/core/workflow";
-import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
+import { dropWorkflowTables, testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
 import { postgres } from "@/library/orm";
 import type { ProcessDocument, ProcessFlow, VariableSpec } from "@/library/workflow";
 
@@ -108,14 +108,8 @@ function root(dsn: string) {
 
 beforeAll(async () => {
   if (!enabled) return;
-  const sql = postgres({ url });
-  try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
-    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
-    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
-  } finally {
-    await sql.close();
-  }
+  // The database is a throwaway one: its name was checked above.
+  await dropWorkflowTables(url!, { force: true });
   server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,

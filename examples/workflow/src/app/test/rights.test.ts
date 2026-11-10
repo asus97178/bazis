@@ -1,36 +1,28 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import { startTestApp, type TestApp } from "bazis/core/testing";
 import { hs256, TokenIssuer } from "bazis/library/jwt";
+import { OrdersApp } from "../App";
 
-// End-to-end: the app from source on a real PostgreSQL, the rights of the roles
-// over HTTP. Needs BAZIS_DB__HOST; without it the test is reported as skipped.
+// End-to-end: the application of src/app/App.ts on a real PostgreSQL, the rights of
+// the roles over HTTP. Needs BAZIS_DB__HOST; without it the test is reported as skipped.
 const enabled = Boolean(process.env.BAZIS_DB__HOST);
-const port = String(20000 + Math.floor(Math.random() * 20000));
-const base = `http://127.0.0.1:${port}`;
 const issuer = new TokenIssuer({ issuer: "orders", audience: "user", algorithm: hs256("dev-only-secret-at-least-32-bytes!!"), accessTtlSeconds: 3600, refreshTtlSeconds: 86400 });
-let app: ReturnType<typeof Bun.spawn> | undefined;
+let app: TestApp | undefined;
 
 beforeAll(async () => {
   if (!enabled) return;
-  app = Bun.spawn([process.execPath, "run", "src/index.ts"], {
-    env: { ...process.env, BAZIS_ENV: "development", HOST: "127.0.0.1", PORT: port, BAZIS_WORKFLOW__LANGUAGES: "en,ru" },
-    stdout: "ignore",
-    stderr: "inherit",
-  });
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (await fetch(`${base}/health`).then((response) => response.ok, () => false)) return;
-    await Bun.sleep(100);
-  }
-  throw new Error("app did not answer /health");
+  process.env.BAZIS_WORKFLOW__LANGUAGES = "en,ru";
+  app = await startTestApp(OrdersApp);
 });
 
 afterAll(async () => {
-  app?.kill();
-  await app?.exited;
+  await app?.stop();
+  delete process.env.BAZIS_WORKFLOW__LANGUAGES;
 });
 
 async function send(user: string | undefined, role: string, method: string, path: string, body?: unknown, language?: string) {
   const token = user === undefined ? undefined : (await issuer.issue(user, { role })).accessToken;
-  const response = await fetch(`${base}${path}`, {
+  const response = await app!.fetch(path, {
     method,
     headers: { "content-type": "application/json", ...(language === undefined ? {} : { "accept-language": language }), ...(token === undefined ? {} : { authorization: `Bearer ${token}` }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

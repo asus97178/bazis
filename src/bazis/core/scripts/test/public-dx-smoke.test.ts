@@ -2,6 +2,7 @@ import { registerGeneratedBindings } from "../../http/Binding/autoBindings";
 import { TOOL_EXECUTION_OPTIONS } from "bazis/core/agent";
 import { describe, expect, test } from "bun:test";
 import {
+  App,
   AgentRuntime,
   type AgentToolAuditHookProjectionV1,
   type AgentToolAuditPhase,
@@ -275,7 +276,10 @@ describe("public bazis DX smoke", () => {
     @Module({ config: brokenConfig })
     class BrokenAppModule {}
 
-    expect(() => runApp(BrokenAppModule)).toThrow("dx config invalid");
+    @App({ modules: [BrokenAppModule] })
+    class BrokenApp {}
+
+    expect(() => runApp(BrokenApp)).toThrow("dx config invalid");
   });
 });
 

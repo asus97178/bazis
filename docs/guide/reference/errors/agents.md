@@ -186,7 +186,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `LOGIN_FAILED` | `ChatGPT sign-in failed. Try again; use device-code sign-in if needed.` |
 | `LOGIN_EXPIRED` | `The sign-in window expired. Start signing in again.` |
 
-Язык текстов задаёт `runApp({ language })` (с 0.105.3), свои тексты —
+Язык текстов задаёт `@App({ language })` (с 0.105.3), свои тексты —
 `CodexError.useMessages({ … })` поверх него
 ([Codex](../../infra/connectors.md#codex)).
 

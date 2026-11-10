@@ -85,7 +85,7 @@ export class MailService {
 ```text
 [bazis] configuration error: Service graph validation failed:
 Missing dependency "Config:report" for "ReportService". The config defineConfig("report", …) is not declared
-in the application: add it to `config` of the module that uses it, or to runApp({ config }).
+in the application: add it to `config` of the module that uses it, or to @App({ config }).
 ```
 
 ## Откуда берутся значения

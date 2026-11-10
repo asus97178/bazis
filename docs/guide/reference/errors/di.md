@@ -40,7 +40,7 @@ Missing dependency "Mailer" for "SignupService"
 ```text
 [bazis] configuration error: Service graph validation failed:
 Missing dependency "Config:report" for "ReportService". The config defineConfig("report", …) is not declared
-in the application: add it to `config` of the module that uses it, or to runApp({ config }).
+in the application: add it to `config` of the module that uses it, or to @App({ config }).
 Missing dependency "IRepository<Lead>" for "LeadsService". Repositories are registered by ormBazis for the
 entities of its context: add Lead to the entities of an ormBazis module and keep registerRepositories on
 (the default), or inject that module's DbContext instead.
@@ -49,7 +49,7 @@ Missing dependency "IClock" for "Scheduler".
 
 | Имя | Что сделать |
 | --- | --- |
-| `Config:report` | Подключить конфиг: `config: reportConfig` в модуле или `runApp({ config })` ([Конфигурация](../../fundamentals/configuration.md)) |
+| `Config:report` | Подключить конфиг: `config: reportConfig` в модуле или `@App({ config })` ([Конфигурация](../../fundamentals/configuration.md)) |
 | `IRepository<Lead>` | Добавить `Lead` в `entities` модуля с `ormBazis` ([Репозитории](../../database/repositories.md)) |
 | `IClock` | Зарегистрировать токен: `scoped(IClock, SystemClock)` ([Провайдеры](../../overview/providers.md#интерфейс-и-токен)) |
 

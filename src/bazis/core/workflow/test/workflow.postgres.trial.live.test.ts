@@ -12,8 +12,8 @@ import { startTestApp } from "@/core/testing";
 import { ormEntityTools } from "@/core/tools";
 import { defineProcess, IWorkflowDefinitions, IWorkflowRuntime, IWorkflowTasks, WORKFLOW_INSTANCE_FINISHED, WORKFLOW_INSTANCE_STARTED, WORKFLOW_PROCESS_CHANGED, WORKFLOW_TASK_COMPLETED, WORKFLOW_TASK_REQUESTED, WORKFLOW_TOKEN_CLOSED, WorkflowModule, WorkflowSetupError, type CodeProcess } from "@/core/workflow";
 import { WorkflowRetention } from "@/core/workflow/runtime_module/background/WorkflowRetention";
-import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
-import { Column, DbContext, Entity, UUID, postgres, Nullable } from "@/library/orm";
+import { dropWorkflowTables, testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
+import { Column, DbContext, Entity, UUID, Nullable } from "@/library/orm";
 import type { ProcessDocument, ProcessFlow, VariableSpec } from "@/library/workflow";
 
 /**
@@ -166,14 +166,8 @@ let wf: TestWorkflow;
 
 beforeAll(async () => {
   if (!enabled) return;
-  const sql = postgres({ url });
-  try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
-    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
-    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
-  } finally {
-    await sql.close();
-  }
+  // The database is a throwaway one: its name was checked above.
+  await dropWorkflowTables(url!, { force: true });
   wf = await testWorkflow(root(url!), { now: "2026-11-02T09:00:00Z" });
 });
 

@@ -35,7 +35,7 @@ const CATALOGS: Readonly<Record<AppLanguage, Readonly<Record<string, string>>>> 
  */
 export function createLocalize(language: AppLanguage = "en", messages: AppMessages = {}): Localize {
   if (!Object.prototype.hasOwnProperty.call(CATALOGS, language)) {
-    throw new KernelError(`runApp: language "${String(language)}" is not supported. Use one of: ${Object.keys(CATALOGS).join(", ")}.`);
+    throw new KernelError(`@App: language "${String(language)}" is not supported. Use one of: ${Object.keys(CATALOGS).join(", ")}.`);
   }
   const catalog = CATALOGS[language];
   const own = messages as Readonly<Record<string, string | undefined>>;
@@ -62,9 +62,9 @@ export function createLanguages(option: AppLanguage | AppLanguageOptions = "en",
     return { negotiated: false, select: () => single };
   }
   const supported = [...new Set(option.supported)];
-  if (supported.length === 0) throw new KernelError("runApp: language.supported needs at least one language.");
+  if (supported.length === 0) throw new KernelError("@App: language.supported needs at least one language.");
   if (!supported.includes(option.default)) {
-    throw new KernelError(`runApp: language.default "${String(option.default)}" must be one of language.supported (${supported.join(", ")}).`);
+    throw new KernelError(`@App: language.default "${String(option.default)}" must be one of language.supported (${supported.join(", ")}).`);
   }
   const selected = new Map<string, SelectedLanguage>(supported.map((language) => [language, { language, localize: createLocalize(language, messages) }]));
   const fallback = selected.get(option.default)!;

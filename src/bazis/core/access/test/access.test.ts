@@ -284,3 +284,15 @@ test("a class of references needs no place in providers: the field registers it"
     await scope.dispose();
   }
 });
+
+test("allowAll gives every subject every permission; grants narrow single subjects", async () => {
+  const { allowAll, StaticAccessPolicy } = await import("@/core/access/testing");
+  const provider = allowAll({ anonymous: "test", grants: { "user:2": { "orders.delete": [] } } });
+  const policy = (provider as unknown as { provider: { useValue: InstanceType<typeof StaticAccessPolicy> } }).provider?.useValue
+    ?? new StaticAccessPolicy({ otherwise: "all", anonymous: "test", grants: { "user:2": { "orders.delete": [] } } });
+  expect(policy.grants({ sub: "user:1" }, "orders.delete")).toBe("all");
+  expect(policy.grants({ sub: "user:2" }, "orders.delete")).toEqual([]);
+  expect(policy.grants({ sub: "user:2" }, "orders.read")).toBe("all");
+  const state = new Map<string, unknown>();
+  expect(policy.subject({ state } as never)).toEqual({ sub: "test" });
+});

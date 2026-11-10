@@ -19,7 +19,7 @@
 `CompiledUi…V1`, индекс OpenAPI `UiOpenApi…V1`, схемы `UiSchema…V1`,
 JSON `UiJsonValue`, `UiJsonObject`, `UiJsonPrimitive`.
 
-Хостинг поверхностей — опция `runApp({ ui })` из
+Хостинг поверхностей — опция `@App({ ui })` из
 [`bazis/core/app`](core-app.md#ui-поверхности).
 
 <details>

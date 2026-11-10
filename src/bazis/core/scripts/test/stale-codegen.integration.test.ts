@@ -31,7 +31,7 @@ async function run(root: string, args: string[], env: Record<string, string> = {
 
 const codegen = path.join(repository, "src/bazis/core/scripts/di-generate.ts");
 
-const server = `import { runApp } from "bazis/core/app";
+const server = `import { App, runApp } from "bazis/core/app";
 import { AppModule } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
@@ -39,7 +39,9 @@ await registerBazisGeneratedRuntime();
 const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
 const port = probe.port;
 probe.stop(true);
-void runApp(AppModule, { http: { hostname: "127.0.0.1", port } });
+@App({ modules: [AppModule], http: { hostname: "127.0.0.1", port } })
+class Application {}
+void runApp(Application);
 const url = "http://127.0.0.1:" + port + "/ping/ann/upper";
 // A loaded CI runner can take several seconds to start the app: wait up to 20.
 for (let i = 0; i < 400 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);

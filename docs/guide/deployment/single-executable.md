@@ -107,7 +107,7 @@ info: bazis started {"environment":"production","debug":false,"configKeys":6,"co
 info: bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":1.1}
 ```
 
-Обе строки отключает `runApp({ kernel: { startupReport: false } })`.
+Обе строки отключает `@App({ kernel: { startupReport: false } })`.
 [Экран запуска](../cli/commands.md#экран-запуска) печатается только вне
 production и только в терминале. Готовность для балансировщика
 по-прежнему проверяйте по `/health`.

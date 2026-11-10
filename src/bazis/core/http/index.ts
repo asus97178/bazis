@@ -6,6 +6,7 @@
  * dependencies, compatible with `bun build --compile`.
  */
 export { httpModule } from "./httpModule";
+export { httpConfig } from "./Http.config";
 export { HttpServer } from "./HttpServer";
 export { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
 export type {

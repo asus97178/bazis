@@ -15,7 +15,7 @@ registerNamedDependencyHint((name) => {
   const match = /^Config:(.+)$/.exec(name);
   if (!match) return undefined;
   const declaration = match[1] === "default" ? "defineConfig({ … })" : `defineConfig("${match[1]}", …)`;
-  return `The config ${declaration} is not declared in the application: add it to \`config\` of the module that uses it, or to runApp({ config }).`;
+  return `The config ${declaration} is not declared in the application: add it to \`config\` of the module that uses it, or to @App({ config }).`;
 });
 
 type Stand = "development" | "test" | "production";
