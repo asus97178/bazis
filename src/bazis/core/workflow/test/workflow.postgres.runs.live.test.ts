@@ -627,3 +627,43 @@ test.skipIf(!enabled)("startMany: an instance per element, with what became of e
   await expect(inScope((runtime) => runtime.startMany("many-input", { actor: ACTOR, items: [] }))).rejects.toThrow(/items must be/);
   expect((await wf.instance((results[4] as { instanceId: string }).instanceId)).status).toBe("running");
 });
+
+test.skipIf(!enabled)("a job that waited in a batch longer than its lease is not run by the worker that lost it", async () => {
+  reset();
+  const { WorkflowJobs } = await import("@/core/workflow/runtime_module/internal/WorkflowJobs");
+  const failures: unknown[] = [];
+  const worker = () => new WorkflowJobs(wf.app.container, (message, error) => failures.push({ message, error }));
+  const signal = new AbortController().signal;
+  const first = await wf.start("child", { input: { value: "lease-a" }, actor: ACTOR });
+  const second = await wf.start("child", { input: { value: "lease-b" }, actor: ACTOR });
+  const slow = worker();
+  const claimed = await slow.claim(10);
+  expect(claimed.length).toBe(2);
+  // The worker is busy with something else for longer than a lease: another one takes its jobs.
+  wf.clock.advance("PT6M");
+  const other = worker();
+  const taken = await other.claim(10);
+  expect(taken.map((job) => job.id).sort()).toEqual(claimed.map((job) => job.id).sort());
+  for (const job of taken) await other.run(job, signal);
+  for (const job of claimed) await slow.run(job, signal);
+  expect(noted().sort()).toEqual(["lease-a", "lease-b"]);
+  expect(failures).toEqual([]);
+  expect((await wf.instance(first.id)).status).toBe("completed");
+  expect((await wf.instance(second.id)).status).toBe("completed");
+});
+
+test.skipIf(!enabled)("a stopping worker gives its claimed jobs back at once, and the claim is not an attempt", async () => {
+  reset();
+  const { WorkflowJobs } = await import("@/core/workflow/runtime_module/internal/WorkflowJobs");
+  const jobs = new WorkflowJobs(wf.app.container, () => undefined);
+  const started = await wf.start("child", { input: { value: "released" }, actor: ACTOR });
+  const claimed = await jobs.claim(10);
+  expect(claimed.map((job) => job.attempts)).toEqual([1]);
+  expect(await jobs.claim(10)).toEqual([]);
+  await jobs.release(claimed);
+  const again = await jobs.claim(10);
+  expect(again.map((job) => [job.id, job.attempts])).toEqual([[claimed[0]!.id, 1]]);
+  await jobs.run(again[0]!, new AbortController().signal);
+  expect(noted()).toEqual(["released"]);
+  expect((await wf.instance(started.id)).status).toBe("completed");
+});

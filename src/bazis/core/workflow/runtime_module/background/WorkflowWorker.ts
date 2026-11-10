@@ -38,8 +38,12 @@ export class WorkflowWorker extends BackgroundService {
       try {
         const jobs = await this.jobs.claim(batchSize);
         claimed = jobs.length;
-        for (const job of jobs) {
-          if (signal.aborted) return;
+        for (const [index, job] of jobs.entries()) {
+          if (signal.aborted) {
+            // What was claimed and will not run is free for another worker at once, not in a lease.
+            await this.jobs.release(jobs.slice(index));
+            return;
+          }
           await this.jobs.run(job, signal);
         }
       } catch (error) {
