@@ -68,7 +68,6 @@ function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
 
   return `${moduleImport}
 ${aiImports}${backgroundImport}import { ${n.module}Controller } from "./http/${n.module}.controller";
-import { ${n.entity} } from "./model/${n.module}.model";
 import { ${n.module}DbContext } from "./model/${n.module}.dbContext";
 import { I${n.module}Service } from "./services/I${n.module}.service";
 import { ${n.module}Service } from "./services/${n.module}.service";
@@ -76,7 +75,6 @@ import { ${n.module}Service } from "./services/${n.module}.service";
 @Module({
   ormBazis: {
     context: ${n.module}DbContext,
-    entities: [${n.entity}],
   },
   controllers: [${n.module}Controller],
   providers: [

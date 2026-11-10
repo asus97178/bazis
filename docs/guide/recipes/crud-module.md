@@ -111,7 +111,6 @@ export class TasksDbContext extends DbContext {
 @Module({
   ormBazis: {
     context: TasksDbContext,
-    entities: [Task],
     ensureCreated: true,
   },
   controllers: [TasksController],

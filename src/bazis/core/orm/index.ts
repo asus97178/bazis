@@ -18,6 +18,7 @@ import { registerModuleMetadataExpander, type BazisModuleRef } from "../di";
 import { registerModuleDescriber } from "../kernel/report/moduleTree";
 import { OrmOwnedStoreAdmissionError, type DbContext } from "../../library/orm";
 import { registerRepositoryEncapsulationHook } from "./encapsulationHook";
+import { contextEntities } from "./contextEntities";
 import { ormModule, type OrmModuleConfig } from "./ormModule";
 import { readOwnedStoreRegistration, revalidateOwnedStoreRegistration } from "./ownedStoreContributions";
 
@@ -63,13 +64,22 @@ function declaredOwnedStore(config: OrmModuleConfig<DbContext>): unknown {
   return descriptor.value;
 }
 
+/** For the startup screen only: a context whose sets cannot be read shows what is listed. */
+function describedEntities(config: OrmModuleConfig<DbContext>): readonly unknown[] {
+  try {
+    return contextEntities(config);
+  } catch {
+    return config.entities ?? [];
+  }
+}
+
 // The module tree of the startup screen: `Task, Comment · TaskDbContext`.
 registerModuleDescriber((metadata) => {
   const orm = (metadata as { ormBazis?: OrmModuleConfig<DbContext> | readonly OrmModuleConfig<DbContext>[] }).ormBazis;
   if (orm === undefined) return [];
   return (Array.isArray(orm) ? orm : [orm]).map((config: OrmModuleConfig<DbContext>) => ({
     kind: "table" as const,
-    text: `${(config.entities ?? []).map((entity) => (entity as { name?: string }).name ?? "entity").join(", ") || "no entities"} · ${(config.context as { name?: string } | undefined)?.name ?? "DbContext"}`,
+    text: `${describedEntities(config).map((entity) => (entity as { name?: string }).name ?? "entity").join(", ") || "no entities"} · ${(config.context as { name?: string } | undefined)?.name ?? "DbContext"}`,
   }));
 });
 

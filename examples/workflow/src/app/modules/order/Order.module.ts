@@ -19,7 +19,6 @@ import { SetOrderStatusTool } from "./tools/SetOrderStatus.tool";
   imports: [AccessModule, WorkflowRuntimeModule, StandardToolsModule],
   ormBazis: {
     context: OrderDbContext,
-    entities: [Order],
     migrateOnStart: true,
   },
   permissions: orderPermissions,

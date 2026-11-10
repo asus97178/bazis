@@ -44,7 +44,7 @@ Sequence contains no elements for entity "Product".
 ### `EntityNotMappedError`
 
 ```text
-Type "Product" is not mapped in this DbContext. Add it to ormModule({ entities: [...] }) and annotate it with @Entity().
+Type "Product" is not mapped in this DbContext. Declare a set for it in the context (this.set(Product)) or add it to entities of ormBazis, and annotate it with @Entity().
 ```
 
 Класс не зарегистрирован в контексте. Другие варианты того же класса:

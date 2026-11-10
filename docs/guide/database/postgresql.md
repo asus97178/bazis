@@ -74,7 +74,7 @@ await runApp(AppModule, { infra: AppInfra, http: { port: 3000, health: true } })
 
 ```ts
 @Module({
-  ormBazis: { context: TaskDbContext, entities: [Task], ensureCreated: true },
+  ormBazis: { context: TaskDbContext, ensureCreated: true },
   controllers: [TaskController],
   providers: [scoped(ITaskService, TaskService)],
   exports: [ITaskService],

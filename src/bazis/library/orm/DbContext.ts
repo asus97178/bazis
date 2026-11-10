@@ -11,6 +11,9 @@ import { OrmTransaction, type OrmTransactionScopeOptions } from "./Transactions/
 
 type EntityClass<T extends object> = new () => T;
 
+/** While a context is constructed only to read its sets: {@link DbContext.entitiesOf}. */
+let discovered: Set<EntityClass<object>> | undefined;
+
 /**
  * Base class of a database context (a scoped DI service). A subclass declares the sets:
  *
@@ -32,7 +35,36 @@ export abstract class DbContext {
   readonly #options: DbContextOptions;
   readonly #runtime: DbContextRuntime;
 
+  /**
+   * The entities a context declares with `this.set(...)`, in the order of its
+   * fields. The class is constructed once without a database and without its
+   * own constructor dependencies only to read the sets: a constructor that needs
+   * them fails here, and the entities are then listed by hand.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static entitiesOf(context: new (options: DbContextOptions, ...dependencies: any[]) => DbContext): readonly EntityClass<object>[] {
+    const previous = discovered;
+    const found = new Set<EntityClass<object>>();
+    discovered = found;
+    try {
+      new context(undefined as unknown as DbContextOptions);
+    } catch (error) {
+      throw new OrmError(`The entities of ${context.name} cannot be read from its sets: its constructor failed without its dependencies (${error instanceof Error ? error.message : String(error)}). List them: entities: [...].`);
+    } finally {
+      discovered = previous;
+    }
+    return [...found];
+  }
+
   constructor(options: DbContextOptions) {
+    if (discovered !== undefined) {
+      // Only the sets are read: nothing of the context works, and it is thrown away.
+      this.#options = options;
+      this.changeTracker = undefined as unknown as ChangeTracker;
+      this.#runtime = undefined as unknown as DbContextRuntime;
+      this.database = undefined as unknown as DatabaseFacade;
+      return;
+    }
     this.#options = options;
     this.changeTracker = new ChangeTracker();
     const provider = observedProvider(this, options.provider, options.model);
@@ -47,6 +79,10 @@ export abstract class DbContext {
 
   /** Public access to a `DbSet` by entity class (for `Repository<T>` and generic scenarios). */
   setOf<T extends object>(entity: EntityClass<T>): DbSet<T> {
+    if (discovered !== undefined) {
+      discovered.add(entity);
+      return undefined as unknown as DbSet<T>;
+    }
     return new DbSet<T>(this.#options.model.requireByCtor(entity), this.#runtime);
   }
 

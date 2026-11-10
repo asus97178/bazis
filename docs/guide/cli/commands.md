@@ -167,7 +167,7 @@ bunx bazis g module Orders --full     # CRUD, список, кэш, доступ
 в `ormBazis` модуля ([Управление схемой](../database/schema.md)):
 
 ```ts
-ormBazis: { context: OrdersDbContext, entities: [Order], ensureCreated: true },
+ormBazis: { context: OrdersDbContext, ensureCreated: true },
 ```
 
 | Опция | Что делает |

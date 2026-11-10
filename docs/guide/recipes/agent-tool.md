@@ -269,7 +269,7 @@ export class AssistantController {
 // tasks/Tasks.module.ts
 @Module({
   imports: [AuthModule],
-  ormBazis: { context: TasksDbContext, entities: [Task, Notification], ensureCreated: true },
+  ormBazis: { context: TasksDbContext, ensureCreated: true },
   controllers: [TasksController, NotificationsController, AssistantController],
   gateways: [NotificationsGateway],
   tools: [ListTasksTool, CreateTaskTool],

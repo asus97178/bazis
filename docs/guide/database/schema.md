@@ -19,7 +19,7 @@
 
 ```ts
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Product], ensureCreated: true },
+  ormBazis: { context: CatalogDbContext, ensureCreated: true },
 })
 export class CatalogModule {}
 ```
@@ -97,7 +97,7 @@ const migrations: Migration[] = [
 ];
 
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Product], ensureCreated: true, migrations, runMigrationsOnStart: true },
+  ormBazis: { context: CatalogDbContext, ensureCreated: true, migrations, runMigrationsOnStart: true },
 })
 export class CatalogModule {}
 ```
@@ -174,7 +174,7 @@ OrmError: Migration "20261010_02_drop_sku" is applied but is not in the migratio
 ## `migrateOnStart`
 
 ```ts
-ormBazis: { context: CatalogDbContext, entities: [Product], migrateOnStart: true }
+ormBazis: { context: CatalogDbContext, migrateOnStart: true }
 ```
 
 Добавляет недостающие таблицы, столбцы и индексы:

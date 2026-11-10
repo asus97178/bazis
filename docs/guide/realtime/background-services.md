@@ -75,7 +75,7 @@ export class JobsWorker extends BackgroundService {
 }
 
 @Module({
-  ormBazis: { context: JobsDb, entities: [Job], ensureCreated: true },
+  ormBazis: { context: JobsDb, ensureCreated: true },
   providers: [scoped(JobsService)],
   controllers: [JobsController],
   background: [JobsWorker],
