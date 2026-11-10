@@ -4,6 +4,62 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.137.0 — 2026-11-11
+
+The first part of the framework audit: less to write and more that the compiler and
+the start check. Stores stay as they are.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01370). Run
+`bunx bazis upgrade columns` in an application before it starts on this version.
+
+### Added
+
+- `@Nullable()`, and the rule that every column says whether it may be empty:
+  `@Required()` or `@Nullable()`. `bazis upgrade columns [--dry-run] [--path <dir>]`
+  marks the columns of an application by what they were, so its schema stays as it is.
+- `@Get(":id", { nullAs: NotFound })`: what `null` of an action answers. The status
+  goes to OpenAPI.
+- `ConflictError` (409).
+- Database errors answer by their meaning without a setting: 409, 404, 422, 503.
+  `databaseHttpError`, `HTTP_ERROR_MAPPER`, `errorHandler.map`.
+- `@Index({ unique: true, conflict: "…" })`: the text of the 409.
+  `UniqueViolationError.properties` and `conflict`; the properties go to
+  `details.fields` of the answer.
+- `Created(body)` sets `Location` by the `id` of the body when the application has a
+  GET route for it.
+- Permission keys are types: `BazisPermissions`, `PermissionKey`, `OwnPermissionKey`,
+  `PermissionsOf`; codegen writes `src/generated/bazis/permissions.ts`.
+- `ConfigView<typeof mailConfig>`: settings described once, by their defaults.
+  `ConfigDefinition.prefix`, `ResolvedConfigView`.
+- `configList()`: a list of strings as a setting, comma-separated in the environment.
+- A context maps the entities of its sets: `ormBazis: { context }` without `entities`.
+  `DbContext.entitiesOf`.
+- The `references` field of a module registers its classes.
+- `POSTGRES_SSL_MODES`, `ToolRunner.listTools()`.
+
+### Changed (breaking)
+
+- A column without `@Required()` or `@Nullable()` stops the start. The `nullable`
+  option of `@Column` is removed.
+- `can`, `access.can`, `access.filter` and `defineRoles` take declared permission keys
+  only. `permissions` of a module names an exported constant.
+- `Created(body, location?)`: the body first. It was `Created(location, body)`.
+- A response with code 201 and an object with `id` gets `Location`.
+- `workflow.languages`, `tools.http.allow` and `tools.http.callers` are
+  `readonly string[]` in the code.
+- A database error that was 500 answers 409, 404, 422 or 503; the body of a unique
+  violation carries `details: { code: "unique", fields }`.
+- `ConfigView` is a type alias: `interface X extends ConfigView<T>` becomes
+  `ResolvedConfigView<T>`.
+- `bazis g module` writes `nullAs: NotFound`, `Created(item)`, `@Required()` and no
+  `entities`.
+
+### Fixed
+
+- An event and a firing of a schedule read the documents of every process. The latest
+  published versions are kept between calls: one query of heads without documents.
+- A job that waited in a batch longer than its lease could be run by two workers. The
+  lease starts when the job does, and a stopping worker gives back what it did not start.
+
 ## 0.136.0 — 2026-11-03
 
 HTTP requests and secrets for processes (stage 6 of WORKFLOW-002, the last one).
