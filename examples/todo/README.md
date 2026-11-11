@@ -48,7 +48,9 @@ BAZIS_ENV=development ./bin/todo
 
 ## Where to look
 
-- `src/index.ts` — `runApp` with the `AppInfra` (database) and HTTP options.
+- `src/app/App.ts` — the application declared with `@App`: modules, `AppInfra`
+  (database) and HTTP options; `src/index.ts` runs it with `runApp(TodoApp)`, the
+  tests start the same declaration with `startTestApp(TodoApp)`.
 - `src/app/infra/App.infra.ts` — `ormBazisConnect(dbConfig)` opens the pool
   before the server starts and closes it after.
 - `src/app/modules/task/services/Task.service.ts` — constructor injection of

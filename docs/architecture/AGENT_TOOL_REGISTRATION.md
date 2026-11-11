@@ -65,7 +65,10 @@ DI exports. ToolsModule is connected to AppModule.
 `scoped(ToolClass)` by the same owner stays compatible and is reused.
 An incompatible lifetime/factory/key, a repeated name and an owner conflict fail
 the container build before a Tool is created. No extra registration decorator,
-second DI container, defineTools or RunAppOptions.tools is introduced.
+second DI container or application-level `tools` option is introduced. Since
+0.138.0 `tools` also takes Tools made by `defineTool` and sets of them
+([TOOLS-001](TOOLS.md) §2.1); they are owned by the module that lists them, as
+classes are.
 
 ## 2. Shared catalog and dependencies
 

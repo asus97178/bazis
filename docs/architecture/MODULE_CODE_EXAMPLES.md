@@ -531,16 +531,28 @@ export class TaskExampleAppModule {}
 ```
 
 ```ts
+// file: src/app/TaskExampleApp.ts
+import { App } from "bazis";
+import { AppInfra } from "./infra/App.infra";
+import { TaskExampleAppModule } from "./modules/TaskExampleApp.module";
+
+@App({ modules: [TaskExampleAppModule], infra: AppInfra, http: { prefix: "api" } })
+export class TaskExampleApp {}
+```
+
+```ts
 // file: src/task-example.ts
 import { runApp } from "bazis";
-import { AppInfra } from "./app/infra/App.infra";
-import { TaskExampleAppModule } from "./app/modules/TaskExampleApp.module";
+import { TaskExampleApp } from "./app/TaskExampleApp";
+import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
-await runApp(TaskExampleAppModule, {
-  infra: AppInfra,
-  http: { port: 3000, prefix: "api" },
-});
+await registerBazisGeneratedRuntime();
+await runApp(TaskExampleApp);
 ```
+
+The address comes from the `http` settings (`BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT`,
+port 3000 by default); `port` in `@App({ http })` would pin it in code. A test starts
+the same declaration: `startTestApp(TaskExampleApp)`.
 
 This connects through the existing infrastructure; running it needs that
 infrastructure's settings and a prepared schema. When moving the code into an

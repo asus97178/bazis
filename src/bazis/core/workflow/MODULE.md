@@ -42,8 +42,11 @@ Shared contracts of the pack (no providers): `contracts/WorkflowError.ts`,
 `contracts/WorkflowClock.ts` (the engine's time; registered by Definitions),
 `contracts/types.ts`; internal helpers `internal/http.ts`, `internal/WorkflowTools.ts`.
 Tests of processes: the entry `bazis/core/workflow/testing` ([testing/index.ts](testing/index.ts)):
-`testWorkflow` starts the application with a `ManualWorkflowClock` and runs jobs
-only in `drain` / `advance`.
+`testWorkflow(Application, options)` starts the `@App` application (0.138.0; a module with
+options still works) with a `ManualWorkflowClock` and runs jobs only in `drain` / `advance`;
+`start` takes a key or a `defineProcess` result (input typed by its variables),
+`instanceByKey(businessKey)`, `use(Service, work)`; `dropWorkflowTables(url)` drops the
+process tables of a test database before the start.
 
 ## 3. Public inputs
 

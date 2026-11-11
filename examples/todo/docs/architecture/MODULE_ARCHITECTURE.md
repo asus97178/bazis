@@ -1,6 +1,6 @@
 # Application module architecture
 
-`src/index.ts` calls `runApp`; `src/app/modules/App.module.ts` composes feature modules through `imports`. The application root owns no domain logic.
+`src/app/App.ts` declares the application with `@App`, `src/index.ts` calls `runApp(TodoApp)`; `src/app/modules/App.module.ts` composes feature modules through `imports`. The application root owns no domain logic.
 
 One self-contained function is an atomic module. It owns its data, services, HTTP and background handlers. A composite module is only for several independent functions; its root does composition. Layers and file counts alone do not create submodules.
 

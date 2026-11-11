@@ -260,7 +260,7 @@ attachment channel, atomically with the rest of the target.
 | The first @GrpcMethod parameter: a DTO class | No binding for an interface/inline object | di:generate binds the class to the handler; for AsyncIterable<DTO> the stream element is bound; an ambiguous union/intersection with a DTO is a codegen error |
 | @GrpcMethod(name?, requestModel?) | An optional second argument; null is forbidden | An explicit class with a no-argument constructor; wins over codegen inference; the old call with a name is kept |
 | GrpcModuleOptions.validator | modelValidatorAdapter; null is forbidden | The existing synchronous ModelValidator; captured by the server, not taken from the global HTTP bridge |
-| RunAppOptions.validator | modelValidatorAdapter | Used by HTTP and gRPC, including gRPC-only; grpc.validator allows an explicit replacement for gRPC only |
+| `@App({ validator })` (was RunAppOptions.validator before 0.138.0) | modelValidatorAdapter | Used by HTTP and gRPC, including gRPC-only; grpc.validator allows an explicit replacement for gRPC only |
 
 The DTO is created and checked before the unary/server-streaming handler. For an input
 stream each consumed message is checked before it is passed to the handler.
@@ -456,7 +456,7 @@ real generator, private controller DI and constructor DI of the own client, four
 modes, HTTP + gRPC, a binary without sources and without the external `.proto`.
 After runApp the automatic client dispose is checked.
 The check of 2026-09-26 additionally proves generated DTO binding, nested validation,
-four RPC modes, the shared RunAppOptions.validator and the grpc.validator override in a
+four RPC modes, the shared application validator (then RunAppOptions.validator) and the grpc.validator override in a
 binary without sources, node_modules and the external .proto.
 Generated files are not edited by hand.
 

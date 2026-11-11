@@ -22,7 +22,7 @@ export class ChatGateway {
 }
 ```
 
-Declare it in its module, like a controller; `runApp` serves it on the HTTP listener:
+Declare it in its module, like a controller; the application started by `runApp(Application)` serves it on the HTTP listener:
 
 ```ts
 import { Module, singleton } from "@/core/di";
@@ -34,7 +34,7 @@ export class ChatModule {}
 export class Application {}
 ```
 
-Without `runApp`, `websocketModule({ imports: [ChatModule], ... })` next to
+Without `@App`, `websocketModule({ imports: [ChatModule], ... })` next to
 `httpModule` does the same. Services send with `WebSocketService`:
 `this.ws.to("user:ann").emit("order-paid", { id })`.
 
