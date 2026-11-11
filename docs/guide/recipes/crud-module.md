@@ -4,9 +4,22 @@
 проверка входных данных, список с фильтрами, сортировкой и страницами,
 своё действие «выполнить», ответы 400/404 и тест на настоящей базе.
 
-Проверено на bazis 0.111.2 и PostgreSQL 17. Это первый шаг [учебного проекта](../introduction/tutorial.md).
+Проверено на bazis 0.111.2 и PostgreSQL 17.
+
+Это первый из трёх рецептов, которые вместе строят планировщик задач:
+этот модуль задач, затем [вход по JWT](jwt-auth.md) и
+[второй модуль — проекты](projects-module.md). Каждый продолжает код
+предыдущего.
 
 ## 1. Проект и база
+
+Нужны Bun 1.4.0 или новее ([Установка](../introduction/installation.md)) и
+PostgreSQL. Локальная база в Docker, `planner_test` — для тестов:
+
+```sh
+docker run -d --name planner-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:17-alpine
+docker exec planner-pg psql -U postgres -c "CREATE DATABASE planner" -c "CREATE DATABASE planner_test"
+```
 
 ```sh
 bunx bazis new Planner

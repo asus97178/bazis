@@ -288,7 +288,7 @@ export class Application {}
 | `@AllowAnonymous()` | Ничего — маршрут открыт |
 | `/health`, документация OpenAPI | Ничего — они открыты всегда |
 
-Проверено на планировщике из [учебного проекта](../introduction/tutorial.md),
+Проверено на планировщике из рецептов [«JWT»](../recipes/jwt-auth.md) и [«Второй модуль»](../recipes/projects-module.md),
 у контроллера проектов убран `@Authorize`:
 
 ```text

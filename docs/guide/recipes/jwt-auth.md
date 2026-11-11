@@ -638,7 +638,7 @@ $ bunx bazis test
 
 ## Дальше
 
-- [Второй модуль и связь между модулями](projects-module.md) — следующий шаг [учебного проекта](../introduction/tutorial.md)
+- [Второй модуль и связь между модулями](projects-module.md) — следующий шаг планировщика
 - [JWT](../security/jwt.md) — ключи RS256, ротация, одноразовый refresh
 - [Шаблоны авторизации](../security/authorization-patterns.md) — роли, `anyOf`, арендаторы, ключи API
 - [Чек-лист перед продакшеном](../security/production-checklist.md#авторизация)
