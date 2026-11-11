@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { Column, Entity, Key, KeyTuple, ModelBuilder } from "../index";
+import { Column, Entity, Key, KeyTuple, ModelBuilder, Nullable } from "../index";
 
 @Entity({ table: "strict_key_tuples" })
 class StrictKeyTupleRow {
   @Key(["tenantId", "entryId"]) @Column({ type: "text" }) tenantId = "";
-  @Column({ type: "integer" }) entryId = 0;
-  @Column({ type: "text" }) value = "";
+  @Nullable() @Column({ type: "integer" }) entryId = 0;
+  @Nullable() @Column({ type: "text" }) value = "";
 }
 
 

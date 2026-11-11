@@ -60,7 +60,7 @@ export function bindEncryptedColumns(options: DbContextOptions, registry: Config
       try {
         view = registry.get(binding.config) as { get(key: string): unknown };
       } catch {
-        throw new OrmError(`${where}: the config "${prefixOf(binding)}" is not declared in the application; add it to \`config\` of the module that owns ${entity.name} or to runApp({ config }).`);
+        throw new OrmError(`${where}: the config "${prefixOf(binding)}" is not declared in the application; add it to \`config\` of the module that owns ${entity.name} or to @App({ config }).`);
       }
       const value = view.get(binding.field);
       const secret = value instanceof Secret ? value.reveal() : value;

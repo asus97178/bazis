@@ -33,11 +33,13 @@ export class AppModule {}
     }, include: ["src/**/*.ts"] }));
     await Bun.write(path.join(root, "bazis.config.json"), JSON.stringify({ version: 1, defaultTarget: "production", targets: { production: { entrypoints: ["src/index.ts"] } } }));
     await Bun.write(path.join(root, "src/Users.module.ts"), source);
-    await Bun.write(path.join(root, "src/index.ts"), `import { runApp } from "bazis/core/app";
+    await Bun.write(path.join(root, "src/index.ts"), `import { App, runApp } from "bazis/core/app";
 import { AppModule } from "./Users.module";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
-process.exitCode = await runApp(AppModule, { http: { port: Number(process.env.PROBE_PORT), prefix: "api", docs: false } });
+@App({ modules: [AppModule], http: { port: Number(process.env.PROBE_PORT), prefix: "api", docs: false } })
+class Application {}
+process.exitCode = await runApp(Application);
 `);
     await command([path.join(repository, "src/bazis/core/scripts/di-generate.ts")]);
     const bindings = await Bun.file(path.join(root, "src/generated/bazis/bindings.ts")).text();

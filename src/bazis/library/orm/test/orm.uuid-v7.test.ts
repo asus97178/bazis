@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   Column, DbContext, DbContextOptions, DbUpdateError, Entity, ForeignKey, ModelBuilder, OrmModel,
-  PostgresDialect, UUID, buildDynamicModel, type DatabaseProvider, type Row, type SqlParam,
+  PostgresDialect, UUID, buildDynamicModel, type DatabaseProvider, type Row, type SqlParam, Nullable,
 } from "../index";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 
@@ -10,13 +10,13 @@ const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 @Entity({ table: "v7_orders" })
 class Order {
   @UUID({ version: "v7" }) id = "";
-  @Column({ type: "text" }) name = "";
+  @Nullable() @Column({ type: "text" }) name = "";
 }
 
 @Entity({ table: "v7_order_lines" })
 class OrderLine {
   @UUID({ version: "v7" }) id = "";
-  @ForeignKey(() => Order) @Column({ type: "text" }) orderId = "";
+  @ForeignKey(() => Order) @Nullable() @Column({ type: "text" }) orderId = "";
 }
 
 @Entity({ table: "v4_orders" })

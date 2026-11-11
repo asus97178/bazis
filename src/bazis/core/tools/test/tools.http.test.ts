@@ -40,7 +40,7 @@ afterAll(() => {
 });
 
 function tool(settings: Partial<ToolsSettings> = {}): HttpRequestTool {
-  const values: ToolsSettings = { "http.allow": `127.0.0.1:${server.port}`, "http.callers": "workflow", "http.allowPrivateNetworks": true, "http.maxResponseBytes": 1000, "http.timeoutMs": 2000, ...settings };
+  const values: ToolsSettings = { "http.allow": [`127.0.0.1:${server.port}`], "http.callers": ["workflow"], "http.allowPrivateNetworks": true, "http.maxResponseBytes": 1000, "http.timeoutMs": 2000, ...settings };
   return new HttpRequestTool({ get: (key: keyof ToolsSettings) => values[key] } as unknown as ConfigView<ToolsSettings>);
 }
 
@@ -50,13 +50,13 @@ const reasonOf = (promise: Promise<unknown>) => promise.then(() => "no error", (
 
 test("closed by default: an empty list lets nothing through, and sends nothing", async () => {
   const before = seen.length;
-  expect(await reasonOf(tool({ "http.allow": "" }).execute({ url: url("/json") }, context()))).toBe("host_not_allowed");
-  expect(await reasonOf(tool({ "http.allow": "api.example.com" }).execute({ url: url("/json") }, context()))).toBe("host_not_allowed");
+  expect(await reasonOf(tool({ "http.allow": [] }).execute({ url: url("/json") }, context()))).toBe("host_not_allowed");
+  expect(await reasonOf(tool({ "http.allow": ["api.example.com"] }).execute({ url: url("/json") }, context()))).toBe("host_not_allowed");
   expect(seen.length).toBe(before);
 });
 
 test("private and loopback addresses are refused unless they are allowed, whatever the name", async () => {
-  const closed = tool({ "http.allowPrivateNetworks": false, "http.allow": `127.0.0.1,localhost,[::1],169.254.169.254` });
+  const closed = tool({ "http.allowPrivateNetworks": false, "http.allow": ["127.0.0.1", "localhost", "[::1]", "169.254.169.254"] });
   const before = seen.length;
   expect(await reasonOf(closed.execute({ url: url("/json") }, context()))).toBe("address_not_allowed");
   expect(await reasonOf(closed.execute({ url: `http://localhost:${server.port}/json` }, context()))).toBe("address_not_allowed");
@@ -95,7 +95,7 @@ test("the method, headers, JSON body and every kind of auth reach the server", a
 test("a bad input is told before anything is sent", async () => {
   const before = seen.length;
   for (const input of [{}, { url: "not a url" }, { url: url("/json"), method: "TRACE" }, { url: url("/json"), body: { a: 1 } }, { url: url("/json"), auth: { type: "bearer" } }, { url: url("/json"), auth: { type: "magic" } }, { url: url("/json"), headers: { a: 1 } }, { url: url("/json"), successCodes: [] }, { url: url("/json"), timeoutMs: 0 }, { url: "ftp://127.0.0.1/x" }, { url: `http://me:pass@127.0.0.1:${server.port}/json` }]) {
-    expect(await reasonOf(tool({ "http.allow": `127.0.0.1:${server.port},127.0.0.1` }).execute(input, context()))).toBe("invalid_input");
+    expect(await reasonOf(tool({ "http.allow": [`127.0.0.1:${server.port}`, "127.0.0.1"] }).execute(input, context()))).toBe("invalid_input");
   }
   expect(seen.length).toBe(before);
 });
@@ -121,7 +121,7 @@ test("redirects stay inside the list and leave credentials behind", async () => 
   expect(await tool().execute({ url: url("/moved") }, context())).toMatchObject({ status: 200, body: { hello: "world" } });
   expect(await reasonOf(tool().execute({ url: url(`/away?to=http://127.0.0.1:${other.port}/json`) }, context()))).toBe("host_not_allowed");
   expect(await reasonOf(tool().execute({ url: url("/loop") }, context()))).toBe("too_many_redirects");
-  const both = tool({ "http.allow": `127.0.0.1:${server.port},127.0.0.1:${other.port}` });
+  const both = tool({ "http.allow": [`127.0.0.1:${server.port}`, `127.0.0.1:${other.port}`] });
   await both.execute({ url: url(`/away?to=http://127.0.0.1:${other.port}/json`), auth: { type: "bearer", token: "abc" }, headers: { "x-free": "1" } }, context());
   expect(seen.at(-1)!.headers.authorization).toBeUndefined();
   expect(seen.at(-1)!.headers["x-free"]).toBe("1");
@@ -147,7 +147,7 @@ test("a trial sends only what reads", async () => {
 
 test("the configuration says who may call it", async () => {
   expect(await reasonOf(tool().execute({ url: url("/json") }, context({ caller: "agent" })))).toBe("caller_not_allowed");
-  expect(await tool({ "http.callers": "agent, workflow" }).execute({ url: url("/json") }, context({ caller: "agent" }))).toMatchObject({ status: 200 });
+  expect(await tool({ "http.callers": ["agent", "workflow"] }).execute({ url: url("/json") }, context({ caller: "agent" }))).toMatchObject({ status: 200 });
 });
 
 test("what is public and what is not", () => {
@@ -160,7 +160,7 @@ test("what is public and what is not", () => {
 });
 
 test("the list of hosts", () => {
-  const allow = "api.example.com, *.example.org, local.test:8080";
+  const allow = ["api.example.com", "*.example.org", "local.test:8080"];
   expect(hostAllowed(allow, "api.example.com", "443")).toBe(true);
   expect(hostAllowed(allow, "API.example.com.", "443")).toBe(true);
   expect(hostAllowed(allow, "other.example.com", "443")).toBe(false);
@@ -170,7 +170,7 @@ test("the list of hosts", () => {
   expect(hostAllowed(allow, "evilexample.org", "443")).toBe(false);
   expect(hostAllowed(allow, "local.test", "8080")).toBe(true);
   expect(hostAllowed(allow, "local.test", "80")).toBe(false);
-  expect(hostAllowed("", "api.example.com", "443")).toBe(false);
+  expect(hostAllowed([], "api.example.com", "443")).toBe(false);
 });
 
 test("the values of a call are cut out of everything, whatever their length", () => {

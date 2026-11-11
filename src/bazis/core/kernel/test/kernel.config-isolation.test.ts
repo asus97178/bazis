@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, createToken, type BazisModuleRef } from "../../di";
+import { createToken, type BazisModuleRef } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { AGENT_MODEL_PROVIDER, agentMessage, agentModelResponse, type AgentModelProvider } from "../../agent";
 import { infraModule, llmConnect, llmProfile, llmRouter, type InfraConnector, type LlmConnectionOptions } from "../../infra";
 import { ConfigRegistry, Configuration, Bazis, defineConfig, envSource, memorySource, secret } from "../index";

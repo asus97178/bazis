@@ -43,10 +43,11 @@ exit 1
 ```
 
 Клиент такого запроса получает разорванное соединение. Срок меняется в
-`runApp`:
+`@App`:
 
 ```ts
-await runApp(AppModule, { kernel: { shutdownTimeoutMs: 20_000 }, http: { … } });
+@App({ modules: [AppModule], kernel: { shutdownTimeoutMs: 20_000 }, http: { … } })
+export class Application {}
 ```
 
 Второй сигнал во время остановки завершает процесс сразу, с кодом 130 —
@@ -100,8 +101,7 @@ containers:
     ports: [{ containerPort: 8080 }]
     env:
       - { name: BAZIS_ENV, value: production }
-      - { name: HOST, value: "0.0.0.0" }
-      - { name: PORT, value: "8080" }
+      - { name: BAZIS_HTTP__PORT, value: "8080" }
     readinessProbe:
       httpGet: { path: /health, port: 8080 }
       periodSeconds: 5

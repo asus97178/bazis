@@ -139,8 +139,14 @@ async function loadRuntimeOnce(): Promise<void> {
  * (`bazis new --link-framework`) would otherwise find that checkout's own
  * `src/generated` next to its sources. Framework sources inside the project
  * (`src/bazis`) find the same directory either way.
+ *
+ * A compiled binary looks nowhere: its generated code is inside it and comes
+ * through `registerBazisGeneratedRuntime()` of the entry point. Reading
+ * `src/generated` of whatever directory the binary was started in would run
+ * another project's code.
  */
 async function importGeneratedModule<T>(name: string): Promise<T | undefined> {
+  if (isCompiledBinary()) return undefined;
   const candidates = [path.join(process.cwd(), "src/generated/bazis", name), `../../generated/bazis/${name}`];
   for (const candidate of candidates) {
     try {
@@ -150,6 +156,11 @@ async function importGeneratedModule<T>(name: string): Promise<T | undefined> {
     }
   }
   return undefined;
+}
+
+/** Whether this code runs from a `bun build --compile` binary: its modules live in Bun's embedded file system. */
+function isCompiledBinary(): boolean {
+  return import.meta.url.includes("/$bunfs/") || import.meta.url.includes("~BUN");
 }
 
 function isOptionalGeneratedModuleMissing(error: unknown, generatedPath: string): boolean {

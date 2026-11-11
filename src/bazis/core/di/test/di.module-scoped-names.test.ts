@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { AmbiguousNamedDependencyError, DI, createContainer, createToken } from "../index";
+import { AmbiguousNamedDependencyError, createContainer, createToken } from "../index";
+import { DI } from "../lowLevel";
 import { namedDependency } from "../provider";
 import { testModule } from "./test-fixtures";
 

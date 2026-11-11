@@ -2,7 +2,7 @@
 
 ORM bazis работает с PostgreSQL через встроенный драйвер Bun — внешних
 пакетов не нужно. Подключение — это три части: настройки, манифест
-инфраструктуры и строчка в `runApp`.
+инфраструктуры и строчка в `@App`.
 
 Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
@@ -10,26 +10,17 @@ ORM bazis работает с PostgreSQL через встроенный дра�
 
 ```ts
 // src/app/config/db.config.ts
-import { configEnum, defineConfig, secret, type Secret } from "bazis/core/kernel";
-import type { PostgresSslMode } from "bazis/core/infra";
+import { POSTGRES_SSL_MODES } from "bazis/core/infra";
+import { configEnum, defineConfig, secret } from "bazis/core/kernel";
 
-export interface DbConfig {
-  host: string;
-  port: number;
-  database: string;
-  username: string;
-  password: Secret;
-  tls: PostgresSslMode;
-}
-
-export const dbConfig = defineConfig<DbConfig>("db", {
+export const dbConfig = defineConfig("db", {
   default: {
     host: "127.0.0.1",
     port: 5432,
     database: "app",
     username: "postgres",
     password: secret("postgres"),
-    tls: configEnum(["disable", "allow", "prefer", "require", "verify-ca", "verify-full"], "disable"),
+    tls: configEnum(POSTGRES_SSL_MODES, "disable"),
   },
   production: {
     password: secret(),
@@ -65,7 +56,8 @@ export class AppInfra {}
 
 ```ts
 // src/index.ts
-await runApp(AppModule, { infra: AppInfra, http: { port: 3000, health: true } });
+@App({ modules: [AppModule], infra: AppInfra, http: { health: true } })
+export class Application {}
 ```
 
 `ormBazisConnect` открывает пул соединений **до** HTTP-сервера, проверяет
@@ -74,7 +66,7 @@ await runApp(AppModule, { infra: AppInfra, http: { port: 3000, health: true } })
 
 ```ts
 @Module({
-  ormBazis: { context: TaskDbContext, entities: [Task], ensureCreated: true },
+  ormBazis: { context: TaskDbContext, ensureCreated: true },
   controllers: [TaskController],
   providers: [scoped(ITaskService, TaskService)],
   exports: [ITaskService],
@@ -148,7 +140,7 @@ default: { ..., tlsCa: "" },          // в продакшене — перем�
 
 ## Пул и тайм-ауты
 
-Эти поля добавляются в `DbConfig` и `default`, как остальные:
+Эти поля добавляются в `default` объявления `dbConfig`, как остальные:
 
 | Поле | Что задаёт |
 | --- | --- |

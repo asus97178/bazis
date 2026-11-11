@@ -14,7 +14,8 @@
 
 ```ts
 // tasks/model/Tasks.model.ts — новое поле
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   remindedAt: Date | null = null;
 ```
 
@@ -197,7 +198,6 @@ export class NotificationsController {
   imports: [AuthModule],
   ormBazis: {
     context: TasksDbContext,
-    entities: [Task, Notification],
     ensureCreated: true,
   },
   controllers: [TasksController, NotificationsController],

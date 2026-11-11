@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { createContainer, Module, HOSTED_SERVICE, singletonFactory, ModuleEncapsulationError, type Class } from "../../di";
+import { createContainer, Module, HOSTED_SERVICE, ModuleEncapsulationError, type Class } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { GrpcClient, GrpcClientBase, GrpcController, GrpcMethod, grpcModule, GrpcServer,
   GrpcError, GrpcStatus as Status, Metadata, type GrpcContext, type GrpcClientOptions } from "../index";
 import { echoService, type EchoMessage } from "./fixtures/contract";
@@ -177,7 +178,7 @@ test("@GrpcClient in grpcClients: a singleton per container, private to its modu
   class EchoClient extends GrpcClientBase {}
   @Module({ grpcClients: [EchoClient], exports: [] }) class PrivateFeature {}
   class Consumer { constructor(readonly client: EchoClient) {} }
-  expect(() => createContainer({ imports: [PrivateFeature], providers: [singletonFactory(Consumer, [EchoClient], client => new Consumer(client))] })).toThrow(ModuleEncapsulationError);
+  expect(() => createContainer({ imports: [PrivateFeature], providers: [DI.singleton(DI.factoryProvider(Consumer, [EchoClient], client => new Consumer(client)))] })).toThrow(ModuleEncapsulationError);
   @Module({ grpcClients: [EchoClient], exports: [EchoClient] }) class Feature {}
   const first = createContainer(Feature), second = createContainer(Feature);
   try {

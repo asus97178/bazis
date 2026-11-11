@@ -1,7 +1,7 @@
 # `bazis/core/di`
 
 Внедрение зависимостей: модули, регистрации, токены, контейнер, ошибки
-графа. Список — по пакету 0.128.0.
+графа. Список — по пакету 0.138.0.
 
 ## Модули
 
@@ -18,10 +18,9 @@
 | `singleton(X)`, `scoped(X)`, `transient(X)` | Класс с временем жизни; `singleton(Contract, Impl)` — реализация по контракту | [Провайдеры](../../overview/providers.md) |
 | `singletonValue(TOKEN, value)` | Готовое значение | [Значения](../../overview/providers.md#значения) |
 | `singletonAsyncFactory(TOKEN, [deps], async factory)` | Результат асинхронной функции; создаётся при запуске | [Асинхронные фабрики](../../fundamentals/dependency-injection.md#асинхронные-фабрики) |
-| `singletonFactory`, `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` | Низкоуровневые фабрики фреймворка; в `providers` модуля их не пишут — codegen отклоняет (`BAZIS_DI_PROVIDER_FORM`) | [Способы регистрации](../../fundamentals/dependency-injection.md#способы-регистрации) |
 | `createToken<T>(name)` | Токен для значения или интерфейса | [Интерфейс и токен](../../overview/providers.md#интерфейс-и-токен) |
 | `keyedDependency`, `namedDependency`, `lazyDependency`, `optionalDependency` | Зависимости в списке асинхронной фабрики; ленивая и необязательная в конструкторе — `Lazy<T>` и `?` | [Внедрение зависимостей](../../fundamentals/dependency-injection.md) |
-| `DI` | Низкоуровневые регистрации фреймворка и тестов (`overrides`); в `providers` модуля не пишутся | [Способы регистрации](../../fundamentals/dependency-injection.md#способы-регистрации) |
+| `DI` из `bazis/core/di/lowLevel` | Низкоуровневые регистрации для пакетов, расширяющих фреймворк: провайдер вручную, фабрика, явный список зависимостей. В `providers` модуля приложения не пишутся; из `bazis/core/di` убраны в 0.138.0 | [Способы регистрации](../../fundamentals/dependency-injection.md#способы-регистрации) |
 | `ProviderDefinition` | Регистрация, которую возвращают функции выше | — |
 | `SERVICE_PROVIDER` | Токен самого контейнера (как `IServiceProvider` в .NET) | — |
 
@@ -40,7 +39,7 @@
 | `HOSTED_SERVICE` | Токен служб, которые запускаются и останавливаются с приложением |
 | `HOSTED_SERVICE_HEALTH` | Проверки здоровья фоновых служб модулей |
 | `addHostedService`, `startHostedServices`, `stopHostedServices` | Регистрация и запуск служб без ядра |
-| `Application`, `runApplication` | Запуск служб поверх контейнера без ядра; приложения запускают `runApp` |
+| `Application`, `runApplication` | Запуск служб поверх контейнера без ядра; приложения запускают `runApp(Application)` |
 
 ## Опции
 

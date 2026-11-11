@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, InvalidProviderError, Module, ServiceValidationError, createContainer } from "../index";
+import { InvalidProviderError, Module, ServiceValidationError, createContainer } from "../index";
+import { DI } from "../lowLevel";
 
 // 0.100.8: DI errors found while writing the error reference.
 

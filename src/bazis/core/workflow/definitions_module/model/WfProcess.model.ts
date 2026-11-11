@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "../../../orm";
+import { Column, Entity, Index, UUID, Nullable } from "../../../orm";
 import type { LocalizedText } from "../../../../library/workflow";
 
 /**
@@ -12,50 +12,63 @@ export class WfProcess {
   id = "";
 
   @Index({ unique: true })
+  @Nullable()
   @Column({ type: "text" })
   key = "";
 
+  @Nullable()
   @Column({ type: "json" })
   title: LocalizedText = "";
 
   /** Every text of `title`, the default language first: what a list searches and sorts by. */
+  @Nullable()
   @Column({ type: "text" })
   titleText = "";
 
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   description: LocalizedText | null = null;
 
   /** A path, `Sales/Orders`: there is no folder entity. */
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   folder: string | null = null;
 
   /** Whose process it is: an opaque id of the application. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   owner: string | null = null;
 
   /** The draft document; kept with validation errors too. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   draft: unknown = null;
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   draftUpdatedAt: Date | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   draftUpdatedByKind: string | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   draftUpdatedById: string | null = null;
 
-  @Column({ type: "integer", nullable: true })
+  @Nullable()
+  @Column({ type: "integer" })
   latestVersion: number | null = null;
 
   /** Days to keep completed and cancelled instances; `null` keeps them. */
-  @Column({ type: "integer", nullable: true })
+  @Nullable()
+  @Column({ type: "integer" })
   retentionDays: number | null = null;
 
   /** An archived process is not started. */
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   archivedAt: Date | null = null;
 
   @Column({ type: "createdAt" })

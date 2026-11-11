@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DI,
   HOSTED_SERVICE,
   AsyncResolutionRequiredError,
   ModuleEncapsulationError,
@@ -19,6 +18,7 @@ import {
   type BazisModuleMetadata,
   type ProviderDefinition,
 } from "../index";
+import { DI } from "../lowLevel";
 import { testModule } from "./test-fixtures";
 
 interface PrivateDependency {
@@ -109,7 +109,7 @@ registerModuleOwnedContributionValidator(testValidator);
 registerModuleOwnedContributionValidator(testValidator);
 
 function capabilityDefinition(): ProviderDefinition<OwnedCapability> {
-  return scoped(OwnedCapability, OwnedCapability, [PRIVATE_DEPENDENCY] as const);
+  return DI.scoped(DI.classProvider(OwnedCapability, OwnedCapability, [PRIVATE_DEPENDENCY] as const));
 }
 
 function moduleWith(metadata: TestContributionMetadata) {
@@ -190,7 +190,7 @@ describe("module-owned provider contributors", () => {
       ],
     });
     const foreign = testModule("ForeignModule", {
-      providers: [singleton(ForeignConsumer, ForeignConsumer, [PRIVATE_DEPENDENCY] as const)],
+      providers: [DI.singleton(DI.classProvider(ForeignConsumer, ForeignConsumer, [PRIVATE_DEPENDENCY] as const))],
       exports: [],
     });
     const app = testModule("AppModule", { imports: [feature, foreign], exports: [] });
@@ -268,7 +268,7 @@ describe("module-owned provider contributors", () => {
     const feature = moduleWith({
       providers: [
         singleton(PRIVATE_DEPENDENCY, PrivateDependencyService),
-        singleton(OwnedCapability, OwnedCapability, [PRIVATE_DEPENDENCY] as const),
+        DI.singleton(DI.classProvider(OwnedCapability, OwnedCapability, [PRIVATE_DEPENDENCY] as const)),
       ],
       exports: [],
       ownedProviderDeclarations: [
@@ -288,7 +288,7 @@ describe("module-owned provider contributors", () => {
     const LEFT_PRIVATE = createToken<PrivateDependency>("LeftOwnedPrivateDependency");
     const RIGHT_PRIVATE = createToken<PrivateDependency>("RightOwnedPrivateDependency");
     const declaration = (dependency: typeof LEFT_PRIVATE, key: string): ProviderDeclaration => ({
-      definition: scoped(OwnedCapability, OwnedCapability, [dependency] as const),
+      definition: DI.scoped(DI.classProvider(OwnedCapability, OwnedCapability, [dependency] as const)),
       payload: Object.freeze({ key }),
     });
     const left = testModule("LeftFeatureModule", {
@@ -360,7 +360,7 @@ describe("module-owned provider contributors", () => {
     const duplicate = moduleWith({ providers: [declaration.definition, declaration.definition], exports: [], attachedProviderDeclarations: [declaration] });
     expect(() => createContainer(testModule("AppModule", { imports: [duplicate], exports: [] }))).toThrow(/is duplicated/);
 
-    const singletonDefinition = singleton(OwnedCapability, OwnedCapability, [PRIVATE_DEPENDENCY] as const);
+    const singletonDefinition = DI.singleton(DI.classProvider(OwnedCapability, OwnedCapability, [PRIVATE_DEPENDENCY] as const));
     const wrongLifetime = moduleWith({ providers: [singletonDefinition], exports: [], attachedProviderDeclarations: [{ definition: singletonDefinition as ProviderDefinition<OwnedCapability>, payload: declaration.payload }] });
     expect(() => createContainer(testModule("AppModule", { imports: [wrongLifetime], exports: [] }))).toThrow(/is missing/);
   });

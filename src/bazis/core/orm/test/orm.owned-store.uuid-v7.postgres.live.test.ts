@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createContainer, Global, Module, singletonValue } from "@/core/di";
 import { Configuration, defineConfig, LifecycleCoordinator, secret } from "@/core/kernel";
 import { Infra } from "@/core/infra";
-import { Column, DbContext, Entity, ormBazisConnect } from "@/core/orm";
+import { Column, DbContext, Entity, ormBazisConnect, Nullable } from "@/core/orm";
 import { ForeignKey, postgres, UUID } from "@/library/orm";
 import { defineOrmOwnedStoreV1 } from "../../../library/orm/Schema/OrmOwnedStore";
 
@@ -24,14 +24,14 @@ const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 @Entity({ table: `${PREFIX}parent` })
 class Parent {
   @UUID({ version: "v7", name: `${PREFIX}parent_pkey` }) id = "";
-  @Column({ type: "text" }) name = "";
+  @Nullable() @Column({ type: "text" }) name = "";
 }
 
 @ForeignKey(() => Parent, { properties: ["parentId"], name: `${PREFIX}child_parent_fk` })
 @Entity({ table: `${PREFIX}child` })
 class Child {
   @UUID({ version: "v7", name: `${PREFIX}child_pkey` }) id = "";
-  @Column({ type: "text" }) parentId = "";
+  @Nullable() @Column({ type: "text" }) parentId = "";
 }
 
 class StoreContext extends DbContext {

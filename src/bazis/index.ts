@@ -46,8 +46,11 @@ export {
   type GrpcContext, type GrpcModuleOptions,
 } from "./core/grpc";
 export {
+  App,
   runApp,
-  type RunAppOptions,
+  type AppClass,
+  type AppOptions,
+  type AppSettings,
   type RunAppUiAppInfo,
   type RunAppUiOptions,
   type RunAppUiSurfaceOptions,
@@ -67,8 +70,6 @@ export {
   createToken,
   scoped,
   singleton,
-  singletonFactory,
-  singletonFactoryWithResolver,
   singletonValue,
   transient,
   type ModuleConfig,

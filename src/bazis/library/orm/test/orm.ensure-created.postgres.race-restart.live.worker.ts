@@ -1,4 +1,4 @@
-import { Check, Column, DbContext, DbContextOptions, Entity, Index, Key, Required, Schema, postgres } from "../index";
+import { Check, Column, DbContext, DbContextOptions, Entity, Index, Key, Required, Schema, postgres, Nullable } from "../index";
 
 const schema = process.env.BAZIS_ORM_ADDITIVE_LIVE_SCHEMA;
 const url = process.env.BAZIS_PG_URL;
@@ -19,7 +19,7 @@ class BaseRow {
 class FullRow {
   @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
   @Required() @Column({ type: "text", default: "ready" }) state = "";
-  @Column({ type: "text" }) note = "";
+  @Nullable() @Column({ type: "text" }) note = "";
 }
 
 class LiveContext extends DbContext {}

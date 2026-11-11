@@ -46,7 +46,8 @@ import { memory } from "@/core/cache";
 
 // A self-installing value: the output-cache composer is published through the
 // `ROUTE_MIDDLEWARE_COMPOSER` DI token, and `httpModule` picks it up automatically.
-await runApp(AppModule, { cache: memory({ maxEntries: 1000 }), http: {} });
+@App({ modules: [AppModule], cache: memory({ maxEntries: 1000 }), http: {} })
+export class Application {}
 
 // Named policies/tuning go through the advanced builder:
 import { buildCacheModule } from "@/core/cache";
@@ -70,7 +71,8 @@ import { redisConfig } from "../config/redis.config"; // defineConfig("redis", {
 })
 export class AppInfra {}
 
-await runApp(AppModule, { cache: memory(), infra: AppInfra, http: {} });
+@App({ modules: [AppModule], cache: memory(), infra: AppInfra, http: {} })
+export class Application {}
 ```
 
 `@CacheableRedis` / `@OutputRedisCache` find the backend through DI automatically.

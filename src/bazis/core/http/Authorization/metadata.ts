@@ -208,7 +208,7 @@ export function resolveAuthorizeMeta(ctor: object, methodName: string | symbol):
 }
 
 /**
- * The checks a route runs: the server's default checks (`runApp({ http:
+ * The checks a route runs: the server's default checks (`@App({ http:
  * { authorize } })`) first, then the route's own `@Authorize`; each function
  * once. `undefined` — the route is open: `@AllowAnonymous`, or no checks at all.
  */

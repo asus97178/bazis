@@ -30,8 +30,6 @@ export interface ColumnOptions {
   readonly name?: string;
   /** Type: physical (`text`, `datetime`, …) or semantic (`uuid`, `createdAt`, `updatedAt`). */
   readonly type?: ColumnOptionsType;
-  /** Allow NULL (default true; `@Required` sets false). */
-  readonly nullable?: boolean;
   /** Closed physical PostgreSQL default. It is not an application initializer or SQL fragment. */
   readonly default?: ColumnDefaultValue;
   /**
@@ -81,6 +79,12 @@ export interface IndexOptions<T extends object = any> {
    * The condition uses the same operators as `@Check`.
    */
   readonly where?: CheckPredicate<T>;
+  /**
+   * For a unique index: what to tell the client when a value is taken. Without it
+   * the answer is the standard text of 409. The names of the properties go to the
+   * details either way.
+   */
+  readonly conflict?: string;
 }
 export interface CompositeKeyOptions { readonly name?: string }
 export type ReferentialAction = "noAction" | "restrict" | "cascade" | "setNull";
@@ -104,7 +108,7 @@ export interface RawProperty {
   default?: ColumnDefaultValue;
   precision?: number;
   scale?: number;
-  index?: { unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst };
+  index?: { unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst; conflict?: string };
   /** `@ForeignKey(() => Principal)` on a scalar column, for the DDL FK. */
   fkTarget?: () => EntityClass;
   /** `@HasConversion(...)`: conversion before/after the dialect. */
@@ -136,7 +140,7 @@ export interface RawEntity {
   /** Soft-delete property name (see `@SoftDelete` / `@Entity({ softDelete })`). */
   softDeleteProperty?: string;
   keyDeclaration?: { properties: readonly string[]; name?: string; anchor: string; composite: boolean };
-  indexes?: Array<{ properties: readonly string[]; unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst }>;
+  indexes?: Array<{ properties: readonly string[]; unique: boolean; name?: string; where?: import("../Schema/CheckExpression").CheckAst; conflict?: string }>;
   foreignKeys?: Array<{ properties: readonly string[]; target: () => EntityClass; name?: string; onDelete?: ReferentialAction; onUpdate?: ReferentialAction }>;
   checks?: Array<{ name: string; expression: import("../Schema/CheckExpression").CheckAst }>;
 }
@@ -297,16 +301,25 @@ export function Column(options: ColumnOptions = {}) {
     prop.default = options.default;
     prop.precision = options.precision;
     prop.scale = options.scale;
-    if (options.nullable !== undefined) {
-      prop.nullable = options.nullable;
-    }
   };
 }
 
-/** NOT NULL. */
+/**
+ * The column is NOT NULL. Every column says whether it may be empty, with this
+ * or with {@link Nullable}: a reader sees it on the column, and a column that
+ * says neither stops the start. Keys and the creation and change timestamps
+ * need no mark: they are always NOT NULL.
+ */
 export function Required() {
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
     ownProperty(context.metadata, fieldName(context)).required = true;
+  };
+}
+
+/** The column allows NULL: the other of the two marks, see {@link Required}. */
+export function Nullable() {
+  return (_value: undefined, context: ClassFieldDecoratorContext): void => {
+    ownProperty(context.metadata, fieldName(context)).nullable = true;
   };
 }
 
@@ -319,13 +332,13 @@ export function Index(first: IndexOptions | readonly [string, ...string[]] = {},
   if (Array.isArray(first)) {
     const where = options.where === undefined ? undefined : compileCheck(options.where);
     return (_value: abstract new (...args: never[]) => unknown, context: ClassDecoratorContext): void => {
-      (ownRaw(context.metadata).indexes ??= []).push({ properties: [...first], unique: options.unique === true, name: options.name, ...(where === undefined ? {} : { where }) });
+      (ownRaw(context.metadata).indexes ??= []).push({ properties: [...first], unique: options.unique === true, name: options.name, ...(where === undefined ? {} : { where }), ...(options.conflict === undefined ? {} : { conflict: options.conflict }) });
     };
   }
   const propertyOptions = first as IndexOptions;
   const where = propertyOptions.where === undefined ? undefined : compileCheck(propertyOptions.where);
   return (_value: undefined, context: ClassFieldDecoratorContext): void => {
-    ownProperty(context.metadata, fieldName(context)).index = { unique: propertyOptions.unique === true, name: propertyOptions.name, ...(where === undefined ? {} : { where }) };
+    ownProperty(context.metadata, fieldName(context)).index = { unique: propertyOptions.unique === true, name: propertyOptions.name, ...(where === undefined ? {} : { where }), ...(propertyOptions.conflict === undefined ? {} : { conflict: propertyOptions.conflict }) };
   };
 }
 

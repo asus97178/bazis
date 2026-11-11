@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, postgres, type Migration, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, postgres, type Migration, type PostgresProvider, Nullable } from "../index";
 
 const url = process.env.BAZIS_PG_URL;
 const run = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
@@ -9,12 +9,12 @@ const racing = `ormecm_${run}_racing`;
 const broken = `ormecm_${run}_broken`;
 const live = url === undefined ? test.skip : test;
 
-@Entity({ table: fresh }) class FreshPrice { @Key() id = 0; @Column({ type: "real" }) price = 0; }
-@Entity({ table: existing }) class OldPrice { @Key() id = 0; @Column({ type: "integer" }) price = 0; }
-@Entity({ table: existing }) class NewPrice { @Key() id = 0; @Column({ type: "real" }) price = 0; @Column({ type: "text" }) note: string | null = null; }
-@Entity({ table: racing }) class RacingPrice { @Key() id = 0; @Column({ type: "real" }) price = 0; }
-@Entity({ table: broken }) class BrokenOld { @Key() id = 0; @Column({ type: "integer" }) price = 0; }
-@Entity({ table: broken }) class BrokenNew { @Key() id = 0; @Column({ type: "real" }) price = 0; }
+@Entity({ table: fresh }) class FreshPrice { @Key() id = 0; @Nullable() @Column({ type: "real" }) price = 0; }
+@Entity({ table: existing }) class OldPrice { @Key() id = 0; @Nullable() @Column({ type: "integer" }) price = 0; }
+@Entity({ table: existing }) class NewPrice { @Key() id = 0; @Nullable() @Column({ type: "real" }) price = 0; @Nullable() @Column({ type: "text" }) note: string | null = null; }
+@Entity({ table: racing }) class RacingPrice { @Key() id = 0; @Nullable() @Column({ type: "real" }) price = 0; }
+@Entity({ table: broken }) class BrokenOld { @Key() id = 0; @Nullable() @Column({ type: "integer" }) price = 0; }
+@Entity({ table: broken }) class BrokenNew { @Key() id = 0; @Nullable() @Column({ type: "real" }) price = 0; }
 
 let shared: PostgresProvider | undefined;
 const provider = () => shared ??= postgres({ url: url! });

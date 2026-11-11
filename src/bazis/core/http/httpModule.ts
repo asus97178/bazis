@@ -1,24 +1,25 @@
-import { DI, HOSTED_SERVICE, Module, SERVICE_PROVIDER, collectModuleControllers, type BazisModule, type ProviderDefinition } from "../di";
+import { HOSTED_SERVICE, Module, SERVICE_PROVIDER, collectModuleControllers, type BazisModule, type ProviderDefinition } from "../di";
+import { DI } from "../di/lowLevel";
 import { HttpServer } from "./HttpServer";
+import { httpConfig } from "./Http.config";
 import type { HttpModuleOptions, HttpServerOptions } from "./options";
 
 /**
  * Builds the HTTP module: discovers the `controllers` of the modules in
- * `imports` and registers the HttpServer hosted service.
+ * `imports` and registers the HttpServer hosted service. The address comes from
+ * {@link httpConfig} unless the options fix it.
  *
  * ```ts
  * @Module({
  *   controllers: [UsersController],
- *   providers: [scoped(IUserStore, UserService, [repositoryFor(User)] as const)],
+ *   providers: [scoped(IUserStore, UserService)],
  * })
  * export class UsersModule {}
  *
- * export const AppModule = createApp({
- *   imports: [UsersModule],
- *   http: { port: 3000, prefix: "api" },
- * }).module;
+ * @App({ modules: [UsersModule], http: { prefix: "api" } })
+ * export class Application {}
  *
- * await Bazis.run(AppModule);
+ * await runApp(Application);
  * ```
  */
 export function httpModule(options: HttpModuleOptions): BazisModule {
@@ -37,6 +38,7 @@ export function httpModule(options: HttpModuleOptions): BazisModule {
 
   @Module({
     imports: options.imports,
+    config: httpConfig,
     providers,
   })
   class HttpModule {}

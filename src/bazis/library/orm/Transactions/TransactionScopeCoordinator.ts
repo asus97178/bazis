@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { DbContext } from "../DbContext";
-import { ConcurrentTransactionScopeError, differentProviderMessage, OrmDatabaseTimeError, OrmProviderIdentityMismatchError, OrmTransactionScopeError, translateDatabaseError } from "../errors";
+import { ConcurrentTransactionScopeError, differentProviderMessage, OrmDatabaseTimeError, OrmProviderIdentityMismatchError, OrmTransactionScopeError, describeViolation, translateDatabaseError, type ViolationModels } from "../errors";
 import { baseProvider, withPostgresScopeOptions, createObservedProvider, postgresTransactionCapability, rootAuthority, withProviderDispatchObserver, withoutProviderDispatchObserver, type CancellableProviderDispatch } from "../Providers/ormTransactionRuntime";
 import type { DatabaseProvider } from "../Providers/types";
 import { OrmTransaction, type OrmDatabaseTimeV1, type OrmTransactionScopeOptions } from "./OrmTransaction";
@@ -84,7 +84,7 @@ export function contextToken(context: object): object {
   return token;
 }
 
-export function observedProvider(context: object, provider: DatabaseProvider): DatabaseProvider {
+export function observedProvider(context: object, provider: DatabaseProvider, models?: ViolationModels): DatabaseProvider {
   contextProviders.set(context, provider);
   const token = contextToken(context);
   const authority = rootAuthority(provider);
@@ -92,7 +92,7 @@ export function observedProvider(context: object, provider: DatabaseProvider): D
     if (uncertainContexts.has(token)) return Promise.reject(new TransactionOutcomeUnknownError());
     // Known SQLSTATEs (unique, foreign key, check, not null, lock timeout)
     // reach the context's caller as ORM errors; the outcome check sees the raw one.
-    const guarded = () => operation().catch((error) => { if (postgresTransactionCapability(provider)?.isOutcomeUncertain?.(error)) uncertainContexts.add(token); throw translateDatabaseError(error); });
+    const guarded = () => operation().catch((error) => { if (postgresTransactionCapability(provider)?.isOutcomeUncertain?.(error)) uncertainContexts.add(token); const translated = translateDatabaseError(error); throw models === undefined ? translated : describeViolation(translated, models); });
     if (!view) return guarded();
     const frame = view.frame;
     if (frame.authority !== authority || !view.enrolled.has(token) || frame.state !== "active" || frame.activeChild !== undefined) {

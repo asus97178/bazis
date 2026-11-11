@@ -29,7 +29,7 @@ my-app/
 ├── package.json            зависимость "bazis" и скрипты
 ├── tsconfig.json
 ├── bazis.config.json       какие файлы читает кодогенерация
-├── .env.example            пример настроек (HOST, PORT, BAZIS_ENV)
+├── .env.example            пример настроек (BAZIS_ENV, BAZIS_HTTP__HOST, BAZIS_HTTP__PORT)
 ├── .gitignore
 ├── AGENTS.md               правила для AI-ассистентов, работающих с проектом
 ├── README.md
@@ -37,25 +37,42 @@ my-app/
 └── src/
     ├── index.ts            точка входа: запускает приложение
     └── app/
+        ├── App.ts                  объявление приложения: модули и серверы
         ├── modules/App.module.ts   корневой модуль
         └── test/health.test.ts     тест: приложение стартует и отвечает на /health
 ```
 
-Посмотрим на точку входа `src/index.ts`:
+Приложение объявлено в `src/app/App.ts`:
+
+```ts
+import { App } from "bazis/core/app";
+import { AppModule } from "./modules/App.module";
+
+@App({
+  modules: [AppModule],
+  http: { health: true },
+})
+export class Application {}
+```
+
+- `modules` — из чего состоит приложение. Здесь один корневой модуль.
+- `http: { health: true }` — приложение поднимает HTTP-сервер с адресом `/health`.
+
+Точка входа `src/index.ts` его запускает:
 
 ```ts
 import { runApp } from "bazis/core/app";
-import { AppModule } from "./app/modules/App.module";
+import { Application } from "./app/App";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
 await registerBazisGeneratedRuntime();
-await runApp(AppModule, { http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });
+await runApp(Application);
 ```
 
 Здесь две строки:
 
 - `registerBazisGeneratedRuntime()` подключает код из папки `src/generated/`.
-- `runApp(AppModule, ...)` запускает приложение и включает адрес `/health`.
+- `runApp(Application)` запускает объявленное приложение.
 
 > **Что за папка `src/generated/`?** Её создаёт сам bazis при каждом запуске.
 > Там записано, какой класс от какого зависит. Руками её не меняют: при
@@ -96,8 +113,8 @@ curl http://127.0.0.1:3000/health
 
 | Задача | Как сделать |
 | --- | --- |
-| Запустить на другом порту | `PORT=3100 bunx bazis dev` |
-| Слушать другой адрес | переменная `HOST`, например `HOST=0.0.0.0` |
+| Запустить на другом порту | `BAZIS_HTTP__PORT=3100 bunx bazis dev` |
+| Слушать другой адрес | переменная `BAZIS_HTTP__HOST`, например `BAZIS_HTTP__HOST=0.0.0.0` |
 | Перезапускать при изменениях в `src/` | `bunx bazis dev --watch` |
 | Остановить приложение | `Ctrl+C` |
 

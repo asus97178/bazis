@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, Module, createContainer, createToken, scoped, singletonAsyncFactory } from "../index";
+import { Module, createContainer, createToken, scoped, singletonAsyncFactory } from "../index";
+import { DI } from "../lowLevel";
 
 // Async singletons are created up front, so constructor injection (which
 // resolves synchronously) can use them afterwards.
@@ -10,7 +11,7 @@ class Repo { constructor(readonly db: Db) {} }
 
 test("initializeAsyncSingletons makes async singletons resolvable synchronously", async () => {
   let created = 0;
-  @Module({ providers: [singletonAsyncFactory(Db, [] as const, async () => ({ id: ++created })), scoped(Repo, Repo, [Db] as const)], exports: [] })
+  @Module({ providers: [singletonAsyncFactory(Db, [] as const, async () => ({ id: ++created })), DI.scoped(DI.classProvider(Repo, Repo, [Db] as const))], exports: [] })
   class App {}
   const container = createContainer(App);
   expect(() => container.createScope().resolve(Repo)).toThrow(/asynchronous/);

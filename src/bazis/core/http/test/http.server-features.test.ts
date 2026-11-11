@@ -1,6 +1,7 @@
 import { registerGeneratedBindings } from "../Binding/autoBindings";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, Module, createContainer, type DiContainer } from "@/core/di";
+import { HOSTED_SERVICE, Module, createContainer, type DiContainer } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { HEALTH_CHECK, HealthService, type HealthCheck } from "@/core/kernel";
 import {
   Controller,

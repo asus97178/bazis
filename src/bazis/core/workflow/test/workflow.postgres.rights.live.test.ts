@@ -4,7 +4,8 @@ setDefaultTimeout(30_000);
 import { AccessPolicy, type AccessSubject, type Scope, type ScopePrincipals } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
 import { TOOL_EXECUTION_OPTIONS } from "@/core/agent";
-import { DI, Module, singletonValue } from "@/core/di";
+import { Module, singletonValue } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { PRINCIPAL_STATE_KEY, UnauthorizedError, type AuthorizeCheck } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret } from "@/core/kernel";
@@ -12,6 +13,7 @@ import { ormBazisConnect } from "@/core/orm";
 import { startTestApp, type TestApp } from "@/core/testing";
 import { IWorkflowDefinitions, WorkflowModule } from "@/core/workflow";
 import { postgres } from "@/library/orm";
+import { dropWorkflowTables } from "@/core/workflow/testing";
 
 /**
  * Rights of the workflow HTTP on PostgreSQL (WORKFLOW-002 §6.2): checks of
@@ -127,14 +129,8 @@ async function taskOf(instanceId: string) {
 
 beforeAll(async () => {
   if (!enabled) return;
-  const sql = postgres({ url });
-  try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
-    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
-    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
-  } finally {
-    await sql.close();
-  }
+  // The database is a throwaway one: its name was checked above.
+  await dropWorkflowTables(url!, { force: true });
   app = await startTestApp(root(url!), { http: { authorize: signedIn } });
   const scope = app.container.createScope();
   try {

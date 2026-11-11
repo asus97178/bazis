@@ -1,4 +1,5 @@
 import { defineProcess } from "bazis/core/workflow";
+import { orderApproval } from "./OrderApproval.process";
 
 /**
  * Approves several orders: the approval of each is a process of its own, two at a
@@ -33,7 +34,7 @@ export const orderBatch = defineProcess({
         kind: "callProcess",
         title: { en: "Approve", ru: "Согласовать" },
         parent: "Each",
-        config: { process: "order-approval", input: { orderId: { path: "$item.orderId" }, amount: { path: "$item.amount" } }, saveTo: "result" },
+        config: { process: orderApproval, input: { orderId: { path: "$item.orderId" }, amount: { path: "$item.amount" } }, saveTo: "result" },
       },
       Done: { kind: "end", title: { en: "Done", ru: "Готово" }, parent: "Each" },
       End: { kind: "end", title: { en: "End", ru: "Конец" } },

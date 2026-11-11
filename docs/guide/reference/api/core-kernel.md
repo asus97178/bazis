@@ -10,6 +10,8 @@
 | `defineConfig(prefix, schema)` | Объявление настроек: значения по умолчанию, окружения, переменные, проверки | [Конфигурация](../../fundamentals/configuration.md) |
 | `secret(value?)`, `Secret` | Секрет: не попадает в журнал, `reveal()` даёт значение | [Секреты](../../security/secrets.md) |
 | `configEnum(values, default)` | Перечисление в настройках | [Объявление](../../fundamentals/configuration.md#объявление) |
+| `ConfigView<typeof config>`, `ResolvedConfigView<T>` | Настройки в конструкторе сервиса по самому объявлению; интерфейс представления | [Объявление](../../fundamentals/configuration.md#объявление) |
+| `configList(default?)` | Список строк в настройках: массив в коде, через запятую в окружении | [Объявление](../../fundamentals/configuration.md#объявление) |
 | `envSource`, `argsSource`, `jsonFileSource`, `memorySource`, `secretFilesSource` | Источники значений: переменные `BAZIS_*`, `--db.host=…`, JSON-файл, объект, файлы `/run/secrets` | [Откуда берутся значения](../../fundamentals/configuration.md#откуда-берутся-значения) |
 | `loadConfiguration(sources)` | Слить источники; поздние важнее | — |
 | `Configuration` | Неизменяемый набор ключей `db.host` → строка | [Настройки вне DI](../../fundamentals/configuration.md#настройки-вне-di) |

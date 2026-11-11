@@ -64,11 +64,9 @@ interface AuthorizeContext {
 
 ```ts
 // Auth.config.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface AuthConfig { jwtSecret: Secret; accessTtlSeconds: number; }
-
-export const authConfig = defineConfig<AuthConfig>("auth", {
+export const authConfig = defineConfig("auth", {
   default: { jwtSecret: secret("dev-only-secret-at-least-32-bytes!!"), accessTtlSeconds: 900 },
   production: { jwtSecret: secret() },             // без значения — обязателен
 });
@@ -87,12 +85,12 @@ auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 // AuthTokens.service.ts
 import { TokenIssuer, hs256 } from "bazis/library/jwt";
 import type { ConfigView } from "bazis/core/kernel";
-import type { AuthConfig } from "./Auth.config";
+import type { authConfig } from "./Auth.config";
 
 export class AuthTokens {
   private readonly issuer: TokenIssuer;
 
-  constructor(config: ConfigView<AuthConfig>) {
+  constructor(config: ConfigView<typeof authConfig>) {
     this.issuer = new TokenIssuer({
       issuer: "my-app",
       audience: "user",
@@ -272,13 +270,15 @@ the result would depend on the decorator order. Keep @Authorize(...) to protect 
 ## Закрыто по умолчанию
 
 Чтобы маршрут без `@Authorize` не оказался открытым по забывчивости,
-задайте общую проверку в `runApp`:
+задайте общую проверку в `@App`:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   infra: AppInfra,
   http: { authorize: requireTokenKind(TokenKind.Admin, TokenKind.Client), /* … */ },
-});
+})
+export class Application {}
 ```
 
 | Маршрут | Что выполняется |

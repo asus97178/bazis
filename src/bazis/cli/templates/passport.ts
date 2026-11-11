@@ -76,14 +76,14 @@ exports: [I${m}Service]. TypeScript contract: services/I${e}.service.ts;
 HTTP access is defined by the controller and the host policy, separately from DI exports.
 I${m}Service → ${m}Service, scoped lifetime. The context and DbSet belong to the ORM.
 ${profile === "full" ? `${m}SummaryTool is listed in tools: [${m}SummaryTool]; the framework registers it as scoped, the tool is not exported.
-The service is scoped; its keyed @Cacheable works when the host installs the cache (runApp cache: memory()).
+The service is scoped; its keyed @Cacheable works when the host installs the cache (@App cache: memory()).
 The background service gets its own scope per tick and disposes it in finally.
 The host also provides auth from src/app/modules/auth (TokenKind.Admin/Client)
 and an LLM connector, which registers AgentRuntime. The CLI does not create them.
 ` : ""}Constructor dependencies, including ${m}DbContext, are wired by codegen.
 No manual deps arrays. UI, events and own configuration are not used.
 
-ORM: context ${m}DbContext, entities [${e}], shared host provider.
+ORM: context ${m}DbContext with the set of ${e}, shared host provider.
 Table ${n.route}${profile === "full" ? `, schema ${n.dbSchema}` : ""}.
 Only the module decides how tables are created: \`ensureCreated: true\` or
 \`migrateOnStart: true\` in \`ormBazis\`. The scaffold sets neither, so the host

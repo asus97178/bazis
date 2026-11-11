@@ -2,7 +2,7 @@ import { expect, spyOn, test } from "bun:test";
 import { Module } from "@/core/di";
 import { Bazis, defineConfig, secret } from "@/core/kernel";
 import { Infra } from "@/core/infra";
-import { Column, DbContext, Entity, Key, ormBazisConnect } from "@/core/orm";
+import { Column, DbContext, Entity, Key, ormBazisConnect, Nullable } from "@/core/orm";
 import { postgres, type PostgresProvider } from "@/library/orm";
 
 const url = process.env.BAZIS_PG_URL?.trim();
@@ -13,6 +13,7 @@ class ReportItem {
   @Key()
   id = 0;
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }

@@ -1,4 +1,4 @@
-import { Conflict, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put } from "bazis/core/http";
+import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Post, Put } from "bazis/core/http";
 import { buildListDocument } from "bazis/library/jsonapi";
 import { ProjectListQuery } from "./contracts/ProjectList.query";
 import { CreateProjectRequest, UpdateProjectRequest } from "./contracts/Project.requests";
@@ -14,32 +14,24 @@ export class ProjectController {
     return buildListDocument(items, query, total, { basePath: ctx.path });
   }
 
-  @Get(":id(uuid)")
-  async getById(id: string) {
-    const item = await this.projects.getById(id);
-    return item ? Ok(item) : NotFound({ error: `project ${id} not found` });
+  @Get(":id(uuid)", { nullAs: NotFound })
+  getById(id: string) {
+    return this.projects.getById(id);
   }
 
+  /** A taken name answers 409 by the unique index of the model. */
   @Post()
   async create(body: CreateProjectRequest) {
-    const item = await this.projects.create(body);
-    return item === "conflict"
-      ? Conflict({ error: `project "${body.name}" already exists` })
-      : Created(item);
+    return Created(await this.projects.create(body));
   }
 
-  @Put(":id(uuid)")
-  async update(id: string, body: UpdateProjectRequest) {
-    const item = await this.projects.update(id, body);
-    if (item === "conflict") {
-      return Conflict({ error: `project "${body.name}" already exists` });
-    }
-    return item ? Ok(item) : NotFound({ error: `project ${id} not found` });
+  @Put(":id(uuid)", { nullAs: NotFound })
+  update(id: string, body: UpdateProjectRequest) {
+    return this.projects.update(id, body);
   }
 
   @Delete(":id(uuid)")
   async delete(id: string) {
-    const removed = await this.projects.delete(id);
-    return removed ? NoContent() : NotFound({ error: `project ${id} not found` });
+    return await this.projects.delete(id) ? NoContent() : NotFound();
   }
 }

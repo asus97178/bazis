@@ -25,7 +25,8 @@ export class AppInfra {}
 
 ```ts
 // index.ts
-await runApp(AppModule, { infra: AppInfra, http: { port: 3000 } });
+@App({ modules: [AppModule], infra: AppInfra, http: {} })
+export class Application {}
 ```
 
 Ключ манифеста — имя экземпляра: `db`, `cache`, `search`. Оно видно в
@@ -126,7 +127,7 @@ OpenSearch недоступен:
 [Команды CLI](../cli/commands.md#если-запуск-не-удался)).
 
 Если что-то не ответило совсем, срабатывает общий срок старта — 30 секунд
-(`runApp(…, { kernel: { startupTimeoutMs } })`). Сообщение называет, что
+(`@App({ kernel: { startupTimeoutMs } })`). Сообщение называет, что
 ещё стартует:
 
 ```text

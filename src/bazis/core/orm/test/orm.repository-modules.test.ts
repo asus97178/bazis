@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module, ModuleEncapsulationError, createContainer, namedDependency } from "@/core/di";
-import { Column, DbContext, Entity, IRepository, Key, ormModule, repositoryFor, type DatabaseProvider } from "@/core/orm";
+import { Module, ModuleEncapsulationError, createContainer, namedDependency } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
+import { Column, DbContext, Entity, IRepository, Key, ormModule, repositoryFor, type DatabaseProvider, Nullable } from "@/core/orm";
 import { redactSensitiveText } from "@/library/redaction";
 
 @Entity({ table: "repo_modules_products" })
-class Product { @Key() id = 0; @Column({ type: "text" }) name = ""; }
+class Product { @Key() id = 0; @Nullable() @Column({ type: "text" }) name = ""; }
 @Entity({ table: "repo_modules_categories" })
-class Category { @Key() id = 0; @Column({ type: "text" }) name = ""; }
+class Category { @Key() id = 0; @Nullable() @Column({ type: "text" }) name = ""; }
 class CatalogDbContext extends DbContext {}
 
 const provider = { name: "test", dialect: { name: "test" }, query: async () => [], execute: async () => ({ changes: 0, lastInsertId: 0 }), transaction: async <T>(work: never) => work as T, ping: async () => true, close: async () => undefined, introspect: async () => ({ tables: new Map() }) } as unknown as DatabaseProvider;

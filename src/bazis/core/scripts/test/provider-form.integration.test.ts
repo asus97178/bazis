@@ -78,3 +78,41 @@ export class AppModule {}
   expect(result.output).toContain('controllers of AppModule: "DI.bindDeps(HelloController, Greeter)" — list the class itself');
   expect(result.output).toContain("Agreed forms: scoped(IService, Service), singleton(IService, Service), transient(IService, Service) (or the class alone), singletonValue(TOKEN, value), singletonAsyncFactory(TOKEN, [deps], async factory) or ...withEventSubscribers(Class).");
 }, 60_000);
+
+// 0.138.0: Tools made by a function come from defineTool; an application writes its own factory.
+const tools = `import { Tool, defineTool, type ToolSet } from "bazis/core/agent";
+@Tool({ name: "hello.say", description: "Says hello.", callers: ["agent"] }) export class SayTool { constructor(private readonly greeter: Greeter) {} execute() { return {}; } }
+export const ping = defineTool({ name: "hello.ping", description: "Answers.", callers: ["agent"], execute: () => ({}) });
+export function exportTools(formats: readonly string[]): ToolSet {
+  return Object.fromEntries(formats.map((format) => [format, defineTool({ name: "hello.export." + format, description: "Exports.", callers: ["agent"], execute: () => ({}) })]));
+}
+export const more = [defineTool({ name: "hello.more", description: "More.", callers: ["agent"], execute: () => ({}) })];
+`;
+
+test("tools take classes, Tools of defineTool, sets of them and calls that make them", async () => {
+  const result = await generate(`${services}${tools}
+@Module({
+  providers: [singleton(IClock, Clock), scoped(Greeter)],
+  tools: [SayTool, ping, exportTools(["pdf", "csv"]), ...more, { inline: defineTool({ name: "hello.inline", description: "Inline.", callers: ["agent"], execute: () => ({}) }) }],
+  exports: [],
+})
+export class AppModule {}
+`);
+  expect(result.exit, result.output).toBe(0);
+}, 60_000);
+
+test("a tool that is neither a class nor made by defineTool stops codegen", async () => {
+  const result = await generate(`${services}${tools}
+import { DI } from "bazis/core/di/lowLevel";
+const made = (): object[] => [];
+@Module({
+  providers: [singleton(IClock, Clock), scoped(Greeter)],
+  tools: [DI.bindDeps(SayTool, Greeter), ...made()],
+  exports: [],
+})
+export class AppModule {}
+`);
+  expect(result.exit).not.toBe(0);
+  expect(result.output).toContain('tools of AppModule: "DI.bindDeps(SayTool, Greeter)" — list the class itself; its constructor dependencies come from codegen. A Tool made by a function comes from defineTool(...).');
+  expect(result.output).toContain('tools of AppModule: "...made()" — list the class itself');
+}, 60_000);

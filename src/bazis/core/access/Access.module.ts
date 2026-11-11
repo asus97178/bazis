@@ -9,7 +9,7 @@ import { AccessPolicy } from "./contracts/AccessPolicy";
 import { AccessCatalogController } from "./http/AccessCatalog.controller";
 import { RolesAccessPolicy } from "./roles/RolesAccessPolicy";
 
-const accessPermissions = definePermissions({
+export const accessPermissions = definePermissions({
   "access.catalog.read": {
     title: { en: "See the permissions catalog", ru: "Видеть каталог прав" },
   },

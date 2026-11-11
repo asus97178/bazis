@@ -86,6 +86,7 @@ older than this controller. Run `bazis codegen` (bazis dev, bazis test and bazis
 | `httpRequestModels.ts` | Описания моделей запросов: типы полей для проверки JSON |
 | `httpListModels.ts` | Описания моделей списков (`ListRequest`) |
 | `openapi.ts` | Данные для документации API |
+| `permissions.ts` | Ключи прав модулей как тип для `can` и `defineRoles`; только если права объявлены ([Права](../security/access.md#ключи-проверяет-компилятор)) |
 | `agentCatalog.ts` | Описания AI-инструментов |
 | `fingerprint.ts` | Отпечаток исходников — для предупреждения об устаревании |
 | `runtime.ts` | `registerBazisGeneratedRuntime()` — подключает всё остальное |
@@ -142,11 +143,11 @@ Codegen разбирает только файлы, до которых можн
 ```ts
 // src/worker.ts
 import { runApp } from "bazis/core/app";
-import { WorkerModule } from "./app/Worker.module";
+import { Worker } from "./app/Worker";   // @App({ modules: [WorkerModule], infra: AppInfra })
 import { registerBazisGeneratedRuntime } from "./generated/bazis/targets/worker/runtime";
 
 await registerBazisGeneratedRuntime();
-await runApp(WorkerModule);
+await runApp(Worker);
 ```
 
 ## Ошибки codegen

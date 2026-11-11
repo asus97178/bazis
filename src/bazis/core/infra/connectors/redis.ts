@@ -7,7 +7,8 @@ import {
   connectionCache,
   type DistributedCacheStores,
 } from "../../cache";
-import { createToken, DI, type InjectionToken, type ProviderDefinition } from "../../di";
+import { createToken, type InjectionToken, type ProviderDefinition } from "../../di";
+import { DI } from "../../di/lowLevel";
 import type { AppConfig, Secret } from "../../kernel";
 import { RedisDistributedCacheBackend, type RedisDistributedCacheTuning } from "../cache/RedisDistributedCacheBackend";
 import { reader, requireValue, settingNames } from "../connectorConfig";

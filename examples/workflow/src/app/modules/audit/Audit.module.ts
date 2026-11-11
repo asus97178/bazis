@@ -5,13 +5,11 @@ import { auditPermissions } from "./access/Audit.permissions";
 import { AuditLog } from "./events/AuditLog";
 import { AuditController } from "./http/Audit.controller";
 import { AuditDbContext } from "./model/Audit.dbContext";
-import { AuditEntry } from "./model/AuditEntry.model";
 
 @Module({
   imports: [AccessModule],
   ormBazis: {
     context: AuditDbContext,
-    entities: [AuditEntry],
     migrateOnStart: true,
   },
   permissions: auditPermissions,

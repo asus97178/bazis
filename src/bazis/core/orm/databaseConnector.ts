@@ -1,7 +1,10 @@
 import { errorMessage, InfraError, reader, requireValue, postgresConnectionOptions, settingNames, type InfraConnector, type PostgresConfigShape } from "../infra";
-import { postgresAddress, serverVersion } from "../infra/connectors/postgres";
+import { POSTGRES_SSL_MODES, postgresAddress, serverVersion, type PostgresSslMode } from "../infra/connectors/postgres";
 import type { AppConfig, ConfigRegistry } from "../kernel";
 import { postgres, type DatabaseProvider, type PostgresServerTimeouts } from "../../library/orm";
+import { singletonValue } from "../di";
+import { HTTP_ERROR_MAPPER } from "../http/middlewareTokens";
+import { databaseHttpError } from "./databaseHttpError";
 import { DATABASE_PROVIDER } from "./DATABASE_PROVIDER";
 
 /** Connect before the servers and ORM features: open the database before anyone asks for it. */
@@ -13,7 +16,7 @@ export interface PostgresOrmConfigShape extends PostgresConfigShape {
   readonly connectionTimeout?: number;
   readonly idleTimeout?: number;
   readonly maxLifetime?: number;
-  readonly tls?: "disable" | "allow" | "prefer" | "require" | "verify-ca" | "verify-full";
+  readonly tls?: PostgresSslMode;
   readonly tlsCa?: string;
   readonly operationTimeoutMs?: number;
   readonly cancellationTimeoutMs?: number;
@@ -43,7 +46,7 @@ function buildPostgresProvider<T extends PostgresOrmConfigShape>(config: AppConf
   // defineConfig keys are always present, so an empty tlsCa means "no additional CA".
   const tls = optional("tls"), configuredCa = optional("tlsCa"), ca = configuredCa === "" ? undefined : configuredCa;
   if (tls !== undefined) {
-    if (typeof tls !== "string" || !["disable", "allow", "prefer", "require", "verify-ca", "verify-full"].includes(tls)) throw new InfraError("Invalid PostgreSQL configuration field: tls.");
+    if (typeof tls !== "string" || !(POSTGRES_SSL_MODES as readonly string[]).includes(tls)) throw new InfraError("Invalid PostgreSQL configuration field: tls.");
     options.tls = tls;
   }
   if (ca !== undefined) {
@@ -96,6 +99,9 @@ export function ormBazisConnect(
     token: DATABASE_PROVIDER,
     config,
     phase: DATABASE_PHASE,
+    // Database errors answer by their meaning (409, 404, 422, 503) without a setting in the application.
+    providers: [singletonValue(HTTP_ERROR_MAPPER, databaseHttpError)],
+    exports: [HTTP_ERROR_MAPPER],
     create(configs) {
       const c = reader(config, configs);
       target = `PostgreSQL at ${String(c.get("host"))}:${String(c.get("port"))} (database "${String(c.get("database"))}", user "${String(c.get("username"))}")`;

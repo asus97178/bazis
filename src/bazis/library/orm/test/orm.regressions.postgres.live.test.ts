@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   Column, DbContext, DbContextOptions, Entity, EntityState, HasConversion,
-  Key, ManyToOne, PostgresProvider, Schema, UUID, type Row,
+  Key, ManyToOne, PostgresProvider, Schema, UUID, type Row, Nullable,
 } from "../index";
 
 // Explicitly opt in on an owner-approved disposable database. This suite
@@ -25,12 +25,12 @@ async function createFixture() {
   @Schema(schema) @Entity({ table: "parents" })
   class Parent {
     @UUID() id = "";
-    @Column({ type: "text", name: "label.external" }) label = "parent";
+    @Nullable() @Column({ type: "text", name: "label.external" }) label = "parent";
   }
   @Schema(schema) @Entity({ table: "children" })
   class Child {
     @Key() id = 0;
-    @Column({ type: "uuid", name: "parent.uuid" }) parentId: string | null = null;
+    @Nullable() @Column({ type: "uuid", name: "parent.uuid" }) parentId: string | null = null;
     @ManyToOne(() => Parent, { foreignKey: "parentId" }) parent?: Parent;
   }
   @Schema(schema) @Entity({ table: "empty_rows" })
@@ -38,6 +38,7 @@ async function createFixture() {
   @Schema(schema) @Entity({ table: "broken_rows" })
   class Broken {
     @Key({ generated: false }) id = 1;
+    @Nullable()
     @Column({ type: "text" })
     @HasConversion({ toProvider() { throw new Error("audit conversion failed"); }, fromProvider(value: unknown) { return value; } })
     value = "broken";
@@ -49,7 +50,7 @@ async function createFixture() {
   @Schema(schema) @Entity({ table: "date_children" })
   class DateChild {
     @Key({ generated: false }) id = 1;
-    @Column({ type: "datetime" }) parentId = new Date(0);
+    @Nullable() @Column({ type: "datetime" }) parentId = new Date(0);
     @ManyToOne(() => DateParent, { foreignKey: "parentId" }) parent?: DateParent;
   }
   const entities = [Parent, Child, Empty, Broken, DateParent, DateChild];

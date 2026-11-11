@@ -1,4 +1,4 @@
-import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
+import { Column, Entity, ForeignKey, Index, UUID, Nullable } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
 /**
@@ -16,36 +16,45 @@ export class WfToken {
   @UUID({ version: "v7" })
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   instanceId = "";
 
+  @Nullable()
   @Column({ type: "text" })
   nodeId = "";
 
   /** The flow the token came by; `null` on a start node. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   viaFlowId: string | null = null;
 
+  @Nullable()
   @Column({ type: "text" })
   status: TokenStatus = "active";
 
   /** A step's result; a loop keeps its progress here while it runs. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   output: unknown = null;
 
   /** The loop token this one runs inside, with its iteration and what only the body sees: `Locals` of the engine. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   parentTokenId: string | null = null;
 
-  @Column({ type: "integer", nullable: true })
+  @Nullable()
+  @Column({ type: "integer" })
   iteration: number | null = null;
 
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   locals: Record<string, unknown> | null = null;
 
   @Column({ type: "createdAt" })
   createdAt = new Date(0);
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   endedAt: Date | null = null;
 }

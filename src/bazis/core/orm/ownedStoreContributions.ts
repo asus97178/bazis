@@ -6,6 +6,7 @@ import {
   type BazisModuleMetadata,
 } from "../di";
 import { OrmModel, type DbContext, type OrmOwnedStoreDefinitionV1 } from "../../library/orm";
+import { contextEntities } from "./contextEntities";
 import { compileExpectedSchema, type OrmExpectedSchema } from "../../library/orm/Schema/ExpectedSchema";
 import { isDefinedOrmOwnedStoreV1 } from "../../library/orm/Schema/OrmOwnedStore";
 import { defineOrmOwnedStoreV1 } from "../../library/orm/Schema/OrmOwnedStore";
@@ -159,7 +160,7 @@ export function ownedStoreRegistrations(snapshot: ModuleOwnedContributionSnapsho
     // view. Direct ordinary modules intentionally read their caller config at
     // build time, then both graph preflight and runtime factories use this copy.
     const source = entry.config as { readonly entities?: readonly EntityClass[]; readonly migrations?: readonly unknown[] } | undefined;
-    const entities = source === undefined ? entry.entities : Object.freeze([...(source.entities ?? [])]);
+    const entities = source === undefined ? entry.entities : Object.freeze([...contextEntities({ context: entry.context, entities: source.entities })]);
     // Migration instances remain caller-owned; only the sequence membership and
     // order are part of this container's effective config snapshot.
     const migrations = source?.migrations;

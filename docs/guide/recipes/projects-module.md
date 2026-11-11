@@ -188,7 +188,7 @@ export class ProjectsController {
 
   @Delete(":id(uuid)")
   async delete(id: string) {
-    return (await this.projects.delete(id)) ? NoContent() : NotFound({ error: `project ${id} not found` });
+    return (await this.projects.delete(id)) ? NoContent() : NotFound();
   }
 }
 ```
@@ -205,7 +205,7 @@ import { ProjectsService } from "./services/Projects.service";
 
 @Module({
   imports: [AuthModule],
-  ormBazis: { context: ProjectsDbContext, entities: [Project], ensureCreated: true },
+  ormBazis: { context: ProjectsDbContext, ensureCreated: true },
   controllers: [ProjectsController],
   providers: [scoped(IProjectsService, ProjectsService)],
   exports: [IProjectsService],
@@ -224,7 +224,8 @@ export class ProjectsModule {}
 ```ts
 // tasks/model/Tasks.model.ts — новое поле
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   projectId: string | null = null;
 ```
 

@@ -68,7 +68,6 @@ function moduleFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
 
   return `${moduleImport}
 ${aiImports}${backgroundImport}import { ${n.module}Controller } from "./http/${n.module}.controller";
-import { ${n.entity} } from "./model/${n.module}.model";
 import { ${n.module}DbContext } from "./model/${n.module}.dbContext";
 import { I${n.module}Service } from "./services/I${n.module}.service";
 import { ${n.module}Service } from "./services/${n.module}.service";
@@ -76,7 +75,6 @@ import { ${n.module}Service } from "./services/${n.module}.service";
 @Module({
   ormBazis: {
     context: ${n.module}DbContext,
-    entities: [${n.entity}],
   },
   controllers: [${n.module}Controller],
   providers: [
@@ -91,15 +89,15 @@ export class ${n.moduleClass} {}
 function controllerFile(n: ModuleNaming, profile: ModuleTemplateProfile, authImportPath: string | null): string {
   const auth = profile === "full" && authImportPath !== null;
   const fullImports = profile !== "full"
-    ? "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from \"bazis/core/http\";\n"
+    ? "import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Post, Put, type FromBody, type FromQuery, type FromRoute } from \"bazis/core/http\";\n"
     : auth
       ? `import { OutputCache } from "bazis/core/cache";
-import { Authorize, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
+import { Authorize, Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 import { TokenKind } from "${authImportPath}/tokenKinds";
 import { requireTokenKind } from "${authImportPath}/jwtAuth";
 `
       : `import { OutputCache } from "bazis/core/cache";
-import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Ok, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
+import { Controller, Created, Delete, Get, HttpContext, NoContent, NotFound, Post, Put, type FromBody, type FromQuery, type FromRoute } from "bazis/core/http";
 // No host auth helpers (src/app/modules/auth) were found: these routes are public.
 // Add @Authorize(...) from "bazis/core/http" with your policy before exposing them.
 `;
@@ -125,10 +123,9 @@ ${authList}  @Get()
     return buildListDocument(items, query, total, { basePath: ctx.path });
   }
 
-${authRead}  @Get(":id(uuid)")
-  async getById(id: FromRoute<string>) {
-    const item = await this.${n.collection}.getById(id);
-    return item ? Ok(item) : NotFound({ error: \`${n.entity.toLowerCase()} \${id} not found\` });
+${authRead}  @Get(":id(uuid)", { nullAs: NotFound })
+  getById(id: FromRoute<string>) {
+    return this.${n.collection}.getById(id);
   }
 
 ${authWrite}  @Post()
@@ -137,16 +134,14 @@ ${authWrite}  @Post()
     return Created(result);
   }
 
-${authWrite}  @Put(":id(uuid)")
-  async update(id: FromRoute<string>, body: FromBody<Update${n.entity}Request>) {
-    const item = await this.${n.collection}.update(id, body);
-    return item ? Ok(item) : NotFound({ error: \`${n.entity.toLowerCase()} \${id} not found\` });
+${authWrite}  @Put(":id(uuid)", { nullAs: NotFound })
+  update(id: FromRoute<string>, body: FromBody<Update${n.entity}Request>) {
+    return this.${n.collection}.update(id, body);
   }
 
 ${authWrite}  @Delete(":id(uuid)")
   async delete(id: FromRoute<string>) {
-    const removed = await this.${n.collection}.delete(id);
-    return removed ? NoContent() : NotFound({ error: \`${n.entity.toLowerCase()} \${id} not found\` });
+    return await this.${n.collection}.delete(id) ? NoContent() : NotFound();
   }
 }
 `;
@@ -155,17 +150,19 @@ ${authWrite}  @Delete(":id(uuid)")
 function ormModelFile(n: ModuleNaming, profile: ModuleTemplateProfile): string {
   const schemaImport = profile === "full" ? ", Schema" : "";
   const schemaDecorator = profile === "full" ? `@Schema("${n.dbSchema}")\n` : "";
-  return `import { Column, Entity, Index, UUID${schemaImport} } from "bazis/core/orm";
+  return `import { Column, Entity, Index, Required, UUID${schemaImport} } from "bazis/core/orm";
 
 ${schemaDecorator}@Entity({ table: "${n.route}" })
 export class ${n.entity} {
   @UUID()
   id = "";
 
+  @Required()
   @Column({ type: "text" })
   name = "";
 
   @Index({ unique: true })
+  @Required()
   @Column({ type: "text" })
   email = "";
 

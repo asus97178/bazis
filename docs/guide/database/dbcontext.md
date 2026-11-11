@@ -19,7 +19,7 @@ export class CatalogDbContext extends DbContext {
 
 ```ts
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Product, Category], ensureCreated: true },
+  ormBazis: { context: CatalogDbContext, ensureCreated: true },
   providers: [scoped(ProductsService)],
   controllers: [ProductsController],
   exports: [],
@@ -28,9 +28,17 @@ export class CatalogModule {}
 ```
 
 `ormBazis` регистрирует контекст в DI и подключает его к общему
-подключению из `@Infra` ([Подключение PostgreSQL](postgresql.md)). В
-`entities` перечисляются все сущности контекста; `ensureCreated` создаёт
+подключению из `@Infra` ([Подключение PostgreSQL](postgresql.md)). Сущности
+контекста — те, для которых он объявил набор через `this.set(...)`; `ensureCreated` создаёт
 недостающие таблицы при запуске.
+
+Поле `entities` нужно в двух случаях:
+
+- у сущности нет своего набора: `ormBazis: { context: CatalogDbContext, entities: [PriceHistory] }`;
+- конструктор контекста не может выполниться без своих зависимостей: тогда bazis не может
+  прочитать наборы, говорит об этом при старте, и сущности перечисляются все.
+
+До версии 0.137.0 в `entities` перечислялись все сущности контекста; старые списки работают как раньше.
 
 Сервис получает контекст в конструкторе, как любой другой сервис:
 
@@ -112,10 +120,10 @@ export class CatalogStats extends PeriodicBackgroundService {
 контекстом, его экспортируют:
 
 ```ts
-@Module({ ormBazis: { context: CatalogDbContext, entities: [Product] }, exports: [CatalogDbContext] })
+@Module({ ormBazis: { context: CatalogDbContext }, exports: [CatalogDbContext] })
 export class CatalogModule {}
 
-@Module({ imports: [CatalogModule], ormBazis: { context: OrdersDbContext, entities: [Order] }, providers: [scoped(OrdersService)] })
+@Module({ imports: [CatalogModule], ormBazis: { context: OrdersDbContext }, providers: [scoped(OrdersService)] })
 export class OrdersModule {}
 
 export class OrdersService {

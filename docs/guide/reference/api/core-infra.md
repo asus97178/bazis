@@ -34,6 +34,7 @@ OpenSearch, LLM, Codex. Список — по пакету 0.128.0.
 | `reader(config)`, `requireValue`, `settingNames` | Чтение настроек коннектора и имена переменных для подсказки об ошибке | [Свой коннектор](../../infra/custom-connector.md) |
 | `errorMessage(error)` | Текст ошибки, даже если брошено не `Error` | там же |
 | `postgresConnectionOptions` | Общие параметры подключения PostgreSQL для SQL и ORM | — |
+| `POSTGRES_SSL_MODES` | Режимы TLS подключения PostgreSQL, для `configEnum(POSTGRES_SSL_MODES, "disable")` | — |
 | `RedisDistributedCacheBackend`, `RedisDistributedCacheDriver` | Распределённый кэш поверх Redis | — |
 
 ## Типы

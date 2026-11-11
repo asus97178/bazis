@@ -92,7 +92,7 @@ try {
   // The same app from source (`bazis dev`) and as the compiled executable.
   for (const [label, command] of [["bazis dev", [bazis, "dev"]], ["binary", [join(app, "bin/demo")]]] as const) {
     const port = String(39000 + Math.floor(Math.random() * 900));
-    server = Bun.spawn([...command], { cwd: app, env: { ...process.env, PORT: port }, stdout: "ignore", stderr: "ignore" });
+    server = Bun.spawn([...command], { cwd: app, env: { ...process.env, BAZIS_HTTP__PORT: port }, stdout: "ignore", stderr: "ignore" });
     let healthy = false;
     for (let attempt = 0; attempt < 100 && !healthy; attempt++) {
       await Bun.sleep(200);

@@ -1,5 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { Module, createContainer, scoped } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Validator, modelValidatorAdapter } from "@/library/validation";
 import {
   AgentToolPreCommitError,
@@ -371,23 +372,23 @@ const CatalogAgent = agentDefinition({ name: CATALOG_AGENT, tools: [
   providers: [
     scoped(ToolState),
     scoped(RetryToolState),
-    scoped(SearchCatalogTool, SearchCatalogTool, [ToolState]),
+    DI.scoped(DI.classProvider(SearchCatalogTool, SearchCatalogTool, [ToolState])),
     scoped(ReindexCatalogTool),
-    scoped(FlakyReadTool, FlakyReadTool, [RetryToolState]),
+    DI.scoped(DI.classProvider(FlakyReadTool, FlakyReadTool, [RetryToolState])),
     scoped(FlakyWriteTool),
     scoped(MissingExecuteTool),
     scoped(InvalidResultTool),
     scoped(InvalidOutputTool),
     scoped(SlowToolState),
-    scoped(SlowTool, SlowTool, [SlowToolState]),
+    DI.scoped(DI.classProvider(SlowTool, SlowTool, [SlowToolState])),
     scoped(HiddenTool),
     scoped(SecretEchoTool),
     scoped(DefaultedRetryTool),
     scoped(DelayedDisposeState),
-    scoped(DelayedDisposeTool, DelayedDisposeTool, [DelayedDisposeState]),
-    scoped(DelayedDisposeWriteTool, DelayedDisposeWriteTool, [DelayedDisposeState]),
+    DI.scoped(DI.classProvider(DelayedDisposeTool, DelayedDisposeTool, [DelayedDisposeState])),
+    DI.scoped(DI.classProvider(DelayedDisposeWriteTool, DelayedDisposeWriteTool, [DelayedDisposeState])),
     scoped(ThrowingDisposeState),
-    scoped(ThrowingDisposeWriteTool, ThrowingDisposeWriteTool, [ThrowingDisposeState]),
+    DI.scoped(DI.classProvider(ThrowingDisposeWriteTool, ThrowingDisposeWriteTool, [ThrowingDisposeState])),
     scoped(InvalidWriteOutputTool),
     scoped(CommitThenThrowTool),
   ],

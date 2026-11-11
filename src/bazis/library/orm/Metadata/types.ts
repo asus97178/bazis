@@ -77,6 +77,8 @@ export interface IndexModel {
   readonly unique: boolean;
   /** Partial index condition over property names (`@Index({ where })`). */
   readonly where?: CheckAst;
+  /** What to tell the client when a unique index rejects a value (`@Index({ conflict })`). */
+  readonly conflict?: string;
 }
 export interface CheckModel { readonly name: string; readonly expression: CheckAst }
 

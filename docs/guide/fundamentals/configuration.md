@@ -12,18 +12,9 @@
 
 ```ts
 // mail/Mail.config.ts
-import { configEnum, defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { configEnum, defineConfig, secret } from "bazis/core/kernel";
 
-export interface MailConfig {
-  host: string;
-  port: number;
-  useTls: boolean;
-  maxRetries: number;
-  provider: "smtp" | "ses";
-  apiKey: Secret;
-}
-
-export const mailConfig = defineConfig<MailConfig>("mail", {
+export const mailConfig = defineConfig("mail", {
   default: {
     host: "localhost",
     port: 1025,
@@ -48,7 +39,7 @@ export const mailConfig = defineConfig<MailConfig>("mail", {
 | `env` | Дополнительные имена переменных окружения для ключа |
 | `validate` | Свои проверки: вернуть строку — ошибка, `undefined` — порядок |
 
-Значения бывают пяти видов:
+Значения бывают шести видов:
 
 | Вид | Как объявить | Из переменной окружения |
 | --- | --- | --- |
@@ -56,36 +47,49 @@ export const mailConfig = defineConfig<MailConfig>("mail", {
 | Число | `port: 1025` | Должно быть числом: `2525` |
 | Логическое | `useTls: false` | `true`, `false`, `1` или `0` |
 | Перечисление | `configEnum(["smtp", "ses"], "smtp")` | Одно из перечисленных значений |
+| Список строк | `configList(["a.example.com"])` | `readonly string[]`. В переменной окружения — через запятую: `BAZIS_MAIL__HOSTS=a.example.com,b.example.com`; пробелы вокруг и пустые элементы убираются. В секции окружения пишется массивом. С версии 0.137.0 |
 | Секрет | `secret("dev-key")` или `secret()` | Непустая строка |
 
+Отдельный интерфейс настроек писать не нужно: типы ключей выводятся из `default`.
+
 Модуль подключает объявление полем `config`, сервис получает настройки по
-типу:
+типу самого объявления:
 
 ```ts
 @Module({ config: mailConfig, providers: [scoped(MailService)], exports: [MailService] })
 export class MailModule {}
 
 export class MailService {
-  constructor(private readonly config: ConfigView<MailConfig>) {}
+  constructor(private readonly config: ConfigView<typeof mailConfig>) {}
 
   send() {
     const host = this.config.get("host");          // string
     const port = this.config.get("port");          // number
+    const provider = this.config.get("provider");  // "smtp" | "ses"
     const key = this.config.get("apiKey").reveal(); // строка секрета
   }
 }
 ```
 
-Настройки, которые не принадлежат ни одному модулю, передают в
-`runApp(AppModule, { config: [appConfig] })`.
+`ConfigView<typeof mailConfig>` — с версии 0.137.0. Имя секции должно быть строкой в самом вызове
+`defineConfig("mail", …)`: по нему codegen находит настройки. Прежняя форма с интерфейсом работает как раньше:
+`defineConfig<MailConfig>("mail", …)` и `ConfigView<MailConfig>`; она нужна, когда тип настроек описан отдельно,
+например общий для нескольких секций.
 
-Если конфиг не подключён ни к модулю, ни к `runApp`, приложение не
+Настройки, которые не принадлежат ни одному модулю, называют в
+`@App({ config: [appConfig] })`.
+
+У фреймворка есть свои настройки, объявленные так же. Адрес HTTP-сервера —
+`http.host` и `http.port` (`BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT`), см.
+[Адрес сервера](../overview/application.md#адрес-сервера).
+
+Если конфиг не подключён ни к модулю, ни к `@App`, приложение не
 стартует:
 
 ```text
 [bazis] configuration error: Service graph validation failed:
 Missing dependency "Config:report" for "ReportService". The config defineConfig("report", …) is not declared
-in the application: add it to `config` of the module that uses it, or to runApp({ config }).
+in the application: add it to `config` of the module that uses it, or to @App({ config }).
 ```
 
 ## Откуда берутся значения
@@ -135,13 +139,15 @@ Bun сам читает файл `.env` в корне проекта, так ч�
 ```ts
 import { argsSource, envSource, jsonFileSource } from "bazis/core/kernel";
 
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   configure: (kernel) => kernel
     .addConfigSource(jsonFileSource("config.json", { optional: true }))
     .addConfigSource(envSource())
     .addConfigSource(argsSource()),
-});
+})
+export class Application {}
 ```
 
 ```json

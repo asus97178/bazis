@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, OrmUnsafeImmediateMutationError, PostgresDialect, type DatabaseProvider, type SqlParam } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, OrmUnsafeImmediateMutationError, PostgresDialect, type DatabaseProvider, type SqlParam, Nullable } from "../index";
 
 @Entity({ table: "native_json_rows" })
 class JsonRow {
   @Key({ generated: false }) id = 1;
-  @Column({ type: "json" }) data: unknown = null;
+  @Nullable() @Column({ type: "json" }) data: unknown = null;
 }
 class Context extends DbContext { readonly rows = this.set(JsonRow); }
 

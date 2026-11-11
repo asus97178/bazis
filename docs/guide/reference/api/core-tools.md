@@ -1,7 +1,7 @@
 # `bazis/core/tools`
 
 Готовые инструменты для процессов и агентов. Закрыты по умолчанию: приложение само называет,
-что открыть. Список — по пакету 0.136.0.
+что открыть. Список — по пакету 0.138.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -9,6 +9,8 @@
 | `HttpRequestTool` | Шаг `http.request`; настройки `tools.http.*` | [HTTP-запрос и секреты](../../workflow/processes.md#http-запрос-и-секреты) |
 | `SecretStore`, `ConfigSecretStore` | Значения `$secrets.NAME`: `get(name, { partition })`; по умолчанию из конфигурации `secrets.*` | [Секреты](../../workflow/processes.md#секреты) |
 | `toolsConfig` | Настройки `tools.http.allow`, `callers`, `allowPrivateNetworks`, `maxResponseBytes`, `timeoutMs` | [HTTP-запрос и секреты](../../workflow/processes.md#http-запрос-и-секреты) |
-| `ormEntityTools(Entity, { context, ops, fields, partitionField?, callers?, name?, maxRows?, maxChanges? })` | Инструменты `orm.<сущность>.find`, `create`, `update`, `delete` | [Данные без своего инструмента](../../workflow/processes.md#данные-без-своего-инструмента) |
+| `ormEntityTools(Entity, { context, ops, fields, partitionField?, callers?, name?, maxRows?, maxChanges? })` | Набор инструментов `orm.<сущность>.find`, `create`, `update`, `delete` по именам операций: `orderTools.find`. Идёт в `tools` модуля целиком; с 0.138.0 это набор, а не массив | [Данные без своего инструмента](../../workflow/processes.md#данные-без-своего-инструмента) |
 
 Типы: `OrmEntityOperation`, `OrmEntityToolsOptions`, `SecretContext`, `ToolsSettings`.
+
+Типы набора: `OrmEntityToolSet`, `OrmEntityToolInputs`, `OrmEntityToolOutputs`, `OrmEntityWhere`, `OrmEntityOperation`, `OrmEntityToolsOptions`.

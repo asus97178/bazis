@@ -7,13 +7,60 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.138.0
+
+Хранилища не меняются. Проверьте вот что:
+
+- **Приложение объявляется классом с `@App`.** `runApp` принимает только его: `runApp(AppModule, { … })` больше не компилируется. Перенесите опции в объявление:
+
+  ```ts
+  // было: src/index.ts
+  await runApp(AppModule, { infra: AppInfra, http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });
+
+  // стало: src/app/App.ts
+  @App({ modules: [AppModule], infra: AppInfra, http: { health: true } })
+  export class Application {}
+
+  // стало: src/index.ts
+  await registerBazisGeneratedRuntime();
+  await runApp(Application);
+  ```
+
+  Корневой модуль `App.module.ts` остаётся как был: CLI по-прежнему регистрирует в нём новые модули. Тип `RunAppOptions` заменён на `AppOptions` (с `modules`) и `AppSettings` (без него). Подробнее — в [«Приложении»](../overview/application.md).
+- **Адрес сервера — настройки `http.host` и `http.port`.** Переменные `HOST` и `PORT` сам фреймворк не читает и раньше не читал: их читал шаблон `src/index.ts`. Теперь адрес задают `BAZIS_HTTP__HOST` и `BAZIS_HTTP__PORT`; поправьте `.env`, Dockerfile и манифесты. Порт по умолчанию тот же, 3000. `port` и `hostname` в `@App({ http })` по-прежнему работают и закрепляют значение в коде.
+- **Вне production сервер слушает `127.0.0.1`.** Раньше приложение без `hostname` слушало все интерфейсы в любом окружении. В production поведение прежнее (`0.0.0.0`). Если сервер разработки должен быть виден снаружи, например из контейнера, задайте `BAZIS_HTTP__HOST=0.0.0.0`. Своя секция настроек с именем `http` теперь конфликтует со встроенной: переименуйте её.
+- **`startTestApp` читает `@App`.** `startTestApp(Application)` берёт `infra`, `cache`, `config` и `http` из объявления; второй аргумент только меняет отдельные поля. Тесты, которые передавали модуль и опции (`startTestApp(AppModule, { infra: AppInfra })`), работают как раньше, но проще передать приложение. Приложение без `http` в `@App` стартует в тесте без сервера. То же у `testWorkflow`.
+- **Собранный бинарник не ищет `src/generated` в текущей папке.** Он получает сгенерированный код только через `await registerBazisGeneratedRuntime()` в точке входа. Шаблон `bazis new` всегда его вызывал; если вы убрали эту строку, верните её.
+- **В `bazis/core/di` остались только согласованные формы.** Убраны третий аргумент `scoped`/`singleton`/`transient` (список зависимостей), `singletonFactory`, `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` и объект `DI`. В модулях приложения codegen отклонял их и раньше. Пакету, который расширяет фреймворк, они доступны отдельно: `import { DI } from "bazis/core/di/lowLevel"`.
+
+  | Было | Стало |
+  | --- | --- |
+  | `scoped(A, B, [Dep])` | `scoped(A, B)` — зависимости берутся из конструктора |
+  | `singletonFactory(T, [deps], f)` | Класс с конструктором: `singleton(T, Impl)`; в пакете — `DI.singleton(DI.factoryProvider(T, [deps], f))` |
+  | `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` | В пакете — `DI.singleton(DI.factoryProviderWithResolver(…))`, `DI.singleton(DI.asyncFactoryProviderWithResolver(…))` |
+  | `import { DI } from "bazis/core/di"` | `import { DI } from "bazis/core/di/lowLevel"` |
+- **`ormEntityTools` возвращает набор, а не массив.** В модуле замените `tools: [...ormEntityTools(Order, {…})]` на `tools: [ormEntityTools(Order, {…})]`, а лучше вынесите набор в константу и называйте инструмент в процессе ссылкой: `tool: orderTools.find`. Имена инструментов (`orm.order.find`) не изменились, сохранённые процессы работают.
+- **Объект в `tools`** теперь читается как набор инструментов `defineTool`. Раньше в списке могли стоять только классы, так что существующий код это не задевает.
+- **`defineProcess` проверяет документ-литерал.** Процесс, записанный в коде, может перестать компилироваться там, где раньше ошибку находил только запуск: поток в несуществующий узел, лишнее или пропущенное поле настроек узла, `attachedTo` у узла, который не `boundary…`. Исправьте документ. Документ, который пришёл как данные, объявите с типом `ProcessDocument` — он проверяется при запуске, как раньше.
+- **Типы `CodeProcess` и `ProcessDefinition` стали обобщёнными,** `StartInstance`, `StartMany` и `StartManyItem` получили параметр входа. Код, который называл эти типы без параметров, менять не нужно. Свои реализации `IWorkflowRuntime` должны принять в `start` и `startMany` и ключ, и сам процесс.
+- **`lookup` из `permissions` регистрируется сам.** Строку `scoped(MyLookup)` в `providers` можно убрать; оставленная работает. `lookup`, общий для нескольких модулей, регистрирует и экспортирует его владелец. Текст ошибки `… is not registered: add it to the module's providers.` стал короче: `… is not registered.`
+- **Тексты сообщений.** Подсказки называют `@App` вместо `runApp`: `add cache: memory() to @App`, `@App: language "de" is not supported`, `set BAZIS_HTTP__HOST=0.0.0.0`. Если тест или мониторинг искал прежний текст, поправьте.
+- **Шаблон `bazis new`** создаёт `src/app/App.ts`, точку входа без опций, `.env.example` с `BAZIS_HTTP__HOST` и `BAZIS_HTTP__PORT` и тест, который поднимает приложение через `startTestApp(Application)`, а не отдельным процессом.
+
 ## 0.137.0
 
 Хранилища не меняются. Проверьте вот что:
 
 - **Автоматический `Location` у 201.** Ответ с кодом 201 и объектом с полем `id` теперь получает `Location: <путь запроса>/<id>`, если у приложения есть маршрут `GET` на этот адрес. Заданный вручную адрес по-прежнему важнее. Если клиент или тест ждал 201 без `Location`, поправьте ожидание. Подробнее — в [«Ответах»](../overview/responses.md#location-для-201).
 - **`Created(body, location?)`.** Сначала тело, адрес вторым и необязательным аргументом. Было `Created(location, body)`. Замените `Created(\`${ctx.path}/${item.id}\`, item)` на `Created(item)`: адрес bazis поставит сам. Другой адрес передайте вторым аргументом: `Created(item, "/elsewhere/7")`. TypeScript подскажет места, где адрес стоит первым, а тело-объект вторым.
-- **Шаблон `bazis g module`** создаёт `create` с `return Created(item)`, без `ctx`.
+- **Шаблон `bazis g module`** создаёт `create` с `return Created(item)`, без `ctx`, а `getById` и `update` — с `nullAs: NotFound`.
+- **Ключи прав проверяет компилятор.** `can`, `access.can`, `access.filter` и `defineRoles` принимают только объявленные права: опечатка и `:own` у права без `owner` теперь ошибки сборки. Объявление прав должно быть экспортированной константой, названной в модуле (`permissions: orderPermissions`); `definePermissions({...})` прямо в `@Module` останавливает codegen. Ключ из переменной типа `string` приведите к `PermissionKey`.
+- **Каждый столбец помечается `@Required()` или `@Nullable()`.** Столбец без метки останавливает старт: `property "title" does not say whether it may be empty`. Опции `nullable` у `@Column` больше нет. Запустите в проекте `bunx bazis upgrade columns` (сначала можно с `--dry-run`): команда ставит каждому столбцу метку того, чем он был, и убирает `nullable`, поэтому схема базы не меняется. Столбцы, которые раньше молча допускали NULL, получат `@Nullable()`; там, где пустого значения быть не должно, замените метку на `@Required()` и добавьте миграцию. Ключи, `@CreatedAt`, `@UpdatedAt` и `@SoftDelete` не помечаются. Динамические таблицы (`DynamicModelBuilder`) не затронуты: у них своё поле `required`.
+- **Сущности контекста берутся из его наборов.** `ormBazis: { context: CatalogDbContext }` отображает всё, что контекст объявил через `this.set(...)`. Список `entities` можно убрать; он нужен только для сущности без набора. Старые списки работают как раньше. Если у контекста был набор, а в `entities` сущности не было, она теперь тоже входит в модель и в создание схемы.
+- **`ConfigView<typeof mailConfig>`.** Интерфейс настроек можно убрать: `defineConfig("mail", { default: {...} })` выводит типы сам, а сервис принимает `ConfigView<typeof mailConfig>`. Прежняя форма работает. У объявления появилось поле `prefix`; `ConfigView` стал псевдонимом типа, поэтому `interface X extends ConfigView<T>` замените на `ResolvedConfigView<T>`.
+- **Настройки-списки стали списками.** `workflow.languages`, `tools.http.allow` и `tools.http.callers` в коде теперь `readonly string[]`, а не строка через запятую. Переменные окружения пишутся как раньше: `BAZIS_WORKFLOW__LANGUAGES=ru,en`. Поправьте код, который читал эти значения и делил их сам. Неверный хост в `tools.http.allow` теперь останавливает старт.
+- **Ошибки базы отвечают по смыслу без настройки.** Приложение с базой само отвечает `409`, `404`, `422` и `503` вместо `500`. Строку `errorHandler: { status: databaseErrorStatus }` уберите: она больше не нужна. Если клиент или тест ждал `500` на нарушение уникальности, поправьте ожидание.
+- **Тело `409` при занятом значении** теперь `{"error":"Conflict","details":{"code":"unique","fields":["name"]}}`, а текст задаёт `@Index({ unique: true, conflict: "…" })`. Раньше со `status: databaseErrorStatus` было `{"error":"Conflict"}`, а в `development` и `test` ещё `message` и `stack`.
 
 ## 0.136.0
 

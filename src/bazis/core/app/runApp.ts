@@ -2,13 +2,13 @@ import {
   collectModuleUiProfiles,
   collectModuleControllers,
   collectModuleGateways,
-  DI,
   Global,
   Module,
   singletonValue,
   CLASS_PROVIDER_HOOK,
   type BazisModuleRef,
 } from "../di";
+import { DI } from "../di/lowLevel";
 import { loadBazisGeneratedRuntime } from "../generatedRuntime";
 import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
 import { cacheableClassProviderHook } from "../cache/di/classProviderHook";
@@ -35,14 +35,16 @@ import { resolveUiProfileAuthoringV1, UiProfileV1Registry, type UiLabels } from 
 import { UiSurfaceDocumentProvider, UiSurfaceHttpController } from "./ui/uiSurfaceHttp";
 
 /**
- * Application start options. Everything is optional: without `http` and `grpc` the app
- * starts as a worker/CLI (kernel and hosted services only).
+ * What an application is made of besides its modules. Everything is optional:
+ * without `http` and `grpc` the app starts as a worker/CLI (kernel and hosted
+ * services only).
  */
-export interface RunAppOptions {
+export interface AppSettings {
   /**
    * Start the HTTP server. Controllers are collected from the whole module tree
-   * automatically, no need to list them. Pass `{}` for the defaults
-   * (port 3000) or an object with settings (port/prefix/cors/...).
+   * automatically, no need to list them. Pass `{}` for the defaults or an
+   * object with settings (prefix/cors/...). The address comes from the `http`
+   * settings: `BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT` (port 3000 by default).
    */
   readonly http?: HttpModuleOptions;
   /** gRPC server; discovers feature-module grpcControllers, independently of HTTP. */
@@ -67,7 +69,7 @@ export interface RunAppOptions {
    * (`new NotFoundError("Книга не найдена")`) are never changed.
    *
    * ```ts
-   * await runApp(AppModule, { language: "ru", http: { port: 3000 } });
+   * @App({ modules: [UsersModule], language: "ru", http: {} })
    * ```
    *
    * Several languages — each request gets the best match of its
@@ -75,7 +77,7 @@ export interface RunAppOptions {
    * and `Vary: Accept-Language`, and `ctx.language` names the choice:
    *
    * ```ts
-   * await runApp(AppModule, { language: { default: "ru", supported: ["ru", "en"] } });
+   * @App({ modules: [UsersModule], language: { default: "ru", supported: ["ru", "en"] } })
    * ```
    */
   readonly language?: AppLanguage | AppLanguageOptions;
@@ -100,7 +102,7 @@ export interface RunAppOptions {
    * their tokens, connections open before the servers and close after them.
    *
    * ```ts
-   * await runApp(AppModule, { infra: AppInfra, http: { port: 3000 } });
+   * @App({ modules: [UsersModule], infra: AppInfra, http: {} })
    * ```
    */
   readonly infra?: BazisModuleRef;
@@ -112,7 +114,7 @@ export interface RunAppOptions {
    *
    * ```ts
    * import { memory } from "@/core/cache";
-   * await runApp(AppModule, { cache: memory({ maxEntries: 1000 }), http: {} });
+   * @App({ modules: [UsersModule], cache: memory({ maxEntries: 1000 }), http: {} })
    * ```
    */
   readonly cache?: BazisModuleRef;
@@ -126,11 +128,71 @@ export interface RunAppOptions {
   readonly ui?: RunAppUiOptions;
 }
 
+/** What `@App` takes: the modules of the application and its {@link AppSettings}. */
+export interface AppOptions extends AppSettings {
+  /** The modules of the application. Their controllers, gateways and background work are found by themselves. */
+  readonly modules: readonly BazisModuleRef[];
+}
+
+/** A class marked `@App`. */
+export type AppClass = abstract new (...args: never) => unknown;
+
+const APP_OPTIONS = Symbol.for("bazis/core/app/options");
+
+/**
+ * Declares the application: its modules, its infrastructure and the servers it
+ * starts. One declaration is read by `runApp` and by the tests, so a test starts
+ * the same application as production does.
+ *
+ * ```ts
+ * // src/app/App.ts
+ * @App({
+ *   modules: [ProjectModule, TaskModule],
+ *   infra: AppInfra,
+ *   http: { health: true },
+ * })
+ * export class TodoApp {}
+ *
+ * // src/index.ts
+ * await registerBazisGeneratedRuntime();
+ * await runApp(TodoApp);
+ *
+ * // a test
+ * const app = await startTestApp(TodoApp);
+ * ```
+ *
+ * The class is also the root module: its `imports` are `modules`.
+ */
+export function App(options: AppOptions) {
+  return (target: AppClass, context: ClassDecoratorContext): void => {
+    if (options === null || typeof options !== "object" || !Array.isArray(options.modules)) {
+      throw new KernelError(`@App on ${target.name || "a class"}: modules must be an array of the application's modules.`);
+    }
+    Module({ imports: options.modules })(target, context);
+    Object.defineProperty(target, APP_OPTIONS, { configurable: false, enumerable: false, writable: false, value: Object.freeze({ ...options }) });
+  };
+}
+
+/** @internal What `@App` declared on a class; `undefined` for anything else. */
+export function appOptionsOf(value: unknown): AppOptions | undefined {
+  return typeof value === "function" && Object.hasOwn(value, APP_OPTIONS) ? (Reflect.get(value, APP_OPTIONS) as AppOptions) : undefined;
+}
+
+/** @internal The settings of an `@App` class without its modules: they are the class's own imports. */
+export function appSettingsOf(app: AppClass): AppSettings {
+  const options = appOptionsOf(app);
+  if (options === undefined) {
+    throw new KernelError(`${typeof app === "function" && app.name ? app.name : "The value"} is not an application: mark the class with @App({ modules: [...] }).`);
+  }
+  const { modules: _modules, ...settings } = options;
+  return settings;
+}
+
 /** Adds the WebSocket module when a module declares gateways; settings alone without gateways are a mistake. */
 function withWebSocket(root: BazisModuleRef, options: WebSocketOptions | undefined): BazisModuleRef {
   if (collectModuleGateways([root]).length === 0) {
     if (options !== undefined) {
-      throw new KernelError("runApp: websocket options are set, but no module declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.");
+      throw new KernelError("@App: websocket options are set, but no module declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.");
     }
     return root;
   }
@@ -139,7 +201,7 @@ function withWebSocket(root: BazisModuleRef, options: WebSocketOptions | undefin
 
 function withUiRuntime(
   root: BazisModuleRef,
-  option: RunAppOptions["ui"],
+  option: AppSettings["ui"],
   http: HttpModuleOptions | undefined,
 ): BazisModuleRef {
   const declarations = collectModuleUiProfiles([root]);
@@ -234,7 +296,7 @@ function declarationName(value: unknown): string {
 
 /** @internal Exported for hosting contract tests. */
 export function normalizeUiSurfaceHostingOptions(
-  option: RunAppOptions["ui"],
+  option: AppSettings["ui"],
   http: HttpModuleOptions,
 ): UiSurfaceHostingOptions | undefined {
   if (option === undefined) {
@@ -271,34 +333,36 @@ function normalizeAbsolutePath(path: string): string {
 }
 
 /**
- * The single application entry point, simpler than `NestFactory`.
+ * The single application entry point: starts what `@App` declares.
  *
  * ```ts
- * // main.ts
- * import { runApp } from "@/core/app";
- * import { AppModule } from "./modules/App.module";
+ * // src/index.ts
+ * import { runApp } from "bazis/core/app";
+ * import { TodoApp } from "./app/App";
+ * import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
  *
- * await runApp(AppModule, { http: { port: 3000, prefix: "api" } });
+ * await registerBazisGeneratedRuntime();
+ * await runApp(TodoApp);
  * ```
  *
  * It does three things you would otherwise write by hand:
  * 1. starts the HTTP server and collects controllers from the whole module tree;
  * 2. plugs in the request body validator (DIP glue between the kernel and the library);
  * 3. starts the kernel with graceful shutdown on SIGINT/SIGTERM.
- *
- * The root module stays clean: `@Module({ imports: [UsersModule] })`.
  */
-export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}): Promise<number> {
+export async function runApp(app: AppClass): Promise<number> {
   await loadBazisGeneratedRuntime();
-  let app: BazisModuleRef;
+  let options: AppSettings;
+  let composed: BazisModuleRef;
   try {
-    app = composeApp(root, options);
+    options = appSettingsOf(app);
+    composed = composeApp(app, options);
   } catch (error) {
     // Composing already reads routes and options: report its errors like the kernel build does.
     return reportBuildFailure(error);
   }
-  return Bazis.run(app, options.kernel, (builder) => {
-    builder.useApplicationRoot(root);
+  return Bazis.run(composed, options.kernel, (builder) => {
+    builder.useApplicationRoot(app);
     options.configure?.(builder);
   });
 }
@@ -308,7 +372,7 @@ export async function runApp(root: BazisModuleRef, options: RunAppOptions = {}):
  * configs next to the feature root, wrapped in the HTTP/gRPC/UI hosts the
  * options ask for. Shared with `startTestApp`, so tests run the same graph.
  */
-export function composeApp(root: BazisModuleRef, options: RunAppOptions = {}): BazisModuleRef {
+export function composeApp(root: BazisModuleRef, options: AppSettings = {}): BazisModuleRef {
   // Checked even without HTTP: an unknown language is a startup error.
   const languages = createLanguages(options.language, options.messages);
   useCodexLanguage(typeof options.language === "object" ? options.language.default : options.language ?? "en");

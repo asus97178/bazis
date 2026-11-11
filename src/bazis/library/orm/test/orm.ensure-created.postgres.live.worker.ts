@@ -1,4 +1,4 @@
-import { Check, Column, DbContext, DbContextOptions, Entity, ForeignKey, Index, Key, Required, Schema, UUID, postgres } from "../index";
+import { Check, Column, DbContext, DbContextOptions, Entity, ForeignKey, Index, Key, Required, Schema, UUID, postgres, Nullable } from "../index";
 
 const schema = process.env.BAZIS_ORM_LIVE_SCHEMA;
 const url = process.env.BAZIS_PG_URL;
@@ -11,8 +11,8 @@ if (!schema || !/^[a-z][a-z0-9_]{0,62}$/.test(schema) || !url) process.exit(2);
 @Index(["id", "tenant"], { name: "ux_parents_id_tenant", unique: true })
 class Parent {
   @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = "";
-  @Column({ type: "text" }) id = "";
-  @Index({ name: "ix_parents_label" }) @Column({ type: "text" }) label = "";
+  @Nullable() @Column({ type: "text" }) id = "";
+  @Index({ name: "ix_parents_label" }) @Nullable() @Column({ type: "text" }) label = "";
 }
 @Schema(schema)
 @Entity({ table: "children" })
@@ -20,14 +20,14 @@ class Parent {
 @Check<Child>("ck_children_value", (fields) => fields.value.gte(0))
 class Child {
   @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = "";
-  @Column({ type: "text" }) id = "";
+  @Nullable() @Column({ type: "text" }) id = "";
   @Required() @Column({ type: "text" }) parentId = "";
-  @Index({ unique: true, name: "ux_children_code" }) @Column({ type: "text" }) code = "";
-  @Column({ type: "integer" }) value = 0;
+  @Index({ unique: true, name: "ux_children_code" }) @Nullable() @Column({ type: "text" }) code = "";
+  @Nullable() @Column({ type: "integer" }) value = 0;
 }
 @Schema(schema)
 @Entity({ table: "generated" })
-class Generated { @Key() @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) value = ""; }
+class Generated { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) value = ""; }
 @Schema(schema)
 @Entity({ table: "plain_keys" })
 class PlainKey { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; }
@@ -41,10 +41,10 @@ class AdditiveBase { @Key({ generated: false }) @Column({ type: "integer" }) id 
 @Entity({ table: "additive_vectors" })
 @Index(["state", "id"], { name: "ux_additive_vectors_state_id", unique: true })
 @Check<AdditiveFull>("ck_additive_vectors_id", (fields) => fields.id.gte(0))
-class AdditiveFull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Required() @Column({ type: "text", default: "new" }) state = ""; @Column({ type: "datetime", default: "2026-08-06T00:00:00Z" }) at = new Date(); }
+class AdditiveFull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Required() @Column({ type: "text", default: "new" }) state = ""; @Nullable() @Column({ type: "datetime", default: "2026-08-06T00:00:00Z" }) at = new Date(); }
 @Schema(schema)
 @Entity({ table: "evolution_parents" })
-class EvolutionParent { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Column({ type: "text" }) id = ""; }
+class EvolutionParent { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "text" }) id = ""; }
 @Schema(schema)
 @Entity({ table: "evolution_children" })
 class EvolutionBase { @Key() @Column({ type: "integer" }) id = 0; }
@@ -54,23 +54,23 @@ class EvolutionBase { @Key() @Column({ type: "integer" }) id = 0; }
 @Index(["state", "id"], { name: "ix_evolution_children_state_id" })
 @Index(["id", "state"], { name: "ux_evolution_children_id_state", unique: true })
 @Check<EvolutionFull>("ck_evolution_children_id", (fields) => fields.id.gte(0))
-class EvolutionFull { @Key() @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) note = ""; @Required() @Column({ type: "text", default: "new" }) state = ""; @Required() @Column({ type: "text", default: "t" }) tenant = ""; @Required() @Column({ type: "text", default: "p" }) parentId = ""; }
+class EvolutionFull { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) note = ""; @Required() @Column({ type: "text", default: "new" }) state = ""; @Required() @Column({ type: "text", default: "t" }) tenant = ""; @Required() @Column({ type: "text", default: "p" }) parentId = ""; }
 @Schema(schema)
 @Entity({ table: "unique_vectors" })
-class UniqueBase { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) code = ""; }
+class UniqueBase { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) code = ""; }
 @Schema(schema)
 @Entity({ table: "unique_vectors" })
-class UniqueFull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Index({ name: "ux_unique_vectors_code", unique: true }) @Column({ type: "text" }) code = ""; }
+class UniqueFull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Index({ name: "ux_unique_vectors_code", unique: true }) @Nullable() @Column({ type: "text" }) code = ""; }
 @Schema(schema)
 @Entity({ table: "check_vectors" })
-class CheckBase { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "integer" }) value = 0; }
+class CheckBase { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "integer" }) value = 0; }
 @Schema(schema)
 @Entity({ table: "check_vectors" })
 @Check<CheckFull>("ck_check_vectors_value", (fields) => fields.value.gte(0))
-class CheckFull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "integer" }) value = 0; }
+class CheckFull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "integer" }) value = 0; }
 @Schema(schema)
 @Entity({ table: "fk_parents" })
-class FkParent { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Column({ type: "text" }) id = ""; }
+class FkParent { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "text" }) id = ""; }
 @Schema(schema)
 @Entity({ table: "fk_children" })
 class FkBase { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Required() @Column({ type: "text" }) tenant = ""; @Required() @Column({ type: "text" }) parentId = ""; }
@@ -92,35 +92,35 @@ class IdentityAdd { @Required() @Column({ type: "text" }) legacy = ""; @Key() @C
 class UuidAdd { @Required() @Column({ type: "text" }) legacy = ""; @UUID() id = ""; }
 @Schema(schema)
 @Entity({ table: "hard_rename_vectors" })
-class HardRename { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) title = ""; @Column({ type: "text" }) note = ""; }
+class HardRename { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) title = ""; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_type_vectors" })
-class HardType { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) note = ""; }
+class HardType { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_default_vectors" })
-class HardDefault { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text", default: "safe" }) code = ""; @Column({ type: "text" }) note = ""; }
+class HardDefault { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text", default: "safe" }) code = ""; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_null_vectors" })
-class HardNull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Required() @Column({ type: "text", default: "safe" }) code = ""; @Column({ type: "text" }) note = ""; }
+class HardNull { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Required() @Column({ type: "text", default: "safe" }) code = ""; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_generation_vectors" })
-class HardGeneration { @Key() @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) note = ""; }
+class HardGeneration { @Key() @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_pk_name_vectors" })
-class HardPkName { @Key({ generated: false, name: "pk_hard_pk_name_expected" }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) note = ""; }
+class HardPkName { @Key({ generated: false, name: "pk_hard_pk_name_expected" }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_pk_order_vectors" })
-class HardPkOrder { @Key(["tenant", "id"], { name: "pk_hard_pk_order_expected" }) @Column({ type: "text" }) tenant = ""; @Column({ type: "text" }) id = ""; @Column({ type: "text" }) note = ""; }
+class HardPkOrder { @Key(["tenant", "id"], { name: "pk_hard_pk_order_expected" }) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "text" }) id = ""; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "hard_pk_components_vectors" })
-class HardPkComponents { @Key(["tenant", "id"], { name: "pk_hard_pk_components_expected" }) @Column({ type: "text" }) tenant = ""; @Column({ type: "text" }) id = ""; @Column({ type: "text" }) note = ""; }
+class HardPkComponents { @Key(["tenant", "id"], { name: "pk_hard_pk_components_expected" }) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "text" }) id = ""; @Nullable() @Column({ type: "text" }) note = ""; }
 @Schema(schema)
 @Entity({ table: "final_drift_vectors" })
 class FinalDrift { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Required() @Column({ type: "text", default: "sealed" }) state = ""; }
 @Schema(schema)
 @Entity({ table: "aliased_check_vectors" })
 @Check<AliasedCheckVector>("ck_aliased_check_vectors_values", (fields) => fields.tenantKey.eq("default").and(fields.leftValue.eq(fields.rightValue)))
-class AliasedCheckVector { @Key({ generated: false }) @Column({ name: "row_id", type: "integer" }) id = 0; @Column({ name: "tenant_key", type: "text" }) tenantKey = ""; @Column({ name: "left_value", type: "integer" }) leftValue = 0; @Column({ name: "right_value", type: "integer" }) rightValue = 0; }
+class AliasedCheckVector { @Key({ generated: false }) @Column({ name: "row_id", type: "integer" }) id = 0; @Nullable() @Column({ name: "tenant_key", type: "text" }) tenantKey = ""; @Nullable() @Column({ name: "left_value", type: "integer" }) leftValue = 0; @Nullable() @Column({ name: "right_value", type: "integer" }) rightValue = 0; }
 class LiveContext extends DbContext {}
 
 const admissionTrace: Array<{ readonly sql: string; readonly params: number }> = [];

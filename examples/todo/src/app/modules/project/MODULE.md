@@ -26,9 +26,11 @@ imports: none. exports: `IProjectService` (DI token + interface,
 | `PUT /projects/:id` | `UpdateProjectRequest.name`: optional, 2–100 chars | `ProjectResponse` | 400, 404, 409 |
 | `DELETE /projects/:id` | `id` uuid | 204 | 404 |
 
-`IProjectService.create/update` return `"conflict"` for a taken name: the
-unique index rejects the save with `UniqueViolationError` from `bazis/core/orm`,
-so concurrent requests cannot both succeed. Deleting a project does not touch
+A taken name is refused by the unique index of the model, so concurrent requests
+cannot both succeed: the save throws `UniqueViolationError` from `bazis/core/orm`,
+and the framework answers 409 with the `conflict` text of the index and
+`details: { code: "unique", fields: ["name"] }`. `nullAs: NotFound` on a route
+turns a `null` of the service into 404. Deleting a project does not touch
 its tasks.
 
 ## Checks

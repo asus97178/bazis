@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Module } from "@/core/di";
 import { registerGeneratedClassDeps } from "@/core/di/module/autoDeps";
 import { defineConfig, KernelBuilder, memorySource, secret, secretFilesSource } from "@/core/kernel";
-import { Column, DbContext, DbContextOptions, encryptedWith, Entity, HasConversion, Key, ormModule, type DatabaseProvider } from "@/core/orm";
+import { Column, DbContext, DbContextOptions, encryptedWith, Entity, HasConversion, Key, ormModule, type DatabaseProvider, Nullable } from "@/core/orm";
 import { PostgresDialect } from "@/library/orm/Providers/PostgresDialect";
 
 const provider = { name: "postgres", dialect: new PostgresDialect(), limits: { maxParametersPerCommand: 32767 }, query: async () => [], execute: async () => ({ changes: 1, lastInsertId: 0 }), transaction: async <T>(work: (p: DatabaseProvider) => Promise<T>) => work(provider), isTransactionActive: () => false, ping: async () => true, close: async () => undefined, introspect: async () => ({ tables: new Map() }) } as unknown as DatabaseProvider;
@@ -16,7 +16,7 @@ const phone = encryptedWith(cryptoConfig, "phoneKey");
 @Entity()
 class Customer {
   @Key({ generated: false }) id = 0;
-  @HasConversion(phone) @Column({ type: "text" }) phone = "";
+  @HasConversion(phone) @Nullable() @Column({ type: "text" }) phone = "";
 }
 class CustomersDb extends DbContext {}
 registerGeneratedClassDeps(CustomersDb, [DbContextOptions]);
@@ -52,12 +52,12 @@ test("encryptedWith names the config that is not declared in the application", a
   @Entity()
   class Lead {
     @Key({ generated: false }) id = 0;
-    @HasConversion(encryptedWith(cryptoConfig, "phoneKey")) @Column({ type: "text" }) phone = "";
+    @HasConversion(encryptedWith(cryptoConfig, "phoneKey")) @Nullable() @Column({ type: "text" }) phone = "";
   }
   class LeadsDb extends DbContext {}
   registerGeneratedClassDeps(LeadsDb, [DbContextOptions]);
   @Module({ imports: [ormModule({ provider, healthCheck: false })], ormBazis: { context: LeadsDb, entities: [Lead] }, exports: [] })
   class App {}
   const kernel = await new KernelBuilder(App).useStartupReport(false).addConfigSource(memorySource({})).build();
-  await expect(kernel.start()).rejects.toThrow('Lead.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application; add it to `config` of the module that owns Lead or to runApp({ config }).');
+  await expect(kernel.start()).rejects.toThrow('Lead.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application; add it to `config` of the module that owns Lead or to @App({ config }).');
 });

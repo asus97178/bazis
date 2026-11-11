@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, postgres, SchemaAdmissionError, type Migration, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, postgres, SchemaAdmissionError, type Migration, type PostgresProvider, Nullable } from "../index";
 
 // An application user with data rights only (SELECT/INSERT/UPDATE/DELETE),
 // while the schema belongs to the owner. Found while writing the production
@@ -11,8 +11,8 @@ const role = `ormru_${run}_app`;
 const password = `pw_${run}`;
 const live = url === undefined ? test.skip : test;
 
-@Entity({ table }) class Note { @Key() id = 0; @Column({ type: "text" }) text = ""; }
-@Entity({ table }) class NoteWithTitle { @Key() id = 0; @Column({ type: "text" }) text = ""; @Column({ type: "text" }) title: string | null = null; }
+@Entity({ table }) class Note { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; }
+@Entity({ table }) class NoteWithTitle { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; @Nullable() @Column({ type: "text" }) title: string | null = null; }
 
 const providers: PostgresProvider[] = [];
 const connect = (credentials?: { user: string; password: string }) => {

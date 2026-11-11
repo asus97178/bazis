@@ -27,12 +27,13 @@ async getById(id: string) {
 | `UnauthorizedError(message?, details?)` | 401 | Заголовок `WWW-Authenticate: Bearer` |
 | `ForbiddenError(message?, details?)` | 403 | |
 | `NotFoundError(message?, details?)` | 404 | |
-| `HttpError(status, message, details?)` | Любой | Для кодов без своего класса: 409, 422 и т. д. |
+| `ConflictError(message?, details?)` | 409 | С версии 0.137.0 |
+| `HttpError(status, message, details?)` | Любой | Для кодов без своего класса: 422 и т. д. |
 
 Тело ответа — `{ "error": message }`, а если переданы `details`, то и они:
 
 ```ts
-throw new HttpError(409, "Name is taken", { field: "name" });
+throw new ConflictError("Name is taken", { field: "name" });
 // 409 {"error":"Name is taken","details":{"field":"name"}}
 ```
 
@@ -62,7 +63,7 @@ throw new HttpError(409, "Name is taken", { field: "name" });
 | `production` | `{"error":"Internal Server Error"}` |
 
 В production текст и стек ошибки клиенту не уходят. Явно включить или
-выключить подробности можно опцией `runApp(AppModule, { http: {
+выключить подробности можно опцией `@App({ http: {
 exposeErrorDetails: false } })`.
 
 Код ответа берётся только из `HttpError`. Обычный `Error` со свойством
@@ -70,11 +71,11 @@ exposeErrorDetails: false } })`.
 библиотеки не управляет ответами вашего API.
 
 Другой код для известных ошибок задаёт функция `errorHandler.status`:
-`http: { errorHandler: { status: (error) => number | undefined } }`. Готовая
-карта для ошибок базы — `databaseErrorStatus`
-([Ошибки базы данных](../database/errors.md#http-статусы)). Тело ответа
+`http: { errorHandler: { status: (error) => number | undefined } }`. Тело ответа
 остаётся названием статуса, а `4xx` из этой функции не пишутся в журнал
-как неожиданные. Опция — с версии 0.98.25.
+как неожиданные. Ответ целиком, с текстом и `details`, задаёт `errorHandler.map`:
+`(error) => HttpError | undefined`. Ошибки базы отвечают по смыслу сами: `409`, `404`, `422`, `503`
+([Ошибки базы данных](../database/errors.md#http-статусы)).
 
 ## Журнал ошибок
 
@@ -99,13 +100,15 @@ info: GET /errors/crash 500 1.2ms {"method":"GET","path":"/errors/crash","status
 саму ошибку и **не отменяет** запись в журнал:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   http: {
     errorHandler: {
       onUnexpectedError: (ctx, error) => tracker.capture(error, { path: ctx.path }),
     },
   },
-});
+})
+export class Application {}
 ```
 
 Ошибка приходит в обработчик как есть, без маскировки: что отправлять наружу,
@@ -123,8 +126,11 @@ await runApp(AppModule, {
 [помощников ответа](responses.md#помощники) дают один и тот же `404`. Удобное
 правило:
 
-- В методе контроллера, где решение очевидно, — **вернуть** помощник:
-  `return task ? Ok(task) : NotFound({ error: "…" })`.
+- «Нет такой записи» в методе контроллера — **объявить** в маршруте:
+  `@Get(":id", { nullAs: NotFound })`, и метод просто возвращает то, что нашёл
+  ([Ответы](responses.md#null-как-404)).
+- Другое очевидное решение в методе контроллера — **вернуть** помощник:
+  `return removed ? NoContent() : NotFound()`.
 - Глубже — в проверке доступа, middleware, общей функции — **бросить**
   `HttpError`: так ответ можно задать, не протаскивая его через все вызовы.
 
@@ -173,7 +179,8 @@ export const domainErrors: HttpMiddleware = async (_ctx, next) => {
   }
 };
 
-await runApp(AppModule, { http: { middleware: [domainErrors] } });
+@App({ modules: [AppModule], http: { middleware: [domainErrors] } })
+export class Application {}
 ```
 
 ```text

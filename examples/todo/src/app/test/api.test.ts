@@ -1,37 +1,27 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
+import { startTestApp, type TestApp } from "bazis/core/testing";
+import { TodoApp } from "../App";
 
-// End-to-end: starts the app from source against a real PostgreSQL and drives
-// it over HTTP. Needs a database: BAZIS_DB__HOST (and BAZIS_DB__PORT/... if not
-// default). Without it the test is reported as skipped, not passed.
+// End-to-end: starts the application declared in src/app/App.ts against a real
+// PostgreSQL and drives it over HTTP. Needs a database: BAZIS_DB__HOST (and
+// BAZIS_DB__PORT/... if not default). Without it the test is reported as
+// skipped, not passed.
 const enabled = Boolean(process.env.BAZIS_DB__HOST);
-const port = String(20000 + Math.floor(Math.random() * 20000));
-const base = `http://127.0.0.1:${port}`;
-let app: ReturnType<typeof Bun.spawn> | undefined;
+let app: TestApp | undefined;
 
 beforeAll(async () => {
-  if (!enabled) return;
-  app = Bun.spawn([process.execPath, "run", "src/index.ts"], {
-    env: { ...process.env, BAZIS_ENV: "development", HOST: "127.0.0.1", PORT: port },
-    stdout: "ignore",
-    stderr: "inherit",
-  });
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (await fetch(`${base}/health`).then((response) => response.ok, () => false)) return;
-    await Bun.sleep(100);
-  }
-  throw new Error("app did not answer /health");
+  if (enabled) app = await startTestApp(TodoApp);
 });
 
 afterAll(async () => {
-  app?.kill();
-  await app?.exited;
+  await app?.stop();
 });
 
 interface Report { projects: number; tasks: number; done: number }
 interface Item { id: string; done?: boolean }
 
 const send = (method: string, path: string, body?: unknown) =>
-  fetch(`${base}${path}`, {
+  app!.fetch(path, {
     method,
     headers: { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -45,7 +35,12 @@ test.skipIf(!enabled)("projects, tasks and the report work together", async () =
   const created = await send("POST", "/projects", { name });
   expect(created.status).toBe(201);
   const project = await json<Item>(created);
-  expect((await send("POST", "/projects", { name })).status).toBe(409);
+  const taken = await send("POST", "/projects", { name });
+  expect(taken.status).toBe(409);
+  expect(await taken.json()).toEqual({ error: "A project with this name already exists", details: { code: "unique", fields: ["name"] } });
+  const missing = await send("GET", `/projects/${crypto.randomUUID()}`);
+  expect(missing.status).toBe(404);
+  expect(await missing.json()).toEqual({ error: "Not Found" });
 
   // The unique index decides under concurrency: exactly one request wins.
   const racing = `Race ${crypto.randomUUID()}`;

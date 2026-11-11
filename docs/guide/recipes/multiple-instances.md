@@ -22,11 +22,9 @@ Planner из предыдущих рецептов запускается в д�
 
 ```ts
 // src/app/config/redis.config.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface RedisConfig { url: Secret }
-
-export const redisConfig = defineConfig<RedisConfig>("redis", {
+export const redisConfig = defineConfig("redis", {
   default: { url: secret("redis://127.0.0.1:6379") },
   production: { url: secret() },
 });
@@ -169,7 +167,7 @@ export class RemindersService {
 }
 ```
 
-Вход по токену и адаптер Redis — в `runApp`. Оба берут сервисы
+Вход по токену и адаптер Redis — в `@App`. Оба берут сервисы
 приложения: проверка — `AuthTokens` из модуля `auth`, адаптер — клиент
 Redis из `@Infra`:
 
@@ -179,7 +177,8 @@ import { IRedis } from "bazis/core/infra";
 import { RedisWebSocketAdapter } from "bazis/core/websocket";
 import { AuthTokens } from "./app/modules/auth/AuthTokens.service";
 
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   infra: AppInfra,
   websocket: {
     requireAuth: true,
@@ -192,7 +191,8 @@ await runApp(AppModule, {
     },
   },
   http: { … },
-});
+})
+export class Application {}
 ```
 
 ### Redis для доставки

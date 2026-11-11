@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Module } from "@/core/di";
-import { runApp } from "../runApp";
+import { App, runApp } from "../runApp";
 
 describe("runApp config validation", () => {
   test("validates configs declared by modules with the configured kernel environment", async () => {
@@ -15,7 +15,9 @@ describe("runApp config validation", () => {
     @Module({ config: brokenConfig })
     class AppModule {}
 
-    await expect(runApp(AppModule, { kernel: { environment: "production" } })).rejects.toThrow(
+    @App({ modules: [AppModule], kernel: { environment: "production" } })
+    class Application {}
+    await expect(runApp(Application)).rejects.toThrow(
       "auth config is invalid",
     );
     expect(environment).toBe("production");
@@ -33,11 +35,11 @@ describe("runApp config validation", () => {
     @Module({})
     class AppModule {}
 
+    @App({ modules: [AppModule], config: brokenConfig,
+        configure: (builder) => builder.useEnvironment("test") })
+    class Application2 {}
     await expect(
-      runApp(AppModule, {
-        config: brokenConfig,
-        configure: (builder) => builder.useEnvironment("test"),
-      }),
+      runApp(Application2),
     ).rejects.toThrow("stop after validation");
     expect(environment).toBe("test");
   });

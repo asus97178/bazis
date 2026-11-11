@@ -13,11 +13,9 @@
 умолчанию — это ключ разработки, а production получает свой:
 
 ```ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface MailConfig { host: string; apiKey: Secret }
-
-export const mailConfig = defineConfig<MailConfig>("mail", {
+export const mailConfig = defineConfig("mail", {
   default: { host: "localhost", apiKey: secret("dev-key") },
   production: { apiKey: secret() },   // без значения — обязателен
 });
@@ -77,16 +75,18 @@ Docker (`secrets:` в compose, swarm) и Kubernetes (секрет, смонти�
 такой каталог:
 
 ```ts
-import { runApp } from "bazis/core/app";
+import { App } from "bazis/core/app";
 import { argsSource, envSource, secretFilesSource } from "bazis/core/kernel";
 
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   configure: (kernel) => kernel
     .addConfigSource(secretFilesSource("/run/secrets", { optional: true }))
     .addConfigSource(envSource())
     .addConfigSource(argsSource()),
-});
+})
+export class Application {}
 ```
 
 ```text
@@ -244,9 +244,7 @@ error: GET /mail/send failed {"method":"GET","path":"/mail/send","error":{"name"
 удобно передать через запятую:
 
 ```ts
-export interface WebhookConfig { keys: Secret }
-
-export const webhookConfig = defineConfig<WebhookConfig>("webhook", {
+export const webhookConfig = defineConfig("webhook", {
   default: { keys: secret("dev-1") },
   production: { keys: secret() },
 });

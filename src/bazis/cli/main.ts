@@ -18,6 +18,8 @@ export const USAGE = `Usage:
                                              for a part of a composite module)
   bazis workflow check [--app-module <path>]  Check the processes of the modules against their Tools
   bazis workflow diagram <key>                Print a process as a Mermaid flowchart
+  bazis upgrade columns [--dry-run]           For 0.137.0: mark every column @Required() or @Nullable() by what
+                                             it was, so the schema stays as it is (--path <dir>, default src)
   bazis codegen [--target <name|all>]         Generate DI wiring into src/generated/bazis
   bazis dev [--watch]                         Codegen, then run the app from source with
                                              BAZIS_ENV=development (unless set);
@@ -46,7 +48,7 @@ Generation options:
   --minimal             Compact example CRUD and MODULE.md (default)
   --full                Example CRUD/list/cache/auth/background/AI and MODULE.md;
                         uses src/app/modules/auth helpers when the project has them.
-                        To run, the host needs a cache (runApp({ cache: memory() }))
+                        To run, the host needs a cache (@App({ cache: memory() }))
                         and a database provider. Legacy alias: --enterprise
   --parts <a,b,...>      Independent empty atomic parts; pack only, at least two
   --dry-run             Validate and list planned changes without writing
@@ -143,6 +145,12 @@ export async function runCli(argv: readonly string[], runtime: CliRuntime = defa
     if (parsed.kind === "test") return await runTest(cwd, parsed.args, codegen, ui);
     if (parsed.kind === "build") return await runBuild(cwd, { bin: parsed.bin, outfile: parsed.outfile, dotenv: parsed.dotenv, platform: parsed.platform }, codegen, ui);
     if (parsed.kind === "new") return await runNew(parsed, ui);
+    if (parsed.kind === "upgrade") {
+      // The codemod parses sources with the TypeScript API: load it for this project first.
+      useTypeScriptCompilerApi(cwd);
+      const { runUpgradeColumns } = await import("./upgrade/runUpgrade");
+      return await runUpgradeColumns(cwd, parsed.path, parsed.dryRun, runtime.log);
+    }
     if (parsed.kind === "workflow") {
       const { runWorkflowCheck, runWorkflowDiagram } = await import("./workflow");
       return parsed.action === "check" ? await runWorkflowCheck(cwd, parsed.appModule, ui) : await runWorkflowDiagram(cwd, parsed.key, parsed.appModule, runtime.log);

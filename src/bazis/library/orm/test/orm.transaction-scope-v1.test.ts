@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { Column, ConcurrentTransactionScopeError, DbContext, DbContextOptions, Entity, EntityState, Key, OrmProviderIdentityMismatchError, OrmTransactionScopeError, PostCommitError, withRetry, type DatabaseProvider, type DbExecutor, type ExecuteResult, type Row, type SqlDialect } from "../index";
+import { Column, ConcurrentTransactionScopeError, DbContext, DbContextOptions, Entity, EntityState, Key, OrmProviderIdentityMismatchError, OrmTransactionScopeError, PostCommitError, withRetry, type DatabaseProvider, type DbExecutor, type ExecuteResult, type Row, type SqlDialect, Nullable } from "../index";
 import { observeProviderDispatch, registerPostgresTransactionCapability } from "../Providers/ormTransactionRuntime";
 import { runPostCommitCallbacks, runRollbackCallbacks } from "../Providers/transactionCallbacks";
 import { assertTransactionCanCommit, beginChildTransactionScope, createTransactionCallbackScope, endChildTransactionScope, mergeTransactionScopeCallbacks, type TransactionCallbackScope } from "../Providers/transactionScopes";
@@ -50,9 +50,9 @@ function provider(): DatabaseProvider {
 }
 class Context extends DbContext { constructor(value: DatabaseProvider) { super(new DbContextOptions({ provider: value, entities: [] })); } }
 @Entity({ table: "transaction_scope_records" })
-class TransactionScopeRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) name = ""; }
+class TransactionScopeRecord { @Key({ generated: false }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) name = ""; }
 @Entity({ table: "transaction_scope_generated_records" })
-class GeneratedScopeRecord { @Key() id = 0; @Column({ type: "text" }) name = ""; }
+class GeneratedScopeRecord { @Key() id = 0; @Nullable() @Column({ type: "text" }) name = ""; }
 class RecordContext extends DbContext { constructor(value: DatabaseProvider, executionStrategy?: { readonly maxRetries: number; readonly baseDelayMs: number; readonly isTransient: (error: unknown) => boolean }) { super(new DbContextOptions({ provider: value, entities: [TransactionScopeRecord], validateOnSave: false, executionStrategy })); } }
 class GeneratedContext extends DbContext { constructor(value: DatabaseProvider) { super(new DbContextOptions({ provider: value, entities: [GeneratedScopeRecord], validateOnSave: false })); } }
 let validationGate: Promise<void> | undefined;
@@ -60,7 +60,7 @@ let validationStarted: (() => void) | undefined;
 @Entity({ table: "transaction_scope_validated_records" })
 class ValidatedRecord {
   @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
-  @Column({ type: "text" }) @Validator({ custom: async () => { validationStarted?.(); await validationGate; return true; } }) name = "validated";
+  @Nullable() @Column({ type: "text" }) @Validator({ custom: async () => { validationStarted?.(); await validationGate; return true; } }) name = "validated";
 }
 class ValidatedContext extends DbContext { constructor(value: DatabaseProvider) { super(new DbContextOptions({ provider: value, entities: [ValidatedRecord] })); } }
 

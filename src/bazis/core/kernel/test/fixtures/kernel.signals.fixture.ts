@@ -1,4 +1,5 @@
-import { DI, HOSTED_SERVICE } from "../../../di";
+import { HOSTED_SERVICE } from "../../../di";
+import { DI } from "../../../di/lowLevel";
 import { KernelBuilder } from "../../KernelBuilder";
 
 const mode = process.argv[2];

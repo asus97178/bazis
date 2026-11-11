@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module, singleton } from "../../di";
+import { Module, singleton } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { AllowAnonymous, anyOf, Authorize, bearerToken, Controller, ForbiddenError, Get, UnauthorizedError, type AuthorizeCheck } from "../../http";
 import type { Logger } from "../../kernel";
 import { startTestApp, type TestApp } from "../../testing";

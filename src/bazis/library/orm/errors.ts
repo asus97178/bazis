@@ -103,7 +103,7 @@ export class EntityNotMappedError extends OrmError {
         ? `No entity or dynamic model named "${name}" is registered in this DbContext. Register a dynamic table first: options.model.registerModel(buildDynamicModel({ name: "${name}", fields: [...] })).`
         : kind === "plain"
           ? `A plain object is not an entity class. For a dynamic table add the row through its set: db.setByName("Table").add(row).`
-          : `Type "${name}" is not mapped in this DbContext. Add it to ormModule({ entities: [...] }) and annotate it with @Entity().`,
+          : `Type "${name}" is not mapped in this DbContext. Declare a set for it in the context (this.set(${name})) or add it to entities of ormBazis, and annotate it with @Entity().`,
     );
   }
 }
@@ -168,6 +168,13 @@ export class OrmUndeclaredConflictTargetError extends OrmError {
 export class UniqueViolationError extends DbUpdateError {
   readonly constraint: string | undefined;
   readonly table: string | undefined;
+  /**
+   * The properties of the index or key that rejected the value, when a context
+   * with the entity of the table made the call; otherwise empty.
+   */
+  properties: readonly string[] = [];
+  /** `conflict` of the index: what to tell the client. */
+  conflict: string | undefined;
 
   constructor(cause: object) {
     const field = (name: string): string | undefined => {
@@ -283,4 +290,35 @@ export class OrmValidationError extends DbUpdateError {
   ) {
     super(`Validation failed for "${entityName}": ${errors.map((error) => error.message).join("; ")}`);
   }
+}
+
+/** What a context knows of a table, to name the properties of a violated constraint. */
+export interface ViolationModels {
+  readonly entities: readonly {
+    readonly tableName: string;
+    readonly keyName?: string;
+    readonly key: readonly { readonly propertyName: string }[];
+    readonly properties: readonly { readonly propertyName: string; readonly columnName: string }[];
+    readonly indexes: readonly { readonly name: string; readonly columns: readonly string[]; readonly unique: boolean; readonly conflict?: string }[];
+  }[];
+}
+
+/** Names the properties behind a unique violation by the model of the context. Returns the same error. */
+export function describeViolation(error: unknown, models: ViolationModels): unknown {
+  if (!(error instanceof UniqueViolationError) || error.constraint === undefined || error.properties.length > 0) return error;
+  for (const entity of models.entities) {
+    if (error.table !== undefined && entity.tableName !== error.table) continue;
+    const index = entity.indexes.find((item) => item.unique && item.name === error.constraint);
+    if (index !== undefined) {
+      error.properties = index.columns.map((column) => entity.properties.find((property) => property.columnName === column)?.propertyName ?? column);
+      error.conflict = index.conflict;
+      return error;
+    }
+    // `pk_<table>` is the name this ORM gives; `<table>_pkey` is PostgreSQL's own, from an older schema.
+    if (error.constraint === (entity.keyName ?? `pk_${entity.tableName}`) || error.constraint === `${entity.tableName}_pkey`) {
+      error.properties = entity.key.map((property) => property.propertyName);
+      return error;
+    }
+  }
+  return error;
 }

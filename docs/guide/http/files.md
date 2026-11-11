@@ -72,7 +72,7 @@ const files = (await ctx.formData()).getAll("files").filter((item) => item insta
 
 | Где | По умолчанию | Как изменить |
 | --- | --- | --- |
-| Всё приложение | 1 МиБ | `runApp(AppModule, { http: { maxBodyBytes: 10 * 1024 * 1024 } })`; `0` — без предела |
+| Всё приложение | 1 МиБ | `@App({ http: { maxBodyBytes: 10 * 1024 * 1024 } })`; `0` — без предела |
 | Один маршрут | Как у приложения | `@Post("avatar", { maxBodySize: "5mb" })` — `b`, `kb`, `mb`, `gb` |
 
 Если клиент заранее сообщил размер (`Content-Length`) и он больше предела,

@@ -18,7 +18,7 @@ export const timing: HttpMiddleware = async (ctx, next) => {
 
 | Уровень | Как подключить | Для чего |
 | --- | --- | --- |
-| Всё приложение | `runApp(AppModule, { http: { middleware: [timing] } })` | Журнал, замеры, общие заголовки |
+| Всё приложение | `@App({ http: { middleware: [timing] } })` | Журнал, замеры, общие заголовки |
 | Контроллер | `@Middleware(mw)` на классе | Всё, что касается этого контроллера |
 | Метод | `@Middleware(mw)` на методе или `{ middleware: [mw] }` в декораторе маршрута | Один маршрут |
 
@@ -39,7 +39,7 @@ export class ReportController {
 ```text
 запрос
  → встроенные: журнал запросов, CORS, заголовки безопасности, обработчик ошибок
- → глобальные middleware (из runApp)
+ → глобальные middleware (из @App)
  → проверка доступа @Authorize
  → middleware контроллера → middleware метода
  → привязка аргументов и проверка модели → ActionFilter.before
@@ -132,13 +132,14 @@ list() { return { items: [] }; }
 ### CORS и журнал запросов
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   http: {
-    port: 3000,
     accessLog: true,
     cors: { origin: ["https://app.example.com"], credentials: true },
   },
-});
+})
+export class Application {}
 ```
 
 Ответ получает `Access-Control-Allow-Origin` только для разрешённых

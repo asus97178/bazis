@@ -3,13 +3,14 @@ import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 setDefaultTimeout(60_000);
 import { AccessPolicy, type AccessSubject, type Grants, type Scope, type ScopePrincipals } from "@/core/access";
 import { TOOL_EXECUTION_OPTIONS, Tool, type AgentToolExecutionContext } from "@/core/agent";
-import { DI, Module, singleton } from "@/core/di";
+import { Module, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import type { AuthorizeContext } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret } from "@/core/kernel";
 import { ormBazisConnect } from "@/core/orm";
 import { defineProcess, IWorkflowRuntime, WorkflowError, WorkflowModule, type CodeProcess, type InstanceDetails } from "@/core/workflow";
-import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
+import { dropWorkflowTables, testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
 import { postgres } from "@/library/orm";
 import type { ProcessDocument, ProcessFlow, VariableSpec } from "@/library/workflow";
 
@@ -196,14 +197,8 @@ let wf: TestWorkflow;
 
 beforeAll(async () => {
   if (!enabled) return;
-  const sql = postgres({ url });
-  try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
-    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
-    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
-  } finally {
-    await sql.close();
-  }
+  // The database is a throwaway one: its name was checked above.
+  await dropWorkflowTables(url!, { force: true });
   wf = await testWorkflow(root(url!), { now: "2026-11-02T09:00:00Z" });
 });
 
@@ -626,4 +621,44 @@ test.skipIf(!enabled)("startMany: an instance per element, with what became of e
   expect(results[3]).toMatchObject({ reason: "business_key_required" });
   await expect(inScope((runtime) => runtime.startMany("many-input", { actor: ACTOR, items: [] }))).rejects.toThrow(/items must be/);
   expect((await wf.instance((results[4] as { instanceId: string }).instanceId)).status).toBe("running");
+});
+
+test.skipIf(!enabled)("a job that waited in a batch longer than its lease is not run by the worker that lost it", async () => {
+  reset();
+  const { WorkflowJobs } = await import("@/core/workflow/runtime_module/internal/WorkflowJobs");
+  const failures: unknown[] = [];
+  const worker = () => new WorkflowJobs(wf.app.container, (message, error) => failures.push({ message, error }));
+  const signal = new AbortController().signal;
+  const first = await wf.start("child", { input: { value: "lease-a" }, actor: ACTOR });
+  const second = await wf.start("child", { input: { value: "lease-b" }, actor: ACTOR });
+  const slow = worker();
+  const claimed = await slow.claim(10);
+  expect(claimed.length).toBe(2);
+  // The worker is busy with something else for longer than a lease: another one takes its jobs.
+  wf.clock.advance("PT6M");
+  const other = worker();
+  const taken = await other.claim(10);
+  expect(taken.map((job) => job.id).sort()).toEqual(claimed.map((job) => job.id).sort());
+  for (const job of taken) await other.run(job, signal);
+  for (const job of claimed) await slow.run(job, signal);
+  expect(noted().sort()).toEqual(["lease-a", "lease-b"]);
+  expect(failures).toEqual([]);
+  expect((await wf.instance(first.id)).status).toBe("completed");
+  expect((await wf.instance(second.id)).status).toBe("completed");
+});
+
+test.skipIf(!enabled)("a stopping worker gives its claimed jobs back at once, and the claim is not an attempt", async () => {
+  reset();
+  const { WorkflowJobs } = await import("@/core/workflow/runtime_module/internal/WorkflowJobs");
+  const jobs = new WorkflowJobs(wf.app.container, () => undefined);
+  const started = await wf.start("child", { input: { value: "released" }, actor: ACTOR });
+  const claimed = await jobs.claim(10);
+  expect(claimed.map((job) => job.attempts)).toEqual([1]);
+  expect(await jobs.claim(10)).toEqual([]);
+  await jobs.release(claimed);
+  const again = await jobs.claim(10);
+  expect(again.map((job) => [job.id, job.attempts])).toEqual([[claimed[0]!.id, 1]]);
+  await jobs.run(again[0]!, new AbortController().signal);
+  expect(noted()).toEqual(["released"]);
+  expect((await wf.instance(started.id)).status).toBe("completed");
 });

@@ -7,7 +7,7 @@ import {
   ForeignKey,
   Key,
   PostgresDialect,
-  type DatabaseProvider,
+  type DatabaseProvider, Nullable,
 } from "@/library/orm";
 
 @Entity()
@@ -21,6 +21,7 @@ class OrderedChild {
   @Key({ generated: false })
   id = 0;
 
+  @Nullable()
   @Column({ type: "integer" })
   @ForeignKey(() => OrderedParent)
   parentId = 0;
@@ -36,6 +37,7 @@ class CycleLeft {
   @Key({ generated: false })
   id = 0;
 
+  @Nullable()
   @Column({ type: "integer" })
   @ForeignKey(() => CycleRight)
   rightId = 0;
@@ -46,6 +48,7 @@ class CycleRight {
   @Key({ generated: false })
   id = 0;
 
+  @Nullable()
   @Column({ type: "integer" })
   @ForeignKey(() => CycleLeft)
   leftId = 0;

@@ -1,7 +1,7 @@
 # Ошибки базы данных
 
 Ошибка базы данных приходит в код как класс ORM с понятным сообщением.
-Ловить её можно по классу, а HTTP-статус клиенту выбирает одна опция.
+Ловить её можно по классу, а HTTP-статус клиенту фреймворк выбирает сам.
 
 Все примеры проверены на bazis 0.109.0 и PostgreSQL 17.
 
@@ -9,7 +9,7 @@
 
 | Класс | Когда | Поля |
 | --- | --- | --- |
-| `UniqueViolationError` | Нарушен уникальный индекс (SQLSTATE 23505) | `constraint`, `table` |
+| `UniqueViolationError` | Нарушен уникальный индекс (SQLSTATE 23505) | `constraint`, `table`, `properties`, `conflict` |
 | `ForeignKeyViolationError` | Ссылка на несуществующую строку или удаление строки, на которую ссылаются (23503) | `constraint`, `table` |
 | `CheckViolationError` | Нарушено условие `@Check` (23514) | `constraint`, `table` |
 | `NotNullViolationError` | `NULL` в обязательный столбец (23502) | `column`, `table` |
@@ -69,18 +69,7 @@ async register(email: string) {
 
 ## HTTP-статусы
 
-По умолчанию любая ошибка базы — это `500 Internal Server Error`. Чтобы
-отвечать по смыслу, подключите готовую карту статусов:
-
-```ts
-import { runApp } from "bazis/core/app";
-import { databaseErrorStatus } from "bazis/core/orm";
-
-await runApp(AppModule, {
-  infra: AppInfra,
-  http: { port: 3000, errorHandler: { status: databaseErrorStatus } },
-});
-```
+Приложение с базой отвечает на ошибку базы по смыслу само, настраивать ничего не нужно:
 
 | Ошибка | Статус |
 | --- | --- |
@@ -90,34 +79,46 @@ await runApp(AppModule, {
 | База не ответила, тайм-аут операции, транзакции или блокировки, deadlock, конфликт сериализации | `503 Service Unavailable` |
 | Остальное | `500 Internal Server Error` |
 
-В production клиент получает только название статуса — имена таблиц и
-ограничений наружу не уходят:
+Клиент получает название статуса — имена таблиц и ограничений наружу не уходят:
 
 ```text
-POST /categories  →  409 {"error":"Conflict"}
 POST /products    →  422 {"error":"Unprocessable Content"}
 GET  /report      →  503 {"error":"Service Unavailable"}
 ```
 
-В `development` и `test` к ответу, как и для любой ошибки, добавляются
-`message` и `stack` ([Обработка ошибок](../overview/errors.md)).
-
-- Ошибки, которые карта превратила в `4xx`, **не** пишутся в лог как
-  неожиданные: это ошибка клиента, а не сервера. `5xx` логируются как
-  раньше.
-- `status` — обычная функция `(error) => number | undefined`. Можно
-  написать свою или дополнить готовую:
+- `4xx` **не** пишутся в лог как неожиданные: это ошибка клиента, а не сервера. `5xx` логируются как раньше.
+- Свой статус для своих ошибок задаёт `errorHandler.status`, функция `(error) => number | undefined`:
 
   ```ts
-  errorHandler: { status: (error) => error instanceof PaymentDeclinedError ? 402 : databaseErrorStatus(error) }
+  errorHandler: { status: (error) => error instanceof PaymentDeclinedError ? 402 : undefined }
   ```
 
-- Своё сообщение клиенту по-прежнему отдают через `HttpError`
-  (`new HttpError(409, "This email is already registered")`), как в
-  примере выше.
+- Свой ответ целиком, с текстом и `details`, задаёт `errorHandler.map`: `(error) => HttpError | undefined`.
+  Модуль может зарегистрировать такую функцию сам, токеном `HTTP_ERROR_MAPPER`.
+
+### Занятое значение
+
+Нарушение уникального индекса отвечает `409` и называет свойства индекса. Текст для клиента задаёт сам индекс:
+
+```ts
+@Index({ unique: true, conflict: "This email is already registered" })
+@Required()
+@Column({ type: "text" })
+email = "";
+```
+
+```text
+POST /users  →  409 {"error":"This email is already registered","details":{"code":"unique","fields":["email"]}}
+```
+
+Без `conflict` текст — `Conflict`, `details` те же. Поэтому ловить `UniqueViolationError` в сервисе ради ответа
+не нужно: индекс решает и под нагрузкой, когда два запроса пришли одновременно. В коде у ошибки есть
+`properties` (свойства индекса или ключа) и `conflict`; они заполнены, когда запрос шёл через контекст с этой сущностью.
 
 > [!NOTE]
-> Опция `errorHandler.status` и `databaseErrorStatus` — с версии 0.98.25.
+> Автоматические статусы, `conflict` у индекса и `errorHandler.map` — с версии 0.137.0. До неё статусы
+> подключали вручную: `errorHandler: { status: databaseErrorStatus }`. Функция `databaseErrorStatus` осталась
+> для своего кода, которому нужен только номер статуса.
 
 ## Тайм-ауты и недоступная база
 

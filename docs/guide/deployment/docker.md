@@ -23,7 +23,7 @@ FROM debian:bookworm-slim
 RUN useradd --system --uid 10001 app
 COPY --from=build /app/bin/shop /usr/local/bin/shop
 USER app
-ENV BAZIS_ENV=production HOST=0.0.0.0 PORT=8080
+ENV BAZIS_ENV=production BAZIS_HTTP__PORT=8080
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s \
   CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
@@ -46,8 +46,9 @@ src/generated
   зависимостями пересобирается, только когда меняется `bun.lock`.
 - **`bazis build --bin`** сам запускает кодогенерацию, поэтому
   `src/generated` в образ не копируется.
-- **`HOST=0.0.0.0`** — иначе приложение слушает только `127.0.0.1` внутри
-  контейнера и снаружи недоступно.
+- **`BAZIS_ENV=production`** — в production сервер слушает `0.0.0.0`, и
+  контейнер доступен снаружи. В другом окружении он слушал бы только
+  `127.0.0.1`; тогда нужен `BAZIS_HTTP__HOST=0.0.0.0`.
 - **`ENTRYPOINT` в форме массива** — приложение становится процессом 1 и
   само получает `SIGTERM` от `docker stop`.
 - **`HEALTHCHECK` без `curl`**: в `debian:bookworm-slim` его нет, а `bash`

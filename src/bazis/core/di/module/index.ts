@@ -34,9 +34,6 @@ export {
   scoped,
   singleton,
   singletonAsyncFactory,
-  singletonAsyncFactoryWithResolver,
-  singletonFactory,
-  singletonFactoryWithResolver,
   singletonValue,
   transient,
 } from "./shortcuts";

@@ -1,6 +1,6 @@
 # WorkflowDefinitionsModule
 
-Passport version: 1.2. Check date: 2026-11-03.
+Passport version: 1.3. Check date: 2026-11-11.
 Status: implemented; checks in the [pack passport](../MODULE.md#4-checks).
 Type: atomic, a part of the composite [WorkflowModule](../MODULE.md).
 Path: `src/bazis/core/workflow/definitions_module`.
@@ -22,7 +22,8 @@ The part provides the pack's `WorkflowClock`.
 | --- | --- | --- | --- |
 | `WfProcess`, `WfVersion`, `DefinitionsDbContext` | [model](model) | ORM, owned store `bazis.workflow.definitions.v2` | tables `bazis_wf2_def_processes`, `bazis_wf2_def_versions` |
 | `IWorkflowDefinitions` / `WorkflowDefinitions` (scoped) | [services](services) | `DefinitionsDbContext`, `WorkflowTools`, `CodeProcessCatalog`, `WorkflowClock`, `WorkflowEvents` | catalog operations, `WorkflowError`; `conflict` on changes of a process declared in code and on an out-of-date `expected` of a draft; `publishCode`; `WORKFLOW_PROCESS_CHANGED` after the commit |
-| `defineProcess`, the `processes` channel | [code/defineProcess.ts](code/defineProcess.ts), [code/codeProcesses.ts](code/codeProcesses.ts) | module-owned metadata of DI | build-time check: the fields, the document without Tools, one key per application, `WorkflowModule` imported; `WorkflowSetupError` as a configuration error |
+| `PublishedVersions` (singleton) | [internal/PublishedVersions.ts](internal/PublishedVersions.ts) | — | the latest published versions between calls: `published()` costs one query of heads, documents are read only for versions published since |
+| `defineProcess`, the `processes` channel | [code/defineProcess.ts](code/defineProcess.ts), [code/codeProcesses.ts](code/codeProcesses.ts) | module-owned metadata of DI | compile time (0.138.0): a document literal is typed by node kind (`config`, unknown fields, the nodes that `flows`, `attachedTo` and `parent` name), a Tool is named by its class or a made Tool (`orderTools.find`), `callProcess.process` and `settings.errorHandler` by a `defineProcess` result, and `input` is checked against what the Tool or process takes; references are stored as the name and key. Container build: the fields, the document without Tools, one key per application, `WorkflowModule` imported; `WorkflowSetupError` as a configuration error. A document given as data (`ProcessDocument`) is checked only at the start |
 | `CodeProcessCatalog` (singleton) | [code/CodeProcessCatalog.ts](code/CodeProcessCatalog.ts) | the container's contributions | which module owns a key (`ProcessSummary.module`) |
 | `CodeProcessPublisher` (hosted, phase 0) | [code/CodeProcessPublisher.ts](code/CodeProcessPublisher.ts) | `CodeProcessCatalog`, `WorkflowTools`, `WorkflowDefinitions` | after the schema: checks with the Tools (an unknown Tool stops the start), then publishes under `pg_advisory_xact_lock(hashtext('bazis.workflow.code'))` as `{ kind: "system", id: "code" }` |
 | `inspectProcesses` | [code/inspectProcesses.ts](code/inspectProcesses.ts) | the module tree, `@Tool` metadata | the checks of build and start without the container, for `bazis workflow check` |

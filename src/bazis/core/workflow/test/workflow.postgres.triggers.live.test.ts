@@ -3,13 +3,14 @@ import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 setDefaultTimeout(60_000);
 import { AccessPolicy, type AccessSubject, type Grants, type Scope, type ScopePrincipals } from "@/core/access";
 import { TOOL_EXECUTION_OPTIONS } from "@/core/agent";
-import { DI, Module, singleton } from "@/core/di";
+import { Module, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import type { AuthorizeContext } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret, OnEvent, withEventSubscribers } from "@/core/kernel";
-import { Column, DbContext, Entity, ormBazisConnect, UUID } from "@/core/orm";
+import { Column, DbContext, Entity, ormBazisConnect, UUID, Nullable } from "@/core/orm";
 import { defineProcess, IWorkflowDefinitions, IWorkflowRuntime, WORKFLOW_PROCESS_CHANGED, WorkflowError, WorkflowModule, WorkflowPartitions, type CodeProcess, type EmitOptions, type EmitResult, type InstanceSummary, type ProcessPartition, type WorkflowProcessChanged } from "@/core/workflow";
-import { testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
+import { dropWorkflowTables, testWorkflow, type TestWorkflow } from "@/core/workflow/testing";
 import { postgres } from "@/library/orm";
 import type { ProcessDocument, ProcessFlow, VariableSpec } from "@/library/workflow";
 
@@ -64,6 +65,7 @@ class TriggerRow {
   @UUID()
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   name = "";
 }
@@ -132,14 +134,8 @@ let wf: TestWorkflow;
 
 beforeAll(async () => {
   if (!enabled) return;
-  const sql = postgres({ url });
-  try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
-    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
-    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
-  } finally {
-    await sql.close();
-  }
+  // The database is a throwaway one: its name was checked above.
+  await dropWorkflowTables(url!, { force: true });
   connected.set("in-all", [{ partition: "shop-a", timezone: "Asia/Tokyo", enabled: true }, { partition: "shop-b", enabled: true }, { partition: "shop-off", enabled: false }]);
   connected.set("in-listed", [{ partition: "shop-a", timezone: "Asia/Tokyo", enabled: true }, { partition: "shop-off", enabled: false }]);
   connected.set("connected", [{ partition: "shop-a", enabled: true }, { partition: "shop-off", enabled: false }]);

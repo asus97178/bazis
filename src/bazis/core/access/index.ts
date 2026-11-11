@@ -5,9 +5,19 @@
  */
 import "./catalog/moduleFields";
 import "./generated/deps";
+import type { accessPermissions } from "./Access.module";
+import type { PermissionsOf } from "./catalog/permissions";
+
+/**
+ * The permissions the application declares, by key: what `can`, `access.can`,
+ * `access.filter` and `defineRoles` accept. Nobody writes it by hand: `bazis codegen`
+ * fills it from `permissions` of the application's modules
+ * (`src/generated/bazis/permissions.ts`), a framework pack from its own.
+ */
+export interface BazisPermissions extends PermissionsOf<typeof accessPermissions> {}
 
 export { AccessModule } from "./Access.module";
-export { definePermissions, type AttributeSpec, type PermissionDeclarations, type PermissionSpec, type ScopeSource } from "./catalog/permissions";
+export { definePermissions, type AttributeSpec, type OwnPermissionKey, type PermissionDeclarations, type PermissionKey, type PermissionsOf, type PermissionSpec, type ScopeSource } from "./catalog/permissions";
 export { IAccessCatalog } from "./catalog/IAccessCatalog.service";
 export type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./catalog/AccessCatalog";
 export { IAccess } from "./check/IAccess.service";

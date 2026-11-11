@@ -175,10 +175,10 @@ const answer = part?.kind === "text" ? part.text : null;
 @Entity({ table: "agents" })
 export class AgentRecord {
   @UUID({ version: "v7" }) id = "";
-  @Index({ unique: true }) @Column({ type: "text" }) name = "";
-  @Column({ type: "text" }) instructions = "";
-  @Column({ type: "json" }) toolNames: string[] = [];
-  @Column({ type: "text", nullable: true }) modelProfile?: string;
+  @Index({ unique: true }) @Nullable() @Column({ type: "text" }) name = "";
+  @Nullable() @Column({ type: "text" }) instructions = "";
+  @Nullable() @Column({ type: "json" }) toolNames: string[] = [];
+  @Nullable() @Column({ type: "text" }) modelProfile?: string;
 }
 ```
 

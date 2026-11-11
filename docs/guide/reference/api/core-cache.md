@@ -7,7 +7,7 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `memory(options)` | Кэш в памяти одной строкой: `runApp({ cache: memory({ maxEntries }) })` | [Кэширование](../../realtime/caching.md) |
+| `memory(options)` | Кэш в памяти одной строкой: `@App({ cache: memory({ maxEntries }) })` | [Кэширование](../../realtime/caching.md) |
 | `buildCacheModule(config)` | Модуль кэша с расширенными настройками: политики, распределённый кэш | — |
 
 Распределённый кэш включает коннектор Redis:

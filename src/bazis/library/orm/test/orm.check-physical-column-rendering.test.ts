@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Check, Column, Entity, Key, ModelBuildError, ModelBuilder, OrmModel, PostgresDialect, buildDynamicModel } from "../index";
+import { Check, Column, Entity, Key, ModelBuildError, ModelBuilder, OrmModel, PostgresDialect, buildDynamicModel, Nullable } from "../index";
 import { compileExpectedSchema } from "../Schema/ExpectedSchema";
 import { renderSafeAdditivePostgres } from "../Schema/SafeAdditiveSchema";
 
@@ -11,11 +11,11 @@ import { renderSafeAdditivePostgres } from "../Schema/SafeAdditiveSchema";
 @Check<AliasedCheckRow>("ck_aliased_nested", (row) => row.tenantKey.ne("default").and(row.leftValue.gte(0)).or(row.stateCode.eq("blocked")).not())
 class AliasedCheckRow {
   @Key({ generated: false }) @Column({ name: "row_id", type: "integer" }) id = 0;
-  @Column({ name: "tenant_key", type: "text" }) tenantKey = "";
-  @Column({ name: "left_value", type: "integer" }) leftValue = 0;
-  @Column({ name: "right_value", type: "integer" }) rightValue = 0;
-  @Column({ name: "state_code", type: "text" }) stateCode = "";
-  @Column({ name: "optional_note", type: "text" }) optionalNote = "";
+  @Nullable() @Column({ name: "tenant_key", type: "text" }) tenantKey = "";
+  @Nullable() @Column({ name: "left_value", type: "integer" }) leftValue = 0;
+  @Nullable() @Column({ name: "right_value", type: "integer" }) rightValue = 0;
+  @Nullable() @Column({ name: "state_code", type: "text" }) stateCode = "";
+  @Nullable() @Column({ name: "optional_note", type: "text" }) optionalNote = "";
 }
 
 @Entity({ table: "invalid_aliased_check_rows" })

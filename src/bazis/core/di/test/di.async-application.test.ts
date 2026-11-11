@@ -3,7 +3,6 @@ import {
   Application,
   AsyncResolutionRequiredError,
   CircularDependencyError,
-  DI,
   HOSTED_SERVICE,
   type HostedService,
   addHostedService,
@@ -13,13 +12,13 @@ import {
   createOptionsToken,
   singleton,
   singletonAsyncFactory,
-  singletonAsyncFactoryWithResolver,
   ScopeDisposedError,
   type BazisModuleRef,
   ServiceCollection,
   SERVICE_PROVIDER,
   type ServiceResolver,
 } from "../index";
+import { DI } from "../lowLevel";
 import { DisposableService } from "./test-fixtures";
 
 interface IDb {
@@ -168,7 +167,7 @@ describe("DI async factories", () => {
     const SELF = createToken<unknown>("AsyncResolverSelf");
     const container = createContainer({
       providers: [
-        singletonAsyncFactoryWithResolver(SELF, [], async (resolver) => resolver.resolve(SELF)),
+        DI.singleton(DI.asyncFactoryProviderWithResolver(SELF, [], async (resolver) => resolver.resolve(SELF))),
       ],
     });
 
@@ -181,8 +180,8 @@ describe("DI async factories", () => {
     const B = createToken<unknown>("AsyncResolverCycleB");
     const container = createContainer({
       providers: [
-        singletonAsyncFactoryWithResolver(A, [], async (resolver) => resolver.resolveAsync(B)),
-        singletonAsyncFactoryWithResolver(B, [], async (resolver) => resolver.resolveAsync(A)),
+        DI.singleton(DI.asyncFactoryProviderWithResolver(A, [], async (resolver) => resolver.resolveAsync(B))),
+        DI.singleton(DI.asyncFactoryProviderWithResolver(B, [], async (resolver) => resolver.resolveAsync(A))),
       ],
     }, { validateOnBuild: true });
 
@@ -199,18 +198,18 @@ describe("DI async factories", () => {
     const enteredB = Promise.withResolvers<void>();
     const container = createContainer({
       providers: [
-        singletonAsyncFactoryWithResolver(A, [], async (resolver) => {
+        DI.singleton(DI.asyncFactoryProviderWithResolver(A, [], async (resolver) => {
           await releaseA.promise;
           return resolver.resolveAsync(B);
-        }),
-        singletonAsyncFactoryWithResolver(B, [], async (resolver) => {
+        })),
+        DI.singleton(DI.asyncFactoryProviderWithResolver(B, [], async (resolver) => {
           enteredB.resolve();
           return resolver.resolveAsync(C);
-        }),
-        singletonAsyncFactoryWithResolver(C, [], async (resolver) => {
+        })),
+        DI.singleton(DI.asyncFactoryProviderWithResolver(C, [], async (resolver) => {
           await releaseC.promise;
           return resolver.resolveAsync(A);
-        }),
+        })),
       ],
     });
     const externalA = container.resolveAsync(A);
@@ -230,16 +229,16 @@ describe("DI async factories", () => {
     let captured: ServiceResolver | undefined;
     const container = createContainer({
       providers: [
-        singletonAsyncFactoryWithResolver(A, [], async (resolver) => {
+        DI.singleton(DI.asyncFactoryProviderWithResolver(A, [], async (resolver) => {
           await resolver.resolveAsync(B);
           entered.resolve();
           await releaseA.promise;
           return "A";
-        }),
-        singletonAsyncFactoryWithResolver(B, [], async (resolver) => {
+        })),
+        DI.singleton(DI.asyncFactoryProviderWithResolver(B, [], async (resolver) => {
           captured = resolver;
           return resolver;
-        }),
+        })),
       ],
     });
     const pendingA = container.resolveAsync(A);
@@ -257,14 +256,14 @@ describe("DI async factories", () => {
     const B = createToken<unknown>("RepeatedCycleB");
     let release = Promise.withResolvers<void>();
     const container = createContainer({ providers: [
-      singletonAsyncFactoryWithResolver(A, [], async resolver => {
+      DI.singleton(DI.asyncFactoryProviderWithResolver(A, [], async resolver => {
         await release.promise;
         return resolver.resolveAsync(B);
-      }),
-      singletonAsyncFactoryWithResolver(B, [], async resolver => {
+      })),
+      DI.singleton(DI.asyncFactoryProviderWithResolver(B, [], async resolver => {
         await release.promise;
         return resolver.resolveAsync(A);
-      }),
+      })),
     ] });
     try {
       for (let attempt = 0; attempt < 100; attempt += 1) {

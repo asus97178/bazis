@@ -13,7 +13,7 @@ test("Accept-Language picks the supported language with the highest q", () => {
   expect(negotiateLanguage("ru;q=0, en;q=0.1", supported)).toBe("en");
   expect(negotiateLanguage("*", supported)).toBeUndefined();
   expect(negotiateLanguage(undefined, supported)).toBeUndefined();
-  expect(() => createLanguages({ default: "en", supported: ["ru"] })).toThrow('runApp: language.default "en" must be one of language.supported (ru).');
+  expect(() => createLanguages({ default: "en", supported: ["ru"] })).toThrow('@App: language.default "en" must be one of language.supported (ru).');
 });
 
 const seen: (string | undefined)[] = [];

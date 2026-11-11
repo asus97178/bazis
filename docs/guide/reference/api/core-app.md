@@ -1,11 +1,12 @@
 # `bazis/core/app`
 
-Точка входа приложения. Список — по пакету 0.128.0.
+Точка входа приложения. Список — по пакету 0.138.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `runApp(AppModule, options)` | Запуск приложения: ядро, HTTP, gRPC, WebSocket, инфраструктура, плавная остановка | [Приложение](../../overview/application.md), [параметры](../configuration.md#runapp) |
-| `RunAppOptions` | Тип опций `runApp` | [Параметры конфигурации](../configuration.md#runapp) |
+| `@App({ modules, infra, cache, config, http, grpc, websocket, language, messages, validator, ui, kernel, configure })` | Объявление приложения: его модули, инфраструктура и серверы. Обязательно только `modules`. С версии 0.138.0 | [Приложение](../../overview/application.md), [параметры](../configuration.md#app) |
+| `runApp(Application)` | Запуск объявленного приложения: ядро, HTTP, gRPC, WebSocket, инфраструктура, плавная остановка. Принимает только класс с `@App` | [Приложение](../../overview/application.md) |
+| `AppOptions`, `AppSettings`, `AppClass` | Типы: что принимает `@App`; то же без `modules`; класс с `@App` | [Параметры конфигурации](../configuration.md#app) |
 | `AppLanguage`, `AppMessages` | Язык текстов ответов и свои тексты | [Русская локализация](../../recipes/russian.md) |
 
 ## UI-поверхности

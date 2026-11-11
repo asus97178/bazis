@@ -3,7 +3,7 @@ import { UnauthorizedError, type AuthorizeContext } from "../../http";
 import { LOGGER, type ConfigView } from "../../kernel";
 import type { AccessConfig } from "./accessConfig";
 import type { IAccessCatalog } from "../catalog/IAccessCatalog.service";
-import type { PermissionSpec } from "../catalog/permissions";
+import type { PermissionKey, PermissionSpec } from "../catalog/permissions";
 import { AccessPolicy, type ScopePrincipals } from "../contracts/AccessPolicy";
 import type { AttributeLookup } from "../contracts/AttributeLookup";
 import type { AccessObject, AccessSubject, Condition, Grant, Grants, Scope } from "../contracts/types";
@@ -70,7 +70,7 @@ export class SubjectAccess {
   ) {}
 
   /** The grants of the permission; a grant the permission cannot use is dropped with a warning. */
-  grants(permission: string): Promise<Grants> {
+  grants(permission: PermissionKey): Promise<Grants> {
     let grants = this.grantCache.get(permission);
     if (grants === undefined) {
       grants = this.load(permission);
@@ -83,7 +83,7 @@ export class SubjectAccess {
    * Whether the subject may do `permission` on `object`. Without an object —
    * whether it has the permission anywhere (a route before the object is known).
    */
-  async can(permission: string, object?: AccessObject): Promise<boolean> {
+  async can(permission: PermissionKey, object?: AccessObject): Promise<boolean> {
     const spec = this.catalog.require(permission).spec;
     const grants = await this.grants(permission);
     if (grants === "all") return true;
@@ -92,7 +92,7 @@ export class SubjectAccess {
   }
 
   /** Which rows of a list the subject may see; `scope` — the partition of the request for `scope: "request"`. */
-  async filter(permission: string, options: { readonly scope?: Scope } = {}): Promise<AccessFilter> {
+  async filter(permission: PermissionKey, options: { readonly scope?: Scope } = {}): Promise<AccessFilter> {
     const spec = this.catalog.require(permission).spec;
     const grants = await this.grants(permission);
     return await buildFilter({
@@ -107,7 +107,7 @@ export class SubjectAccess {
   }
 
   /** The fields of `object` the subject may read and write (ACCESS-001 §4.4). */
-  async fields(permission: string, object: AccessObject): Promise<FieldAccess> {
+  async fields(permission: PermissionKey, object: AccessObject): Promise<FieldAccess> {
     const spec = this.catalog.require(permission).spec;
     const grants = await this.grants(permission);
     if (grants === "all") return { read: "all", write: "all" };

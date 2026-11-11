@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, ForeignKey, Key, Required, Schema, type DatabaseProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, ForeignKey, Key, Required, Schema, type DatabaseProvider, Nullable } from "../index";
 
-@Schema("zeta") @Entity({ table: "parents" }) class Parent { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Column({ type: "text" }) id = ""; }
-@Schema("alpha") @Entity({ table: "children" }) @ForeignKey(() => Parent, { properties: ["tenant", "parentId"] }) class Child { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Column({ type: "text" }) id = ""; @Required() @Column({ type: "text" }) parentId = ""; }
+@Schema("zeta") @Entity({ table: "parents" }) class Parent { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "text" }) id = ""; }
+@Schema("alpha") @Entity({ table: "children" }) @ForeignKey(() => Parent, { properties: ["tenant", "parentId"] }) class Child { @Key(["tenant", "id"]) @Column({ type: "text" }) tenant = ""; @Nullable() @Column({ type: "text" }) id = ""; @Required() @Column({ type: "text" }) parentId = ""; }
 class Context extends DbContext {}
-@Entity({ table: "cycle_a" }) class CycleA { @Key() @Column({ type: "integer" }) id = 0; @ForeignKey(() => CycleB) @Column({ type: "integer" }) bId = 0; }
-@Entity({ table: "cycle_b" }) class CycleB { @Key() @Column({ type: "integer" }) id = 0; @ForeignKey(() => CycleA) @Column({ type: "integer" }) aId = 0; }
+@Entity({ table: "cycle_a" }) class CycleA { @Key() @Column({ type: "integer" }) id = 0; @ForeignKey(() => CycleB) @Nullable() @Column({ type: "integer" }) bId = 0; }
+@Entity({ table: "cycle_b" }) class CycleB { @Key() @Column({ type: "integer" }) id = 0; @ForeignKey(() => CycleA) @Nullable() @Column({ type: "integer" }) aId = 0; }
 
 describe("PostgreSQL ensure-created recording admission", () => {
   test("sorts schemas, creates all missing tables before cyclic FKs, and replay is DDL-free", async () => {

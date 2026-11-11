@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, ModuleEncapsulationError, ServiceCollection, ServiceValidationError, createContainer, createToken, namedDependency, singletonValue } from "../index";
+import { ModuleEncapsulationError, ServiceCollection, ServiceValidationError, createContainer, createToken, namedDependency, singletonValue } from "../index";
+import { DI } from "../lowLevel";
 
 test("class wrapper dependencies participate in lifetime and module validation", () => {
   class Service {}

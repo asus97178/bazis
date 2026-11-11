@@ -67,7 +67,7 @@ export interface ICache<TValue = unknown> {
 export const ICache = createToken<ICache>("ICache") as InjectionToken<ICache<unknown>>;
 
 registerNamedDependencyHint((name) => name === "ICache" || name.startsWith("ICache<")
-  ? "The cache is provided by a cache module: add cache: memory() to the runApp options (startTestApp takes the same options)."
+  ? "The cache is provided by a cache module: add cache: memory() to @App (startTestApp takes the same option)."
   : undefined);
 
 /** Typed token for a specific value type. */

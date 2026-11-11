@@ -1,4 +1,6 @@
-import { DI, HOSTED_SERVICE, type InjectionToken, type ModuleOwnedContributionSnapshot, type ProviderDefinition, type ProviderDependencyList, type ServiceResolver } from "../di";
+import { HOSTED_SERVICE, type InjectionToken, type ModuleOwnedContributionSnapshot, type ProviderDefinition, type ProviderDependencyList, type ServiceResolver } from "../di";
+import { DI } from "../di/lowLevel";
+import { contextEntities } from "./contextEntities";
 import { getGeneratedClassDeps } from "../di/module/autoDeps";
 import { resolveDependencyList } from "../di/internal/resolveDependencyList";
 import { ConfigRegistry, HEALTH_CHECK, StartupReport } from "../kernel";
@@ -27,7 +29,7 @@ function createContextOptions<TContext extends DbContext>(
 ): DbContextOptions {
   return bindKeys(new DbContextOptions({
     provider,
-    entities: config.entities ?? [],
+    entities: contextEntities(config),
     validateOnSave: config.validateOnSave,
     executionStrategy: config.executionStrategy,
   }), serviceProvider);

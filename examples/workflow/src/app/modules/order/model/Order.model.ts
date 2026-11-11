@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "bazis/core/orm";
+import { Column, Entity, Index, UUID, Required } from "bazis/core/orm";
 
 export type OrderStatus = "new" | "approved" | "rejected";
 
@@ -9,12 +9,15 @@ export class Order {
 
   /** Who placed the order: the owner column of `orders.read`. */
   @Index()
+  @Required()
   @Column({ type: "text" })
   customerId = "";
 
+  @Required()
   @Column({ type: "integer" })
   amount = 0;
 
+  @Required()
   @Column({ type: "text" })
   status: OrderStatus = "new";
 

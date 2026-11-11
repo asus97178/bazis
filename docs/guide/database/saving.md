@@ -155,7 +155,6 @@ DbUpdateError: Primary key for tracked entity "Article" cannot be changed.
 @Module({
   ormBazis: {
     context: Customers,
-    entities: [Customer],
     executionStrategy: { maxRetries: 3, baseDelayMs: 50 },
   },
   exports: [],

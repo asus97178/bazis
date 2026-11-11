@@ -1,5 +1,5 @@
 import { Module } from "../../../di";
-import { runApp } from "../../../app/runApp";
+import { App, runApp } from "../../../app/runApp";
 import { GrpcController, GrpcMethod } from "../../index";
 import { echoService, type EchoMessage } from "./contract";
 
@@ -13,4 +13,6 @@ class HalfEchoController {
 @Module({ grpcControllers: [HalfEchoController] })
 class AppModule {}
 
-await runApp(AppModule, { grpc: { address: "127.0.0.1:0" }, kernel: { environment: "development", signals: [] } });
+@App({ modules: [AppModule], grpc: { address: "127.0.0.1:0" }, kernel: { environment: "development", signals: [] } })
+class Application {}
+await runApp(Application);

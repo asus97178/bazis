@@ -17,7 +17,7 @@ deciding what is open: nothing is open by itself.
 
 | Part | Where | Depends on | What it does |
 | --- | --- | --- | --- |
-| `ormEntityTools` | [orm/ormEntityTools.ts](orm/ormEntityTools.ts) | `core/agent`, `core/orm`, `core/di` | Makes Tool classes at run time with a JSON Schema contract; they check their input themselves |
+| `ormEntityTools` | [orm/ormEntityTools.ts](orm/ormEntityTools.ts) | `core/agent`, `core/orm`, `core/di` | Makes Tools with `defineTool` and a JSON Schema contract, returned as a set named by operation (`orderTools.find`; `OrmEntityToolSet`, `OrmEntityToolInputs`, `OrmEntityToolOutputs`) since 0.138.0, not an array; they check their input themselves |
 | `HttpRequestTool` | [http/HttpRequest.tool.ts](http/HttpRequest.tool.ts), [http/publicAddress.ts](http/publicAddress.ts) | `core/agent`, `core/kernel` | `http.request`: closed list of hosts, public addresses only, limits |
 | `SecretStore`, `ConfigSecretStore` | [secrets/SecretStore.ts](secrets/SecretStore.ts) | `core/kernel` | Values of `$secrets.NAME`; the process engine asks for them, this module only provides them |
 | `OrmEntityReferences`, `OrmFieldReferences` | [orm/OrmEntity.references.ts](orm/OrmEntity.references.ts) | `core/access`, the Tool catalog | Reference kinds `orm.entity`, `orm.field`: what `ormEntityTools` opened |

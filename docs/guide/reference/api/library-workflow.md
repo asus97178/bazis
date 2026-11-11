@@ -1,7 +1,7 @@
 # `bazis/library/workflow`
 
 Формат документа процесса `bazis.workflow/v2`: чистые функции без DI и
-базы — для дизайнера, CLI, браузера. Список — по пакету 0.136.0.
+базы — для дизайнера, CLI, браузера. Список — по пакету 0.138.0.
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
@@ -36,3 +36,8 @@
 `ProcessDocumentV1`, `ConditionV1`, `FormFieldV1`, `ProcessStructure`, `StructureStep`,
 `StructureBranch`, `StructureBoundary`, `StructureStart`, `ProcessPalette`,
 `PaletteNodeKind`, `PaletteTool`, `StepForm`, `StepFormField`, `CronSchedule`.
+
+Типы настроек узлов (с 0.138.0): `NodeConfigs` — `config` каждого вида узла, `ProcessNodeOf`,
+`TypedProcessNode`, `TypedProcessFlow`, `ConfiguredNodeKind`, `BoundaryNodeKind`, `RetryPolicy`,
+`TimerConfig`, `InputMapping`. Ими пишут документ с проверкой при сборке; сохранённый документ
+по-прежнему судит `validateProcess`.

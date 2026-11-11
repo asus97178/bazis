@@ -1,6 +1,6 @@
 {
   "name": "bazis",
-  "version": "0.136.0",
+  "version": "0.138.0",
   "description": "Modular backend framework for Bun in TypeScript: DI wired by codegen, HTTP, a PostgreSQL ORM, JWT, WebSocket, agents and a CLI.",
   "license": "MIT",
   "author": "Alexander Alenin",
@@ -35,6 +35,7 @@
     "./core/background": "./core/background/index.ts",
     "./core/cache": "./core/cache/index.ts",
     "./core/di": "./core/di/index.ts",
+    "./core/di/lowLevel": "./core/di/lowLevel.ts",
     "./core/generatedRuntime": "./core/generatedRuntime.ts",
     "./core/grpc": "./core/grpc/index.ts",
     "./core/http": "./core/http/index.ts",

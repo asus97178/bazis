@@ -22,6 +22,7 @@
 | --- | --- | --- |
 | `can(permission, objectOf?)` | Проверка маршрута: `401` без человека, `403` без права; без объекта — право хоть где-нибудь | [Проверить маршрут](../../security/access.md#проверить-маршрут) |
 | `IAccess` | Сервис проверок: `for(ctx)` — человек запроса, `as(subject, scope)` — без HTTP, `policy(scope)` | [Проверить маршрут](../../security/access.md#проверить-маршрут) |
+| `BazisPermissions`, `PermissionKey`, `OwnPermissionKey`, `PermissionsOf` | Объявленные права как тип: интерфейс заполняет codegen, `PermissionKey` принимают `can` и `defineRoles` | [Ключи проверяет компилятор](../../security/access.md#ключи-проверяет-компилятор) |
 | `SubjectAccess` | Права одного человека: `can`, `filter`, `fields`, `grants`, `principals`, `ownerIds` | там же |
 | `grantsToWhere(filter)` | Фильтр как условие ORM, `"all"` или `"none"` | [Отфильтровать список](../../security/access.md#отфильтровать-список) |
 | `maskFields(record, read)` | Запись только с разрешёнными полями | — |

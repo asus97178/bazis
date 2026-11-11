@@ -1,24 +1,47 @@
 # Приложение
 
-Точка входа приложения — `src/index.ts`. В нём одна главная строка —
-`runApp`:
+Приложение объявляется один раз, классом с `@App`: из каких модулей оно
+состоит, какая у него инфраструктура и какие серверы оно поднимает.
 
 ```ts
+// src/app/App.ts
+import { App } from "bazis/core/app";
+import { AppInfra } from "./infra/App.infra";
+import { AppModule } from "./modules/App.module";
+
+@App({
+  modules: [AppModule],
+  infra: AppInfra,
+  http: { health: true },
+})
+export class Application {}
+```
+
+Точка входа `src/index.ts` запускает это объявление и больше ничего не
+настраивает:
+
+```ts
+// src/index.ts
 import { runApp } from "bazis/core/app";
-import { AppModule } from "./app/modules/App.module";
+import { Application } from "./app/App";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
 await registerBazisGeneratedRuntime();
-await runApp(AppModule, {
-  http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true },
-});
+await runApp(Application);
 ```
 
 `registerBazisGeneratedRuntime()` подключает результат
-[кодогенерации](../fundamentals/codegen.md), `runApp` —
-запускает приложение и ждёт его остановки. Когда `await runApp(...)`
-завершается, приложение уже остановлено, а код выхода записан в
-`process.exitCode`.
+[кодогенерации](../fundamentals/codegen.md), `runApp` запускает приложение
+и ждёт его остановки. Когда `await runApp(...)` завершается, приложение уже
+остановлено, а код выхода записан в `process.exitCode`.
+
+То же объявление читают тесты: `startTestApp(Application)` поднимает ровно
+то приложение, которое уйдёт в production, — с теми же модулями,
+инфраструктурой и настройками HTTP. Подробнее — в [«Тестировании»](../fundamentals/testing.md).
+
+`@App` и `runApp(Application)` — с версии 0.138.0. Раньше опции передавали
+вторым аргументом: `runApp(AppModule, { … })`; как перейти — в
+[«Обновлении»](../reference/upgrading.md#01380).
 
 ## Что происходит при запуске
 
@@ -29,7 +52,7 @@ await runApp(AppModule, {
 3. Открываются подключения инфраструктуры (база данных, кэш), затем
    запускаются фоновые службы (`background` в модулях) и HTTP-сервер.
    Контроллеры собираются со всего дерева модулей — перечислять их в
-   `runApp` не нужно.
+   `@App` не нужно.
 4. Приложение работает, пока не придёт сигнал остановки.
 
 После запуска в журнале появляется строка с адресом в `listening`, в любом
@@ -47,12 +70,13 @@ info: bazis started {"environment":"development","debug":true,"configKeys":2,"co
 auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 ```
 
-## Опции `runApp`
+## Поля `@App`
 
-Все опции необязательны.
+Обязательно только `modules`.
 
-| Опция | Что делает |
+| Поле | Что делает |
 | --- | --- |
+| `modules` | Модули приложения. Обычно один корневой `AppModule`, который собирает остальные через `imports` |
 | `http` | Запускает HTTP-сервер; см. ниже |
 | `cache` | Кэш приложения: `cache: memory({ maxEntries: 1000 })`, `memory` — из `bazis/core/cache`. Включает `ICache`, `@Cacheable`, `@OutputCache` |
 | `infra` | Подключения к базе данных, Redis и т. п. — класс с `@Infra` |
@@ -69,8 +93,8 @@ auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 
 | Опция | По умолчанию | Что задаёт |
 | --- | --- | --- |
-| `port` | `3000` | Порт; `0` — любой свободный |
-| `hostname` | Все интерфейсы | Адрес. Созданный CLI проект слушает `127.0.0.1`, если не задан `HOST` |
+| `port` | Настройка `http.port` | Жёстко задаёт порт в коде; `0` — любой свободный. Обычно не пишут: см. [Адрес сервера](#адрес-сервера) |
+| `hostname` | Настройка `http.host` | Жёстко задаёт адрес в коде. Обычно не пишут |
 | `prefix` | — | Общий префикс маршрутов: `prefix: "api"` → `/api/tasks` |
 | `health` | Выключено | `true` — маршрут `GET /health` |
 | `docs` | Вне production | Документация API: `/docs` и `/docs/openapi.json`; `false` — выключить, `true` — включить и в production |
@@ -92,6 +116,35 @@ auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
 // GET /health
 {"healthy":true,"checks":[]}
 ```
+
+### Адрес сервера
+
+Порт и адрес не пишут в коде: они берутся из встроенных настроек `http`
+и меняются окружением, как любые [настройки](../fundamentals/configuration.md).
+
+| Настройка | Переменная | По умолчанию |
+| --- | --- | --- |
+| `http.port` | `BAZIS_HTTP__PORT` | `3000` |
+| `http.host` | `BAZIS_HTTP__HOST` | `127.0.0.1`; в `production` — `0.0.0.0` |
+
+```bash
+BAZIS_HTTP__PORT=3100 bunx bazis dev
+```
+
+Вне production сервер доступен только с этой машины. В production он
+слушает все интерфейсы, как и нужно в контейнере; за обратным прокси на том
+же хосте задайте `BAZIS_HTTP__HOST=127.0.0.1`.
+
+`port` или `hostname`, написанные в `@App({ http })`, закрепляют значение в
+коде, и окружение его уже не меняет. Неверный порт останавливает запуск:
+
+```text
+[bazis] configuration error: Invalid configuration (environment "development"):
+http.port — must be a TCP port (0-65535) (BAZIS_HTTP__PORT).
+```
+
+Настройки доступны и сервисам: `ConfigView<typeof httpConfig>`, `httpConfig` —
+из `bazis/core/http`. С версии 0.138.0.
 
 ## Остановка
 
@@ -178,11 +231,14 @@ error: Unhandled error, shutting down {"error":{"name":"Error","message":"forgot
 
 ## Приложение без HTTP
 
-Без опции `http` сервер не запускается — остаются фоновые службы и ядро.
+Без поля `http` сервер не запускается — остаются фоновые службы и ядро.
 Так пишут обработчики очередей, планировщики и другие фоновые процессы:
 
 ```ts
-await runApp(WorkerModule);
+@App({ modules: [WorkerModule], infra: AppInfra })
+export class Worker {}
+
+await runApp(Worker);
 ```
 
 Такое приложение тоже работает до сигнала остановки и останавливается так

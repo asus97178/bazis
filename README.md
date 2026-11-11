@@ -83,15 +83,15 @@ connection, the CLI commands and the public entry points;
 
 | Area | Entry point | What it gives | Spec |
 | --- | --- | --- | --- |
-| Application | `bazis/core/app` | `runApp`: wires modules, infrastructure, HTTP and lifecycle | [MODULE](src/bazis/core/app/MODULE.md) |
-| Modules and DI | `bazis/core/di` | `@Module`, `scoped` / `singleton`, module encapsulation, codegen-wired constructors | [README](src/bazis/core/di/README.md), [MODULE](src/bazis/core/di/MODULE.md) |
+| Application | `bazis/core/app` | `@App` declares the application once; `runApp(App)` wires modules, infrastructure, HTTP and lifecycle; the address is `BAZIS_HTTP__HOST`/`BAZIS_HTTP__PORT` | [MODULE](src/bazis/core/app/MODULE.md) |
+| Modules and DI | `bazis/core/di` | `@Module`, `scoped` / `singleton`, module encapsulation, codegen-wired constructors; low-level forms in `bazis/core/di/lowLevel` | [README](src/bazis/core/di/README.md), [MODULE](src/bazis/core/di/MODULE.md) |
 | HTTP | `bazis/core/http` | Controllers, routing, request models, middleware, `@Authorize`, OpenAPI, rate limit | [SPEC](src/bazis/core/http/SPEC.md), [README](src/bazis/core/http/README.md) |
 | Validation | `bazis/library/validation` | `@Validator` rules and messages, a Russian message set | [SPEC](src/bazis/library/validation/SPEC.md) |
 | ORM | `bazis/core/orm`, `bazis/library/orm` | `DbContext`, typed queries, migrations, UUID v7 keys, owned stores (PostgreSQL) | [README](src/bazis/library/orm/README.md), [MODULE](src/bazis/library/orm/MODULE.md) |
 | Configuration and kernel | `bazis/core/kernel` | `defineConfig`, per-environment values, `BAZIS_*` overrides, secrets, lifecycle | [README](src/bazis/core/kernel/README.md), [config](src/bazis/core/kernel/config/README.md) |
 | Infrastructure | `bazis/core/infra` | `@Infra` connectors: PostgreSQL, Redis, OpenSearch, LLM, Codex | [MODULE](src/bazis/core/infra/MODULE.md) |
 | Cache | `bazis/core/cache` | Output cache, `@Cacheable`, in-memory and distributed (Redis) | [SPEC](src/bazis/core/cache/SPEC.md) |
-| Testing | `bazis/core/testing` | `createTestContainer` and `startTestApp`: provider overrides, an in-process HTTP app on a free port | [MODULE](src/bazis/core/testing/MODULE.md) |
+| Testing | `bazis/core/testing` | `startTestApp(App)` and `createTestContainer(App)`: the declared application with provider overrides, an in-process HTTP app on a free port; `allowAll()` in `bazis/core/access/testing` | [MODULE](src/bazis/core/testing/MODULE.md) |
 | WebSocket | `bazis/core/websocket` | Gateways, acknowledgements, replay, a Redis adapter | [MODULE](src/bazis/core/websocket/MODULE.md) |
 | gRPC | `bazis/core/grpc` | `@GrpcController` server and `GrpcClient`; `.proto` files are parsed at runtime, no generated stubs | [MODULE](src/bazis/core/grpc/MODULE.md) |
 | Background | `bazis/core/background` | Hosted services with managed start and stop | [MODULE](src/bazis/core/background/MODULE.md) |

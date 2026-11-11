@@ -1,4 +1,5 @@
-import { DI, DiError, Global, HOSTED_SERVICE, Module, registerModuleMetadataExpander, SERVICE_PROVIDER, type BazisModuleMetadata, type ServiceProvider } from "../di";
+import { DiError, Global, HOSTED_SERVICE, Module, registerModuleMetadataExpander, SERVICE_PROVIDER, type BazisModuleMetadata, type ServiceProvider } from "../di";
+import { DI } from "../di/lowLevel";
 import { LOGGER } from "../kernel/logging/Logger";
 import { modelValidatorAdapter } from "../../library/validation";
 import { AgentRegistry, type ToolDefinition } from "./AgentRegistry";
@@ -40,6 +41,11 @@ export class ToolRunner {
     this.catalog = AgentRegistry.fromContainer(services);
     // Invalid options and hook setup fail here, when the runner is built at start.
     this.executor = new AgentToolExecutor(services, this.catalog, { schemaValidator: modelValidatorAdapter, ...executorOptions }, logger);
+  }
+
+  /** Every Tool of the application, whoever may call it. */
+  listTools(): readonly ToolDefinition[] {
+    return this.catalog.listTools();
   }
 
   /** A view of the Tools this caller may run. `"agent"` is refused: agents run through `AgentRuntime`. */

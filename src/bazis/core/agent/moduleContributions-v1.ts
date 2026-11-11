@@ -11,6 +11,7 @@ import {
   type BazisModuleRef,
 } from "../di";
 import { AgentSetupError } from "./errors";
+import { moduleToolsOf } from "./defineTool";
 import { toolMetadataOf } from "./metadata";
 import type { AgentToolHookRegistrationV1 } from "./AgentToolHooks";
 
@@ -25,16 +26,8 @@ const HOOK_CHANNEL = createModuleOwnedProviderChannel<AgentOwnedHookContribution
 // Internal imports (including generatedRuntime's type-only AgentRegistry import)
 // must not depend on the public barrel having augmented DI's metadata interface.
 interface AgentModuleFields {
-  readonly tools?: readonly Class<object>[];
+  readonly tools?: readonly unknown[];
   readonly agentToolHooks?: readonly AgentToolHookRegistrationV1[];
-}
-
-function classValues(value: unknown, field: string): readonly Class<object>[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "function")) {
-    throw new AgentSetupError(`${field} must be an array of classes.`);
-  }
-  return value as readonly Class<object>[];
 }
 
 export function assertAgentToolHookIdV1(id: unknown): asserts id is string {
@@ -59,7 +52,7 @@ function assertHook(registration: AgentToolHookRegistrationV1): void {
 registerModuleOwnedProviderContributor((metadata: BazisModuleMetadata, context) => {
   const owner = metadata as BazisModuleRef;
   const fields = metadata as BazisModuleMetadata & AgentModuleFields;
-  for (const target of classValues(fields.tools, "tools")) {
+  for (const target of moduleToolsOf(fields.tools)) {
     const tool = toolMetadataOf(target);
     if (!tool) throw new AgentSetupError(`${target.name || "<anonymous class>"} is listed as a tool but is not decorated with @Tool(...).`);
     if (tool.callers.length === 0) {

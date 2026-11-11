@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Index, Key, TransactionOutcomeUnknownError, UniqueViolationError, postgres, type PostgresProvider } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Index, Key, TransactionOutcomeUnknownError, UniqueViolationError, postgres, type PostgresProvider, Nullable } from "../index";
 
 // SaveChanges against a real unique index: needs BAZIS_PG_URL, otherwise skipped.
 const url = process.env.BAZIS_PG_URL;
@@ -14,8 +14,8 @@ const quoted = () => {
 @Index(["code"], { unique: true, name: `${table}_code_key` })
 class Row {
   @Key({ generated: false }) @Column({ type: "integer" }) id = 0;
-  @Column() code = "";
-  @Column({ type: "integer" }) amount = 0;
+  @Nullable() @Column() code = "";
+  @Nullable() @Column({ type: "integer" }) amount = 0;
 }
 
 class Context extends DbContext {

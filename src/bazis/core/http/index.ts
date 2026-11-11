@@ -6,6 +6,7 @@
  * dependencies, compatible with `bun build --compile`.
  */
 export { httpModule } from "./httpModule";
+export { httpConfig } from "./Http.config";
 export { HttpServer } from "./HttpServer";
 export { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
 export type {
@@ -18,10 +19,12 @@ export type { OpenApiDocsOptions } from "../../library/openapi";
 export { composeRouteMiddlewareComposers } from "./composeRouteMiddlewareComposers";
 export {
   HTTP_ERROR_HOOK,
+  HTTP_ERROR_MAPPER,
   ROUTE_MIDDLEWARE_COMPOSER,
   SERVER_MIDDLEWARE,
   sortByOrder,
   type HttpErrorHook,
+  type HttpErrorMapper,
   type RouteMiddlewareComposerRegistration,
   type ServerMiddlewareRegistration,
 } from "./middlewareTokens";
@@ -131,6 +134,7 @@ export type { ActionFilterHooks, HttpMiddleware } from "./Middleware/types";
 // Errors
 export {
   BadRequestError,
+  ConflictError,
   ForbiddenError,
   HttpError,
   HttpSetupError,

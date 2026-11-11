@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { createContainer, Global, Module, singletonValue } from "@/core/di";
 import { Configuration, defineConfig, LifecycleCoordinator, secret } from "@/core/kernel";
 import { Infra } from "@/core/infra";
-import { Column, DbContext, defineOrmOwnedStoreV1, Entity, Key, ormBazisConnect, OrmOwnedStoreAdmissionError, postgres } from "@/core/orm";
+import { Column, DbContext, defineOrmOwnedStoreV1, Entity, Key, ormBazisConnect, OrmOwnedStoreAdmissionError, postgres, Nullable } from "@/core/orm";
 
 const url = process.env.BAZIS_PG_URL;
 const live = url === undefined ? test.skip : test;
@@ -10,15 +10,15 @@ const run = crypto.randomUUID().replaceAll("-", "").slice(0, 10);
 const p = `osm${run}`;
 const registry = "__bazis_orm_owned_stores_v1";
 
-@Entity({ table: `${p}a_items` }) class ItemV1 { @Key() id = 0; @Column({ type: "text" }) text = ""; }
-@Entity({ table: `${p}a_items` }) class ItemV2 { @Key() id = 0; @Column({ type: "text" }) text = ""; @Column({ type: "text" }) tag: string | null = null; }
+@Entity({ table: `${p}a_items` }) class ItemV1 { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; }
+@Entity({ table: `${p}a_items` }) class ItemV2 { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; @Nullable() @Column({ type: "text" }) tag: string | null = null; }
 @Entity({ table: `${p}a_v2_items` }) class OverlapItem { @Key() id = 0; }
 @Entity({ table: `${p}b_items` }) class FreshItem { @Key() id = 0; }
 @Entity({ table: `${p}c_items` }) class NextItem { @Key() id = 0; }
 @Entity({ table: `${p}d_items` }) class ForgedScopeItem { @Key() id = 0; }
-@Entity({ table: `${p}g_items` }) class FormatItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
-@Entity({ table: `${p}e_items` }) class DroppedColumnItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
-@Entity({ table: `${p}f_items` }) class AddedColumnItem { @Key() id = 0; @Column({ type: "text" }) text = ""; }
+@Entity({ table: `${p}g_items` }) class FormatItem { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; }
+@Entity({ table: `${p}e_items` }) class DroppedColumnItem { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; }
+@Entity({ table: `${p}f_items` }) class AddedColumnItem { @Key() id = 0; @Nullable() @Column({ type: "text" }) text = ""; }
 class StoreDb extends DbContext {}
 
 const definition = (storeKey: string, prefix: string, extra: object = {}) => defineOrmOwnedStoreV1({ contract: "bazis.orm-owned-store/v1", storeKey: `${p}.${storeKey}`, formatVersion: 1, ownedScope: { schema: "public", tablePrefix: prefix }, ...extra });

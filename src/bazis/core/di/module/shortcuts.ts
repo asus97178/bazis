@@ -1,95 +1,47 @@
 import type { Class, Token } from "../token";
-import type { ServiceResolver } from "../types";
-import type {
-  ProviderDefinition,
-  ProviderDependencyList,
-  ResolvedDeps,
-} from "../provider";
+import type { ProviderDefinition, ProviderDependencyList, ResolvedDeps } from "../provider";
 import { DI } from "./DI";
 
-function registerClassProvider<T, D extends ProviderDependencyList>(
-  lifetime: "singleton" | "scoped" | "transient",
-  provide: Token<T>,
-  useClass: Class<T>,
-  deps?: D,
-): ProviderDefinition<T> {
-  const factory = lifetime === "singleton" ? DI.singleton : lifetime === "scoped" ? DI.scoped : DI.transient;
-  return factory(DI.classProvider(provide, useClass, deps));
+type Lifetime = "singleton" | "scoped" | "transient";
+
+/** A class under its contract, or under itself. Its constructor dependencies come from codegen. */
+function classProvider<T>(lifetime: Lifetime, provide: Token<T>, useClass: Class<T> | undefined): ProviderDefinition<T> {
+  const register = lifetime === "singleton" ? DI.singleton : lifetime === "scoped" ? DI.scoped : DI.transient;
+  return register(DI.classProvider(provide, useClass ?? (provide as Class<T>)));
 }
 
+/**
+ * One instance for the whole application.
+ *
+ * ```ts
+ * singleton(IClock, SystemClock) // under a contract
+ * singleton(Metrics)             // the class is its own contract
+ * ```
+ */
 export function singleton<T>(useClass: Class<T>): ProviderDefinition<T>;
-export function singleton<T, D extends ProviderDependencyList = []>(
-  provide: Token<T>,
-  useClass: Class<T>,
-  deps?: D,
-): ProviderDefinition<T>;
-export function singleton<T, D extends ProviderDependencyList = []>(
-  provide: Token<T>,
-  useClass?: Class<T>,
-  deps?: D,
-): ProviderDefinition<T> {
-  if (!useClass) {
-    const classOnly = provide as Class<T>;
-    return registerClassProvider("singleton", classOnly, classOnly);
-  }
-
-  return registerClassProvider("singleton", provide, useClass, deps);
+export function singleton<T>(provide: Token<T>, useClass: Class<T>): ProviderDefinition<T>;
+export function singleton<T>(provide: Token<T>, useClass?: Class<T>): ProviderDefinition<T> {
+  return classProvider("singleton", provide, useClass);
 }
 
+/** One instance per scope: an HTTP request, a job, a message. */
 export function scoped<T>(useClass: Class<T>): ProviderDefinition<T>;
-export function scoped<T, D extends ProviderDependencyList = []>(
-  provide: Token<T>,
-  useClass: Class<T>,
-  deps?: D,
-): ProviderDefinition<T>;
-export function scoped<T, D extends ProviderDependencyList = []>(
-  provide: Token<T>,
-  useClass?: Class<T>,
-  deps?: D,
-): ProviderDefinition<T> {
-  if (!useClass) {
-    const classOnly = provide as Class<T>;
-    return registerClassProvider("scoped", classOnly, classOnly);
-  }
-
-  return registerClassProvider("scoped", provide, useClass, deps);
+export function scoped<T>(provide: Token<T>, useClass: Class<T>): ProviderDefinition<T>;
+export function scoped<T>(provide: Token<T>, useClass?: Class<T>): ProviderDefinition<T> {
+  return classProvider("scoped", provide, useClass);
 }
 
+/** A new instance each time it is asked for. */
 export function transient<T>(useClass: Class<T>): ProviderDefinition<T>;
-export function transient<T, D extends ProviderDependencyList = []>(
-  provide: Token<T>,
-  useClass: Class<T>,
-  deps?: D,
-): ProviderDefinition<T>;
-export function transient<T, D extends ProviderDependencyList = []>(
-  provide: Token<T>,
-  useClass?: Class<T>,
-  deps?: D,
-): ProviderDefinition<T> {
-  if (!useClass) {
-    const classOnly = provide as Class<T>;
-    return registerClassProvider("transient", classOnly, classOnly);
-  }
-
-  return registerClassProvider("transient", provide, useClass, deps);
+export function transient<T>(provide: Token<T>, useClass: Class<T>): ProviderDefinition<T>;
+export function transient<T>(provide: Token<T>, useClass?: Class<T>): ProviderDefinition<T> {
+  return classProvider("transient", provide, useClass);
 }
 
-export function singletonFactory<T, D extends ProviderDependencyList>(
-  provide: Token<T>,
-  deps: D,
-  useFactory: (...args: ResolvedDeps<D>) => T,
-): ProviderDefinition<T> {
-  return DI.singleton(DI.factoryProvider(provide, deps, useFactory));
-}
-
-export function singletonFactoryWithResolver<T, D extends ProviderDependencyList>(
-  provide: Token<T>,
-  deps: D,
-  useFactory: (resolver: ServiceResolver, ...args: ResolvedDeps<D>) => T,
-): ProviderDefinition<T> {
-  return DI.singleton(DI.factoryProviderWithResolver(provide, deps, useFactory));
-}
-
+/**
+ * A resource that is created asynchronously, once, at startup: a connection, a
+ * loaded key. Everything else is a class with a constructor.
+ */
 export function singletonAsyncFactory<T, D extends ProviderDependencyList>(
   provide: Token<T>,
   deps: D,
@@ -98,14 +50,7 @@ export function singletonAsyncFactory<T, D extends ProviderDependencyList>(
   return DI.singleton(DI.asyncFactoryProvider(provide, deps, useAsyncFactory));
 }
 
-export function singletonAsyncFactoryWithResolver<T, D extends ProviderDependencyList>(
-  provide: Token<T>,
-  deps: D,
-  useAsyncFactory: (resolver: ServiceResolver, ...args: ResolvedDeps<D>) => Promise<T>,
-): ProviderDefinition<T> {
-  return DI.singleton(DI.asyncFactoryProviderWithResolver(provide, deps, useAsyncFactory));
-}
-
+/** A ready value under a token: a constant, a test double. */
 export function singletonValue<T>(provide: Token<T>, useValue: T): ProviderDefinition<T> {
   return DI.singleton(DI.valueProvider(provide, useValue));
 }

@@ -197,7 +197,7 @@ export class Driver {
 `);
     await Bun.write(path.join(root, "src/main.ts"), `
 import { strict as assert } from "node:assert";
-import { runApp } from "bazis/core/app";
+import { App, runApp } from "bazis/core/app";
 import { Module, HOSTED_SERVICE, singleton } from "bazis/core/di";
 import { modelValidatorAdapter } from "bazis/library/validation";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
@@ -214,7 +214,9 @@ const customValidator = { validate(instance: object) {
 await registerBazisGeneratedRuntime();
 @Module({ imports: [FeatureModule], exports: [], providers: [singleton(HOSTED_SERVICE, Driver)] })
 class AppModule {}
-const code = await runApp(AppModule, { validator: custom ? customValidator : undefined, http: grpcOnly ? undefined : {port: 0, hostname: "127.0.0.1"}, grpc: {address: "127.0.0.1:0", validator: override ? modelValidatorAdapter : undefined}, kernel: {signals: [], startupReport: false} });
+@App({ modules: [AppModule], validator: custom ? customValidator : undefined, http: grpcOnly ? undefined : {port: 0, hostname: "127.0.0.1"}, grpc: {address: "127.0.0.1:0", validator: override ? modelValidatorAdapter : undefined}, kernel: {signals: [], startupReport: false} })
+class Application {}
+const code = await runApp(Application);
 if (code !== 0) throw new Error("runApp failed: " + code);
 assert.ok(state.ownClient);
 await assert.rejects(state.ownClient.unary("Echo", {}), {code:1});

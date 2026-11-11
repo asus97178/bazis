@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { HOSTED_SERVICE, DI, ServiceValidationError, type BazisModuleRef, type HostedService } from "../../di";
+import { HOSTED_SERVICE, ServiceValidationError, type BazisModuleRef, type HostedService } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { PLAIN, Screen } from "../../../library/terminal";
 import {
   Bazis,

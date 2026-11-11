@@ -13,6 +13,7 @@ import {
   grantsToWhere,
   maskFields,
   type AccessValue,
+  type PermissionsOf,
   type ReferenceItem,
 } from "@/core/access";
 import { StaticAccessPolicy } from "@/core/access/testing";
@@ -47,6 +48,11 @@ const orderPermissions = definePermissions({
   "orders.create": { title: "Create orders", scope: "request", on: { process: { ref: "orders.process" } } },
   "orders.export": { title: "Export orders" },
 });
+// What `bazis codegen` writes for an application: the keys become the type of `can` and `defineRoles`.
+declare module "@/core/access" {
+  interface BazisPermissions extends PermissionsOf<typeof orderPermissions> {}
+}
+
 
 @Module({
   imports: [AccessModule],
@@ -89,15 +95,27 @@ test("declarations are checked when the application is built", async () => {
   expect((await buildError(LooseModule)).message).toBe("LooseModule: permissions must be a definePermissions(...) result.");
 });
 
-test("the graph must import AccessModule, own every reference kind and register the lookups", async () => {
+test("the graph must import AccessModule and own every reference kind; the lookups of permissions register themselves", async () => {
   @Module({ permissions: definePermissions({ "a.read": { title: "x" } }) }) class LonelyModule {}
   expect((await buildError(LonelyModule)).message).toBe("LonelyModule declares access (permissions, references or roles), but the application does not import AccessModule (bazis/core/access).");
 
   @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", on: { table: { ref: "dm.table" } } } }) }) class NoKindModule {}
   expect((await buildError(NoKindModule)).message).toContain('attribute "table" refers to kind "dm.table", which no module declares in references');
 
-  @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", scope: { lookup: FolderLookup } } }) }) class NoLookupModule {}
-  expect((await buildError(NoLookupModule)).message).toBe('NoLookupModule: FolderLookup of permission "a.read" is not registered: add it to the module\'s providers.');
+  // 0.138.0: the permission names its lookup, and that is enough: no line in `providers`.
+  @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", scope: { lookup: FolderLookup } } }) }) class LookupModule {}
+  const container = await createTestContainer(LookupModule);
+  const scope = container.createScope();
+  expect(scope.resolve(FolderLookup)).toBeInstanceOf(FolderLookup);
+  await scope.dispose();
+  await container.dispose();
+
+  // A lookup an imported module owns and exports is taken from it, not registered again.
+  @Module({ providers: [singleton(FolderLookup)], exports: [FolderLookup] }) class SharedLookupModule {}
+  @Module({ imports: [AccessModule, SharedLookupModule], permissions: definePermissions({ "b.read": { title: "x", scope: { lookup: FolderLookup } } }) }) class BorrowingModule {}
+  const borrowing = await createTestContainer(BorrowingModule);
+  expect(borrowing.resolve(FolderLookup)).toBe(borrowing.resolve(FolderLookup));
+  await borrowing.dispose();
 
   @Module({ imports: [AccessModule], permissions: definePermissions({ "orders.read": { title: "again" } }) }) class TwiceModule {}
   @Module({ imports: [OrdersModule, TwiceModule] }) class AppModule {}
@@ -105,7 +123,7 @@ test("the graph must import AccessModule, own every reference kind and register 
 });
 
 test("roles name declared permissions with valid conditions", async () => {
-  @Module({ imports: [OrdersModule], roles: defineRoles({ clerk: ["orders.delete"] }) }) class UnknownModule {}
+  @Module({ imports: [OrdersModule], roles: defineRoles({ clerk: ["orders.delete" as never] }) }) class UnknownModule {}
   expect((await buildError(UnknownModule)).message).toBe('UnknownModule: role "clerk" names permission "orders.delete", which no module declares.');
 
   @Module({ imports: [OrdersModule], roles: defineRoles({ clerk: [{ permission: "orders.export", where: { own: true } }] }) }) class OwnModule {}
@@ -137,7 +155,7 @@ test("can: partition, own, conditions in three-valued logic", async () => {
   expect(await access.can("orders.export", {})).toBe(true);
   expect(await access.can("orders.create")).toBe(false);
   await expect(access.can("orders.read", { customerId: 7 })).rejects.toThrow('can("orders.read") needs the object\'s partition');
-  await expect(access.can("orders.delete")).rejects.toThrow('Permission "orders.delete" is not declared');
+  await expect(access.can("orders.delete" as never)).rejects.toThrow('Permission "orders.delete" is not declared');
 });
 
 test("filter: grants become one column condition; lookups and limits apply", async () => {
@@ -260,4 +278,33 @@ test("the default rights system: roles from the token, permissions from @Module(
   } finally {
     await app.stop();
   }
+});
+
+test("a class of references needs no place in providers: the field registers it", async () => {
+  class TableReferences extends References {
+    async exists(ids: readonly string[]): Promise<ReadonlySet<string>> { return new Set(ids); }
+    async describe(): Promise<readonly ReferenceItem[]> { return []; }
+    async search(): Promise<readonly ReferenceItem[]> { return []; }
+  }
+  @Module({ imports: [AccessModule], references: { "docs.table": TableReferences, "docs.view": TableReferences } }) class DocsModule {}
+  const container = await createTestContainer(DocsModule);
+  const scope = container.createScope();
+  try {
+    expect(scope.resolve(TableReferences)).toBeInstanceOf(TableReferences);
+    expect([...await scope.resolve(TableReferences).exists(["a"])]).toEqual(["a"]);
+  } finally {
+    await scope.dispose();
+  }
+});
+
+test("allowAll gives every subject every permission; grants narrow single subjects", async () => {
+  const { allowAll, StaticAccessPolicy } = await import("@/core/access/testing");
+  const provider = allowAll({ anonymous: "test", grants: { "user:2": { "orders.delete": [] } } });
+  const policy = (provider as unknown as { provider: { useValue: InstanceType<typeof StaticAccessPolicy> } }).provider?.useValue
+    ?? new StaticAccessPolicy({ otherwise: "all", anonymous: "test", grants: { "user:2": { "orders.delete": [] } } });
+  expect(policy.grants({ sub: "user:1" }, "orders.delete")).toBe("all");
+  expect(policy.grants({ sub: "user:2" }, "orders.delete")).toEqual([]);
+  expect(policy.grants({ sub: "user:2" }, "orders.read")).toBe("all");
+  const state = new Map<string, unknown>();
+  expect(policy.subject({ state } as never)).toEqual({ sub: "test" });
 });

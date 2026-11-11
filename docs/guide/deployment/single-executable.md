@@ -79,7 +79,7 @@ disk file exists: false        ← Bun.file("runtime.txt") с диска не н
 ## Запуск
 
 ```sh
-BAZIS_DB__PASSWORD=… PORT=8080 HOST=0.0.0.0 ./shop
+BAZIS_DB__PASSWORD=… BAZIS_HTTP__PORT=8080 ./shop
 ```
 
 Файл можно запускать из любого каталога. Он ничего не читает рядом с
@@ -107,7 +107,7 @@ info: bazis started {"environment":"production","debug":false,"configKeys":6,"co
 info: bazis stopped {"signal":"SIGTERM","exitCode":0,"shutdownMs":1.1}
 ```
 
-Обе строки отключает `runApp({ kernel: { startupReport: false } })`.
+Обе строки отключает `@App({ kernel: { startupReport: false } })`.
 [Экран запуска](../cli/commands.md#экран-запуска) печатается только вне
 production и только в терминале. Готовность для балансировщика
 по-прежнему проверяйте по `/health`.

@@ -59,6 +59,7 @@ export class ModelBuilder {
           columns: [property.columnName],
           unique: rawProp.index.unique,
           ...(rawProp.index.where === undefined ? {} : { where: rawProp.index.where }),
+          ...conflictOf(ctor.name, rawProp.index),
         });
       }
       if (rawProp.fkTarget) {
@@ -179,7 +180,7 @@ export class ModelBuilder {
         return property.columnName;
       });
       if (new Set(columns).size !== columns.length) throw new ModelBuildError(`Entity "${ctor.name}": index contains duplicate properties.`);
-      indexes.push({ name: declared.name ?? `ix_${(raw.table ?? defaultTableName(ctor.name)).toLowerCase()}_${columns.join("_")}`, columns, unique: declared.unique, ...(declared.where === undefined ? {} : { where: declared.where }) });
+      indexes.push({ name: declared.name ?? `ix_${(raw.table ?? defaultTableName(ctor.name)).toLowerCase()}_${columns.join("_")}`, columns, unique: declared.unique, ...(declared.where === undefined ? {} : { where: declared.where }), ...conflictOf(ctor.name, declared) });
     }
     const indexNames = new Set<string>();
     for (const index of indexes) {
@@ -255,12 +256,19 @@ export class ModelBuilder {
         `Entity "${entityName}": key "${raw.propertyName}" has keyGenerated=true but is not an integer identity key.`,
       );
     }
-    // The key and semantic timestamp fields are always NOT NULL.
-    const required =
-      isKey ||
-      raw.required === true ||
-      raw.nullable === false ||
-      resolved.impliedRequired === true;
+    // The key and semantic timestamp fields are always NOT NULL. Every other
+    // column says it itself: silence would be read as either by different readers.
+    const always = isKey || resolved.impliedRequired === true;
+    if (raw.required === true && raw.nullable === true) {
+      throw new ModelBuildError(`Entity "${entityName}": property "${raw.propertyName}" is marked both @Required() and @Nullable(). Keep one.`);
+    }
+    if (always && raw.nullable === true) {
+      throw new ModelBuildError(`Entity "${entityName}": property "${raw.propertyName}" is ${isKey ? "a key" : "a creation or change timestamp"} and cannot be @Nullable().`);
+    }
+    if (!always && raw.required !== true && raw.nullable !== true) {
+      throw new ModelBuildError(`Entity "${entityName}": property "${raw.propertyName}" does not say whether it may be empty. Mark it @Required() (NOT NULL) or @Nullable().`);
+    }
+    const required = always || raw.required === true;
     const databaseDefault = ModelBuilder.defaultFor(entityName, raw, storageType, isKey, generated, convention, required);
     const digits = ModelBuilder.decimalDigits(entityName, raw, storageType);
     return {
@@ -371,6 +379,14 @@ function isCanonicalRfc3339(value: string): boolean {
  * refused: PostgreSQL stores it in its own time zone form, so the declared
  * and the stored conditions could never be compared.
  */
+/** The text of a unique index for a rejected value; on any other index it would never be used. */
+function conflictOf(entity: string, index: { readonly unique: boolean; readonly conflict?: string }): { readonly conflict?: string } {
+  if (index.conflict === undefined) return {};
+  if (!index.unique) throw new ModelBuildError(`Entity "${entity}": conflict is the text of a unique index; this index is not unique.`);
+  if (typeof index.conflict !== "string" || index.conflict.trim() === "") throw new ModelBuildError(`Entity "${entity}": conflict of an index must be a non-empty text.`);
+  return { conflict: index.conflict };
+}
+
 function validateIndexCondition(entity: string, index: string, where: CheckAst, properties: readonly PropertyModel[]): void {
   validateCheckAst(where, properties, `Entity "${entity}": index "${index}" condition`);
   const byName = new Map(properties.map((property) => [property.propertyName, property]));

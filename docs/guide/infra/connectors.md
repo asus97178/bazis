@@ -22,10 +22,9 @@ OpenSearch 2.17. Codex проверен только без установлен
 запросом.
 
 ```ts
-export interface DbConfig { host: string; port: number; database: string; username: string; password: Secret; tls: PostgresSslMode; max: number }
-export const dbConfig = defineConfig<DbConfig>("db", {
+export const dbConfig = defineConfig("db", {
   default: { host: "127.0.0.1", port: 5432, database: "app", username: "postgres", password: secret("postgres"),
-    tls: configEnum(["disable", "allow", "prefer", "require", "verify-ca", "verify-full"], "disable"), max: 5 },
+    tls: configEnum(POSTGRES_SSL_MODES, "disable"), max: 5 },
   production: { password: secret(), tls: "verify-full" },
 });
 
@@ -67,8 +66,7 @@ SQL-инъекции нет. Подробности клиента — в док
 ## Redis: `redisConnect`
 
 ```ts
-export interface RedisConfig { url: Secret }
-export const redisConfig = defineConfig<RedisConfig>("redis", {
+export const redisConfig = defineConfig("redis", {
   default: { url: secret("redis://127.0.0.1:6379") },
   production: { url: secret() },
 });
@@ -106,8 +104,7 @@ ttl 60 · get token-1 · incr 1
 ## OpenSearch: `openSearchConnect`
 
 ```ts
-export interface SearchConfig { url: string; username: string; password: Secret }
-export const searchConfig = defineConfig<SearchConfig>("search", {
+export const searchConfig = defineConfig("search", {
   default: { url: "http://127.0.0.1:9200", username: "admin", password: secret("admin") },
   production: { password: secret() },
 });
@@ -172,8 +169,7 @@ InfraError: OpenSearch POST /missing-index/_search -> 404: {"error":{"root_cause
 > вход в аккаунт и ответы модели на стенде не проверялись.
 
 ```ts
-export interface CodexConfig { enabled: boolean; binary: string; stateDirectory: string }
-export const codexConfig = defineConfig<CodexConfig>("codex", {
+export const codexConfig = defineConfig("codex", {
   default: { enabled: false, binary: "codex", stateDirectory: "var/codex" },
 });
 
@@ -233,7 +229,7 @@ enabled: false
 `SIGN_IN_REQUIRED`, `BUSY`, `MODEL_UNAVAILABLE`, `REASONING_UNAVAILABLE`,
 `PROTOCOL_ERROR`, `RESPONSE_FAILED`, `TIMEOUT`, `LOGIN_FAILED`,
 `LOGIN_EXPIRED`. Текст `message` рассчитан на показ пользователю, его язык
-задаёт `runApp({ language })`:
+задаёт `@App({ language })`:
 
 ```ts
 try {

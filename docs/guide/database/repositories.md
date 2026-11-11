@@ -30,7 +30,7 @@ export class ProductsService {
 }
 
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Category, Product], ensureCreated: true },
+  ormBazis: { context: CatalogDbContext, ensureCreated: true },
   providers: [scoped(ProductsService)],
 })
 export class CatalogModule {}
@@ -75,7 +75,7 @@ await this.products.saveChanges();   // 2 — сохранены и катего
 import { IRepository, repositoryFor } from "bazis/core/orm";
 
 @Module({
-  ormBazis: { context: CatalogDbContext, entities: [Category, Product] },
+  ormBazis: { context: CatalogDbContext },
   exports: [repositoryFor(Product)],   // только товары
   // exports: [IRepository],           // репозитории всех сущностей каталога
 })
@@ -119,7 +119,7 @@ imports of "OrdersModule".
 ## Выключить
 
 ```ts
-ormBazis: { context: CatalogDbContext, entities: [Category, Product], registerRepositories: false }
+ormBazis: { context: CatalogDbContext, registerRepositories: false }
 ```
 
 Тогда внедрить репозиторий нельзя:
@@ -141,16 +141,15 @@ dependency` и не называло сервис.
 ([Тестирование](../fundamentals/testing.md)). Токен — `repositoryFor(Product)`:
 
 ```ts
-import { DI } from "bazis/core/di";
+import { singletonValue } from "bazis/core/di";
 import { repositoryFor, type IRepository } from "bazis/core/orm";
 import { startTestApp } from "bazis/core/testing";
 
 test("orders count products through a fake repository", async () => {
   const fake = { query: () => ({ count: async () => 42 }) } as unknown as IRepository<Product>;
-  const app = await startTestApp(AppModule, {
-    infra: AppInfra,
+  const app = await startTestApp(Application, {
     http: false,
-    overrides: [DI.scoped(DI.valueProvider(repositoryFor(Product), fake))],
+    overrides: [singletonValue(repositoryFor(Product), fake)],
   });
   try {
     expect(await app.container.createScope().resolve(OrdersService).count()).toBe(42);

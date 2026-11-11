@@ -1,5 +1,6 @@
 import { expandModuleMetadata, type BazisModuleRef } from "../../../di";
 import { describeTool, toolMetadataOf } from "../../../agent";
+import { moduleToolsOf } from "../../../agent/defineTool";
 import { documentReferences, schemaReferenceKinds, validateProcess } from "../../../../library/workflow";
 import { WORKFLOW_CALLER } from "../../internal/WorkflowTools";
 import { WorkflowDefinitionsModule } from "../WorkflowDefinitions.module";
@@ -38,8 +39,8 @@ export function inspectProcesses(root: BazisModuleRef): ProcessInspection {
     const fields = moduleRef as { readonly processes?: unknown; readonly tools?: unknown; readonly references?: unknown };
     if (typeof fields.references === "object" && fields.references !== null) for (const kind of Object.keys(fields.references)) kinds.add(kind);
     if (Array.isArray(fields.tools)) {
-      for (const target of fields.tools) {
-        const metadata = typeof target === "function" ? toolMetadataOf(target as new () => object) : undefined;
+      for (const target of toolsOrNone(fields.tools)) {
+        const metadata = toolMetadataOf(target as new () => object);
         if (metadata?.callers.includes(WORKFLOW_CALLER)) {
           tools.add(metadata.name);
           const input = describeTool({ target: target as new () => object, metadata }).input;
@@ -82,4 +83,13 @@ export function inspectProcesses(root: BazisModuleRef): ProcessInspection {
     errors,
     tools: [...tools].sort(),
   };
+}
+
+/** The Tools of a module; a wrong list is reported by the start, not by the check. */
+function toolsOrNone(tools: unknown): readonly unknown[] {
+  try {
+    return moduleToolsOf(tools);
+  } catch {
+    return [];
+  }
 }

@@ -148,7 +148,7 @@ const en = {
       dns: "the host name does not resolve — check the address",
       database: "the database does not exist — create it or fix the name",
       deadline: "give connect() its own deadline and fail with a clear message",
-      raiseLimit: "or raise the limit: runApp(…, { kernel: { startupTimeoutMs } })",
+      raiseLimit: "or raise the limit: @App({ kernel: { startupTimeoutMs } })",
     },
   },
   schema: { add: "+", none: "schema is up to date", warnings: "schema warnings" },
@@ -168,7 +168,7 @@ const en = {
   ready: {
     running: (app: string, ms: string) => `${app} is running · ready in ${ms}`,
     local: "Local", network: "Network", health: "Health", docs: "OpenAPI",
-    notExposed: (host: string) => `not exposed — listening on ${host} (set HOST=0.0.0.0)`,
+    notExposed: (host: string) => `not exposed — listening on ${host} (set BAZIS_HTTP__HOST=0.0.0.0)`,
     watching: (src: string) => `watching ${src} · restarts on change · logs below · Ctrl+C to stop`,
     noWatch: "logs below · Ctrl+C to stop",
     worker: (app: string, ms: string) => `${app} started · ready in ${ms}`,
@@ -240,7 +240,7 @@ const en = {
     codegenSkipped: "codegen skipped (--no-codegen) — run bazis codegen",
     needsDb: "this module uses a database: connect one with @Infra({ db: ormBazisConnect(dbConfig) })",
     needsTable: (moduleFile: string) => `its table is not created: add ensureCreated: true to ormBazis in ${moduleFile}, or write a migration`,
-    needsCache: "this module caches: pass runApp(AppModule, { cache: memory() })",
+    needsCache: "this module caches: add cache: memory() to @App",
     keptOnFailure: "scaffold files were kept — fix the error and run bazis codegen",
   },
   workflow: {
@@ -325,7 +325,7 @@ const ru: Messages = {
       dns: "имя хоста не разрешается — проверьте адрес",
       database: "базы данных нет — создайте её или исправьте имя",
       deadline: "дайте connect() свой срок и понятную ошибку",
-      raiseLimit: "или увеличьте предел: runApp(…, { kernel: { startupTimeoutMs } })",
+      raiseLimit: "или увеличьте предел: @App({ kernel: { startupTimeoutMs } })",
     },
   },
   schema: { add: "+", none: "схема актуальна", warnings: "предупреждения схемы" },
@@ -345,7 +345,7 @@ const ru: Messages = {
   ready: {
     running: (app, ms) => `${app} работает · готово за ${ms}`,
     local: "Локально", network: "Сеть", health: "Здоровье", docs: "OpenAPI",
-    notExposed: (host) => `недоступно снаружи — слушает ${host} (задайте HOST=0.0.0.0)`,
+    notExposed: (host) => `недоступно снаружи — слушает ${host} (задайте BAZIS_HTTP__HOST=0.0.0.0)`,
     watching: (src) => `слежу за ${src} · перезапуск при изменениях · журнал ниже · Ctrl+C — остановить`,
     noWatch: "журнал ниже · Ctrl+C — остановить",
     worker: (app, ms) => `${app} запущено · готово за ${ms}`,
@@ -417,7 +417,7 @@ const ru: Messages = {
     codegenSkipped: "кодогенерация пропущена (--no-codegen) — запустите bazis codegen",
     needsDb: "модулю нужна база данных: подключите её через @Infra({ db: ormBazisConnect(dbConfig) })",
     needsTable: (moduleFile) => `таблицу шаблон не создаёт: добавьте ensureCreated: true в ormBazis в ${moduleFile} или напишите миграцию`,
-    needsCache: "модуль кэширует: передайте runApp(AppModule, { cache: memory() })",
+    needsCache: "модуль кэширует: добавьте cache: memory() в @App",
     keptOnFailure: "файлы модуля оставлены — исправьте ошибку и запустите bazis codegen",
   },
   workflow: {

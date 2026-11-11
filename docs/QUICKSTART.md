@@ -21,7 +21,7 @@ cd ../my-app
 ```
 
 The empty backend listens on `http://127.0.0.1:3000`; GET `/health` checks that it runs.
-If the port is busy, set `PORT=3100`. This project needs no database and no LLM.
+If the port is busy, set `BAZIS_HTTP__PORT=3100`. This project needs no database and no LLM.
 The sample application in the source checkout has its own infrastructure requirements.
 
 The new project depends on `bazis` from npm (`"bazis": "^<version>"`); `bun install`

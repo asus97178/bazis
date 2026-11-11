@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DI,
   OptionsValidationError,
   ScopeDisposedError,
   ScopedServiceFromRootError,
@@ -15,6 +14,7 @@ import {
   type Lazy,
   type BazisModuleRef,
 } from "../index";
+import { DI } from "../lowLevel";
 
 class Heavy {
   public static created = 0;

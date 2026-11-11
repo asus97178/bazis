@@ -35,17 +35,9 @@ src/app/modules/auth/
 
 ```ts
 // auth.config.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface AuthConfig {
-  jwtSecret: Secret;
-  accessTtlSeconds: number;
-  refreshTtlSeconds: number;
-  adminEmail: string;
-  adminPassword: Secret;
-}
-
-export const authConfig = defineConfig<AuthConfig>("auth", {
+export const authConfig = defineConfig("auth", {
   default: {
     jwtSecret: secret("dev-only-secret-at-least-32-bytes!!"),
     accessTtlSeconds: 900,
@@ -104,12 +96,12 @@ export class CurrentUser {
 // AuthTokens.service.ts
 import type { ConfigView } from "bazis/core/kernel";
 import { TokenIssuer, hs256 } from "bazis/library/jwt";
-import type { AuthConfig } from "./auth.config";
+import type { authConfig } from "./auth.config";
 
 export class AuthTokens {
   readonly issuer: TokenIssuer;
 
-  constructor(config: ConfigView<AuthConfig>) {
+  constructor(config: ConfigView<typeof authConfig>) {
     this.issuer = new TokenIssuer({
       issuer: "planner",
       audience: "planner-api",
@@ -249,8 +241,7 @@ export class AuthService {
 - **Неизвестный email и неверный пароль** отвечают одинаково, `401`: по
   ответу нельзя узнать, есть ли такой пользователь.
 - **Повторная регистрация** нарушает уникальный индекс `email`, и
-  `databaseErrorStatus` из [рецепта CRUD](crud-module.md#1-проект-и-база)
-  отвечает `409`.
+  приложение отвечает `409` ([Ошибки базы данных](../database/errors.md#занятое-значение)).
 - **`refresh`** проверяет refresh-токен и что пользователь ещё есть, и
   выдаёт новую пару. Вид токена берётся из базы, а не из старого токена:
   сменили роль — следующее обновление её учтёт.
@@ -264,12 +255,12 @@ export class AuthService {
 // AdminSeed.ts
 import type { HostedService, ServiceProvider } from "bazis/core/di";
 import { LOGGER, type ConfigView } from "bazis/core/kernel";
-import type { AuthConfig } from "./auth.config";
+import type { authConfig } from "./auth.config";
 import { AuthService } from "./services/Auth.service";
 
 /** Creates the first administrator at start, after the schema and before HTTP. */
 export class AdminSeed implements HostedService {
-  constructor(private readonly services: ServiceProvider, private readonly config: ConfigView<AuthConfig>) {}
+  constructor(private readonly services: ServiceProvider, private readonly config: ConfigView<typeof authConfig>) {}
 
   async start(): Promise<void> {
     const scope = this.services.createScope();
@@ -372,7 +363,6 @@ import { AuthService } from "./services/Auth.service";
   config: authConfig,
   ormBazis: {
     context: AuthDbContext,
-    entities: [User],
     ensureCreated: true,
   },
   controllers: [AuthController],
@@ -408,7 +398,7 @@ export class AuthModule {}
 // tasks/Tasks.module.ts
 @Module({
   imports: [AuthModule],
-  ormBazis: { context: TasksDbContext, entities: [Task], ensureCreated: true },
+  ormBazis: { context: TasksDbContext, ensureCreated: true },
   …
 })
 ```
@@ -512,20 +502,18 @@ $ curl localhost:3000/auth/me -H "authorization: Bearer $ANN"
 
 ## 10. Тест
 
-Приложению в тесте нужны те же опции, что в `src/index.ts`: без
-`errorHandler` дубликат email дал бы в тесте `500`, а не `409`. Общий
+Приложению в тесте нужны те же опции, что в `src/index.ts`. Общий
 помощник:
 
 ```ts
 // src/app/test/testApp.ts
-import { databaseErrorStatus } from "bazis/core/orm";
 import { startTestApp, type TestApp } from "bazis/core/testing";
 import { AppModule } from "../modules/App.module";
 import { AppInfra } from "../infra/App.infra";
 
 /** The application as src/index.ts starts it, on a free port and the test database. */
 export function startPlanner(): Promise<TestApp> {
-  return startTestApp(AppModule, { infra: AppInfra, http: { errorHandler: { status: databaseErrorStatus } } });
+  return startTestApp(AppModule, { infra: AppInfra });
 }
 ```
 

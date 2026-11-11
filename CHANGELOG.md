@@ -4,6 +4,128 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.138.0 — 2026-11-11
+
+The second part of the framework audit: the application is declared once, Tools made
+by a function have one form, and a process written in code is checked by the compiler.
+Stores stay as they are.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01380).
+
+### Added
+
+- `@App({ modules, infra, cache, config, http, grpc, websocket, language, messages,
+  validator, ui, kernel, configure })` declares the application. `runApp(App)` starts
+  it; `startTestApp(App)`, `createTestContainer(App)` and `testWorkflow(App)` start the
+  same application, and their options only say what differs.
+- `httpConfig`: the address of the HTTP server is the settings `http.host` and
+  `http.port` (`BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT`).
+- Test helpers: `app.use(Service, work)`; `allowAll()` and the options `otherwise`,
+  `anonymous` of `StaticAccessPolicy` (`bazis/core/access/testing`);
+  `wf.instanceByKey(businessKey)`, `wf.use(...)` and `dropWorkflowTables(url)`
+  (`bazis/core/workflow/testing`).
+- `defineTool({ …, execute(input, context, services) })`: a Tool without a class, for
+  Tools made by a function. `@Module({ tools })` takes classes, made Tools and sets of
+  them. `DefinedTool`, `ToolSet`, `isDefinedTool`, `toolNameOf`.
+- `defineProcess` checks a document written as a literal: the `config` of each node
+  kind, unknown fields, the nodes that `flows`, `attachedTo` and `parent` name.
+- A process names a Tool by its class or by a made Tool (`orderTools.find`), a called
+  process and the error handler by their `defineProcess` result; the input mapping is
+  checked against what the Tool or the process takes.
+- `runtime.start(process, { input })`, `startMany` and `wf.start` take the process
+  itself: the input is typed by its variables. `ProcessInput`, `ProcessOutput`.
+- `bazis/library/workflow`: `NodeConfigs`, `ProcessNodeOf`, `TypedProcessNode`,
+  `TypedProcessFlow`, `RetryPolicy`, `TimerConfig`, `InputMapping`.
+- `bazis/core/di/lowLevel`: the low-level provider forms, for packages that extend
+  the framework.
+- The `lookup` classes of `permissions` register themselves.
+- Typed inputs of the entity Tools: `OrmEntityToolSet`, `OrmEntityToolInputs`,
+  `OrmEntityToolOutputs`.
+
+### Changed (breaking)
+
+- `runApp` takes only a class marked `@App`; `runApp(AppModule, options)` is removed.
+  `RunAppOptions` became `AppOptions` and `AppSettings`.
+- Outside production the HTTP server listens on `127.0.0.1` unless `http.host` says
+  otherwise; it used to listen on every interface. Production is as before.
+- The project template reads `BAZIS_HTTP__HOST` and `BAZIS_HTTP__PORT`, not `HOST` and
+  `PORT`.
+- `bazis/core/di` exports only the agreed provider forms. The dependency-list argument
+  of `scoped`, `singleton` and `transient`, `singletonFactory`,
+  `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` and `DI` are
+  removed from it; `DI` lives in `bazis/core/di/lowLevel`.
+- `ormEntityTools` returns a set named by operation, not an array:
+  `tools: [orderTools]` instead of `tools: [...ormEntityTools(...)]`.
+- A process literal with a mistake the start used to find no longer compiles.
+  `CodeProcess` and `ProcessDefinition` are generic; `IWorkflowRuntime.start` and
+  `startMany` take a key or a process.
+- Hints name `@App` instead of `runApp`, and `BAZIS_HTTP__HOST` instead of `HOST`.
+
+### Fixed
+
+- A compiled binary no longer loads `src/generated` of the directory it was started
+  in: its generated code comes only through `registerBazisGeneratedRuntime()`.
+
+### Template
+
+- `bazis new` writes `src/app/App.ts`, an entry point without options, and a test that
+  starts the declared application in the test process.
+
+## 0.137.0 — 2026-11-11
+
+The first part of the framework audit: less to write and more that the compiler and
+the start check. Stores stay as they are.
+Breaking: see [Upgrading](docs/guide/reference/upgrading.md#01370). Run
+`bunx bazis upgrade columns` in an application before it starts on this version.
+
+### Added
+
+- `@Nullable()`, and the rule that every column says whether it may be empty:
+  `@Required()` or `@Nullable()`. `bazis upgrade columns [--dry-run] [--path <dir>]`
+  marks the columns of an application by what they were, so its schema stays as it is.
+- `@Get(":id", { nullAs: NotFound })`: what `null` of an action answers. The status
+  goes to OpenAPI.
+- `ConflictError` (409).
+- Database errors answer by their meaning without a setting: 409, 404, 422, 503.
+  `databaseHttpError`, `HTTP_ERROR_MAPPER`, `errorHandler.map`.
+- `@Index({ unique: true, conflict: "…" })`: the text of the 409.
+  `UniqueViolationError.properties` and `conflict`; the properties go to
+  `details.fields` of the answer.
+- `Created(body)` sets `Location` by the `id` of the body when the application has a
+  GET route for it.
+- Permission keys are types: `BazisPermissions`, `PermissionKey`, `OwnPermissionKey`,
+  `PermissionsOf`; codegen writes `src/generated/bazis/permissions.ts`.
+- `ConfigView<typeof mailConfig>`: settings described once, by their defaults.
+  `ConfigDefinition.prefix`, `ResolvedConfigView`.
+- `configList()`: a list of strings as a setting, comma-separated in the environment.
+- A context maps the entities of its sets: `ormBazis: { context }` without `entities`.
+  `DbContext.entitiesOf`.
+- The `references` field of a module registers its classes.
+- `POSTGRES_SSL_MODES`, `ToolRunner.listTools()`.
+
+### Changed (breaking)
+
+- A column without `@Required()` or `@Nullable()` stops the start. The `nullable`
+  option of `@Column` is removed.
+- `can`, `access.can`, `access.filter` and `defineRoles` take declared permission keys
+  only. `permissions` of a module names an exported constant.
+- `Created(body, location?)`: the body first. It was `Created(location, body)`.
+- A response with code 201 and an object with `id` gets `Location`.
+- `workflow.languages`, `tools.http.allow` and `tools.http.callers` are
+  `readonly string[]` in the code.
+- A database error that was 500 answers 409, 404, 422 or 503; the body of a unique
+  violation carries `details: { code: "unique", fields }`.
+- `ConfigView` is a type alias: `interface X extends ConfigView<T>` becomes
+  `ResolvedConfigView<T>`.
+- `bazis g module` writes `nullAs: NotFound`, `Created(item)`, `@Required()` and no
+  `entities`.
+
+### Fixed
+
+- An event and a firing of a schedule read the documents of every process. The latest
+  published versions are kept between calls: one query of heads without documents.
+- A job that waited in a batch longer than its lease could be run by two workers. The
+  lease starts when the job does, and a stopping worker gives back what it did not start.
+
 ## 0.136.0 — 2026-11-03
 
 HTTP requests and secrets for processes (stage 6 of WORKFLOW-002, the last one).

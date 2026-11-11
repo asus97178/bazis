@@ -1,15 +1,14 @@
-import { Tool, ToolError, type AgentToolExecutionContext } from "../../agent";
-import { type Class, ServiceProvider } from "../../di";
-import { registerFrameworkClassDeps } from "../../di/module/autoDeps";
+import { defineTool, ToolError, type AgentToolExecutionContext, type DefinedTool } from "../../agent";
+import type { Class } from "../../di";
 import { ModelBuilder, type DbContext, type DbSet, type EntityModel, type FieldSelector, type Operand, type Predicate, type PropertyModel } from "../../orm";
 
 /** What a process may do with an entity. */
 export type OrmEntityOperation = "find" | "create" | "update" | "delete";
 
-export interface OrmEntityToolsOptions {
+export interface OrmEntityToolsOptions<Op extends OrmEntityOperation = OrmEntityOperation> {
   /** The context of the entity, from `@Module({ ormBazis })`. */
   readonly context: Class<DbContext>;
-  readonly ops: readonly OrmEntityOperation[];
+  readonly ops: readonly Op[];
   /** The only fields a Tool reads, filters by, sorts by and writes. The key is always read and filtered by, never written. */
   readonly fields: readonly string[];
   /**
@@ -27,6 +26,33 @@ export interface OrmEntityToolsOptions {
   /** The most records one `update` or `delete` touches, or it is refused with `too_many_records`; 100 by default. */
   readonly maxChanges?: number;
 }
+
+/** A filter of records: field → a value to equal, or `{ eq, ne, gt, gte, lt, lte, in, nin, contains, startsWith, isNull }`. */
+export type OrmEntityWhere = Readonly<Record<string, unknown>>;
+
+/** What each Tool takes, as a step of a process maps it. */
+export interface OrmEntityToolInputs {
+  readonly find: {
+    readonly where?: OrmEntityWhere;
+    readonly sort?: readonly { readonly field: string; readonly dir?: "asc" | "desc" }[];
+    readonly limit?: number;
+    readonly offset?: number;
+  };
+  readonly create: { readonly values: Readonly<Record<string, unknown>> };
+  readonly update: { readonly where: OrmEntityWhere; readonly values: Readonly<Record<string, unknown>> };
+  readonly delete: { readonly where: OrmEntityWhere };
+}
+
+/** What each Tool gives back; a trial run adds `dryRun: true` to what would have changed. */
+export interface OrmEntityToolOutputs {
+  readonly find: { readonly items: readonly Readonly<Record<string, unknown>>[]; readonly total: number };
+  readonly create: { readonly item: Readonly<Record<string, unknown>>; readonly dryRun?: boolean };
+  readonly update: { readonly updated: number; readonly dryRun?: boolean };
+  readonly delete: { readonly deleted: number; readonly dryRun?: boolean };
+}
+
+/** The Tools of the listed operations, by operation: `orderTools.find`. */
+export type OrmEntityToolSet<Op extends OrmEntityOperation = OrmEntityOperation> = { readonly [P in Op]: DefinedTool<OrmEntityToolInputs[P], OrmEntityToolOutputs[P]> };
 
 /** What the reference kinds `orm.entity` and `orm.field` read about a made Tool. */
 export interface OrmEntityToolInfo {
@@ -66,15 +92,20 @@ type Run = (set: DbSet<object>, input: Json, context: AgentToolExecutionContext,
 /**
  * Tools `orm.<entity>.find|create|update|delete` over an entity of the application
  * (WORKFLOW-002 §7.4). Nothing is open by itself: the application names the
- * operations and the fields. The result goes to `@Module({ tools })`, and the
- * module imports `StandardToolsModule` for the reference kinds `orm.entity` and
- * `orm.field`. All of them run with `context.dryRun`: nothing is written then.
+ * operations and the fields. The result is a set of Tools named by operation: it
+ * goes to `@Module({ tools })`, and a process names a Tool of it by reference.
+ * The module imports `StandardToolsModule` for the reference kinds `orm.entity`
+ * and `orm.field`. All of them run with `context.dryRun`: nothing is written then.
  *
  * ```ts
- * @Module({ imports: [StandardToolsModule], tools: [...ormEntityTools(Order, { context: OrdersDbContext, ops: ["find", "update"], fields: ["status", "amount"], partitionField: "shopId" })] })
+ * export const orderTools = ormEntityTools(Order, { context: OrdersDbContext, ops: ["find", "update"], fields: ["status", "amount"], partitionField: "shopId" });
+ *
+ * @Module({ imports: [StandardToolsModule], tools: [orderTools] })
+ *
+ * serviceTask({ tool: orderTools.find, input: { where: { status: "new" } } })
  * ```
  */
-export function ormEntityTools(entity: EntityClass<object>, options: OrmEntityToolsOptions): Class<object>[] {
+export function ormEntityTools<const Op extends OrmEntityOperation>(entity: EntityClass<object>, options: OrmEntityToolsOptions<Op>): OrmEntityToolSet<Op> {
   const model = ModelBuilder.build(entity);
   const name = options.name ?? entity.name.replace(/(?<=[a-z0-9])[A-Z]/g, (letter) => `-${letter}`).toLowerCase();
   const fail = (problem: string) => new TypeError(`ormEntityTools(${entity.name}): ${problem}`);
@@ -101,10 +132,12 @@ export function ormEntityTools(entity: EntityClass<object>, options: OrmEntityTo
     maxChanges,
   };
   const callers = options.callers ?? ["workflow"];
-  return [...new Set(options.ops)].map((op) => {
+  const tools: Partial<Record<OrmEntityOperation, DefinedTool>> = {};
+  for (const op of new Set<OrmEntityOperation>(options.ops)) {
     if (!Object.hasOwn(OPERATIONS, op)) throw fail(`unknown operation ${JSON.stringify(op)}`);
-    return toolClass(spec, op, callers);
-  });
+    tools[op] = madeTool(spec, op, callers);
+  }
+  return Object.freeze(tools) as OrmEntityToolSet<Op>;
 }
 
 function limit(value: number | undefined, fallback: number, max: number, fail: (problem: string) => Error, name: string): number {
@@ -113,10 +146,9 @@ function limit(value: number | undefined, fallback: number, max: number, fail: (
   return value;
 }
 
-function toolClass(spec: Spec, op: OrmEntityOperation, callers: readonly string[]): Class<object> {
+function madeTool(spec: Spec, op: OrmEntityOperation, callers: readonly string[]): DefinedTool {
   const { describe, run, sideEffect, input, output } = OPERATIONS[op];
-
-  @Tool({
+  const tool = defineTool({
     name: `orm.${spec.name}.${op}`,
     description: describe(spec.entity.name),
     sideEffect,
@@ -124,19 +156,13 @@ function toolClass(spec: Spec, op: OrmEntityOperation, callers: readonly string[
     dryRun: "supported",
     inputSchema: input(spec),
     outputSchema: output(spec),
-  })
-  class OrmEntityTool {
-    constructor(private readonly services: ServiceProvider) {}
-
-    async execute(raw: unknown, context: AgentToolExecutionContext): Promise<unknown> {
-      const db = this.services.resolve(spec.context) as DbContext;
+    execute: async (raw, context, services) => {
+      const db = services.resolve(spec.context) as DbContext;
       return await run(spec)(db.setOf(spec.entity), inputOf(raw), context, db);
-    }
-  }
-
-  registerFrameworkClassDeps([[OrmEntityTool, [ServiceProvider]]]);
-  INFO.set(OrmEntityTool, { entity: spec.entity.name, fields: spec.readable });
-  return OrmEntityTool;
+    },
+  });
+  INFO.set(tool, { entity: spec.entity.name, fields: spec.readable });
+  return tool;
 }
 
 interface Operation {

@@ -10,7 +10,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `ormBazisConnect(dbConfig, options)` | Коннектор PostgreSQL для `@Infra`: подключение, схема при запуске, здоровье | [Подключение PostgreSQL](../../database/postgresql.md#инфраструктура) |
-| `ormModule(config)` | Регистрация контекста модуля: `context`, `entities`, `ensureCreated`, `migrations` | [DbContext](../../database/dbcontext.md) |
+| `ormModule(config)` | Регистрация контекста модуля: `context`, `ensureCreated`, `migrations`; `entities` — только для сущностей без набора | [DbContext](../../database/dbcontext.md) |
 | `postgres(options)` | Подключение для `ormModule({ provider: postgres(...) })` без `@Infra` | — |
 | `DATABASE_PROVIDER` | Токен общего подключения | — |
 | `OrmLifecycle`, `OrmConnectionLifecycle`, `OrmProviderReadyLifecycle` | Службы запуска схемы и закрытия подключения; создаёт `ormModule` | — |
@@ -20,7 +20,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
 | `Entity(options)` | Класс — таблица | [Сущности](../../database/entities.md#таблица) |
-| `Column(options)`, `Required()` | Столбец; `NOT NULL` | [Столбцы](../../database/entities.md#столбцы) |
+| `Column(options)`, `Required()`, `Nullable()` | Столбец; метка `NOT NULL` или «NULL можно», одна из двух обязательна | [Столбцы](../../database/entities.md#столбцы) |
 | `Key(options)`, `UUID(options)` | Первичный ключ; ключ UUID (v7) | [Ключи](../../database/entities.md#ключи) |
 | `CreatedAt()`, `UpdatedAt()` | Время создания и изменения | [Время создания и изменения](../../database/entities.md#время-создания-и-изменения) |
 | `Index(options)`, `Check(name, predicate)` | Индекс; условие `CHECK` | [Индексы и проверки](../../database/entities.md#индексы-и-проверки) |
@@ -79,7 +79,8 @@ ORM: сущности, контекст, запросы, сохранение, �
 | Экспорт | Что это |
 | --- | --- |
 | `translateDatabaseError(error)` | Ошибка драйвера с известным SQLSTATE → класс ORM |
-| `databaseErrorStatus(error)` | HTTP-статус ошибки базы для `errorHandler.status`: 409, 422, 404, 503 |
+| `databaseErrorStatus(error)` | HTTP-статус ошибки базы: 409, 422, 404, 503. Приложение применяет его само |
+| `databaseHttpError(error)` | Ошибка базы как `HttpError`: статус, а для занятого значения текст `conflict` и свойства индекса. Зарегистрирована как `HTTP_ERROR_MAPPER` |
 
 Классы: `OrmError`, `DbUpdateError`, `UniqueViolationError`,
 `ForeignKeyViolationError`, `CheckViolationError`, `NotNullViolationError`,

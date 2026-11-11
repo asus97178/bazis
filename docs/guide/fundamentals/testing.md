@@ -82,7 +82,7 @@ import { singleton } from "bazis/core/di";
 import { createTestContainer } from "bazis/core/testing";
 
 test("TaskService with a fake store", async () => {
-  const container = await createTestContainer(AppModule, {
+  const container = await createTestContainer(TaskModule, {
     overrides: [singleton(ITaskStore, FakeStore)],
   });
   const tasks = container.createScope().resolve(TaskService);
@@ -93,7 +93,8 @@ test("TaskService with a fake store", async () => {
 В контейнере есть службы ядра, как в запущенном приложении: `Logger`,
 `EventBus`, `ConfigView` объявленных настроек (секция `test`) и
 `Environment` (`test`). Ничего не запускается: ни фоновые службы, ни
-HTTP-сервер, ни подключения `infra`.
+HTTP-сервер, ни подключения `infra`. Если передать класс с `@App`, в графе
+будут и его `infra`, `cache`, `config` — но по-прежнему ничего не запущено.
 
 > [!NOTE]
 > Службы ядра в `createTestContainer` — с версии 0.109.0. Раньше модуль,
@@ -119,17 +120,18 @@ Override of "ITaskStore" replaces nothing: no module registers it. Check the tok
 [проверка инкапсуляции](encapsulation.md#одна-реализация-на-токен)
 остановит сборку.
 
-## HTTP: `startTestApp`
+## Приложение целиком: `startTestApp`
 
-`startTestApp` запускает приложение в процессе теста — так же, как
-`runApp`, — на свободном порту:
+`startTestApp` запускает в процессе теста то приложение, которое объявлено
+в `src/app/App.ts`, — на свободном порту:
 
 ```ts
 import { singleton } from "bazis/core/di";
 import { startTestApp } from "bazis/core/testing";
+import { Application } from "../App";
 
 test("GET /tasks/:id", async () => {
-  const app = await startTestApp(AppModule, { overrides: [singleton(ITaskStore, FakeStore)] });
+  const app = await startTestApp(Application, { overrides: [singleton(ITaskStore, FakeStore)] });
   try {
     const response = await app.fetch("/tasks/1");
     expect(response.status).toBe(200);
@@ -141,30 +143,83 @@ test("GET /tasks/:id", async () => {
 });
 ```
 
-Проверяется всё, что видит клиент: маршруты, привязка аргументов,
-валидация, авторизация, коды ответов и обработка ошибок.
+Модули, инфраструктура, кэш и настройки HTTP берутся из `@App`: тест не
+повторяет их и не расходится с production. Проверяется всё, что видит
+клиент: маршруты, привязка аргументов, валидация, авторизация, коды ответов
+и обработка ошибок.
 
 | У `app` есть | Что это |
 | --- | --- |
 | `fetch(path, init?)` | `fetch` относительно адреса приложения |
-| `url` | `http://127.0.0.1:<порт>` |
-| `container` | Контейнер приложения: `app.container.createScope().resolve(TaskService)` |
+| `url` | `http://127.0.0.1:<порт>`; пусто, если сервера нет |
+| `use(Service, work)` | Вызывает сервис в своей области, как запрос, и закрывает её: `await app.use(ITaskService, (tasks) => tasks.create("Отчёт"))`. С версии 0.138.0 |
+| `container` | Контейнер приложения — когда `use` мало: singleton, несколько сервисов одной области |
 | `stop()` | Плавная остановка, как по `SIGTERM` |
 
-Опции — те же, что у `runApp` (`cache`, `infra`, `config`, `http`…), плюс
-`overrides`. Порт и адрес задаёт сам помощник, окружение — `test`, строки
-«bazis started» нет. Ошибка настроек или запуска бросается в тест, а не
-завершает процесс.
+Второй аргумент говорит только о том, чем тест отличается от объявления:
+
+| Опция | Что делает |
+| --- | --- |
+| `overrides` | Подмены сервисов, как у `createTestContainer` |
+| `http: false` | Без HTTP-сервера: тест сервисов и фоновой работы |
+| `http: { … }` | Меняет отдельные настройки HTTP, остальные остаются из `@App` |
+| Любое поле `@App` (`infra`, `cache`, `config`, `language`…) | Заменяет объявленное: `infra: TestInfra` |
+
+Порт и адрес задаёт сам помощник, окружение — `test`, строки «bazis
+started» нет. Ошибка настроек или запуска бросается в тест, а не завершает
+процесс. Приложение без `http` в `@App` стартует в тесте тоже без сервера.
 
 Всегда останавливайте приложение в `finally`: иначе следующий тест может
 упасть на занятых ресурсах, а `bun test` — не завершиться.
 
-## Запуск как в production
+### Часть приложения
 
-`bazis new` создаёт тест `src/app/test/health.test.ts`: он запускает
-`src/index.ts` отдельным процессом — ровно так, как `bazis dev`, — и
-проверяет `/health`. Оставьте его: он ловит ошибки в самой точке входа,
-которые `startTestApp` не увидит, потому что не выполняет `src/index.ts`.
+`startTestApp` принимает и отдельный модуль — чтобы поднять одну функцию
+без остальных. Тогда всё, что ей нужно, задаёт сам тест:
+
+```ts
+const app = await startTestApp(TaskModule, { infra: TestInfra, http: { prefix: "api" } });
+```
+
+### Права в тестах
+
+Тесту, который не про права, не нужна настоящая система прав:
+`allowAll()` из `bazis/core/access/testing` разрешает всё всем.
+
+```ts
+import { allowAll } from "bazis/core/access/testing";
+
+const app = await startTestApp(Application, { overrides: [allowAll()] });
+```
+
+Запросу по-прежнему нужен вошедший пользователь; `allowAll({ anonymous: "test" })`
+пускает и запрос без него — как субъекта `test`. Отдельным субъектам права
+сужают: `allowAll({ grants: { "user:2": { "orders.delete": [] } } })`. Тест
+самих прав описывает их целиком через `StaticAccessPolicy` — см.
+[«Права»](../security/access.md). `allowAll` — с версии 0.138.0.
+
+## Тест нового проекта
+
+`bazis new` создаёт тест `src/app/test/health.test.ts`: он поднимает
+приложение из `src/app/App.ts` и проверяет `/health`.
+
+```ts
+import { expect, test } from "bun:test";
+import { startTestApp } from "bazis/core/testing";
+import { Application } from "../App";
+
+test("app starts and answers /health", async () => {
+  const app = await startTestApp(Application);
+  try {
+    expect((await app.fetch("/health")).status).toBe(200);
+  } finally {
+    await app.stop();
+  }
+});
+```
+
+До версии 0.138.0 этот тест запускал `src/index.ts` отдельным процессом:
+опции приложения жили в точке входа, и иначе тест их не видел.
 
 ## Конфигурация в тестах
 
@@ -172,7 +227,7 @@ test("GET /tasks/:id", async () => {
 `BAZIS_*` работают как обычно:
 
 ```ts
-export const mailConfig = defineConfig<MailConfig>("mail", {
+export const mailConfig = defineConfig("mail", {
   default: { host: "localhost", apiKey: secret("dev-key") },
   test: { host: "smtp.test" },
   production: { apiKey: secret() },

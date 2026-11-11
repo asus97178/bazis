@@ -1,4 +1,4 @@
-import { Column, Entity, ForeignKey, Index, UUID } from "../../../orm";
+import { Column, Entity, ForeignKey, Index, UUID, Nullable } from "../../../orm";
 import { WfInstance } from "./WfInstance.model";
 
 export type HistoryType = "started" | "queued" | "released" | "entered" | "left" | "tool" | "assigned" | "iteration" | "called" | "returned" | "skipped" | "timer" | "event" | "error" | "retried" | "cancelled" | "timedOut" | "handler" | "completed";
@@ -11,26 +11,33 @@ export class WfHistory {
   @UUID({ version: "v7" })
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   instanceId = "";
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   tokenId: string | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   nodeId: string | null = null;
 
+  @Nullable()
   @Column({ type: "text" })
   type: HistoryType = "entered";
 
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   data: Record<string, unknown> | null = null;
 
   /** Who did it: cancel, retry, task completion; `null` for engine steps. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   actorKind: string | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   actorId: string | null = null;
 
   @Column({ type: "createdAt" })

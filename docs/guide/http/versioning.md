@@ -58,9 +58,11 @@ GET /v9/tasks/7 → 404
 передают параметром или заголовком:
 
 ```ts
-await runApp(AppModule, {
-  http: { port: 3000, versioning: { source: "query", defaultVersion: "1" } },
-});
+@App({
+  modules: [AppModule],
+  http: { versioning: { source: "query", defaultVersion: "1" } },
+})
+export class Application {}
 ```
 
 | Настройка | Запрос |

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { Check, Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema } from "../index";
+import { Check, Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema, Nullable } from "../index";
 
 // 0.115.0: PostgreSQL stores `in([...])` as `= ANY (ARRAY[...])` and prints an
 // AND chain without inner parentheses. The second start read both back as a
@@ -22,8 +22,8 @@ describe.skipIf(!url)("PostgreSQL CHECK constraints survive a restart (live)", (
     @Check<Task>("ck_tasks_range", (t) => t.priority.gte(0).and(t.priority.lte(9)).and(t.status.ne("x")))
     class Task {
       @Key() id = 0;
-      @Column({ type: "text" }) status = "open";
-      @Column({ type: "integer" }) priority = 0;
+      @Nullable() @Column({ type: "text" }) status = "open";
+      @Nullable() @Column({ type: "integer" }) priority = 0;
     }
     class TasksDb extends DbContext { readonly tasks = this.set(Task); }
     const provider = postgres({ url: url! });

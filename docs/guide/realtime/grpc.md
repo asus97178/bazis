@@ -117,13 +117,15 @@ export class UsersGrpcController {
 export class UsersModule {}
 ```
 
-Сервер включает опция `grpc` в `runApp`, рядом с HTTP:
+Сервер включает поле `grpc` в `@App`, рядом с HTTP:
 
 ```ts
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   grpc: { address: "0.0.0.0:50051" },
-});
+})
+export class Application {}
 ```
 
 | Вид вызова | Аргументы метода | Что вернуть |
@@ -319,12 +321,7 @@ client.close();
 // reports/config/UsersRpc.config.ts
 import { defineConfig } from "bazis/core/kernel";
 
-export interface UsersRpcConfig {
-  address: string;
-  timeoutMs: number;
-}
-
-export const usersRpcConfig = defineConfig<UsersRpcConfig>("usersRpc", {
+export const usersRpcConfig = defineConfig("usersRpc", {
   default: { address: "users.internal:50051", timeoutMs: 2000 },
 });
 ```

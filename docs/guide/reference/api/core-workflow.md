@@ -1,7 +1,7 @@
 # `bazis/core/workflow`
 
 Бизнес-процессы: составной модуль, сервисы, события, точки расширения.
-Список — по пакету 0.136.0.
+Список — по пакету 0.138.0.
 
 ## Модули
 
@@ -19,7 +19,7 @@
 | `IWorkflowDefinitions` | Каталог: `list`, `get`, `folderOf`, `partitionsOf`, `validate`, `palette`, `create`, `update`, `remove`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `versionById`, `referencing`, `retentionPolicies`, `tools` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowRuntime` | Исполнение: `start`, `startMany`, `emit`, `emitLater`, `cancel`, `retry`, `completeToken`, `instances`, `instance`, `history` | [Из кода](../../workflow/processes.md#из-кода) |
 | `IWorkflowTasks` | Входящие задачи: `list`, `get`, `claim`, `release`, `complete` | [Задача сотруднику](../../workflow/processes.md#задача-сотруднику) |
-| `defineProcess({ key, title, description?, folder?, owner?, retentionDays?, document })` | Процесс в коде модуля: перечисляется в `@Module({ processes })`, публикуется при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
+| `defineProcess({ key, title, description?, folder?, owner?, retentionDays?, document })` | Процесс в коде модуля: перечисляется в `@Module({ processes })`, публикуется при старте. Документ-литерал проверяется при сборке; инструмент и процесс называют ссылкой (с 0.138.0) | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
 | `WorkflowSetupError` | Ошибка конфигурации процессов в коде: при сборке и при старте | [Процесс в коде](../../workflow/processes.md#процесс-в-коде) |
 | `WorkflowClock`, `SystemWorkflowClock` | Часы движка (`now()`): сроки таймеров, повторов, расписания; по умолчанию системные | [Тесты процесса](../../workflow/processes.md#тесты-процесса) |
 | `workflowConfig` | Настройки `workflow.language`, `workflow.languages`, `workflow.worker.*` и `workflow.retention.*` | [Несколько экземпляров](../../workflow/processes.md#несколько-экземпляров-приложения) |
@@ -51,8 +51,9 @@
 
 ## Типы
 
-- **Процессы в коде:** `ProcessDefinition`, `CodeProcess`; поле `processes`
-  в метаданных `@Module`.
+- **Процессы в коде:** `ProcessDefinition`, `CodeProcess<Input, Output>`, `CodeProcessDocument`,
+  `CodeProcessNode`, `CodeProcessSettings`, `CodeNodeConfigs`, `ProcessInput`, `ProcessOutput`,
+  `ToolRef`, `ToolClass`, `ProcessRef`; поле `processes` в метаданных `@Module`.
 - **Каталог:** `ProcessSummary` (с `module` — модулем-владельцем процесса из кода), `ProcessDetails`, `VersionSummary`,
   `VersionDetails`, `CreateProcess`, `UpdateProcess`, `ProcessListQuery`, `ValidateOptions`, `ProcessReference`, `ProcessReferenceQuery`.
 - **Исполнение:** `StartInstance`, `StartMany`, `StartManyItem`, `StartManyResult`, `EmitCause`, `EmitOptions`, `EmitResult`, `InstanceSummary`, `InstanceDetails`,

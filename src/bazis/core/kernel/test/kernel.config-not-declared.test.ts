@@ -15,7 +15,7 @@ test("a ConfigView<T> of a config no module declares names the service and where
   class App {}
   const error = await new KernelBuilder(App).useStartupReport(false).addConfigSource(memorySource({})).build().catch((caught: unknown) => caught);
   expect(String((error as Error).message)).toContain(
-    'Missing dependency "Config:crypto" for "PhoneHash". The config defineConfig("crypto", …) is not declared in the application: add it to `config` of the module that uses it, or to runApp({ config }).',
+    'Missing dependency "Config:crypto" for "PhoneHash". The config defineConfig("crypto", …) is not declared in the application: add it to `config` of the module that uses it, or to @App({ config }).',
   );
 });
 

@@ -1,4 +1,4 @@
-import { Column, Entity, Index, UUID } from "../../../orm";
+import { Column, Entity, Index, UUID, Nullable } from "../../../orm";
 
 /**
  * `completed`, `cancelled` and `timedOut` are finished: retention deletes them.
@@ -23,76 +23,96 @@ export class WfInstance {
   id = "";
 
   /** The version (a Definitions row: a reference without a foreign key). */
+  @Nullable()
   @Column({ type: "text" })
   versionId = "";
 
+  @Nullable()
   @Column({ type: "text" })
   processKey = "";
 
+  @Nullable()
   @Column({ type: "integer" })
   version = 0;
 
   /** The application's scope: a space, an organization. Never interpreted. */
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   partition: string | null = null;
 
+  @Nullable()
   @Column({ type: "text" })
   status: InstanceStatus = "running";
 
+  @Nullable()
   @Column({ type: "json" })
   input: Record<string, unknown> = {};
 
+  @Nullable()
   @Column({ type: "json" })
   vars: Record<string, unknown> = {};
 
   /** The result of every passed step by node id: `$nodes.<node>.<field>`. */
+  @Nullable()
   @Column({ type: "json" })
   nodes: Record<string, unknown> = {};
 
   /** What the process gave back: its `out` variables when it completed. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   output: Record<string, unknown> | null = null;
 
   /** `$event`: the data of the event that started or last continued it. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   event: unknown = null;
 
   /** `$trigger`: how it was started. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   trigger: Record<string, unknown> | null = null;
 
   /** A trial run (WORKFLOW-002 §5.4, stage 5). */
+  @Nullable()
   @Column({ type: "boolean" })
   test = false;
 
   /** The instance whose `callProcess` started this one, and the waiting token there. */
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   parentInstanceId: string | null = null;
 
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   parentTokenId: string | null = null;
 
   @Index()
-  @Column({ type: "text", nullable: true })
+  @Nullable()
+  @Column({ type: "text" })
   businessKey: string | null = null;
 
+  @Nullable()
   @Column({ type: "text" })
   startedVia: StartedVia = "manual";
 
+  @Nullable()
   @Column({ type: "text" })
   startedByKind: "user" | "system" = "user";
 
+  @Nullable()
   @Column({ type: "text" })
   startedById = "";
 
   /** Why the instance failed: node, code and message. */
-  @Column({ type: "json", nullable: true })
+  @Nullable()
+  @Column({ type: "json" })
   error: { readonly node: string; readonly code: string; readonly message: string } | null = null;
 
   @Column({ type: "createdAt" })
   createdAt = new Date(0);
 
-  @Column({ type: "datetime", nullable: true })
+  @Nullable()
+  @Column({ type: "datetime" })
   endedAt: Date | null = null;
 }

@@ -12,11 +12,11 @@ import { definitionsPermissions } from "./access/Definitions.permissions";
 import { FolderReferences } from "./access/Folder.references";
 import { ProcessReferences } from "./access/Process.references";
 import { ProcessFolderLookup } from "./access/ProcessFolder.lookup";
-import { ProcessPartitionLookup } from "./access/ProcessPartition.lookup";
 import { CatalogImport } from "./code/CatalogImport";
 import { CodeProcessCatalog } from "./code/CodeProcessCatalog";
 import { CodeProcessPublisher } from "./code/CodeProcessPublisher";
 import { ProcessesController } from "./http/Processes.controller";
+import { PublishedVersions } from "./internal/PublishedVersions";
 import { DefinitionsDbContext, definitionsStore } from "./model/Definitions.dbContext";
 import { WfProcess } from "./model/WfProcess.model";
 import { WfVersion } from "./model/WfVersion.model";
@@ -39,6 +39,7 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     singleton(WorkflowClock, SystemWorkflowClock),
     singleton(WorkflowTools),
     singleton(CodeProcessCatalog),
+    singleton(PublishedVersions),
     singleton(WorkflowLanguages),
     singleton(WorkflowExtensions, DefaultWorkflowExtensions),
     singleton(WorkflowPartitions, DefaultWorkflowPartitions),
@@ -46,10 +47,8 @@ import { WorkflowDefinitions } from "./services/WorkflowDefinitions.service";
     scoped(WorkflowReferences),
     scoped(CatalogImport),
     scoped(IWorkflowDefinitions, WorkflowDefinitions),
-    scoped(ProcessReferences),
-    scoped(FolderReferences),
+    // Shared with the Runtime and Tasks parts: owned and exported here.
     scoped(ProcessFolderLookup),
-    scoped(ProcessPartitionLookup),
     singleton(HOSTED_SERVICE, CodeProcessPublisher),
   ],
   controllers: [ProcessesController],

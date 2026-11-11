@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from "node:util";
 import { createContainer, Global, HOSTED_SERVICE, Module, singletonValue } from "@/core/di";
 import { HEALTH_CHECK, LifecycleCoordinator } from "@/core/kernel";
 import { Infra } from "@/core/infra";
-import { Column, DATABASE_PROVIDER, DbContext, Entity, Index, Key, ormBazisConnect } from "@/core/orm";
+import { Column, DATABASE_PROVIDER, DbContext, Entity, Index, Key, ormBazisConnect, Nullable } from "@/core/orm";
 import { Configuration, defineConfig, secret } from "@/core/kernel";
 import { OrmModel, postgres, type DatabaseProvider } from "@/library/orm";
 import { compileExpectedSchema } from "../../../library/orm/Schema/ExpectedSchema";
@@ -22,8 +22,8 @@ let infraDefinitions = 0, observers = 0, containers = 0;
 let cachedRoot: { readonly url: string; readonly Root: new () => object } | undefined;
 function check(condition: unknown, code: string): asserts condition { if (!condition) throw new Error(code); }
 
-@Entity({ table: names.a }) class StoreAItem { @Key({ generated: false, name: names.aPk }) @Column({ type: "integer" }) id = 0; @Column({ type: "text" }) value = ""; }
-@Entity({ table: names.b }) class StoreBItem { @Key({ generated: false, name: names.bPk }) @Column({ type: "integer" }) id = 0; @Index({ name: names.collision }) @Column({ type: "text" }) value = ""; }
+@Entity({ table: names.a }) class StoreAItem { @Key({ generated: false, name: names.aPk }) @Column({ type: "integer" }) id = 0; @Nullable() @Column({ type: "text" }) value = ""; }
+@Entity({ table: names.b }) class StoreBItem { @Key({ generated: false, name: names.bPk }) @Column({ type: "integer" }) id = 0; @Index({ name: names.collision }) @Nullable() @Column({ type: "text" }) value = ""; }
 class StoreAContext extends DbContext { readonly items = this.set(StoreAItem); }
 class StoreBContext extends DbContext { readonly items = this.set(StoreBItem); }
 

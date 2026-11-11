@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { Module } from "@/core/di";
-import { Column, DbContext, Entity, UUID } from "@/core/orm";
+import { Column, DbContext, Entity, UUID, Nullable } from "@/core/orm";
 import { ormEntityTools, StandardToolsModule } from "@/core/tools";
 import { WorkflowModule } from "@/core/workflow";
 import { inspectProcesses } from "@/core/workflow/definitions_module/code/inspectProcesses";
@@ -10,6 +10,7 @@ class Note {
   @UUID()
   id = "";
 
+  @Nullable()
   @Column({ type: "text" })
   text = "";
 }
@@ -21,11 +22,11 @@ class NotesDbContext extends DbContext {
 const tools = ormEntityTools(Note, { context: NotesDbContext, ops: ["find"], fields: ["text"] });
 
 test("bazis workflow check tells of a kind no module owns", () => {
-  @Module({ imports: [WorkflowModule], tools })
+  @Module({ imports: [WorkflowModule], tools: [tools] })
   class Without {}
   expect(inspectProcesses(Without).errors).toEqual(expect.arrayContaining([expect.stringContaining("orm.field")]));
 
-  @Module({ imports: [WorkflowModule, StandardToolsModule], tools })
+  @Module({ imports: [WorkflowModule, StandardToolsModule], tools: [tools] })
   class With {}
   const inspection = inspectProcesses(With);
   expect(inspection.errors).toEqual([]);

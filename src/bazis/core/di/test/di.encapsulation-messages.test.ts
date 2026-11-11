@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, Module, ModuleEncapsulationError, createContainer, createToken, keyedDependency, singletonValue } from "../index";
+import { Module, ModuleEncapsulationError, createContainer, createToken, keyedDependency, singletonValue } from "../index";
+import { DI } from "../lowLevel";
 import { redactSensitiveText } from "../../../library/redaction";
 
 // The error tells why a provided service is not visible: the owner does not

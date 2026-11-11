@@ -1,5 +1,6 @@
 import type { HttpMiddleware } from "../Middleware/types";
 import { HttpSetupError } from "../Errors/HttpError";
+import type { HttpResult } from "../Results/HttpResult";
 import { ownActionMeta, ownRoutes } from "./metadata";
 
 type MethodDecorator = (value: (...args: never[]) => unknown, context: ClassMethodDecoratorContext) => void;
@@ -27,6 +28,11 @@ export interface RouteOptions {
   readonly version?: string;
   /** Route middleware (= `@Middleware` on the method). */
   readonly middleware?: readonly HttpMiddleware[];
+  /**
+   * What `null` or `undefined` from the action means, as a result helper:
+   * `{ nullAs: NotFound }` answers 404 with the standard body instead of 204.
+   */
+  readonly nullAs?: () => HttpResult;
   /** Maximum body size: an integer and a binary unit together, for example `4mb`. */
   readonly maxBodySize?: `${bigint}${"b" | "kb" | "mb" | "gb"}`;
 }
@@ -58,6 +64,12 @@ function route(httpMethod: string, templateOrOptions?: string | RouteOptions, ma
       }
       if (options.middleware !== undefined) {
         action.middleware.push(...options.middleware);
+      }
+      if (options.nullAs !== undefined) {
+        if (typeof options.nullAs !== "function") {
+          throw new HttpSetupError("nullAs must be a result helper, for example NotFound.");
+        }
+        action.nullAs = options.nullAs;
       }
       if (options.maxBodySize !== undefined) {
         const maxBodyBytes = parseRouteMaxBodySize(options.maxBodySize);

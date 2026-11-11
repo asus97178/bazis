@@ -8,15 +8,17 @@
 
 ## Подключение
 
-Кэш — отдельный модуль, его подключают в `runApp`:
+Кэш — отдельный модуль, его подключают в `@App`:
 
 ```ts
 import { memory } from "bazis/core/cache";
 
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   cache: memory({ maxEntries: 1000 }),
-  http: { port: 3000 },
-});
+  http: {},
+})
+export class Application {}
 ```
 
 ```ts
@@ -47,7 +49,7 @@ GET /tasks → метод вызван снова
 
 ```text
 warn: [cache] @OutputCache on TasksController.getAll has no effect: no cache module is installed,
-so every request runs the action. Add `cache: memory()` to the runApp options.
+so every request runs the action. Add `cache: memory()` to @App.
 ```
 
 > [!NOTE]
@@ -159,14 +161,16 @@ unlessAuthenticated — responses may leak between users. Add varyByUser: true o
 Одинаковые настройки для многих маршрутов задайте один раз:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   cache: memory({
     policies: {
       catalog: { seconds: 60, varyByQuery: ["page"], tags: ["catalog"], clientCache: { public: true, maxAge: 30 } },
     },
   }),
-  http: { port: 3000 },
-});
+  http: {},
+})
+export class Application {}
 ```
 
 ```ts

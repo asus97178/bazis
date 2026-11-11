@@ -1,13 +1,12 @@
 import type { ReferenceContext, ReferenceItem, ReferencePage } from "../../access";
 import { References } from "../../access";
-import { AgentRegistry } from "../../agent/AgentRegistry";
-import type { ServiceProvider } from "../../di";
+import type { ToolRunner } from "../../agent";
 import { ormEntityToolInfo, type OrmEntityToolInfo } from "./ormEntityTools";
 
 /** What `ormEntityTools` opened in this application: only that is referenced. */
-function opened(services: ServiceProvider): readonly OrmEntityToolInfo[] {
+function opened(tools: ToolRunner): readonly OrmEntityToolInfo[] {
   const entities = new Map<string, Set<string>>();
-  for (const tool of AgentRegistry.fromContainer(services).listTools()) {
+  for (const tool of tools.listTools()) {
     const info = ormEntityToolInfo(tool.target);
     if (info === undefined) continue;
     const fields = entities.get(info.entity) ?? new Set<string>();
@@ -24,12 +23,12 @@ function page(ids: readonly string[], text: string, { limit, offset }: Reference
 
 /** Reference kind `orm.entity`: an entity open to processes, `Order`. */
 export class OrmEntityReferences extends References {
-  constructor(private readonly services: ServiceProvider) {
+  constructor(private readonly tools: ToolRunner) {
     super();
   }
 
   private ids(): readonly string[] {
-    return opened(this.services).map((item) => item.entity);
+    return opened(this.tools).map((item) => item.entity);
   }
 
   async exists(ids: readonly string[]): Promise<ReadonlySet<string>> {
@@ -48,12 +47,12 @@ export class OrmEntityReferences extends References {
 
 /** Reference kind `orm.field`: a field open to processes, `Order.status`, or `status` within `Order`. */
 export class OrmFieldReferences extends References {
-  constructor(private readonly services: ServiceProvider) {
+  constructor(private readonly tools: ToolRunner) {
     super();
   }
 
   private ids(): readonly string[] {
-    return opened(this.services).flatMap((item) => item.fields.map((field) => `${item.entity}.${field}`));
+    return opened(this.tools).flatMap((item) => item.fields.map((field) => `${item.entity}.${field}`));
   }
 
   async exists(ids: readonly string[], context: ReferenceContext): Promise<ReadonlySet<string>> {

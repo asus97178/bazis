@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, PostgresDialect, type DatabaseProvider, type ExecuteResult, type Row } from "../index";
+import { Column, DbContext, DbContextOptions, Entity, Key, PostgresDialect, type DatabaseProvider, type ExecuteResult, type Row, Nullable } from "../index";
 
 // 0.98.16: a predicate that is not an ORM condition fails with a hint,
 // text matches take { ignoreCase: true } (ILIKE), and a computation inside
@@ -7,8 +7,8 @@ import { Column, DbContext, DbContextOptions, Entity, Key, PostgresDialect, type
 @Entity({ table: "posts" })
 class Post {
   @Key() id = 0;
-  @Column({ type: "text" }) title = "";
-  @Column({ type: "integer" }) views = 0;
+  @Nullable() @Column({ type: "text" }) title = "";
+  @Nullable() @Column({ type: "integer" }) views = 0;
 }
 
 class BlogDb extends DbContext { readonly posts = this.set(Post); }

@@ -2,6 +2,7 @@ import { grantsToWhere, type AccessFilter } from "bazis/core/access";
 import { IWorkflowRuntime, type WorkflowActor } from "bazis/core/workflow";
 import { OrderDbContext } from "../model/Order.dbContext";
 import { Order, type OrderStatus } from "../model/Order.model";
+import { orderApproval } from "../process/OrderApproval.process";
 import { IOrderService } from "./IOrder.service";
 
 export class OrderService extends IOrderService {
@@ -17,7 +18,7 @@ export class OrderService extends IOrderService {
       await this.db.saveChanges();
       await this.workflow.emitLater(tx, "orders.placed", { orderId: order.id, amount, customerId: customer.id });
     });
-    await this.workflow.start("order-approval", {
+    await this.workflow.start(orderApproval, {
       input: { orderId: order.id, amount },
       businessKey: `order:${order.id}`,
       actor: customer,

@@ -2,7 +2,7 @@
 
 Passport version: 1.3. Date: 2026-09-26. Type: atomic technical module.
 Path: `src/bazis/core/grpc`. Public entry: `bazis/core/grpc`.
-Connection: `runApp(AppModule, { grpc: options })`, or `grpcModule({ imports, ... })`; controllers are declared by `grpcControllers` of their modules only (the `controllers` option is removed in 0.98.32).
+Connection: `@App({ grpc: options })`, or `grpcModule({ imports, ... })`; controllers are declared by `grpcControllers` of their modules only (the `controllers` option is removed in 0.98.32).
 Status: implemented without external libraries; the functional checks and the binary smoke test passed.
 Scope: server controllers, client RPCs, the protobuf contract, DI and the transport lifecycle.
 
@@ -57,7 +57,7 @@ the owner; it is not a full clone of a third-party gRPC SDK API.
 ```ts
 import { Module, scoped } from "bazis/core/di";
 import { GrpcController, GrpcMethod, GrpcError, GrpcStatus, grpcService, loadGrpcPackage } from "bazis/core/grpc";
-import { runApp } from "bazis/core/app";
+import { App } from "bazis/core/app";
 import { Validator } from "bazis/library/validation";
 import usersProto from "./users.proto" with { type: "file" };
 import { UsersController } from "./UsersController";
@@ -91,10 +91,12 @@ export class UsersGrpcController {
 })
 export class UsersModule {}
 
-await runApp(UsersModule, {
-  http: { port: 3000 },
+@App({
+  modules: [UsersModule],
+  http: {},
   grpc: { address: "127.0.0.1:50051" },
-});
+})
+export class Application {}
 ```
 
 This is an integration scheme for an application that already has an IUserService
@@ -258,7 +260,7 @@ attachment channel, atomically with the rest of the target.
 | The first @GrpcMethod parameter: a DTO class | No binding for an interface/inline object | di:generate binds the class to the handler; for AsyncIterable<DTO> the stream element is bound; an ambiguous union/intersection with a DTO is a codegen error |
 | @GrpcMethod(name?, requestModel?) | An optional second argument; null is forbidden | An explicit class with a no-argument constructor; wins over codegen inference; the old call with a name is kept |
 | GrpcModuleOptions.validator | modelValidatorAdapter; null is forbidden | The existing synchronous ModelValidator; captured by the server, not taken from the global HTTP bridge |
-| RunAppOptions.validator | modelValidatorAdapter | Used by HTTP and gRPC, including gRPC-only; grpc.validator allows an explicit replacement for gRPC only |
+| `@App({ validator })` (was RunAppOptions.validator before 0.138.0) | modelValidatorAdapter | Used by HTTP and gRPC, including gRPC-only; grpc.validator allows an explicit replacement for gRPC only |
 
 The DTO is created and checked before the unary/server-streaming handler. For an input
 stream each consumed message is checked before it is passed to the handler.
@@ -454,7 +456,7 @@ real generator, private controller DI and constructor DI of the own client, four
 modes, HTTP + gRPC, a binary without sources and without the external `.proto`.
 After runApp the automatic client dispose is checked.
 The check of 2026-09-26 additionally proves generated DTO binding, nested validation,
-four RPC modes, the shared RunAppOptions.validator and the grpc.validator override in a
+four RPC modes, the shared application validator (then RunAppOptions.validator) and the grpc.validator override in a
 binary without sources, node_modules and the external .proto.
 Generated files are not edited by hand.
 

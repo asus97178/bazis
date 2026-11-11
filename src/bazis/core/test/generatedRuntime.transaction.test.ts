@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { getGeneratedClassDeps } from "@/core/di/module/autoDeps";
-import { createContainer, DI, ServiceCollection, ServiceValidationError, singleton } from "@/core/di";
+import { createContainer, ServiceCollection, ServiceValidationError, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { setClassDeps } from "@/core/di/internal/classDeps";
 import { resolveGeneratedBindings } from "@/core/http/Binding/autoBindings";
 import { findListModelByName } from "@/core/http/Binding/listModelRegistry";

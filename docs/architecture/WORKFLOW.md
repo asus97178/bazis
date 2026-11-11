@@ -1,10 +1,11 @@
 # Бизнес-процессы во фреймворке
 
-Идентификатор: **WORKFLOW-001**. Версия: **1.4**. Дата: **2026-11-01**.
+Идентификатор: **WORKFLOW-001**. Версия: **1.5**. Дата: **2026-11-11**.
 
 > Формат документа и хранилища развивает [WORKFLOW-002](WORKFLOW_BUILDER.md): с 0.132.0
 > документ — `bazis.workflow/v2`, таблицы — `bazis_wf2_*`, настройки — `workflowConfig`.
-> Ниже описан исходный `bazis.workflow/v1`.
+> Ниже описан исходный `bazis.workflow/v1`. §14 (процессы в коде и тесты) приведён к
+> bazis 0.138.0: документ v2, ссылки на Tools и процессы, проверка компилятором.
 Статус: **принята; этапы 1–5 реализованы в bazis 0.124.0–0.128.0**.
 
 Цель: разработчик на bazis получает бизнес-процессы целиком — модели, сервисы,
@@ -482,7 +483,9 @@ complete(taskId, output, actor)  // invalid_input по форме; вызыва�
 3. События (`eventStart`, `eventWait`, `boundaryEvent`, `emit`, HTTP) и
    расписание — 0.126.0.
 4. Часть Tasks — 0.127.0.
-5. Процессы в коде, `testWorkflow`, команды CLI (§14) — 0.128.0.
+5. Процессы в коде, `testWorkflow`, команды CLI (§14) — 0.128.0; проверка
+   документа-литерала компилятором, ссылки на Tools и процессы, запуск самим
+   процессом — 0.138.0.
 
 ## 13. Переход bazis-cms
 
@@ -501,21 +504,55 @@ CMS убирает свои `wf_processes`, `wf_process_versions`, `wf_instances
 модуля-владельца, рядом с его Tools, и проверяют в CI.
 
 ```ts
+// orders_module/tools/Order.tools.ts
+export const orderTools = ormEntityTools(Order, { context: OrdersDbContext, ops: ["find", "update"], fields: ["status", "amount"] });
+
 // orders_module/processes/OrderApproval.process.ts
 export const OrderApprovalProcess = defineProcess({
   key: "order-approval",
-  title: "Согласование заказа",
+  title: { ru: "Согласование заказа", en: "Order approval" },
   retentionDays: 90,
-  document: { schemaVersion: "bazis.workflow/v1", nodes: { … }, flows: { … } },
+  document: {
+    schemaVersion: "bazis.workflow/v2",
+    variables: [{ name: "orderId", type: "string", direction: "in", required: true },
+                { name: "amount", type: "number", direction: "in", required: true }],
+    nodes: {
+      Start: { kind: "manualStart", title: "Заказ создан" },
+      Charge: { kind: "serviceTask", title: "Списать оплату", config: {
+        tool: ChargeTool, input: { orderId: "$input.orderId", amount: "$input.amount" } } },
+      Mark: { kind: "serviceTask", title: "Отметить оплаченным", config: {
+        tool: orderTools.update, input: { where: { id: "$input.orderId" }, values: { status: "paid" } } } },
+      Done: { kind: "end", title: "Оплачен" },
+    },
+    flows: { f1: { source: "Start", target: "Charge" }, f2: { source: "Charge", target: "Mark" },
+             f3: { source: "Mark", target: "Done" } },
+    settings: { errorHandler: PaymentFailureProcess },
+  },
 });
 
-@Module({ tools: [ChargeTool], processes: [OrderApprovalProcess] })
+@Module({ tools: [ChargeTool, orderTools], processes: [OrderApprovalProcess] })
 export class OrdersModule {}
 ```
 
 - `defineProcess` из `bazis/core/workflow` только описывает процесс: ключ,
-  названия, срок хранения и документ `ProcessDocument`. Файл —
-  `processes/<Name>.process.ts`, экспорт — `<Name>Process`.
+  названия, папку, срок хранения и документ. Файл —
+  `processes/<Name>.process.ts`, экспорт — `<Name>Process`. Документ —
+  `bazis.workflow/v2` (WORKFLOW-002); v1 переводится `upgradeDocument`.
+- **Документ-литерал проверяет компилятор** (0.138.0): `config` узла своего
+  вида и лишние поля, узлы, которые называют `flows`, `attachedTo` и
+  `parent`. Ошибка, которую раньше находил старт, не компилируется.
+  `CodeProcess` и `ProcessDefinition` — обобщённые по переменным процесса.
+- **Ссылки вместо строк.** Tool называют классом с `@Tool` или Tool из
+  набора (`tool: orderTools.find`, TOOLS-001 §2.1), вызываемый процесс
+  (`callProcess`) и `settings.errorHandler` — результатом их
+  `defineProcess`. Вход (`input`) сверяется с тем, что принимает Tool
+  (тип параметра `execute`) или процесс (его переменные `in`). В
+  сохранённом документе остаются имя и ключ (`"tool": "orm.order.update"`).
+  Строка по-прежнему принимается — для Tool или процесса, которых модуль не
+  видит; её проверяет старт и `bazis workflow check`.
+- Документ, который уже существует как данные (из дизайнера, собранный
+  функцией), передают с типом `ProcessDocument`: компилятор его не
+  разбирает, проверки при старте те же.
 - Поле `processes` в `@Module` — канал метаданных модуля (как `tools`).
   Сборка контейнера проверяет форму описаний и документы без Tools,
   одинаковые ключи в разных модулях и то, что приложение импортирует
@@ -537,6 +574,12 @@ export class OrdersModule {}
   становится обычным. Ключ, уже занятый процессом каталога, код забирает:
   версии продолжаются.
 - Без единого `processes` в модулях служба ничего не делает.
+- **Запуск самим процессом.** `IWorkflowRuntime.start(process, { input, … })`,
+  `startMany` и `wf.start` принимают ключ или результат `defineProcess`; с
+  процессом `input` типизирован его переменными (`ProcessInput<P>`,
+  `ProcessOutput<P>`): забытое обязательное поле не компилируется. Своя
+  реализация `IWorkflowRuntime` принимает в `start` и `startMany` и то и
+  другое.
 
 ### Время: `WorkflowClock`
 
@@ -548,8 +591,8 @@ export class OrdersModule {}
 ### Тесты: `bazis/core/workflow/testing`
 
 ```ts
-const wf = await testWorkflow(AppModule, { now: "2026-11-02T09:00:00Z" });
-const order = await wf.start("order-approval", { input: { amount: 5000 } });
+const wf = await testWorkflow(Application, { now: "2026-11-02T09:00:00Z", http: false, overrides: [allowAll()] });
+const order = await wf.start(OrderApprovalProcess, { input: { orderId: "42", amount: 5000 } });
 await wf.drain();                                // всё, что пора
 await wf.complete(order.id, "approve", { approved: true });
 await wf.advance("PT2H");                        // часы вперёд, затем drain
@@ -557,16 +600,26 @@ expect((await wf.instance(order.id)).status).toBe("completed");
 await wf.stop();
 ```
 
-- `testWorkflow(root, options)` запускает приложение как `startTestApp`
-  (опции те же, плюс `now`) с управляемыми часами и выключенным воркером:
-  задания выполняются только в `drain`, поэтому тест детерминирован.
+- `testWorkflow(app, options)` запускает приложение как `startTestApp`:
+  `app` — класс с `@App`, из которого берутся `infra`, `cache`, `config` и
+  `http`; опции меняют только отдельные поля (плюс `now` и `actor`). Часы
+  управляемые, воркер выключен: задания выполняются только в `drain`,
+  поэтому тест детерминирован. Корневой модуль с опциями
+  (`testWorkflow(AppModule, { infra })`) по-прежнему принимается.
+- Тесту не про права хватит `overrides: [allowAll()]` из
+  `bazis/core/access/testing` (ACCESS-001 §8).
 - `drain()` планирует расписание и выполняет задания, срок которых настал по
   управляемым часам, пока они есть; возвращает их число. Больше 1000 кругов —
   ошибка: процесс сам себе создаёт задания.
 - `advance(duration)` — ISO-длительность или миллисекунды; только вперёд.
-- `start`, `emit`, `complete(instanceId, nodeId, output)` (ждущая задача на
-  узле), `instance`, `history`, `now()`, `app`, `stop()`. Действуют от
+- `start` (ключом или процессом), `emit`, `complete(instanceId, nodeId, output)`
+  (ждущая задача на узле), `instance`, `instanceByKey(businessKey)` (самый
+  новый экземпляр с этим ключом), `history`, `use(Service, work)` (вызов
+  сервиса приложения в своей области), `now()`, `app`, `stop()`. Действуют от
   `{ kind: "system", id: "test" }`, если не указано иное.
+- `dropWorkflowTables(url)` до запуска удаляет таблицы процессов тестовой
+  базы; базу, чьё имя не начинается с `test_` и не кончается на `_test`, без
+  `{ force: true }` не трогает.
 - Нужна PostgreSQL, как и самому модулю.
 
 ### CLI

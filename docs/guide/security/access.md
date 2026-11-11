@@ -42,7 +42,10 @@ export const orderPermissions = definePermissions({
   - `{ lookup }` — его вычисляет класс модуля;
   - по умолчанию `"none"`: у права нет раздела.
 - `on` — атрибуты для условий: `type` для простых значений, `ref` для
-  ссылок (о них ниже). Атрибут не колонка строки — `lookup`.
+  ссылок (о них ниже). Атрибут не колонка строки — `lookup`. Класс
+  `lookup` модуль регистрирует сам, в `providers` его не повторяют (с версии
+  0.138.0); общий для нескольких модулей регистрирует и экспортирует его
+  владелец.
 - `owner` — колонка владельца, с ней работает условие «своё».
 
 Права подключаются полем модуля, а `AccessModule` — один раз в приложении:
@@ -57,6 +60,24 @@ export class OrdersModule {}
 Ошибка в объявлении останавливает старт, а не запрос: неверный ключ, слово
 условия (`all`, `any`, `not`, `own`, `scope`) как имя атрибута, одно право в
 двух модулях, `AccessModule` не подключён.
+
+### Ключи проверяет компилятор
+
+`bazis codegen` собирает права всех модулей в один тип (`src/generated/bazis/permissions.ts`), поэтому
+`can`, `access.can`, `access.filter` и `defineRoles` принимают только объявленные ключи:
+
+```ts
+@Authorize(can("orders.raed"))                       // ошибка сборки: такого права нет
+defineRoles({ customer: ["orders.export:own"] })     // ошибка сборки: у права нет owner
+```
+
+- Права пакетов фреймворка (`workflow.*`, `access.catalog.read`) в типе уже есть.
+- Объявление должно быть экспортированной константой, а в модуле стоит её имя: `permissions: orderPermissions`.
+  `definePermissions({...})` прямо в `@Module` останавливает codegen с ошибкой `BAZIS_ACCESS_PERMISSIONS_FORM`.
+- Новое право видно компилятору после перегенерации; `bazis dev`, `bazis build` и `bazis test` делают её сами.
+- Гранты, которые отдаёт своя система прав, остаются строками: они приходят из базы.
+
+Проверка ключей — с версии 0.137.0.
 
 ## Проверить маршрут
 
@@ -178,11 +199,11 @@ singleton(AccessPolicy, AppAccessPolicy)   // или scoped, если ей ну�
   imports: [AccessModule],
   permissions: orderPermissions,
   references: { "orders.process": ProcessReferences },
-  providers: [singleton(ProcessReferences)],
 })
 ```
 
-`ProcessReferences` наследует `References`: `exists`, `describe`, `search`.
+`ProcessReferences` наследует `References`: `exists`, `describe`, `search`. Поле само регистрирует
+класс, в `providers` его повторять не нужно (с версии 0.137.0).
 Каталог читается по HTTP с правом `access.catalog.read`:
 
 - `GET /access/catalog` — права всех модулей с атрибутами;
@@ -196,10 +217,13 @@ import { StaticAccessPolicy } from "bazis/core/access/testing";
 const policy = new StaticAccessPolicy({
   grants: { "user:7": { "orders.read": [{ scopes: "all", where: { own: true } }] } },
 });
-const app = await startTestApp(AppModule, {
+const app = await startTestApp(Application, {
   overrides: [singletonValue(AccessPolicy, policy)],
 });
 ```
+
+`otherwise: "all"` даёт всё, чего нет в таблице; тесту не про права хватит
+`overrides: [allowAll()]` — см. [«Права в тестах»](../fundamentals/testing.md#права-в-тестах).
 
 Без HTTP — в своей области DI:
 

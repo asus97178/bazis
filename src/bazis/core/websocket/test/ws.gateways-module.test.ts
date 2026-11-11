@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { collectModuleGateways, DI, Module, singleton } from "@/core/di";
+import { collectModuleGateways, Module, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Controller, Post } from "@/core/http";
 import { KernelError, type Logger } from "@/core/kernel";
 import { startTestApp, type TestApp } from "@/core/testing";

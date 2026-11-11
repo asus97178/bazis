@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DI, Module, createContainer, keyedDependency, scoped, singleton } from "../index";
+import { Module, createContainer, keyedDependency, scoped, singleton } from "../index";
+import { DI } from "../lowLevel";
 
 // Test replacements: registered after the graph, visible to every module, and
 // they must replace something. Before, a replacement in the importing module
@@ -10,7 +11,7 @@ class RealStore implements IStore { name() { return "real"; } }
 class FakeStore implements IStore { name() { return "fake"; } }
 class Service { constructor(readonly store: IStore) {} }
 
-@Module({ providers: [scoped(IStore, RealStore), scoped(Service, Service, [IStore] as const)], exports: [Service] })
+@Module({ providers: [scoped(IStore, RealStore), DI.scoped(DI.classProvider(Service, Service, [IStore] as const))], exports: [Service] })
 class FeatureModule {}
 
 test("an override replaces a provider the module itself consumes", () => {
@@ -27,7 +28,7 @@ test("the result does not depend on where the feature module sits in the graph",
 test("keyed registrations are overridden by key", () => {
   class Uses { constructor(readonly store: IStore) {} }
   @Module({
-    providers: [DI.keyedSingleton("main", DI.classProvider(IStore, RealStore)), scoped(Uses, Uses, [keyedDependency(IStore, "main")] as const)],
+    providers: [DI.keyedSingleton("main", DI.classProvider(IStore, RealStore)), DI.scoped(DI.classProvider(Uses, Uses, [keyedDependency(IStore, "main")] as const))],
     exports: [],
   })
   class KeyedModule {}

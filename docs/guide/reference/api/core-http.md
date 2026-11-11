@@ -4,7 +4,7 @@ HTTP-слой: контроллеры, маршруты, привязка арг
 middleware, авторизация, списки. Основная точка входа для кода
 контроллеров.
 
-Список — по пакету 0.128.0.
+Список — по пакету 0.138.0.
 
 ## Контроллеры и маршруты
 
@@ -48,7 +48,7 @@ middleware, авторизация, списки. Основная точка в
 | Экспорт | Что это |
 | --- | --- |
 | `HttpError` | Базовая ошибка с кодом ответа; превращается в `{ error, details? }` |
-| `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError` | `400`, `401`, `403`, `404` |
+| `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError` | `400`, `401`, `403`, `404`, `409` |
 | `MethodNotAllowedError`, `PayloadTooLargeError`, `UnsupportedMediaTypeError`, `TooManyRequestsError` | `405`, `413`, `415`, `429` |
 | `ModelValidationError` | `400 Validation failed` со списком ошибок привязки и проверки |
 | `HttpSetupError` | Ошибка маршрутов при запуске |
@@ -93,8 +93,9 @@ middleware, авторизация, списки. Основная точка в
 
 | Экспорт | Что это |
 | --- | --- |
-| `httpModule(options)`, `HttpServer` | HTTP-модуль и сервер; `runApp({ http })` создаёт их сам |
-| `SERVER_MIDDLEWARE`, `ROUTE_MIDDLEWARE_COMPOSER`, `HTTP_ERROR_HOOK` | Токены, через которые пакет добавляет свой middleware или обработчик ошибок |
+| `httpModule(options)`, `HttpServer` | HTTP-модуль и сервер; `@App({ http })` создаёт их сам |
+| `httpConfig` | Настройки адреса: `http.host`, `http.port` (`BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT`). С версии 0.138.0 |
+| `SERVER_MIDDLEWARE`, `ROUTE_MIDDLEWARE_COMPOSER`, `HTTP_ERROR_HOOK`, `HTTP_ERROR_MAPPER` | Токены, через которые пакет добавляет свой middleware, обработчик ошибок или ответ на свои ошибки |
 | `composeRouteMiddlewareComposers`, `createAuthorizeComposer`, `resolveAuthorizeMeta`, `sortByOrder` | Сборка middleware маршрута |
 | `WEBSOCKET_UPGRADE` | Токен: WebSocket на порту HTTP-сервера |
 | `registerRequestModelClass`, `registerRequestModelShape`, `findRequestModelByName`, `findRequestModelShape`, `AMBIGUOUS_REQUEST_MODEL` | Реестр моделей запроса; заполняет сгенерированный код |

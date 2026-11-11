@@ -48,8 +48,8 @@
 - [ ] **`/health` включён для оркестратора** — `http: { health: true }`.
   `exposeDetails` — только если адрес закрыт снаружи
   ([Health checks](../fundamentals/health-checks.md#подробности)).
-- [ ] **Ответы на ошибки БД — по смыслу**, а не `500`:
-  `errorHandler: { status: databaseErrorStatus }`
+- [ ] **Ответы на ошибки БД — по смыслу**, а не `500`: с версии 0.137.0 это
+  так без настройки; текст для занятого значения задаёт `conflict` индекса
   ([Ошибки базы данных](../database/errors.md#http-статусы)).
 
 ## HTTP
@@ -91,7 +91,7 @@
 ## Авторизация
 
 Маршрут без `@Authorize` **открыт**, если не задана общая проверка
-`runApp({ http: { authorize } })` ([Закрыто по
+`@App({ http: { authorize } })` ([Закрыто по
 умолчанию](../overview/authorization.md#закрыто-по-умолчанию)). С ней открыты
 только маршруты с `@AllowAnonymous`. Список открытых маршрутов всё равно
 стоит закрепить тестом. Защищённые маршруты в документе OpenAPI отмечены
@@ -227,9 +227,10 @@ applies the schema and exits), or grant the rights.
   No vulnerabilities found (checked 6 packages)
   ```
 
-- [ ] **Тест запуска как в production** (`src/app/test/health.test.ts` из
-  `bazis new`) не удалён: он ловит ошибки в `src/index.ts`
-  ([Тестирование](../fundamentals/testing.md#запуск-как-в-production)).
+- [ ] **Тест запуска приложения** (`src/app/test/health.test.ts` из
+  `bazis new`) не удалён: он поднимает то же приложение, что уходит в
+  production, и ловит ошибки его объявления и графа сервисов
+  ([Тестирование](../fundamentals/testing.md#тест-нового-проекта)).
 - [ ] **Бинарник запускается не от root** и не может писать в свой каталог.
 
 ## Дальше

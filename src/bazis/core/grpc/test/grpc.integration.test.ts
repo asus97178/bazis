@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { Metadata, GrpcStatus as status } from "../index";
 import type { ServiceError, ClientReadableStream } from "./fixtures/nativeClient";
-import { DI, HOSTED_SERVICE, Module, createContainer, scoped, type Class } from "../../di";
+import { HOSTED_SERVICE, Module, createContainer, scoped, type Class } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { Controller, Get, httpModule } from "../../http";
 import { GrpcController, GrpcMethod, GrpcError, GrpcServer, grpcModule, type GrpcContext } from "../index";
 import { echoClient, echoService, type EchoMessage } from "./fixtures/contract";

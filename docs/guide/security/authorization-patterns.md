@@ -158,15 +158,15 @@ async update(id: number, text: string) {
 запроса:
 
 ```ts
-import { Column, DbContext, DbContextOptions, Entity, Key, QueryFilter } from "bazis/core/orm";
+import { Column, DbContext, DbContextOptions, Entity, Key, QueryFilter, Nullable } from "bazis/core/orm";
 
 @Entity({ table: "notes" })
 @QueryFilter<Note, NotesDb>((n, db) => n.tenantId.eq(db.tenantId))
 export class Note {
   @Key() id = 0;
-  @Column({ type: "text" }) tenantId = "";
-  @Column({ type: "text" }) ownerId = "";
-  @Column({ type: "text" }) text = "";
+  @Nullable() @Column({ type: "text" }) tenantId = "";
+  @Nullable() @Column({ type: "text" }) ownerId = "";
+  @Nullable() @Column({ type: "text" }) text = "";
 }
 
 export class NotesDb extends DbContext {

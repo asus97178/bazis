@@ -4,7 +4,7 @@ import { echoService, type EchoMessage } from "../../../grpc/test/fixtures/contr
 import { Infra, llmRouter } from "../../../infra";
 import { configEnum, defineConfig } from "../../../kernel";
 import "../../../orm";
-import { runApp } from "../../runApp";
+import { App, runApp } from "../../runApp";
 
 // Each case declares something invalid while the module file is evaluated,
 // the way an application's own files do at import.
@@ -57,4 +57,6 @@ switch (process.argv[2]) {
     throw new Error(`unknown case ${process.argv[2]}`);
 }
 
-await runApp(app, { grpc: { address: "127.0.0.1:0" }, kernel: { environment: "development", signals: [] } });
+@App({ modules: [app], grpc: { address: "127.0.0.1:0" }, kernel: { environment: "development", signals: [] } })
+class Application {}
+await runApp(Application);

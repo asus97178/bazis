@@ -161,12 +161,14 @@ flowchart TB
 
 ```ts
 import { Cacheable, OutputCache, memory } from "@/core/cache";
-import { runApp } from "@/core/app";
+import { App } from "@/core/app";
 
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   cache: memory(),
   http: { prefix: "api" },
-});
+})
+export class Application {}
 ```
 
 Controller:
@@ -194,7 +196,7 @@ class UserService implements IUserStore {
 
 // UsersModule:
 providers: [
-  scoped(IUserStore, UserService, [repositoryFor(User)]),
+  scoped(IUserStore, UserService), // codegen reads the constructor
 ],
 ```
 
@@ -205,7 +207,7 @@ The backend is connected from `@/core/infra/*`; the framework stays backend-agno
 ```ts
 import { memory } from "@/core/cache";
 import { Infra, redisConnect } from "@/core/infra";
-import { runApp } from "@/core/app";
+import { App } from "@/core/app";
 import { redisConfig } from "@/app/config/redis.config";
 import { AppModule } from "@/app/modules/App.module";
 
@@ -214,7 +216,8 @@ import { AppModule } from "@/app/modules/App.module";
 })
 class AppInfra {}
 
-await runApp(AppModule, { cache: memory(), infra: AppInfra, http: {} });
+@App({ modules: [AppModule], cache: memory(), infra: AppInfra, http: {} })
+export class Application {}
 ```
 
 ```ts
@@ -662,7 +665,7 @@ scoped(IUserStore, UserService, deps);
 
 ### 10.2. Module encapsulation
 
-The application must install the cache module once with `runApp(AppModule, { cache: memory() })`
+The application must install the cache module once with `@App({ cache: memory() })`
 or a root import of `memory()`. A feature module registers only its own service:
 
 ```ts
@@ -795,10 +798,12 @@ The order on a route with `@Authorize` and an output cache:
 Connection: installing the cache module is enough. `memory()` (or `buildCacheModule(...)`) registers the output cache composer through the `ROUTE_MIDDLEWARE_COMPOSER` DI token, and `httpModule` picks it up:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   cache: memory(),            // registers the output cache ROUTE_MIDDLEWARE_COMPOSER
   http: {},
-});
+})
+export class Application {}
 ```
 
 No manual `routeMiddlewareComposer` wiring is needed; an explicit
@@ -1040,11 +1045,13 @@ import { redisConfig } from "@/app/config/redis.config";
 })
 class AppInfra {}
 
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   infra: AppInfra,
   cache: memory(),
-  http: { port: 3000, prefix: "api" },
-});
+  http: { prefix: "api" },
+})
+export class Application {}
 ```
 
 **Service** (one and the same provider for memory and distributed):

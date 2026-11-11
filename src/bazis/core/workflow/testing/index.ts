@@ -1,8 +1,10 @@
-import { DI } from "../../di";
+import { DI } from "../../di/lowLevel";
 import "../generated/deps";
 import { startTestApp, type TestApp, type TestAppOptions } from "../../testing";
+import { postgres } from "../../../library/orm";
 import { durationMs } from "../../../library/workflow";
 import { WorkflowClock } from "../contracts/WorkflowClock";
+import type { CodeProcess } from "../definitions_module/code/defineProcess";
 import type { WorkflowActor } from "../contracts/types";
 import { WorkflowJobs } from "../runtime_module/internal/WorkflowJobs";
 import { IWorkflowRuntime, type EmitOptions, type EmitResult, type HistoryEntry, type InstanceDetails, type StartInstance } from "../runtime_module/services/IWorkflowRuntime.service";
@@ -57,7 +59,11 @@ export interface TestWorkflow {
   readonly app: TestApp;
   readonly clock: ManualWorkflowClock;
   now(): Date;
-  /** Starts the latest version of a process from its manual start; jobs wait for {@link drain}. */
+  /**
+   * Starts the latest version of a process from its manual start; jobs wait for {@link drain}.
+   * Given the `defineProcess` result, the input is checked by its variables.
+   */
+  start<Input>(process: CodeProcess<Input, unknown>, options?: Partial<StartInstance<Input>>): Promise<InstanceDetails>;
   start(processKey: string, options?: Partial<StartInstance>): Promise<InstanceDetails>;
   emit(eventKey: string, payload?: unknown, options?: EmitOptions): Promise<EmitResult>;
   /** Completes the user task waiting at `nodeId` (through its task when the Tasks part is there). */
@@ -67,7 +73,11 @@ export interface TestWorkflow {
   /** Moves the clock forward (ISO duration or milliseconds), then {@link drain}. */
   advance(by: string | number): Promise<number>;
   instance(instanceId: string): Promise<InstanceDetails>;
+  /** The instance started with this `businessKey`, the newest one when there are several. */
+  instanceByKey(businessKey: string): Promise<InstanceDetails>;
   history(instanceId: string): Promise<readonly HistoryEntry[]>;
+  /** Calls a service of the application in a scope of its own, see `TestApp.use`. */
+  use: TestApp["use"];
   stop(): Promise<void>;
 }
 
@@ -77,7 +87,7 @@ export interface TestWorkflow {
  * deterministic. Needs PostgreSQL, as the workflow module does.
  *
  * ```ts
- * const wf = await testWorkflow(AppModule, { now: "2026-11-02T09:00:00Z" });
+ * const wf = await testWorkflow(OrdersApp, { now: "2026-11-02T09:00:00Z", http: false });
  * try {
  *   const order = await wf.start("order-approval", { input: { amount: 5000 } });
  *   await wf.drain();
@@ -127,7 +137,7 @@ export async function testWorkflow(root: Parameters<typeof startTestApp>[0], opt
     app,
     clock,
     now: () => clock.now(),
-    start: (processKey, start = {}) => inScope((scope) => scope.resolve(IWorkflowRuntime).start(processKey, { ...start, actor: start.actor ?? actor })),
+    start: (process: string | CodeProcess<unknown, unknown>, start: Partial<StartInstance> = {}) => inScope((scope) => scope.resolve(IWorkflowRuntime).start(typeof process === "string" ? process : process.key, { ...start, actor: start.actor ?? actor })),
     emit: (eventKey, payload, emitOptions = {}) => inScope((scope) => scope.resolve(IWorkflowRuntime).emit(eventKey, payload, { ...emitOptions, actor: emitOptions.actor ?? actor })),
     complete: (instanceId, nodeId, output = {}, by = actor) => inScope(async (scope) => {
       const runtime = scope.resolve(IWorkflowRuntime);
@@ -151,9 +161,41 @@ export async function testWorkflow(root: Parameters<typeof startTestApp>[0], opt
       return await drain();
     },
     instance: (instanceId) => inScope((scope) => scope.resolve(IWorkflowRuntime).instance(instanceId)),
+    instanceByKey: (businessKey) => inScope(async (scope) => {
+      const runtime = scope.resolve(IWorkflowRuntime);
+      const found = (await runtime.instances({ businessKey })).items[0];
+      if (found === undefined) throw new Error(`No instance was started with the business key ${JSON.stringify(businessKey)}`);
+      return await runtime.instance(found.id);
+    }),
+    use: app.use,
     history: (instanceId) => inScope((scope) => scope.resolve(IWorkflowRuntime).history(instanceId)),
     stop: () => app.stop(),
   };
+}
+
+/**
+ * Drops the tables of the workflow module, so the next start creates them anew:
+ * a clean state for a test database. Everything the module stored there is lost,
+ * so the name of the database must start with `test_` or end with `_test`, or
+ * `force` must say the loss is meant.
+ *
+ * ```ts
+ * beforeAll(() => dropWorkflowTables(process.env.TEST_DATABASE_URL!));
+ * ```
+ */
+export async function dropWorkflowTables(url: string, options: { readonly force?: boolean } = {}): Promise<void> {
+  const database = new URL(url).pathname.slice(1);
+  if (options.force !== true && !/^test_|_test$/.test(database)) {
+    throw new Error(`dropWorkflowTables: the database "${database}" does not look like a test one (test_… or …_test). Pass { force: true } to drop its workflow tables anyway.`);
+  }
+  const sql = postgres({ url });
+  try {
+    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
+    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((table) => `"${table.tablename}"`).join(", ")} CASCADE`, []);
+    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
+  } finally {
+    await sql.close();
+  }
 }
 
 function toTime(value: Date | string, what: string): number {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Column, Entity, Index, Key, ModelBuilder } from "@/core/orm";
+import { Column, Entity, Index, Key, ModelBuilder, Nullable } from "@/core/orm";
 
 @Entity()
 class ConventionUser {
@@ -7,6 +7,7 @@ class ConventionUser {
   id = 0;
 
   @Index({ unique: true })
+  @Nullable()
   @Column({ type: "text" })
   email = "";
 }

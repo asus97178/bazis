@@ -1,4 +1,5 @@
-import { DI, DiContainer, HOSTED_SERVICE, Module, SERVICE_PROVIDER, type BazisModule } from "../di";
+import { DiContainer, HOSTED_SERVICE, Module, SERVICE_PROVIDER, type BazisModule } from "../di";
+import { DI } from "../di/lowLevel";
 import type { GrpcModuleOptions } from "./contracts";
 import { GrpcServer } from "./GrpcServer";
 import { collectGrpcControllers, GRPC_CONTROLLERS } from "./moduleControllers";

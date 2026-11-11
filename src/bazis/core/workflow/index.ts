@@ -3,11 +3,28 @@
  * with the Definitions and Runtime parts, their services, HTTP, events and
  * extension points. The document format is `bazis/library/workflow`.
  */
+import type { PermissionsOf } from "../access";
+import type { definitionsPermissions } from "./definitions_module/access/Definitions.permissions";
 import type { CodeProcess } from "./definitions_module/code/defineProcess";
+import type { runtimePermissions } from "./runtime_module/access/Runtime.permissions";
+import type { tasksPermissions } from "./tasks_module/access/Tasks.permissions";
 import "./generated/deps";
 
 export { WorkflowModule } from "./Workflow.module";
-export { defineProcess, type CodeProcess, type ProcessDefinition } from "./definitions_module/code/defineProcess";
+export {
+  defineProcess,
+  type CodeNodeConfigs,
+  type CodeProcess,
+  type CodeProcessDocument,
+  type CodeProcessNode,
+  type CodeProcessSettings,
+  type ProcessDefinition,
+  type ProcessInput,
+  type ProcessOutput,
+  type ProcessRef,
+  type ToolClass,
+  type ToolRef,
+} from "./definitions_module/code/defineProcess";
 export { WorkflowSetupError } from "./definitions_module/code/codeProcesses";
 export { WorkflowClock, SystemWorkflowClock } from "./contracts/WorkflowClock";
 export { WorkflowDefinitionsModule } from "./definitions_module/WorkflowDefinitions.module";
@@ -72,6 +89,11 @@ export { WorkflowExtensions, DefaultWorkflowExtensions, type ExtensionTarget, ty
 export { WorkflowPartitions, DefaultWorkflowPartitions, type ProcessPartition } from "./contracts/WorkflowPartitions";
 export { WorkflowError, type WorkflowErrorCode } from "./contracts/WorkflowError";
 export type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging, WorkflowRequest, WorkflowToolMetadata } from "./contracts/types";
+
+// The pack's own permissions: an application that imports the pack may name them in `can` and `defineRoles`.
+declare module "../access/index" {
+  interface BazisPermissions extends PermissionsOf<typeof definitionsPermissions>, PermissionsOf<typeof runtimePermissions>, PermissionsOf<typeof tasksPermissions> {}
+}
 
 // Augment the declaring file, not the "../di" re-export: re-export targets
 // depend on program file order and silently stop merging in some projects.

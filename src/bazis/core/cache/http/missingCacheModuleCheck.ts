@@ -1,4 +1,5 @@
-import { singletonFactoryWithResolver, type InjectionToken, type ProviderDefinition } from "../../di";
+import { type InjectionToken, type ProviderDefinition } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { ROUTE_MIDDLEWARE_COMPOSER, type RouteMiddlewareComposerRegistration } from "../../http";
 import { LOGGER } from "../../kernel";
 import { outputCacheMetaOf, resolveOutputCacheRequirement } from "../decorators/outputCacheMetadata";
@@ -22,7 +23,7 @@ const OUTPUT_CACHE_COMPOSER_ORDER = 100;
  *   decorator has no effect.
  */
 export function missingCacheModuleCheck(): ProviderDefinition {
-  return singletonFactoryWithResolver(ROUTE_MIDDLEWARE_COMPOSER, [], (resolver): RouteMiddlewareComposerRegistration => {
+  return DI.singleton(DI.factoryProviderWithResolver(ROUTE_MIDDLEWARE_COMPOSER, [], (resolver): RouteMiddlewareComposerRegistration => {
     const cacheInstalled = resolver.tryResolve(ICache) !== undefined;
     const logger = resolver.tryResolve(LOGGER);
     const redis = createRouteOutputCacheComposerWithOptions({
@@ -43,11 +44,11 @@ export function missingCacheModuleCheck(): ProviderDefinition {
         if (requirement === undefined || requirement.enabled === false) return [];
         const message = `[cache] @OutputCache on ${controllerClass.name}.${String(methodName)} has no effect: `
           + "no cache module is installed, so every request runs the action. "
-          + "Add `cache: memory()` to the runApp options.";
+          + "Add `cache: memory()` to @App.";
         if (logger) logger.warn(message);
         else console.warn(message);
         return [];
       },
     };
-  });
+  }));
 }

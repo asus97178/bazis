@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, Module, createContainer } from "@/core/di";
+import { HOSTED_SERVICE, Module, createContainer } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Controller, File, Get, HttpServer, httpModule, type HttpContext } from "../index";
 import { holdResponseScope } from "../HttpContext/responseLifetime";
 

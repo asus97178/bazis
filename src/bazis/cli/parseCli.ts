@@ -37,6 +37,7 @@ export type ParseCliResult =
   | { readonly kind: "workflow"; readonly action: "check"; readonly appModule?: string }
   | { readonly kind: "workflow"; readonly action: "diagram"; readonly key: string; readonly appModule?: string }
   | { readonly kind: "codegen"; readonly target?: string }
+  | { readonly kind: "upgrade"; readonly action: "columns"; readonly path?: string; readonly dryRun: boolean }
   | { readonly kind: "dev"; readonly watch: boolean }
   | { readonly kind: "test"; readonly args: readonly string[] }
   | { readonly kind: "build"; readonly bin: boolean; readonly outfile?: string; readonly dotenv: boolean; readonly platform?: string }
@@ -126,6 +127,14 @@ export function parseCliArgs(argv: readonly string[]): ParseCliResult {
       if (option !== "--target") return error(`Option ${option} is not supported by codegen.`);
     }
     return { kind: "codegen", target };
+  }
+  if (command === "upgrade") {
+    for (const option of options.keys()) {
+      if (option !== "--path" && option !== "--dry-run") return error(`Option ${option} is not supported by upgrade.`);
+    }
+    if (generatorToken !== "columns" || positional.length !== 2) return error("Use: bazis upgrade columns [--path <directory>] [--dry-run]");
+    const directory = options.get("--path");
+    return { kind: "upgrade", action: "columns", ...(directory === undefined ? {} : { path: directory }), dryRun: options.has("--dry-run") };
   }
   if (command === "workflow") {
     for (const option of options.keys()) {

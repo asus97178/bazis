@@ -160,6 +160,7 @@ export class RouterBuilder {
     assertBindingsFresh(controllerClass, methodName, bindings);
     const responseDefaults = {
       httpCode: action.httpCode,
+      nullAs: action.nullAs,
       produces: action.produces,
       locate: (ctx: HttpContext, id: string | number) => this.locateCreated(ctx, id),
     };
