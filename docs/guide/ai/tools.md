@@ -332,6 +332,45 @@ export class ProcessSteps {
 > `callers`, папка `tools/`, `ToolRunner` и `TOOL_EXECUTION_OPTIONS` — с
 > версии 0.123.0 ([переход](../reference/upgrading.md#01230)).
 
+## Инструменты, созданные функцией
+
+Инструмент, написанный руками, — класс с `@Tool`. Когда инструментов
+несколько однотипных и их число и имена известны только из аргументов
+функции, их делает `defineTool`:
+
+```ts
+import { defineTool, type ToolSet } from "bazis/core/agent";
+
+export function exportTools<const F extends string>(formats: readonly F[]): ToolSet<F> {
+  return Object.fromEntries(formats.map((format) => [format, defineTool({
+    name: `reports.export.${format}`,
+    description: `Exports a report as ${format}.`,
+    sideEffect: "read",
+    callers: ["workflow"],
+    inputSchema: { type: "object", properties: { reportId: { type: "string" } }, required: ["reportId"] },
+    execute: (input: { reportId: string }, context, services) =>
+      services.resolve(ReportService).export(input.reportId, format),
+  })])) as ToolSet<F>;
+}
+
+export const reportExports = exportTools(["pdf", "csv"]);
+
+@Module({ tools: [SendReportTool, reportExports], providers: [scoped(ReportService)] })
+export class ReportModule {}
+```
+
+- `defineTool` принимает то же, что `@Tool`, кроме классов `input` и
+  `output`: вход описывает `inputSchema` (JSON Schema), а проверяет его сама
+  функция `execute`. Третий аргумент `execute` — область вызова: из неё
+  берут сервисы.
+- В `tools` модуля стоят классы, отдельные инструменты `defineTool` и их
+  наборы — объекты «имя → инструмент». Набор не разворачивают: `tools: [reportExports]`.
+- У инструмента есть `toolName`; [процесс в коде](../workflow/processes.md#процесс-в-коде)
+  называет его ссылкой: `tool: reportExports.pdf`.
+- Так устроен `ormEntityTools` из `bazis/core/tools`. До версии 0.138.0 он
+  был единственной функцией, которую пропускала кодогенерация; теперь свою
+  такую функцию может написать приложение.
+
 ## Дальше
 
 - [Агенты](agents.md)

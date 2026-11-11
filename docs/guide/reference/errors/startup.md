@@ -170,7 +170,7 @@ Event "order.paid" handler exceeded 5000ms.
 @App: websocket options are set, but no module declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.
 ```
 
-Текст подсказывает, что поменять в `runApp` или в модуле.
+Текст подсказывает, что поменять в `@App` или в модуле.
 
 ## Дальше
 

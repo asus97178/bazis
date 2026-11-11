@@ -42,7 +42,10 @@ export const orderPermissions = definePermissions({
   - `{ lookup }` — его вычисляет класс модуля;
   - по умолчанию `"none"`: у права нет раздела.
 - `on` — атрибуты для условий: `type` для простых значений, `ref` для
-  ссылок (о них ниже). Атрибут не колонка строки — `lookup`.
+  ссылок (о них ниже). Атрибут не колонка строки — `lookup`. Класс
+  `lookup` модуль регистрирует сам, в `providers` его не повторяют (с версии
+  0.138.0); общий для нескольких модулей регистрирует и экспортирует его
+  владелец.
 - `owner` — колонка владельца, с ней работает условие «своё».
 
 Права подключаются полем модуля, а `AccessModule` — один раз в приложении:
@@ -214,10 +217,13 @@ import { StaticAccessPolicy } from "bazis/core/access/testing";
 const policy = new StaticAccessPolicy({
   grants: { "user:7": { "orders.read": [{ scopes: "all", where: { own: true } }] } },
 });
-const app = await startTestApp(AppModule, {
+const app = await startTestApp(Application, {
   overrides: [singletonValue(AccessPolicy, policy)],
 });
 ```
+
+`otherwise: "all"` даёт всё, чего нет в таблице; тесту не про права хватит
+`overrides: [allowAll()]` — см. [«Права в тестах»](../fundamentals/testing.md#права-в-тестах).
 
 Без HTTP — в своей области DI:
 

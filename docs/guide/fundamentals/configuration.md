@@ -76,10 +76,14 @@ export class MailService {
 `defineConfig<MailConfig>("mail", …)` и `ConfigView<MailConfig>`; она нужна, когда тип настроек описан отдельно,
 например общий для нескольких секций.
 
-Настройки, которые не принадлежат ни одному модулю, передают в
-`runApp(AppModule, { config: [appConfig] })`.
+Настройки, которые не принадлежат ни одному модулю, называют в
+`@App({ config: [appConfig] })`.
 
-Если конфиг не подключён ни к модулю, ни к `runApp`, приложение не
+У фреймворка есть свои настройки, объявленные так же. Адрес HTTP-сервера —
+`http.host` и `http.port` (`BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT`), см.
+[Адрес сервера](../overview/application.md#адрес-сервера).
+
+Если конфиг не подключён ни к модулю, ни к `@App`, приложение не
 стартует:
 
 ```text
@@ -135,13 +139,15 @@ Bun сам читает файл `.env` в корне проекта, так ч�
 ```ts
 import { argsSource, envSource, jsonFileSource } from "bazis/core/kernel";
 
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   configure: (kernel) => kernel
     .addConfigSource(jsonFileSource("config.json", { optional: true }))
     .addConfigSource(envSource())
     .addConfigSource(argsSource()),
-});
+})
+export class Application {}
 ```
 
 ```json

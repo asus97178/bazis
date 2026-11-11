@@ -39,22 +39,21 @@ export class AppInfra {}
 ```
 
 ```ts
-// src/index.ts
-import { runApp } from "bazis/core/app";
-import { AppModule } from "./app/modules/App.module";
-import { AppInfra } from "./app/infra/App.infra";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
+// src/app/App.ts
+import { App } from "bazis/core/app";
+import { AppInfra } from "./infra/App.infra";
+import { AppModule } from "./modules/App.module";
 
-await registerBazisGeneratedRuntime();
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   infra: AppInfra,
-  http: {
-    hostname: process.env.HOST ?? "127.0.0.1",
-    port: Number(process.env.PORT ?? 3000),
-    health: true,
-  },
-});
+  http: { health: true },
+})
+export class Application {}
 ```
+
+`src/index.ts`, созданный `bazis new`, запускает это объявление и не
+меняется: `await runApp(Application)`.
 
 Секция `test` направляет тесты в отдельную базу `planner_test`.
 Ошибки базы отвечают понятными кодами сами: нарушение

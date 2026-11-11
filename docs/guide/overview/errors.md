@@ -63,7 +63,7 @@ throw new ConflictError("Name is taken", { field: "name" });
 | `production` | `{"error":"Internal Server Error"}` |
 
 В production текст и стек ошибки клиенту не уходят. Явно включить или
-выключить подробности можно опцией `runApp(AppModule, { http: {
+выключить подробности можно опцией `@App({ http: {
 exposeErrorDetails: false } })`.
 
 Код ответа берётся только из `HttpError`. Обычный `Error` со свойством
@@ -100,13 +100,15 @@ info: GET /errors/crash 500 1.2ms {"method":"GET","path":"/errors/crash","status
 саму ошибку и **не отменяет** запись в журнал:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   http: {
     errorHandler: {
       onUnexpectedError: (ctx, error) => tracker.capture(error, { path: ctx.path }),
     },
   },
-});
+})
+export class Application {}
 ```
 
 Ошибка приходит в обработчик как есть, без маскировки: что отправлять наружу,
@@ -177,7 +179,8 @@ export const domainErrors: HttpMiddleware = async (_ctx, next) => {
   }
 };
 
-await runApp(AppModule, { http: { middleware: [domainErrors] } });
+@App({ modules: [AppModule], http: { middleware: [domainErrors] } })
+export class Application {}
 ```
 
 ```text

@@ -143,11 +143,11 @@ Codegen разбирает только файлы, до которых можн
 ```ts
 // src/worker.ts
 import { runApp } from "bazis/core/app";
-import { WorkerModule } from "./app/Worker.module";
+import { Worker } from "./app/Worker";   // @App({ modules: [WorkerModule], infra: AppInfra })
 import { registerBazisGeneratedRuntime } from "./generated/bazis/targets/worker/runtime";
 
 await registerBazisGeneratedRuntime();
-await runApp(WorkerModule);
+await runApp(Worker);
 ```
 
 ## Ошибки codegen

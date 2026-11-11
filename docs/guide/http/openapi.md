@@ -18,9 +18,11 @@ bazis сам описывает API в формате [OpenAPI 3.1](https://spec
 выключена в `production`. Настройка — опция `docs`:
 
 ```ts
-await runApp(AppModule, {
-  http: { port: 3000, docs: { path: "/api-docs", title: "Tasks API", version: "2.1.0" } },
-});
+@App({
+  modules: [AppModule],
+  http: { docs: { path: "/api-docs", title: "Tasks API", version: "2.1.0" } },
+})
+export class Application {}
 ```
 
 | Опция | По умолчанию | Что задаёт |

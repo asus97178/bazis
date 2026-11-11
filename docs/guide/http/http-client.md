@@ -19,12 +19,7 @@ Axios: `get`, `post`, `baseUrl`, `params`, перехватчики, ответ 
 // weather/config/Weather.config.ts
 import { defineConfig } from "bazis/core/kernel";
 
-export interface WeatherConfig {
-  baseUrl: string;
-  timeoutMs: number;
-}
-
-export const weatherConfig = defineConfig<WeatherConfig>("weather", {
+export const weatherConfig = defineConfig("weather", {
   default: { baseUrl: "https://weather.example.com", timeoutMs: 2000 },
 });
 ```

@@ -38,7 +38,7 @@
 
 | ASP.NET Core | bazis | Где читать |
 | --- | --- | --- |
-| `WebApplication.CreateBuilder` … `app.Run()` | `runApp(AppModule, { http })` | [Приложение](../overview/application.md) |
+| `WebApplication.CreateBuilder` … `app.Run()` | `@App({ http })` | [Приложение](../overview/application.md) |
 | `builder.Services.Add…` в `Program.cs` | `providers` модуля | [Модули](../overview/modules.md) |
 | `AddSingleton` / `AddScoped` / `AddTransient` | `singleton` / `scoped` / `transient` | [Провайдеры](../overview/providers.md#время-жизни) |
 | `AddSingleton<IService, Impl>()` | `singleton(IService, Impl)`, `IService` — абстрактный класс | [Провайдеры](../overview/providers.md#регистрация-по-контракту) |
@@ -77,7 +77,7 @@
 | Grpc.AspNetCore | gRPC | [gRPC](../realtime/grpc.md) |
 | Swashbuckle | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../http/openapi.md) |
 | EF Core: `DbContext`, `DbSet`, `SaveChangesAsync` | `DbContext`, `DbSet`, `saveChanges` | [DbContext](../database/dbcontext.md) |
-| `WebApplicationFactory` + `ConfigureTestServices` | `startTestApp(AppModule, { overrides })` | [Тестирование](../fundamentals/testing.md#http-starttestapp) |
+| `WebApplicationFactory` + `ConfigureTestServices` | `startTestApp(AppModule, { overrides })` | [Тестирование](../fundamentals/testing.md#приложение-целиком-starttestapp) |
 | `dotnet new webapi` | `bazis new` | [Команды CLI](../cli/commands.md#bazis-new) |
 | `dotnet publish -p:PublishSingleFile=true` | `bazis build --bin` | [Один исполняемый файл](../deployment/single-executable.md) |
 
@@ -122,7 +122,8 @@ app.Run();
 export class BooksModule {}
 
 // bazis: src/index.ts
-await runApp(AppModule, { http: { /* … */ health: true, middleware: [bookErrors] } });
+@App({ modules: [AppModule], http: { /* … */ health: true, middleware: [bookErrors] } })
+export class Application {}
 ```
 
 Контроллеры в `providers` не регистрируются: как и в ASP.NET, контроллер
@@ -154,7 +155,7 @@ export abstract class IBookStore {
 }
 
 export class BooksService {
-  constructor(private readonly store: IBookStore, private readonly config: ConfigView<BooksConfig>) {}
+  constructor(private readonly store: IBookStore, private readonly config: ConfigView<typeof booksConfig>) {}
 
   search(q: string, limit: number): Book[] {
     const max = Math.min(limit, this.config.get("pageSize"));
@@ -182,9 +183,7 @@ public class BooksOptions { public int PageSize { get; set; } = 20; public strin
 
 ```ts
 // bazis
-export interface BooksConfig { pageSize: number; adminKey: Secret }
-
-export const booksConfig = defineConfig<BooksConfig>("books", {
+export const booksConfig = defineConfig("books", {
   default: { pageSize: 20, adminKey: secret("dev-admin-key") },
   production: { adminKey: secret() },
 });
@@ -321,7 +320,7 @@ public class AdminKeyFilter(IOptions<BooksOptions> options) : IAuthorizationFilt
 export const adminKey: AuthorizeCheck = (ctx) => {
   const key = ctx.header("x-admin-key");
   if (!key) throw new UnauthorizedError();
-  const config = ctx.services.resolve(booksConfig.token) as ConfigView<BooksConfig>;
+  const config = ctx.services.resolve(booksConfig.token) as ConfigView<typeof booksConfig>;
   return key === config.get("adminKey").reveal();
 };
 ```

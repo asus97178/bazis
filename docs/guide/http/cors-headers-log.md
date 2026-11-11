@@ -5,15 +5,16 @@
 `401`, `404`, `500`, ответах `413` и `/health`.
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   http: {
-    port: 3000,
     cors: { origin: ["https://app.example.com"], credentials: true },
     securityHeaders: { hsts: true },
     accessLog: true,
     middleware: [createCorrelationIdMiddleware()],
   },
-});
+})
+export class Application {}
 ```
 
 Все примеры проверены на bazis 0.108.0.

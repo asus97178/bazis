@@ -35,17 +35,9 @@ src/app/modules/auth/
 
 ```ts
 // auth.config.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface AuthConfig {
-  jwtSecret: Secret;
-  accessTtlSeconds: number;
-  refreshTtlSeconds: number;
-  adminEmail: string;
-  adminPassword: Secret;
-}
-
-export const authConfig = defineConfig<AuthConfig>("auth", {
+export const authConfig = defineConfig("auth", {
   default: {
     jwtSecret: secret("dev-only-secret-at-least-32-bytes!!"),
     accessTtlSeconds: 900,
@@ -104,12 +96,12 @@ export class CurrentUser {
 // AuthTokens.service.ts
 import type { ConfigView } from "bazis/core/kernel";
 import { TokenIssuer, hs256 } from "bazis/library/jwt";
-import type { AuthConfig } from "./auth.config";
+import type { authConfig } from "./auth.config";
 
 export class AuthTokens {
   readonly issuer: TokenIssuer;
 
-  constructor(config: ConfigView<AuthConfig>) {
+  constructor(config: ConfigView<typeof authConfig>) {
     this.issuer = new TokenIssuer({
       issuer: "planner",
       audience: "planner-api",
@@ -263,12 +255,12 @@ export class AuthService {
 // AdminSeed.ts
 import type { HostedService, ServiceProvider } from "bazis/core/di";
 import { LOGGER, type ConfigView } from "bazis/core/kernel";
-import type { AuthConfig } from "./auth.config";
+import type { authConfig } from "./auth.config";
 import { AuthService } from "./services/Auth.service";
 
 /** Creates the first administrator at start, after the schema and before HTTP. */
 export class AdminSeed implements HostedService {
-  constructor(private readonly services: ServiceProvider, private readonly config: ConfigView<AuthConfig>) {}
+  constructor(private readonly services: ServiceProvider, private readonly config: ConfigView<typeof authConfig>) {}
 
   async start(): Promise<void> {
     const scope = this.services.createScope();

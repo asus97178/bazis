@@ -1243,19 +1243,35 @@ export class ShopsModule {}
 Само ничего не открывается: операции и поля называет приложение.
 
 ```ts
-import { ormEntityTools, StandardToolsModule } from "bazis/core/tools";
+// order/tools/Order.tools.ts
+import { ormEntityTools } from "bazis/core/tools";
+
+export const orderTools = ormEntityTools(Order, {
+  context: OrderDbContext,
+  ops: ["find", "create", "update"],
+  fields: ["status", "amount"],
+  partitionField: "shopId",
+});
+```
+
+```ts
+// order/Order.module.ts
+import { StandardToolsModule } from "bazis/core/tools";
 
 @Module({
   imports: [StandardToolsModule],
-  tools: [...ormEntityTools(Order, {
-    context: OrderDbContext,
-    ops: ["find", "create", "update"],
-    fields: ["status", "amount"],
-    partitionField: "shopId",
-  })],
+  tools: [SetOrderStatusTool, orderTools],
 })
 export class OrderModule {}
 ```
+
+`ormEntityTools` возвращает набор инструментов по именам операций:
+`orderTools.find`, `orderTools.update`. Набор целиком идёт в `tools`
+модуля, а [процесс в коде](#процесс-в-коде) называет нужный инструмент
+ссылкой — `tool: orderTools.find`. До версии 0.138.0 функция возвращала
+массив, и в модуле писали `...ormEntityTools(…)`.
+
+В процессе из каталога инструмент называют по имени:
 
 ```json
 "Find": { "kind": "serviceTask", "title": "Новые заказы", "config": {
@@ -1370,7 +1386,8 @@ export const signedIn: AuthorizeCheck = async (ctx) => {
   return true;
 };
 
-await runApp(AppModule, { infra: AppInfra, http: { port: 3000, authorize: signedIn } });
+@App({ modules: [AppModule], infra: AppInfra, http: { authorize: signedIn } })
+export class Application {}
 ```
 
 ```text
@@ -1434,6 +1451,11 @@ export class OrdersService {
 }
 ```
 
+[Процесс, описанный в коде](#процесс-в-коде), запускают им самим, а не
+ключом: `this.workflow.start(orderProcess, { input, … })`. Тогда `input`
+проверяется по переменным процесса при сборке — забытое обязательное поле
+или опечатка в имени не скомпилируются. С версии 0.138.0.
+
 | Сервис | Методы |
 | --- | --- |
 | `IWorkflowDefinitions` | `list`, `get`, `create`, `update`, `saveDraft`, `publish`, `versions`, `version`, `latest`, `published`, `tools`; `publishCode` вызывает сам фреймворк при старте |
@@ -1468,11 +1490,15 @@ bunx bazis g process Delivery --module Delivery
 ```
 
 В заготовке — ручной старт и конец. Документ — тот же `bazis.workflow/v2`,
-что и в каталоге, только записанный в TypeScript, с подсказками типов:
+что и в каталоге, только записанный в TypeScript. С версии 0.138.0 он
+проверяется, пока вы его пишете, а инструмент и вызываемый процесс
+называют ссылкой, а не строкой:
 
 ```ts
 // delivery/processes/Delivery.process.ts
 import { defineProcess } from "bazis/core/workflow";
+import { BookTool } from "../tools/Book.tool";
+import { NotifyManagerTool } from "../tools/NotifyManager.tool";
 
 export const DeliveryProcess = defineProcess({
   key: "delivery",
@@ -1488,7 +1514,7 @@ export const DeliveryProcess = defineProcess({
     nodes: {
       Start: { kind: "manualStart", title: "Заказ оплачен" },
       Book: { kind: "serviceTask", title: "Забронировать доставку", config: {
-        tool: "delivery.book",
+        tool: BookTool,
         input: { orderId: "$input.orderId", city: "$input.city" },
         saveTo: "delivery",
         retry: { maxAttempts: 3, backoff: "PT1M" },
@@ -1497,7 +1523,7 @@ export const DeliveryProcess = defineProcess({
       Arrange: { kind: "userTask", title: "Договориться о доставке", config: { assignee: { role: "logistics" } } },
       Late: { kind: "boundaryTimer", title: "Не успели за 4 часа", attachedTo: "Arrange", config: { duration: "PT4H" } },
       Escalate: { kind: "serviceTask", title: "Сообщить менеджеру", config: {
-        tool: "notify.manager", input: { text: "Доставка не согласована" },
+        tool: NotifyManagerTool, input: { text: "Доставка не согласована" },
       } },
       Shipped: { kind: "end", title: "Передан в доставку" },
       Escalated: { kind: "end", title: "У менеджера" },
@@ -1519,6 +1545,38 @@ export const DeliveryProcess = defineProcess({
 @Module({ tools: [BookTool, NotifyManagerTool], processes: [DeliveryProcess] })
 export class DeliveryModule {}
 ```
+
+### Что проверяет компилятор
+
+| Что | Пример ошибки |
+| --- | --- |
+| Настройки узла своего вида | у `timerCatch` нет `delay`; у `userTask` нет `assignee`; опечатка `savTo` |
+| Узлы, которые называют `flows`, `attachedTo` и `parent` | `target: "Shiped"` — такого узла нет |
+| Вход инструмента, названного ссылкой | у `BookTool` нет параметра `orderID`; не передан обязательный `city` |
+| Вход вызываемого процесса | `callProcess` с `process: orderApproval` без обязательной переменной |
+| Вход при запуске | `workflow.start(DeliveryProcess, { input: { orderId: 42 } })` — `orderId` строка, нет `city` |
+
+```text
+Delivery.process.ts:22:18 - error TS2322: Type '"Shiped"' is not assignable to type
+'"Start" | "Book" | "NoSlots" | "Arrange" | "Late" | "Escalate" | "Shipped" | "Escalated"'.
+```
+
+Ссылкой называют:
+
+- **инструмент** — класс с `@Tool` (`tool: BookTool`) или инструмент из набора
+  (`tool: orderTools.find`, см. [Данные без своего инструмента](#данные-без-своего-инструмента));
+- **вызываемый процесс** — результат его `defineProcess`: `process: orderApproval`;
+- **процесс-обработчик ошибок** — так же: `settings: { errorHandler: failureReport }`.
+
+Вход инструмента сверяется с типом параметра его `execute(input: …)`.
+В сохранённом документе остаются имя и ключ: `"tool": "delivery.book"`.
+Имя или ключ строкой по-прежнему принимаются — для инструмента или процесса,
+которых модуль не видит. Тогда их, как и ключи событий, имена секретов и
+выражения, проверяет запуск приложения и `bazis workflow check`.
+
+Документ, который уже существует как данные — выгружен из дизайнера,
+собран функцией, обновлён `upgradeDocument`, — передаётся как есть, с типом
+`ProcessDocument`: компилятор его не разбирает, проверки при запуске те же.
 
 При старте процесс публикуется от `{ kind: "system", id: "code" }`:
 
@@ -1624,7 +1682,7 @@ flowchart LR
 
 Процесс ждёт минуты, часы и дни, а в тесте ждать нельзя.
 `testWorkflow` из `bazis/core/workflow/testing` запускает приложение как
-[`startTestApp`](../fundamentals/testing.md#http-starttestapp), но со
+[`startTestApp`](../fundamentals/testing.md#приложение-целиком-starttestapp), но со
 своими часами и без фонового воркера: задания выполняются, только когда тест
 скажет.
 
@@ -1632,16 +1690,18 @@ flowchart LR
 // src/app/test/delivery.process.test.ts
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { testWorkflow, type TestWorkflow } from "bazis/core/workflow/testing";
-import { AppModule } from "../modules/App.module";
+import { Application } from "../App";
+import { DeliveryProcess } from "../modules/delivery/processes/Delivery.process";
 
 let wf: TestWorkflow;
 beforeAll(async () => {
-  wf = await testWorkflow(AppModule, { now: "2026-11-02T09:00:00Z" });
+  // The application of src/app/App.ts without its HTTP server.
+  wf = await testWorkflow(Application, { now: "2026-11-02T09:00:00Z", http: false });
 });
 afterAll(() => wf?.stop());
 
 test("a silent delivery service is retried in a minute, then in two", async () => {
-  const order = await wf.start("delivery", { input: { orderId: "42", city: "Казань" } });
+  const order = await wf.start(DeliveryProcess, { input: { orderId: "42", city: "Казань" } });
   expect(await wf.drain()).toBe(1); // the first try failed; the retry waits a minute
   expect((await wf.instance(order.id)).status).toBe("running");
   await wf.advance("PT1M"); // the second try failed; the next one in two minutes
@@ -1652,7 +1712,7 @@ test("a silent delivery service is retried in a minute, then in two", async () =
 });
 
 test("no slots: logistics has four hours, then the manager is told", async () => {
-  const order = await wf.start("delivery", { input: { orderId: "43", city: "Тикси" } });
+  const order = await wf.start(DeliveryProcess, { input: { orderId: "43", city: "Тикси" } });
   await wf.drain();
   await wf.advance("PT4H");
   const done = await wf.instance(order.id);
@@ -1660,7 +1720,7 @@ test("no slots: logistics has four hours, then the manager is told", async () =>
 });
 
 test("a logistician who arranges it in time ships the order", async () => {
-  const order = await wf.start("delivery", { input: { orderId: "44", city: "Тикси" } });
+  const order = await wf.start(DeliveryProcess, { input: { orderId: "44", city: "Тикси" } });
   await wf.drain();
   await wf.advance("PT1H");
   expect((await wf.complete(order.id, "Arrange", {})).status).toBe("completed");
@@ -1680,17 +1740,24 @@ manager: Доставка не согласована
 
 | Метод | Что делает |
 | --- | --- |
-| `start(key, { input, partition?, businessKey?, actor? })` | Запускает процесс; его задания ждут `drain` |
+| `start(process, { input, partition?, businessKey?, actor? })` | Запускает процесс — самим `defineProcess` (вход проверяется по его переменным) или ключом; его задания ждут `drain` |
 | `drain()` | Планирует расписание и выполняет все задания, срок которых настал по часам теста; возвращает их число |
 | `advance(duration)` | Переводит часы вперёд (`"PT2H"`, `"P1D"` или миллисекунды), затем `drain` |
 | `complete(instanceId, nodeId, output)` | Завершает задачу, которая ждёт на узле, через входящие, если они подключены |
 | `emit(eventKey, payload, options)` | Доставляет событие |
 | `instance(id)`, `history(id)`, `now()`, `clock` | Состояние экземпляра и часы |
+| `instanceByKey(businessKey)` | Экземпляр, запущенный с таким `businessKey`; самый новый, если их несколько. С версии 0.138.0 |
+| `use(Service, work)` | Вызывает сервис приложения в своей области: `await wf.use(IOrderService, (orders) => orders.place(100, customer))`. С версии 0.138.0 |
 | `app`, `stop()` | Запущенное приложение (`app.fetch`, `app.container`) и остановка |
 
 - Опции — как у `startTestApp`, плюс `now` (откуда начинаются часы) и
   `actor` (от чьего имени действует тест; по умолчанию
-  `{ kind: "system", id: "test" }`).
+  `{ kind: "system", id: "test" }`). Тесту не про права хватит
+  `overrides: [allowAll()]` — см. [«Права в тестах»](../fundamentals/testing.md#права-в-тестах).
+- Чистое состояние между прогонами: `await dropWorkflowTables(url)` до
+  запуска удаляет таблицы процессов тестовой базы, запуск создаст их
+  заново. Функция отказывается работать с базой, чьё имя не начинается с
+  `test_` и не кончается на `_test`, пока не передан `{ force: true }`.
 - Часы теста двигают сроки движка: таймеры, повторы, расписание, задержки
   заданий, отметки задач. Отметки записей — `createdAt`, время в истории —
   остаются временем базы.

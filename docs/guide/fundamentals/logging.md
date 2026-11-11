@@ -53,10 +53,12 @@ info: payment accepted {"amount":50,"requestId":"req-7"}
 ```ts
 import { ConsoleLogger } from "bazis/core/kernel";
 
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   configure: (kernel) => kernel.useLogger(new ConsoleLogger({ minLevel: "info", name: "shop" })),
-});
+})
+export class Application {}
 ```
 
 ```text
@@ -113,9 +115,11 @@ http: { accessLog: { skip: (ctx) => ctx.path === "/health" } }
 ```ts
 import { createCorrelationIdMiddleware } from "bazis/core/http";
 
-await runApp(AppModule, {
-  http: { port: 3000, accessLog: true, middleware: [createCorrelationIdMiddleware()] },
-});
+@App({
+  modules: [AppModule],
+  http: { accessLog: true, middleware: [createCorrelationIdMiddleware()] },
+})
+export class Application {}
 ```
 
 - Если клиент прислал заголовок `x-request-id`, используется он. Иначе — и
@@ -177,7 +181,8 @@ export class JsonLogger implements Logger {
   }
 }
 
-await runApp(AppModule, { http: { port: 3000 }, configure: (kernel) => kernel.useLogger(new JsonLogger()) });
+@App({ modules: [AppModule], http: {}, configure: (kernel) => kernel.useLogger(new JsonLogger()) })
+export class Application {}
 ```
 
 Не забудьте маскировку: стандартный логгер делает её сам, свой — нет.

@@ -1,7 +1,7 @@
 # `bazis/core/agent`
 
 Агенты: инструменты, запуск, аудит и подтверждение, хуки, контракты для
-своих адаптеров моделей. Список — по пакету 0.128.0.
+своих адаптеров моделей. Список — по пакету 0.138.0.
 
 ## Для приложения
 
@@ -16,6 +16,9 @@
 | `ToolError` | Ошибка, текст которой модель видит как есть | [Ошибки](../../ai/tools.md#ошибки) |
 | `AgentToolPreCommitError` | Ошибка «запись не началась»: вызов можно повторить с ключом идемпотентности | [Повторы](../../ai/tools.md#повторы) |
 | `AgentSetupError`, `AgentRuntimeError`, `AgentToolExecutionError`, `AgentSemanticError`, `AgentModelTimeoutError` | Ошибки настройки и адаптеров | [Ошибки агентов](../errors/agents.md#классы-исключений) |
+| `defineTool({ name, description, callers, inputSchema?, outputSchema?, sideEffect?, …, execute(input, context, services) })` | Инструмент без класса — для инструментов, которые делает функция. С версии 0.138.0 | [Инструменты, созданные функцией](../../ai/tools.md#инструменты-созданные-функцией) |
+| `DefinedTool<Input, Output>`, `ToolSet<Names>`, `DefinedToolOptions` | Типы: инструмент `defineTool` (с `toolName`), набор «имя → инструмент», опции | там же |
+| `isDefinedTool(value)`, `toolNameOf(tool)` | Сделан ли инструмент `defineTool`; имя класса с `@Tool` или инструмента `defineTool` | — |
 | `describeTool(Tool)`, `toolMetadataOf(Tool)` | Контракт и метаданные инструмента | — |
 
 ## Для своих адаптеров моделей

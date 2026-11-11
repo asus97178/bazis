@@ -55,7 +55,7 @@ export class ChatGateway {
 export class ChatModule {}
 ```
 
-Больше ничего не нужно: `runApp` с опцией `http` обслуживает шлюзы на том
+Больше ничего не нужно: приложение с полем `http` в `@App` обслуживает шлюзы на том
 же порту.
 
 > [!NOTE]
@@ -167,11 +167,12 @@ ann <- {"v":1,"type":"event","namespace":"/chat","event":"order-paid","data":{"o
 
 ## Вход
 
-Настройки WebSocket на всё приложение — опция `websocket` в `runApp`:
+Настройки WebSocket на всё приложение — поле `websocket` в `@App`:
 
 ```ts
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   websocket: {
     requireAuth: true,
     cors: { origins: ["https://app.example.com"] },
@@ -181,7 +182,8 @@ await runApp(AppModule, {
       return { id: String(payload.sub) };            // socket.data.user
     },
   },
-});
+})
+export class Application {}
 ```
 
 `context.services` — сервисы приложения: проверка берёт тот же

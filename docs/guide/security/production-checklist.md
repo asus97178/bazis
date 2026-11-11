@@ -227,9 +227,10 @@ applies the schema and exits), or grant the rights.
   No vulnerabilities found (checked 6 packages)
   ```
 
-- [ ] **Тест запуска как в production** (`src/app/test/health.test.ts` из
-  `bazis new`) не удалён: он ловит ошибки в `src/index.ts`
-  ([Тестирование](../fundamentals/testing.md#запуск-как-в-production)).
+- [ ] **Тест запуска приложения** (`src/app/test/health.test.ts` из
+  `bazis new`) не удалён: он поднимает то же приложение, что уходит в
+  production, и ловит ошибки его объявления и графа сервисов
+  ([Тестирование](../fundamentals/testing.md#тест-нового-проекта)).
 - [ ] **Бинарник запускается не от root** и не может писать в свой каталог.
 
 ## Дальше

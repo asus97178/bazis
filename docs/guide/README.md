@@ -26,7 +26,7 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Middleware](overview/middleware.md) — серверный и маршрутный уровни, порядок выполнения
 - ✅ [Авторизация](overview/authorization.md) — `@Authorize`, `@AllowAnonymous`
 - ✅ [Обработка ошибок](overview/errors.md) — `HttpError`, неожиданные ошибки, доменные ошибки
-- ✅ [Приложение](overview/application.md) — `runApp`, запуск, остановка, коды выхода
+- ✅ [Приложение](overview/application.md) — `@App`, `runApp`, запуск, остановка, коды выхода
 
 ## 3. Основы
 

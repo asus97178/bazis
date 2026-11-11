@@ -11,9 +11,11 @@
 ```ts
 import { rateLimit } from "bazis/core/http";
 
-await runApp(AppModule, {
-  http: { port: 3000, middleware: [rateLimit({ windowMs: 60_000, max: 100 })] },
-});
+@App({
+  modules: [AppModule],
+  http: { middleware: [rateLimit({ windowMs: 60_000, max: 100 })] },
+})
+export class Application {}
 ```
 
 100 запросов в минуту с одного IP-адреса:

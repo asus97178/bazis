@@ -16,10 +16,12 @@ API на русском:
 Одна опция в `src/index.ts`:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   language: "ru",
   http: { /* … */ middleware: [bookErrors] },
-});
+})
+export class Application {}
 ```
 
 По-русски становится всё, что фреймворк пишет в ответ сам:
@@ -66,7 +68,8 @@ POST /books {"title":"","year":"abc"}
 Если клиентам нужны разные языки, перечислите их:
 
 ```ts
-await runApp(AppModule, { language: { default: "ru", supported: ["ru", "en"] }, http: { /* … */ } });
+@App({ modules: [AppModule], language: { default: "ru", supported: ["ru", "en"] }, http: { /* … */ } })
+export class Application {}
 ```
 
 Каждый запрос получает лучший язык из `Accept-Language` (с учётом `q`,
@@ -105,11 +108,13 @@ POST /auth/register {"email":"bad","password":"x"}
 Отдельный текст можно заменить поверх выбранного языка:
 
 ```ts
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   language: "ru",
   messages: { notFound: "Такой страницы нет" },
   http: { /* … */ },
-});
+})
+export class Application {}
 ```
 
 ```text

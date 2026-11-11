@@ -160,7 +160,7 @@ bunx bazis g module Orders --full     # CRUD, список, кэш, доступ
 `+` — новый файл, `~` — изменённый. Строка `◆` говорит, что нужно
 модулю для запуска: примерам `--minimal` и `--full` нужна база данных
 ([подключение](../database/postgresql.md)), примеру `--full` — ещё и кэш
-(`runApp(AppModule, { cache: memory() })`).
+(`@App({ cache: memory() })`).
 
 Таблицу модуля шаблон не создаёт: как появится схема, решает
 приложение. Без этого первый запрос ответит
@@ -339,7 +339,7 @@ bunx bazis codegen --target all      # все цели bazis.config.json
 ```sh
 bunx bazis dev
 bunx bazis dev --watch         # перезапуск при изменениях в src/
-PORT=3100 bunx bazis dev       # другой порт
+BAZIS_HTTP__PORT=3100 bunx bazis dev       # другой порт
 ```
 
 С `--watch` изменение в `src/` (кроме `src/generated`) останавливает
@@ -415,7 +415,7 @@ PORT=3100 bunx bazis dev       # другой порт
     ✔  SUCCESS   shop is running · ready in 36 ms
 
   │ ➜  Local      http://127.0.0.1:3000
-  │ ➜  Network    not exposed — listening on 127.0.0.1 (set HOST=0.0.0.0)
+  │ ➜  Network    not exposed — listening on 127.0.0.1 (set BAZIS_HTTP__HOST=0.0.0.0)
   │ ➜  Health     http://127.0.0.1:3000/health
   │ ➜  OpenAPI    http://127.0.0.1:3000/docs
   │
@@ -612,7 +612,7 @@ bunx bazis build --bin --platform linux-x64  # для другой платфо�
 | `BAZIS_UI` | `1` — экран запуска без терминала, `0` — строка журнала в терминале |
 | `NO_COLOR` / `FORCE_COLOR` | Выключить / включить цвет |
 | `BAZIS_ENV` | Среда приложения; `bazis dev` по умолчанию ставит `development` |
-| `PORT`, `HOST` | Порт и адрес HTTP-сервера в шаблоне нового проекта |
+| `BAZIS_HTTP__PORT`, `BAZIS_HTTP__HOST` | Порт и адрес HTTP-сервера: настройки `http.port` и `http.host` |
 | `BAZIS_BUN_BIN` | Какой `bun` запускать, если его нет в `PATH` |
 
 ## Дальше

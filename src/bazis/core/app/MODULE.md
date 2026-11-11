@@ -31,10 +31,12 @@ DTO errors map to INVALID_ARGUMENT with bounded field errors, not to HTTP 400;
 details and streaming semantics are in the gRPC passport.
 
 ```ts
-await runApp(AppModule, {
-  http: { port: 3000 },
+@App({
+  modules: [AppModule],
+  http: {},
   grpc: { address: "127.0.0.1:50051" },
-});
+})
+export class Application {}
 ```
 
 Components of the change: RunAppOptions and the composition before bazis.run.

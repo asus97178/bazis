@@ -168,7 +168,7 @@ const en = {
   ready: {
     running: (app: string, ms: string) => `${app} is running · ready in ${ms}`,
     local: "Local", network: "Network", health: "Health", docs: "OpenAPI",
-    notExposed: (host: string) => `not exposed — listening on ${host} (set HOST=0.0.0.0)`,
+    notExposed: (host: string) => `not exposed — listening on ${host} (set BAZIS_HTTP__HOST=0.0.0.0)`,
     watching: (src: string) => `watching ${src} · restarts on change · logs below · Ctrl+C to stop`,
     noWatch: "logs below · Ctrl+C to stop",
     worker: (app: string, ms: string) => `${app} started · ready in ${ms}`,
@@ -345,7 +345,7 @@ const ru: Messages = {
   ready: {
     running: (app, ms) => `${app} работает · готово за ${ms}`,
     local: "Локально", network: "Сеть", health: "Здоровье", docs: "OpenAPI",
-    notExposed: (host) => `недоступно снаружи — слушает ${host} (задайте HOST=0.0.0.0)`,
+    notExposed: (host) => `недоступно снаружи — слушает ${host} (задайте BAZIS_HTTP__HOST=0.0.0.0)`,
     watching: (src) => `слежу за ${src} · перезапуск при изменениях · журнал ниже · Ctrl+C — остановить`,
     noWatch: "журнал ниже · Ctrl+C — остановить",
     worker: (app, ms) => `${app} запущено · готово за ${ms}`,
