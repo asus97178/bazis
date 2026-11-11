@@ -1,6 +1,6 @@
 # Бизнес-процессы из коробки: конструктор
 
-Идентификатор: **WORKFLOW-002**. Версия: **1.14**. Дата: **2026-11-03**.
+Идентификатор: **WORKFLOW-002**. Версия: **1.15**. Дата: **2026-11-11**.
 Статус: **утверждено владельцем 2026-11-01** (согласовано агентами bazis и bazis-cms; права — [ACCESS-001](ACCESS.md)).
 Основа: [WORKFLOW-001](WORKFLOW.md) (этапы 1–5, bazis 0.124.0–0.128.0),
 [TOOLS-001](TOOLS.md), прототип дизайнера
@@ -186,7 +186,8 @@ interface ProcessSettings {
   stepTimeout?: string;                 // по умолчанию для шагов с Tool
   maxConcurrent?: number;               // одновременных running-экземпляров процесса
   sameKey?: "allow" | "skip" | "queue"; // новый запуск с тем же businessKey, пока старый идёт
-  errorHandler?: string;                // ключ процесса, который запускается при failed/timedOut с $event = сведения об ошибке
+  errorHandler?: string;                // ключ процесса, который запускается при failed/timedOut с $event = сведения об ошибке;
+                                        // в процессе из кода — результат defineProcess (§11, v1.15)
   log?: {
     variables?: boolean;                // значения переменных на каждом шаге в истории (по умолчанию false)
     toolPayloads?: boolean;             // вход и выход Tools целиком, в том числе тела HTTP (по умолчанию false)
@@ -285,11 +286,13 @@ error }`; граничный `boundaryError` важнее `onError`).
 
 ### 5.1 Запуски
 
-- **Ручной**: `start(key, { input, partition, businessKey, actor, test? })`;
+- **Ручной**: `start(keyOrProcess, { input, partition, businessKey, actor, test? })`;
+  процесс из кода передают самим результатом `defineProcess`, и `input`
+  типизирован его переменными (с 0.138.0);
   `sameKey` и `maxConcurrent` проверяются в той же транзакции под
   блокировкой процесса (advisory lock по ключу). `queue` — экземпляр в
   статусе `pending`, стартует, когда освободится место.
-- **Массовый**: `startMany(key, items: { input, businessKey }[], options)` —
+- **Массовый**: `startMany(keyOrProcess, items: { input, businessKey }[], options)` —
   массовое действие над записями; каждый элемент — отдельный экземпляр,
   `businessKey` обязателен и подчиняется `sameKey`; ответ — по элементу
   `started | skipped | rejected` с причиной.
@@ -444,8 +447,18 @@ IP, частные, loopback и link-local адреса запрещены; ре
 ### 7.4 Данные: `ormEntityTools`
 
 ```ts
-@Module({ tools: [...ormEntityTools(Order, { context: OrdersDbContext, ops: ["find", "create", "update"], fields: ["status", "amount"] })] })
+export const orderTools = ormEntityTools(Order, { context: OrdersDbContext, ops: ["find", "create", "update"], fields: ["status", "amount"] });
+
+@Module({ imports: [StandardToolsModule], tools: [orderTools] })
+export class OrdersModule {}
 ```
+
+С 0.138.0 `ormEntityTools` возвращает набор, названный по операциям
+(`orderTools.find`, `orderTools.update`; тип `OrmEntityToolSet`, входы —
+`OrmEntityToolInputs`), а не массив: в `tools` он стоит целиком, процесс в
+коде называет Tool ссылкой `tool: orderTools.find`, процесс из каталога —
+именем `"orm.order.find"`. Набор устроен как любые Tools, сделанные функцией
+(`defineTool`, TOOLS-001 §2.1).
 
 Делает Tools `orm.<entity>.find|create|update|delete` с фильтром по
 разрешённым полям, лимитом, сортировкой, защитой от массовых изменений и
@@ -507,7 +520,7 @@ store («миграций для хранилищ нет»), поэтому пр
 экземпляры завершают на старом выпуске. Старые таблицы `bazis_wf_def_`,
 `bazis_wf_run_`, `bazis_wf_task_` удаляются вручную по `upgrading.md`.
 Процессы в коде (`defineProcess`) принимают v2; v1 переводится
-`upgradeDocument`.
+`upgradeDocument`. Документ-литерал в коде проверяет компилятор (§11, v1.15).
 
 ## 10. Этапы
 
@@ -539,9 +552,36 @@ store («миграций для хранилищ нет»), поэтому пр
    `referencing`; журнал запусков (длительность, шаг ошибки).
 6. **`bazis/core/tools`**: `http.request`, `SecretStore`, редакция секретов.
 
+После этапов (аудит фреймворка, 0.137.0–0.138.0): процесс в коде проверяется
+компилятором и называет Tools и процессы ссылками; `ormEntityTools` — набор;
+`testWorkflow` и `startTestApp` запускают приложение `@App` (§11, v1.15).
+
 bazis-cms идёт следом за каждым этапом (§8); дизайнер — после этапа 2.
 
 ## 11. Решено на рецензии и открыто
+
+Решено в 0.138.0 (v1.15):
+
+- **Документ-литерал в коде проверяет компилятор.** `defineProcess` выводит
+  тип узлов: `config` каждого вида (`NodeConfigs`), лишние и пропущенные поля,
+  узлы в `flows`, `attachedTo` и `parent`. Типы — в `bazis/library/workflow`:
+  `ProcessNodeOf`, `TypedProcessNode`, `TypedProcessFlow`, `RetryPolicy`,
+  `TimerConfig`, `InputMapping`. Документ-данные (`ProcessDocument`)
+  проверяются при старте, как раньше: дизайнер и CMS не затронуты.
+- **Ссылки вместо строк в коде.** `serviceTask.tool` — класс с `@Tool` или Tool
+  из набора; `callProcess.process` и `settings.errorHandler` — результат
+  `defineProcess`. `input` сверяется с входом Tool (параметр `execute`) или
+  переменными `in` процесса. В хранилище — те же имя и ключ, формат v2 не
+  меняется. Строка остаётся для того, чего модуль не видит; её проверяет
+  старт и `bazis workflow check`.
+- **Запуск процессом.** `start`, `startMany`, `wf.start` принимают процесс;
+  вход типизирован (`ProcessInput`, `ProcessOutput`). `IWorkflowRuntime.start`
+  принимает ключ или процесс; `CodeProcess`, `ProcessDefinition`,
+  `StartInstance`, `StartMany` — обобщённые.
+- **`ormEntityTools` — набор** по операциям, а не массив (§7.4).
+- **Тесты.** `testWorkflow(Application, …)` берёт приложение из `@App`;
+  `wf.instanceByKey(businessKey)`, `wf.use(Service, work)`,
+  `dropWorkflowTables(url)`; права — `allowAll()` (ACCESS-001 §8).
 
 Решено на этапе 6 (v1.14):
 
@@ -591,7 +631,7 @@ bazis-cms идёт следом за каждым этапом (§8); дизай
   Живые экземпляры считает `WorkflowProcessUsage`, который реализует Runtime: каталог о них не знает.
   Завершённые экземпляры и журнал остаются, срок хранения на них больше не действует.
 - **`ormEntityTools` — Tools без класса входа**: схема приходит в `@Tool({ inputSchema, outputSchema })`, вход проверяет сам
-  Tool. Модуль `StandardToolsModule` появляется уже здесь: он владеет видами `orm.entity` и `orm.field`. `x-ref-scope` без `/`
+  Tool (с 0.138.0 — через `defineTool`, набор вместо массива, §7.4). Модуль `StandardToolsModule` появляется уже здесь: он владеет видами `orm.entity` и `orm.field`. `x-ref-scope` без `/`
   в начале — готовое значение области, а не указатель на соседний вход: у таких Tools область — сущность.
 - **`context.dryRun`** и `ToolRunOptions.dryRun` появились здесь: сами Tools научились раньше, чем движок стал их так звать.
 

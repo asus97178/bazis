@@ -1,6 +1,6 @@
 # bazis module architecture and directory structure
 
-Identifier: **MOD-ARCH-001**. Version: **1.11**. Date: **2026-10-06**.
+Identifier: **MOD-ARCH-001**. Version: **1.12**. Date: **2026-11-11**.
 Status: **mandatory repository rule**.
 
 The specification fixes the choice between an atomic and a composite module, the
@@ -31,8 +31,10 @@ through `imports` and, when needed, re-exports public DI tokens through `exports
 The implementation itself lives in the atomic modules.
 
 The **application root** (`AppModule`) assembles the application features. The
-infrastructure manifest (`AppInfra`) and the entry point (`runApp`) connect the
-environment, transport and shared resources. They are not a template for the
+application declaration (`@App({ modules: [AppModule], infra: AppInfra, http, … })` in
+`src/app/App.ts`), the infrastructure manifest (`AppInfra`) and the entry point
+(`runApp(Application)` in `src/index.ts`) connect the environment, transport and
+shared resources. They are not a template for the
 structure of every simple feature.
 
 A **group directory**, for example `actor_modules`, only organizes files. It
@@ -429,7 +431,7 @@ gRPC is connected by importing `bazis/core/grpc`: the field
 `@GrpcController` as scoped per RPC through the existing owner-bound DI
 extension. A feature module can own both `controllers`
 and `grpcControllers`; splitting into submodules by transport is not needed.
-The server is enabled through `runApp(..., { grpc: ... })` or `grpcModule(options)`.
+The server is enabled through `@App({ grpc: ... })` or `grpcModule(options)`.
 Contracts and checks are in the [gRPC passport](../../src/bazis/core/grpc/MODULE.md).
 
 Source of the current AI fields: [agent/index.ts](../../src/bazis/core/agent/index.ts).
@@ -439,7 +441,7 @@ agents from modules; the migration follows [AGENT-ARCH-001](AGENT_ARCHITECTURE.m
 | Current API field | Input type | What to describe in the passport |
 | --- | --- | --- |
 | `agents` | `readonly Class<object>[]` | The previous module path, only for compatibility during the migration; new agents are declared separately |
-| `tools` | `readonly Class<object>[]` | A class with `@Tool`, input/output schema, side effects, access, DI dependencies |
+| `tools` | `readonly (Class<object> \| DefinedTool \| ToolSet)[]` | A class with `@Tool`, a Tool made by `defineTool` or a set of them ([TOOLS-001](TOOLS.md) §2.1): input/output schema, side effects, `callers`, DI dependencies |
 | `prompts` | `readonly Class<object>[]` | The current module registration path; an agent's prompts move together with its standalone declaration |
 | `agentToolHooks` | `readonly AgentToolHookRegistrationV1[]` | The hook kind and identity, handler, order, timeout, input event and result |
 
@@ -593,8 +595,10 @@ codegen extracts their types, including `IRepository<Entity>`, and DI uses the
 generated binding. There is no dependency list, no synchronous factory and no
 `DI.*` in a module: a computed service is a class with a constructor. Codegen
 refuses any other form (`BAZIS_DI_PROVIDER_FORM`), in applications and in the
-framework's own packs. `controllers`, `background`, `gateways`, `grpcControllers`
-and `tools` list the classes themselves. After a constructor changes, codegen is
+framework's own packs. Since 0.138.0 `bazis/core/di` exports only these forms;
+the low-level constructors (`DI`, factory providers) live in
+`bazis/core/di/lowLevel`, for packages that extend the framework. `controllers`, `background`, `gateways` and `grpcControllers`
+list the classes themselves; `tools` lists classes, made Tools and Tool sets. After a constructor changes, codegen is
 refreshed.
 
 A controller is already registered through `controllers` (HTTP) or `grpcControllers`

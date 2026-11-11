@@ -161,7 +161,7 @@ flowchart TB
 
 ```ts
 import { Cacheable, OutputCache, memory } from "@/core/cache";
-import { runApp } from "@/core/app";
+import { App } from "@/core/app";
 
 @App({
   modules: [AppModule],
@@ -196,7 +196,7 @@ class UserService implements IUserStore {
 
 // UsersModule:
 providers: [
-  scoped(IUserStore, UserService, [repositoryFor(User)]),
+  scoped(IUserStore, UserService), // codegen reads the constructor
 ],
 ```
 
@@ -207,7 +207,7 @@ The backend is connected from `@/core/infra/*`; the framework stays backend-agno
 ```ts
 import { memory } from "@/core/cache";
 import { Infra, redisConnect } from "@/core/infra";
-import { runApp } from "@/core/app";
+import { App } from "@/core/app";
 import { redisConfig } from "@/app/config/redis.config";
 import { AppModule } from "@/app/modules/App.module";
 

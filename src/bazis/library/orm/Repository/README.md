@@ -284,14 +284,16 @@ class MyModule {}
 
 ### Explicit dependencies in a provider
 
+An application never lists dependencies: codegen reads the constructor
+(`scoped(UserService)` is enough). A package that extends the framework and builds
+providers by hand takes the low-level forms from `bazis/core/di/lowLevel` (0.138.0):
+
 ```ts
-import { scoped, DI } from "@/core/di";
-import { repositoryFor } from "@/core/orm";
+import { DI } from "bazis/core/di/lowLevel";
+import { repositoryFor } from "bazis/core/orm";
 
 providers: [
-  scoped(
-    DI.classProvider(UserService, UserService, [repositoryFor(User)] as const),
-  ),
+  DI.scoped(DI.classProvider(UserService, UserService, [repositoryFor(User)] as const)),
 ],
 ```
 
@@ -385,12 +387,11 @@ export class UserService {
 
 ```ts
 import { Module, scoped } from "@/core/di";
-import { repositoryFor } from "@/core/orm";
 
 @Module({
   imports: [DataModule],
   providers: [
-    scoped(UserService, UserService, [repositoryFor(User)] as const),
+    scoped(UserService), // codegen reads `IRepository<User>` from the constructor
   ],
   exports: [UserService],
 })
@@ -517,7 +518,9 @@ books.add(book);
 `di:generate` wires a constructor parameter typed `IRepository<User>` automatically. Explicit deps are needed only when the class is registered without codegen (for example in a hand-built test container):
 
 ```ts
-scoped(UserService, UserService, [repositoryFor(User)] as const)
+import { DI } from "bazis/core/di/lowLevel"; // since 0.138.0; not in bazis/core/di
+
+DI.scoped(DI.classProvider(UserService, UserService, [repositoryFor(User)] as const))
 ```
 
 ### 4. `ensureCreated` in tests without starting the application
@@ -596,7 +599,7 @@ A mock usually needs only the methods the service calls.
 For **controller** tests it is enough to replace the store contract the controller depends on (here a hypothetical `IUserStore`):
 
 ```ts
-import { Module, createContainer, DI } from "bazis/core/di";
+import { Module, createContainer, singletonValue } from "bazis/core/di";
 import { InMemoryUserStore } from "./InMemoryUserStore";
 import { IUserStore } from "./IUserStore";
 import { UsersController } from "./UsersController";
@@ -604,7 +607,7 @@ import { UsersController } from "./UsersController";
 @Module({
   controllers: [UsersController],
   providers: [
-    DI.scoped(DI.valueProvider(IUserStore, new InMemoryUserStore())),
+    singletonValue(IUserStore, new InMemoryUserStore()),
   ],
 })
 class TestUsersModule {}
@@ -652,7 +655,7 @@ expect(await service.list(10)).toHaveLength(1);
 1. **Do not mock `query()`** if you test SQL/filters: use PostgreSQL qualification.
 2. **Mock `saveChanges()`** to check that the service saves data at all.
 3. **One scope per test**: `scope.dispose()` in `afterEach`, otherwise scoped services leak.
-4. In hand-built DI test containers (without codegen) with `validateOnBuild: true`, give Repository deps explicitly: `[repositoryFor(User)]`.
+4. In hand-built DI test containers (without codegen) with `validateOnBuild: true`, give Repository deps explicitly through `DI.classProvider(…, [repositoryFor(User)])` from `bazis/core/di/lowLevel`. With codegen, prefer `createTestContainer(Application, { overrides })` from `bazis/core/testing`.
 
 ---
 

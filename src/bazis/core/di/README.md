@@ -5,7 +5,10 @@ contracts are described in [MODULE.md](MODULE.md).
 
 ## Public API
 
-- `index.ts`: the single public DI entry point.
+- `index.ts`: the public DI entry point for applications (`bazis/core/di`): only the agreed
+  provider forms, tokens, `@Module` and the container.
+- `lowLevel.ts`: `bazis/core/di/lowLevel` (0.138.0): the low-level provider forms (`DI`,
+  factories, dependency lists), for the framework's own modules and packages that extend it.
 - `MODULE.md`: the contracts, boundaries and checks of the DI core.
 
 ## Container core
@@ -33,7 +36,7 @@ contracts are described in [MODULE.md](MODULE.md).
 
 ## Module layer
 
-- `module/DI.ts`: low-level provider constructors.
+- `module/DI.ts`: low-level provider constructors, exported only through `lowLevel.ts`.
 - `module/shortcuts.ts`: the short API (`singleton/scoped/transient`).
 - `module/createContainer.ts`: builds a container from modules.
 - `module/encapsulation.ts`: build-time check of module isolation (`exports`).
@@ -81,7 +84,11 @@ contracts are described in [MODULE.md](MODULE.md).
   (or the class alone), `singletonValue(TOKEN, value)`, `singletonAsyncFactory(TOKEN, [deps], async factory)`
   and `...withEventSubscribers(Class)`. Codegen refuses anything else (`BAZIS_DI_PROVIDER_FORM`).
 - The low-level path (`DI.classProvider(...)`, `DI.factoryProvider(...)`) stays for the kernel's own
-  plumbing and test `overrides`, never in a module's `providers`.
+  plumbing and packages that extend the framework, never in a module's `providers`. Since 0.138.0
+  it is imported from `bazis/core/di/lowLevel`; `bazis/core/di` no longer exports `DI`, the
+  dependency-list argument of `scoped`/`singleton`/`transient`, `singletonFactory`,
+  `singletonFactoryWithResolver` or `singletonAsyncFactoryWithResolver`. Test `overrides` use
+  the agreed forms: `singletonValue(IStore, fake)`, `scoped(IStore, FakeStore)`.
 
 ## Contributing Checklist
 

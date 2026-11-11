@@ -71,8 +71,11 @@ npm page shows the source commit and the workflow that built it. The release
 tarball is also attached to each
 [GitHub Release](https://github.com/asus97178/bazis/releases).
 
-`bazis new` creates a project with `src/index.ts`, a root `AppModule`,
-`bazis.config.json`, scripts, a `/health` test and an `.env.example`.
+`bazis new` creates a project with `src/app/App.ts` (the application declared by
+`@App`), `src/index.ts` (`runApp(Application)`, no options), a root `AppModule`,
+`bazis.config.json`, scripts, a `/health` test that starts the declared application
+in the test process and an `.env.example` with `BAZIS_HTTP__HOST` and
+`BAZIS_HTTP__PORT`.
 
 ## CLI
 
@@ -141,20 +144,25 @@ import { dbConfig } from "../config/db.config"; // defineConfig("db", { default:
 @Infra({ db: ormBazisConnect(dbConfig) })
 export class AppInfra {}
 
-// src/index.ts
+// src/app/App.ts
 @App({ modules: [AppModule], infra: AppInfra, http: { health: true } })
 export class Application {}
+
+// src/index.ts
+await registerBazisGeneratedRuntime();
+await runApp(Application);
 ```
 
 A feature module attaches its own `DbContext` and entities with
-`ormBazis: { context, entities }`; its services take that context in their
+`ormBazis: { context }` (the entities of its sets are mapped by themselves); its services take that context in their
 constructors. `bunx bazis g module Task --minimal` generates such a module.
 Configuration values can be overridden from the environment
 (`BAZIS_DB__HOST`, `BAZIS_DB__PASSWORD`, ...). Invalid configuration or a
 missing production secret stops startup with an error that names the key.
 
 A unique index violation in `saveChanges()` rejects with
-`UniqueViolationError` (with `constraint` and `table`); catch it to answer 409.
+`UniqueViolationError` (with `constraint`, `table` and `properties`); uncaught, it
+answers 409 by itself, as other database errors answer 404, 422 or 503.
 Request-body fields declared as `string`, `number` or `boolean` are checked
 against the JSON type automatically (400 on mismatch); other rules come from
 `@Validator`.

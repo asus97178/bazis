@@ -1,7 +1,7 @@
 # Tools: one contract for agents and processes
 
-Identifier: **TOOLS-001**. Version: **1.0**. Date: **2026-10-31**.
-Status: **implemented in bazis 0.123.0**.
+Identifier: **TOOLS-001**. Version: **1.1**. Date: **2026-11-11**.
+Status: **implemented in bazis 0.123.0; §2.1 (Tools made by a function) in 0.138.0**.
 Basis: `ToolRunner` (0.122.0) let a business-process engine call Tools without a
 model. The user asked where and how Tools should live now that an LLM agent and a
 process engine call the same operations, and accepted the recommendations below.
@@ -44,7 +44,8 @@ orders/
   services/   IOrders.service.ts, Orders.service.ts
 ```
 
-Registration stays declarative in the owner: `@Module({ tools: [OrdersFindTool] })`.
+Registration stays declarative in the owner: `@Module({ tools: [OrdersFindTool] })`
+(classes, made Tools and sets of them, §2.1).
 The framework builds one catalog from all modules. Consumers (agent definitions, the
 process engine) do not register Tools: they refer to them by name. There is no
 central `tools/` folder of the application and no registration in the consumer's
@@ -52,6 +53,44 @@ module, because a Tool depends on the owner's scoped services and encapsulation.
 
 `ai/tools/` and `ai/contracts/` are removed from the module layout; a module has no
 `ai/` folder for Tools.
+
+### 2.1 Tools made by a function (0.138.0)
+
+A hand-written Tool is a class with `@Tool`. When several Tools of one shape are made
+by a function and their number and names come from its arguments, the function uses
+`defineTool` from `bazis/core/agent`:
+
+```ts
+export function exportTools<const F extends string>(formats: readonly F[]): ToolSet<F> {
+  return Object.fromEntries(formats.map((format) => [format, defineTool({
+    name: `reports.export.${format}`,
+    description: `Exports a report as ${format}.`,
+    sideEffect: "read",
+    callers: ["workflow"],
+    inputSchema: { type: "object", properties: { reportId: { type: "string" } }, required: ["reportId"] },
+    execute: (input: { reportId: string }, context, services) =>
+      services.resolve(ReportService).export(input.reportId, format),
+  })])) as ToolSet<F>;
+}
+
+export const reportExports = exportTools(["pdf", "csv"]);
+
+@Module({ tools: [SendReportTool, reportExports], providers: [scoped(ReportService)] })
+export class ReportModule {}
+```
+
+- `defineTool` takes the options of `@Tool` except the `input` and `output` classes:
+  `inputSchema` (and `outputSchema`) is JSON Schema, and `execute(input, context,
+  services)` checks the input itself. `services` is the scope of the call.
+- `@Module({ tools })` takes Tool classes, made Tools (`DefinedTool`) and sets of them
+  (`ToolSet`: an object «key → Tool»). A set is not spread: `tools: [reportExports]`.
+- `isDefinedTool(x)` and `toolNameOf(x)` (the name of a class or a made Tool) are public;
+  a process written in code names a Tool by reference: `tool: reportExports.pdf`
+  (WORKFLOW-002 §11, v1.15).
+- `ormEntityTools` from `bazis/core/tools` returns such a set named by operation
+  (`orderTools.find`, `orderTools.update`), not an array.
+- A made Tool goes through the same `AgentToolExecutor` (§1), `callers` (§3) and
+  catalog as a class; only the source of its contract differs.
 
 ## 3. Who may call a Tool: `callers`
 

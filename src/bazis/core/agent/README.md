@@ -86,11 +86,11 @@ are shared by agents and `ToolRunner`:
 ```ts
 @Module({
   providers: [
-    DI.singleton(DI.valueProvider(AGENT_RUNTIME_OPTIONS, { maxSteps: 6 })),
-    DI.singleton(DI.valueProvider(TOOL_EXECUTION_OPTIONS, {
+    singletonValue(AGENT_RUNTIME_OPTIONS, { maxSteps: 6 }),
+    singletonValue(TOOL_EXECUTION_OPTIONS, {
       approvalPolicy: (request) => request.tool.metadata.sideEffect === "read",
       auditSink: (entry) => auditStore.write(entry),
-    })),
+    }),
   ],
 })
 export class AgentSettingsModule {}

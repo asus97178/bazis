@@ -52,6 +52,8 @@ particular `providers` of a module use only the agreed forms of
 `scoped/singleton/transient(IService, Service)`, `singletonValue`,
 `singletonAsyncFactory`, `...withEventSubscribers` — no dependency lists,
 factories or `DI.*`; codegen refuses anything else (`BAZIS_DI_PROVIDER_FORM`).
+`bazis/core/di` exports only these forms; `DI` lives in `bazis/core/di/lowLevel` for
+packages that extend the framework.
 A framework pack gets its constructor wiring from `framework.packs` of
 `bazis.config.json`, like an application.
 

@@ -1,7 +1,7 @@
 # Testing
 
-Passport version: 1.0. Type: atomic. CLI profile: empty.
-Status: implemented in 0.98.0.
+Passport version: 1.1. Type: atomic. CLI profile: empty.
+Status: implemented in 0.98.0; reads `@App` since 0.138.0.
 Entry: [index.ts](index.ts), the public barrel `bazis/core/testing`; no DI module.
 Created with: `bunx bazis g module Testing --empty --modules-root src/bazis/core --no-register`
 (run as `./scripts/bazis-bun run bazis g module ...` in this repository). The
@@ -20,8 +20,18 @@ no data and no runtime behaviour of its own.
 
 | Entry | Input | Result |
 | --- | --- | --- |
-| `createTestContainer(root, options?)` | Root module; `CreateContainerOptions` (`overrides`, `validateOnBuild` default true) | `Promise<DiContainer>` |
-| `startTestApp(root, options?)` | Root module; `TestAppOptions`: `RunAppOptions` without `http.port/hostname`, `http: false` for no server, `overrides` | `Promise<TestApp>`: `url`, `fetch(path, init?)`, `container`, `stop()` |
+| `createTestContainer(root, options?)` | The `@App` class or a module; `TestContainerOptions` (`overrides`, `validateOnBuild` default true) | `Promise<DiContainer>`; for an `@App` class the graph also holds its infrastructure, cache and configs |
+| `startTestApp(root, options?)` | The `@App` class or a module; `TestAppOptions`: `AppSettings` without `http.port/hostname`, `http: false` for no server, `overrides` | `Promise<TestApp>`: `url`, `fetch(path, init?)`, `use(Service, work)`, `container`, `stop()` |
+
+For an `@App` class (0.138.0) the test starts what production starts: `infra`, `cache`,
+`config` and `http` come from the declaration, and every option given replaces the
+declared field. An `@App` without `http` starts without a server unless the test asks
+for one. A single module with its options still works, to test a part of the
+application: `startTestApp(TaskModule, { infra: TestInfra })`.
+`app.use(Service, work)` calls a service in a scope of its own, as a request does:
+`await app.use(ITaskService, (tasks) => tasks.create("Write the report"))`.
+Rights for a test that is not about rights: `overrides: [allowAll()]` from
+`bazis/core/access/testing`.
 
 `startTestApp` builds the same graph as `runApp` (`composeApp` in
 `core/app/runApp.ts`), on 127.0.0.1 and a free port, environment `test`

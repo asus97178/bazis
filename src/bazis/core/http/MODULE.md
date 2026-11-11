@@ -1,10 +1,10 @@
 # HTTP server
 
-Passport version: 2. Date: 2026-09-14. Status: implemented, checks below.
+Passport version: 2.1. Date: 2026-11-11. Status: implemented, checks below.
 Type: atomic infrastructure module. Path: `src/bazis/core/http`.
 Connection point: `httpModule(options)`; public entry: `index.ts`.
 Controllers are declared only by `controllers` of the modules in `imports` (and of
-the modules `runApp` composes); the `controllers` option of `httpModule` is removed in
+the modules of the `@App` that `runApp` composes); the `controllers` option of `httpModule` is removed in
 0.98.32. `AuthorizeCheck` takes an `AuthorizeContext` (`header`, `services`, `state`)
 that `HttpContext` and the gRPC `GrpcContext` both provide, so `@Authorize` checks,
 `bearerToken` and `anyOf` serve both transports. An error marked by
@@ -185,6 +185,19 @@ connected through `options.middleware` or `@Middleware(rateLimit(...))`;
 Exceeding `maxLength`/`length` keeps HTTP 400 with `Validation failed` and the
 public `details`, but does not run `pattern` beyond the upper bound in the same
 decorator. Check: [validation-admission.test.ts](test/validation-admission.test.ts).
+
+## Listening address: the `http` settings (2026-11-11, 0.138.0)
+
+Where the server listens is the settings section `http` ([Http.config.ts](Http.config.ts),
+`httpConfig`): `host` (default `127.0.0.1`, `0.0.0.0` in `production`) and `port` (default
+3000, 0–65535), from `BAZIS_HTTP__HOST` and `BAZIS_HTTP__PORT`. An empty host or a port out
+of range stops the start with the key named. `hostname`/`port` in `@App({ http })` are fixed
+in code and win over the settings. `HttpServer` reads the section through `tryResolve`: a
+hand-built `httpModule` without the kernel's configs listens on port 3000 and Bun's
+default host. The framework never
+read `HOST`/`PORT`: that was the old project template, which now reads the `BAZIS_HTTP__*`
+keys. An application config section named `http` conflicts with this one. `startTestApp`
+always listens on `127.0.0.1` and a free port.
 
 ## Client address behind trusted proxies (2026-10-26, 0.120.0)
 
