@@ -138,15 +138,25 @@ TypeScript 7 поддерживается с bazis 0.97.5.
 }
 ```
 
+`src/app/App.ts` — объявление приложения:
+
+```ts
+import { App } from "bazis/core/app";
+import { AppModule } from "./modules/App.module";
+
+@App({ modules: [AppModule], http: { health: true } })
+export class Application {}
+```
+
 `src/index.ts` — точка входа:
 
 ```ts
 import { runApp } from "bazis/core/app";
-import { AppModule } from "./app/modules/App.module";
+import { Application } from "./app/App";
 import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
 await registerBazisGeneratedRuntime();
-await runApp(AppModule, { http: { port: 3000, health: true } });
+await runApp(Application);
 ```
 
 `src/app/modules/App.module.ts` — корневой модуль:

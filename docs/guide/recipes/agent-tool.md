@@ -12,11 +12,9 @@ OpenAI-совместимым API, который отвечает по сцен
 
 ```ts
 // src/app/config/llm.config.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface LlmConfig { provider: string; model: string; baseUrl: string; apiKey: Secret }
-
-export const llmConfig = defineConfig<LlmConfig>("llm", {
+export const llmConfig = defineConfig("llm", {
   default: { provider: "openai", model: "gpt-5-mini", baseUrl: "https://api.openai.com/v1", apiKey: secret("dev-key") },
   production: { apiKey: secret() },
 });

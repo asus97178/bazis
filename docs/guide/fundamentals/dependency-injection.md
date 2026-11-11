@@ -20,8 +20,10 @@
 | `...withEventSubscribers(Class)` | Подписчиков на [события](events.md) |
 
 Зависимости класса codegen берёт из конструктора, поэтому третьего
-аргумента со списком зависимостей нет. Всё остальное — список
-зависимостей, синхронные фабрики, `DI.*` — codegen отклоняет:
+аргумента со списком зависимостей нет. С версии 0.138.0 других форм нет и
+в самом `bazis/core/di`: `scoped(A, B, [deps])` не проходит проверку типов,
+а `singletonFactory` и объект `DI` из него убраны. Если такая запись
+всё-таки попала в модуль, codegen её отклоняет:
 
 ```text
 BAZIS_DI_PROVIDER_FORM: src/app/modules/notes/Notes.module.ts:12: providers of NotesModule:
@@ -32,7 +34,13 @@ singletonAsyncFactory(TOKEN, [deps], async factory) or ...withEventSubscribers(C
 ```
 
 В `controllers`, `background`, `gateways`, `grpcControllers` и `tools`
-перечисляют сами классы.
+перечисляют сами классы. Классы `references` и `lookup` из `permissions`
+модуль регистрирует сам — в `providers` их не повторяют.
+
+Низкоуровневые формы — провайдер, собранный вручную, фабрика, класс с
+явным списком зависимостей — остались для пакетов, которые расширяют
+фреймворк (свой коннектор, свой хост): `import { DI } from "bazis/core/di/lowLevel"`.
+Приложению они не нужны.
 
 ## Значения
 

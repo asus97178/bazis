@@ -115,8 +115,7 @@ export function notifyConnect(config: AppConfig<NotifyConfigShape>): InfraConnec
 
 ```ts
 // infra/configs.ts
-export interface NotifyConfig { url: string; token: Secret }
-export const notifyConfig = defineConfig<NotifyConfig>("notify", {
+export const notifyConfig = defineConfig("notify", {
   default: { url: "http://127.0.0.1:4020", token: secret("notify-dev") },
   production: { token: secret() },
 });

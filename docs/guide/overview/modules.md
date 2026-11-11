@@ -20,7 +20,7 @@ export class TaskModule {}
 ## Корневой модуль
 
 Приложение — дерево модулей. Корень — `AppModule` в
-`src/app/modules/App.module.ts`, его передают в `runApp`:
+`src/app/modules/App.module.ts`, его называет `@App` в `src/app/App.ts`:
 
 ```ts
 @Module({ imports: [GreetingModule, TaskModule], exports: [] })

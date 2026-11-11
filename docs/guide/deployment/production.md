@@ -14,19 +14,16 @@
 старте и файлы секретов:
 
 ```ts
-// src/index.ts
-import { runApp } from "bazis/core/app";
+// src/app/App.ts
+import { App } from "bazis/core/app";
 import { argsSource, envSource, secretFilesSource } from "bazis/core/kernel";
-import { AppModule } from "./app/modules/App.module";
-import { AppInfra } from "./app/infra/App.infra";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
+import { AppInfra } from "./infra/App.infra";
+import { AppModule } from "./modules/App.module";
 
-await registerBazisGeneratedRuntime();
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   infra: AppInfra,
   http: {
-    hostname: process.env.HOST ?? "127.0.0.1",
-    port: Number(process.env.PORT ?? 3000),
     health: true,                                  // /health для оркестратора
     accessLog: true,                               // строка на каждый запрос
     securityHeaders: { hsts: true },               // TLS — на прокси перед приложением
@@ -36,12 +33,13 @@ await runApp(AppModule, {
     .addConfigSource(secretFilesSource(process.env.SECRETS_DIR ?? "/run/secrets", { optional: true }))
     .addConfigSource(envSource())
     .addConfigSource(argsSource()),
-});
+})
+export class Application {}
 ```
 
 | Что | Зачем | Подробнее |
 | --- | --- | --- |
-| `hostname`, `port` из `HOST`, `PORT` | Один файл для всех стендов | [ниже](#адрес-и-порт) |
+| Нет `hostname` и `port` | Адрес задаёт окружение: `BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT` | [ниже](#адрес-и-порт) |
 | `health: true` | Оркестратор знает, что приложение готово | [Плавная остановка и health](graceful-shutdown.md) |
 | `accessLog: true` | Запросы видны в журнале | [Журнал запросов](../fundamentals/logging.md#журнал-запросов) |
 | `securityHeaders: { hsts: true }` | Браузер ходит только по HTTPS | [Чек-лист](../security/production-checklist.md#http) |
@@ -56,8 +54,8 @@ await runApp(AppModule, {
 | Переменная | Пример | Что задаёт |
 | --- | --- | --- |
 | `BAZIS_ENV` | `production` | Среда; без неё — тоже production, но лучше явно |
-| `HOST` | `0.0.0.0` | На каком адресе слушать |
-| `PORT` | `8080` | Порт |
+| `BAZIS_HTTP__PORT` | `8080` | Порт; по умолчанию `3000` |
+| `BAZIS_HTTP__HOST` | `127.0.0.1` | На каком адресе слушать; в production по умолчанию `0.0.0.0` |
 | `BAZIS_DB__HOST`, `BAZIS_DB__PORT`, `BAZIS_DB__DATABASE`, `BAZIS_DB__USERNAME` | `db.internal` … | Подключение к базе |
 | `BAZIS_DB__PASSWORD` | — | Секрет: переменная или файл `/run/secrets/BAZIS_DB__PASSWORD` |
 | `SECRETS_DIR` | `/run/secrets` | Каталог файлов секретов, если не стандартный |
@@ -69,10 +67,11 @@ await runApp(AppModule, {
 
 ### Адрес и порт
 
-Шаблон слушает `127.0.0.1` — только локальные подключения. В контейнере
-и за балансировщиком нужен `HOST=0.0.0.0`, иначе запросы снаружи не
-дойдут. Сам сервер работает по HTTP; TLS завершается на прокси или
-балансировщике.
+Адрес и порт — настройки `http.host` и `http.port`. В production сервер
+слушает все интерфейсы (`0.0.0.0`), как нужно в контейнере и за
+балансировщиком; вне production — только `127.0.0.1`. Если приложение стоит
+за nginx на том же хосте, закройте его снаружи: `BAZIS_HTTP__HOST=127.0.0.1`.
+Сам сервер работает по HTTP; TLS завершается на прокси или балансировщике.
 
 ### За nginx
 
@@ -91,9 +90,11 @@ location / {
 Укажите приложению, каким прокси верить:
 
 ```ts
-await runApp(AppModule, {
-  http: { hostname: "127.0.0.1", port: 3000, trustedProxies: ["127.0.0.1", "::1"] },
-});
+@App({
+  modules: [AppModule],
+  http: { trustedProxies: ["127.0.0.1", "::1"] },   // и BAZIS_HTTP__HOST=127.0.0.1 в окружении
+})
+export class Application {}
 ```
 
 - `ctx.clientIp` — адрес клиента; по нему же считают
@@ -131,7 +132,7 @@ info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"dur
 - Пароли, токены и учётные данные в адресах маскируются.
 - Запуск и остановка пишутся всегда: `bazis started` с адресом в
   `listening` и `bazis stopped` с сигналом и кодом выхода (с 0.107.0).
-  При `HOST=0.0.0.0` адрес показан как `http://localhost:<порт>`.
+  Когда сервер слушает `0.0.0.0`, адрес показан как `http://localhost:<порт>`.
   Отключает их `kernel: { startupReport: false }`.
 
 Свой формат или отправка в систему сбора — через свой логгер

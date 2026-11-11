@@ -2,7 +2,7 @@
 
 Passport version: 1.3. Date: 2026-09-26. Type: atomic technical module.
 Path: `src/bazis/core/grpc`. Public entry: `bazis/core/grpc`.
-Connection: `runApp(AppModule, { grpc: options })`, or `grpcModule({ imports, ... })`; controllers are declared by `grpcControllers` of their modules only (the `controllers` option is removed in 0.98.32).
+Connection: `@App({ grpc: options })`, or `grpcModule({ imports, ... })`; controllers are declared by `grpcControllers` of their modules only (the `controllers` option is removed in 0.98.32).
 Status: implemented without external libraries; the functional checks and the binary smoke test passed.
 Scope: server controllers, client RPCs, the protobuf contract, DI and the transport lifecycle.
 
@@ -57,7 +57,7 @@ the owner; it is not a full clone of a third-party gRPC SDK API.
 ```ts
 import { Module, scoped } from "bazis/core/di";
 import { GrpcController, GrpcMethod, GrpcError, GrpcStatus, grpcService, loadGrpcPackage } from "bazis/core/grpc";
-import { runApp } from "bazis/core/app";
+import { App } from "bazis/core/app";
 import { Validator } from "bazis/library/validation";
 import usersProto from "./users.proto" with { type: "file" };
 import { UsersController } from "./UsersController";
@@ -91,10 +91,12 @@ export class UsersGrpcController {
 })
 export class UsersModule {}
 
-await runApp(UsersModule, {
-  http: { port: 3000 },
+@App({
+  modules: [UsersModule],
+  http: {},
   grpc: { address: "127.0.0.1:50051" },
-});
+})
+export class Application {}
 ```
 
 This is an integration scheme for an application that already has an IUserService

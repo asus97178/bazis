@@ -30,7 +30,8 @@ import { Module, singleton } from "@/core/di";
 @Module({ gateways: [ChatGateway], providers: [singleton(ChatHistory)] })
 export class ChatModule {}
 
-await runApp(AppModule, { http: { port: 3000 }, websocket: { requireAuth: true, authenticator } });
+@App({ modules: [AppModule], http: {}, websocket: { requireAuth: true, authenticator } })
+export class Application {}
 ```
 
 Without `runApp`, `websocketModule({ imports: [ChatModule], ... })` next to
@@ -150,7 +151,8 @@ Pass an existing native Bun RedisClient from the host infrastructure:
 const adapter = new RedisWebSocketAdapter(hostRedisClient, {
   keyPrefix: "my-app:ws", // same on participating nodes; distinct per application
 });
-await runApp(AppModule, { http: {}, websocket: { adapter, replayDelivery: "client-ack" } });
+@App({ modules: [AppModule], http: {}, websocket: { adapter, replayDelivery: "client-ack" } })
+export class Application {}
 ```
 
 The adapter owns only a duplicate connection for pub/sub. Closing the adapter

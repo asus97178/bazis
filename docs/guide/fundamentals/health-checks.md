@@ -10,7 +10,8 @@
 ## Включение
 
 ```ts
-await runApp(AppModule, { http: { port: 3000, health: true } });
+@App({ modules: [AppModule], http: { health: true } })
+export class Application {}
 ```
 
 ```text

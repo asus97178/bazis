@@ -32,7 +32,7 @@ NestJS — переносится большая часть привычек. Н
 
 | NestJS | bazis | Где читать |
 | --- | --- | --- |
-| `NestFactory.create(AppModule)` + `listen` | `runApp(AppModule, { http })` | [Приложение](../overview/application.md) |
+| `NestFactory.create(AppModule)` + `listen` | `@App({ http })` | [Приложение](../overview/application.md) |
 | `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../overview/modules.md) |
 | `@Global()` | `@Global()` — так же | [Модули](../overview/modules.md#глобальные-модули) |
 | `@Injectable()` | Не нужен | |
@@ -51,7 +51,7 @@ NestJS — переносится большая часть привычек. Н
 | `OnModuleInit`, `OnApplicationShutdown` | `LifecycleHook`: `onInit`, `onShutdown` | [Жизненный цикл](../fundamentals/lifecycle.md#хуки-жизненного-цикла) |
 | `@nestjs/schedule`, `@Cron` | `PeriodicBackgroundService` в поле `background` модуля | [Фоновые службы](../realtime/background-services.md) |
 | `@nestjs/swagger` | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../http/openapi.md) |
-| `Test.createTestingModule(...).overrideProvider(...)` | `startTestApp(AppModule, { overrides })` | [Тестирование](../fundamentals/testing.md#http-starttestapp) |
+| `Test.createTestingModule(...).overrideProvider(...)` | `startTestApp(AppModule, { overrides })` | [Тестирование](../fundamentals/testing.md#приложение-целиком-starttestapp) |
 | `nest g resource` | `bazis g module` | [Команды CLI](../cli/commands.md) |
 | TypeORM / Prisma | Встроенная ORM: `DbContext`, `DbSet`, `saveChanges` | [Рецепт CRUD](crud-module.md) |
 
@@ -117,7 +117,7 @@ export abstract class IBookStore {
 }
 
 export class BooksService {
-  constructor(private readonly store: IBookStore, private readonly config: ConfigView<BooksConfig>) {}
+  constructor(private readonly store: IBookStore, private readonly config: ConfigView<typeof booksConfig>) {}
 
   search(q: string, limit: number): Book[] {
     const max = Math.min(limit, this.config.get("pageSize"));
@@ -143,9 +143,7 @@ export class BooksService {
 
 ```ts
 // bazis
-export interface BooksConfig { pageSize: number; adminKey: Secret }
-
-export const booksConfig = defineConfig<BooksConfig>("books", {
+export const booksConfig = defineConfig("books", {
   default: { pageSize: 20, adminKey: secret("dev-admin-key") },
   production: { adminKey: secret() },
 });
@@ -264,7 +262,7 @@ export class AdminKeyGuard implements CanActivate {
 export const adminKey: AuthorizeCheck = (ctx) => {
   const key = ctx.header("x-admin-key");
   if (!key) throw new UnauthorizedError();
-  const config = ctx.services.resolve(booksConfig.token) as ConfigView<BooksConfig>;
+  const config = ctx.services.resolve(booksConfig.token) as ConfigView<typeof booksConfig>;
   return key === config.get("adminKey").reveal();
 };
 ```
@@ -296,7 +294,8 @@ export const bookErrors: HttpMiddleware = async (_ctx, next) => {
   }
 };
 
-await runApp(AppModule, { http: { /* … */ middleware: [bookErrors] } });
+@App({ modules: [AppModule], http: { /* … */ middleware: [bookErrors] } })
+export class Application {}
 ```
 
 ### `OnModuleInit` → `LifecycleHook`

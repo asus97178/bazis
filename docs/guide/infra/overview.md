@@ -25,7 +25,8 @@ export class AppInfra {}
 
 ```ts
 // index.ts
-await runApp(AppModule, { infra: AppInfra, http: { port: 3000 } });
+@App({ modules: [AppModule], infra: AppInfra, http: {} })
+export class Application {}
 ```
 
 Ключ манифеста — имя экземпляра: `db`, `cache`, `search`. Оно видно в

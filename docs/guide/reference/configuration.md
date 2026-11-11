@@ -1,7 +1,7 @@
 # Параметры конфигурации
 
 Все параметры, которыми настраивается приложение bazis:
-- опции [`runApp`](#runapp);
+- поля [`@App`](#app);
 - параметры [ядра](#kernel) и [HTTP-сервера](#http);
 - [переменные окружения](#переменные-окружения);
 - [`bazis.config.json`](#bazisconfigjson).
@@ -13,15 +13,17 @@
 
 Значения по умолчанию — для bazis 0.100.8.
 
-## `runApp`
+## `@App`
 
 ```ts
-await runApp(AppModule, { language: "ru", infra: AppInfra, kernel: { shutdownTimeoutMs: 20_000 }, http: { port: 3000 } });
+@App({ modules: [AppModule], language: "ru", infra: AppInfra, kernel: { shutdownTimeoutMs: 20_000 }, http: {} })
+export class Application {}
 ```
 
-| Опция | Что задаёт | Подробно |
+| Поле | Что задаёт | Подробно |
 | --- | --- | --- |
-| `http` | HTTP-сервер; без неё приложение запускается без HTTP — как фоновый процесс | [HTTP](#http) |
+| `modules` | Модули приложения; обязательно | [Приложение](../overview/application.md) |
+| `http` | HTTP-сервер; без него приложение запускается без HTTP — как фоновый процесс | [HTTP](#http) |
 | `grpc` | gRPC-сервер | [gRPC](../realtime/grpc.md) |
 | `websocket` | Вход, адаптер и лимиты WebSocket; шлюзы собираются из модулей сами | [WebSocket](../realtime/websocket.md) |
 | `kernel` | Окружение, сроки запуска и остановки, сигналы | [Ядро](#kernel) |
@@ -33,9 +35,10 @@ await runApp(AppModule, { language: "ru", infra: AppInfra, kernel: { shutdownTim
 | `validator` | Свой валидатор моделей запроса вместо встроенного | [Проверка данных](../overview/validation.md) |
 | `configure` | Тонкая настройка `KernelBuilder`: логгер, источники настроек | [Приложение](../overview/application.md) |
 
-`startTestApp` принимает те же опции, кроме `port` и `hostname` в `http`, и
-ещё `overrides` — замены сервисов
-([Тестирование](../fundamentals/testing.md#http-starttestapp)).
+`startTestApp(Application, …)` принимает те же поля, кроме `modules` и
+`port` с `hostname` в `http`, — ими тест заменяет объявленное — и ещё
+`overrides`, замены сервисов
+([Тестирование](../fundamentals/testing.md#приложение-целиком-starttestapp)).
 
 ## `kernel`
 
@@ -55,8 +58,8 @@ await runApp(AppModule, { language: "ru", infra: AppInfra, kernel: { shutdownTim
 
 | Опция | По умолчанию | Что задаёт |
 | --- | --- | --- |
-| `port` | `3000` | Порт; `0` — свободный порт |
-| `hostname` | все адреса (`0.0.0.0`); при `port: 0` — `127.0.0.1` | Адрес. В контейнере нужен `0.0.0.0` ([Docker](../deployment/docker.md)) |
+| `port` | настройка `http.port` (`BAZIS_HTTP__PORT`), `3000` | Закрепляет порт в коде; `0` — свободный порт. Обычно не задают |
+| `hostname` | настройка `http.host` (`BAZIS_HTTP__HOST`): `127.0.0.1`, в production `0.0.0.0` | Закрепляет адрес в коде. Обычно не задают ([Адрес сервера](../overview/application.md#адрес-сервера)) |
 | `prefix` | — | Общий префикс маршрутов: `"api"` → `/api/…` |
 | `middleware` | — | Глобальные middleware ([Middleware](../overview/middleware.md)) |
 | `cors` | `false` | CORS для всех маршрутов ([CORS](../http/cors-headers-log.md)) |
@@ -75,7 +78,7 @@ await runApp(AppModule, { language: "ru", infra: AppInfra, kernel: { shutdownTim
 | `imports` | — | Модули с зависимостями контроллеров, если они не видны иначе |
 
 Опции, которые обычно не задают руками: `validator` и `languages` ставит
-`runApp`, `routeMiddlewareComposer` — пакеты фреймворка.
+`@App`, `routeMiddlewareComposer` — пакеты фреймворка.
 
 ## Переменные окружения
 

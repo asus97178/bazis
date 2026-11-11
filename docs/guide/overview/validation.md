@@ -240,7 +240,8 @@ zip?: string;
 Русские тексты включает опция `language` приложения:
 
 ```ts
-await runApp(AppModule, { language: "ru", http: { … } });
+@App({ modules: [AppModule], language: "ru", http: { … } })
+export class Application {}
 ```
 
 Переводятся все тексты ответа: сообщения правил, ошибки типов JSON и

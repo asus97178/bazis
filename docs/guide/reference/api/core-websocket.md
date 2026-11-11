@@ -64,4 +64,4 @@ WebSocket: шлюзы, комнаты, вход, рассылка из серв�
   `ReliableRoomPublication`, `ReliableSessionOwner`, `ReplayAcknowledgement`,
   `ReplayDelivery`, `OfflineBroadcastResult`.
 
-Параметры — `@App({ websocket })` ([Параметры конфигурации](../configuration.md#runapp)).
+Параметры — `@App({ websocket })` ([Параметры конфигурации](../configuration.md#app)).

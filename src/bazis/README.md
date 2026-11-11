@@ -142,7 +142,8 @@ import { dbConfig } from "../config/db.config"; // defineConfig("db", { default:
 export class AppInfra {}
 
 // src/index.ts
-await runApp(AppModule, { infra: AppInfra, http: { port: 3000, health: true } });
+@App({ modules: [AppModule], infra: AppInfra, http: { health: true } })
+export class Application {}
 ```
 
 A feature module attaches its own `DbContext` and entities with
@@ -180,11 +181,13 @@ import { CodexError, RU_CODEX_MESSAGES } from "bazis/core/infra";
 import { RU_UI_LABELS } from "bazis/core/app";
 
 CodexError.useMessages(RU_CODEX_MESSAGES); // Codex connector errors
-await runApp(AppModule, {
+@App({
+  modules: [AppModule],
   language: "ru",                          // response texts: validation, 404/405, 401/403, binding errors
   messages: { notFound: "Нет такой страницы" }, // optional: own texts for single keys
-  ui: { labels: RU_UI_LABELS, surfaces: [/* ... */] }, // generated UI texts
-});
+  ui: { labels: RU_UI_LABELS, surfaces: [/* ... */] }, // generated UI texts,
+})
+export class Application {}
 ```
 
 `language` is per application: it is applied when the response is written, so

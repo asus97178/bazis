@@ -84,7 +84,7 @@ Wants=network-online.target
 [Service]
 ExecStart=/opt/shop/shop
 DynamicUser=yes
-Environment=BAZIS_ENV=production HOST=0.0.0.0 PORT=8080
+Environment=BAZIS_ENV=production BAZIS_HTTP__PORT=8080
 EnvironmentFile=/etc/shop/shop.env
 Restart=on-failure
 RestartSec=2

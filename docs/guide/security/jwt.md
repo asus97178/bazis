@@ -199,9 +199,7 @@ const { payload } = await verifier.validate(token);
 Ключи — в настройках модуля, приватный — как секрет:
 
 ```ts
-export interface AuthConfig { privateKeyPem: Secret; publicKeyPem: string; }
-
-export const authConfig = defineConfig<AuthConfig>("auth", {
+export const authConfig = defineConfig("auth", {
   default: { privateKeyPem: secret(), publicKeyPem: "" },
 });
 // BAZIS_AUTH__PRIVATEKEYPEM, BAZIS_AUTH__PUBLICKEYPEM

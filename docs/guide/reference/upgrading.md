@@ -7,6 +7,46 @@
 Переходите через несколько версий — пройдите по всем разделам между
 вашей версией и новой.
 
+## 0.138.0
+
+Хранилища не меняются. Проверьте вот что:
+
+- **Приложение объявляется классом с `@App`.** `runApp` принимает только его: `runApp(AppModule, { … })` больше не компилируется. Перенесите опции в объявление:
+
+  ```ts
+  // было: src/index.ts
+  await runApp(AppModule, { infra: AppInfra, http: { hostname: process.env.HOST ?? "127.0.0.1", port: Number(process.env.PORT ?? 3000), health: true } });
+
+  // стало: src/app/App.ts
+  @App({ modules: [AppModule], infra: AppInfra, http: { health: true } })
+  export class Application {}
+
+  // стало: src/index.ts
+  await registerBazisGeneratedRuntime();
+  await runApp(Application);
+  ```
+
+  Корневой модуль `App.module.ts` остаётся как был: CLI по-прежнему регистрирует в нём новые модули. Тип `RunAppOptions` заменён на `AppOptions` (с `modules`) и `AppSettings` (без него). Подробнее — в [«Приложении»](../overview/application.md).
+- **Адрес сервера — настройки `http.host` и `http.port`.** Переменные `HOST` и `PORT` сам фреймворк не читает и раньше не читал: их читал шаблон `src/index.ts`. Теперь адрес задают `BAZIS_HTTP__HOST` и `BAZIS_HTTP__PORT`; поправьте `.env`, Dockerfile и манифесты. Порт по умолчанию тот же, 3000. `port` и `hostname` в `@App({ http })` по-прежнему работают и закрепляют значение в коде.
+- **Вне production сервер слушает `127.0.0.1`.** Раньше приложение без `hostname` слушало все интерфейсы в любом окружении. В production поведение прежнее (`0.0.0.0`). Если сервер разработки должен быть виден снаружи, например из контейнера, задайте `BAZIS_HTTP__HOST=0.0.0.0`. Своя секция настроек с именем `http` теперь конфликтует со встроенной: переименуйте её.
+- **`startTestApp` читает `@App`.** `startTestApp(Application)` берёт `infra`, `cache`, `config` и `http` из объявления; второй аргумент только меняет отдельные поля. Тесты, которые передавали модуль и опции (`startTestApp(AppModule, { infra: AppInfra })`), работают как раньше, но проще передать приложение. Приложение без `http` в `@App` стартует в тесте без сервера. То же у `testWorkflow`.
+- **Собранный бинарник не ищет `src/generated` в текущей папке.** Он получает сгенерированный код только через `await registerBazisGeneratedRuntime()` в точке входа. Шаблон `bazis new` всегда его вызывал; если вы убрали эту строку, верните её.
+- **В `bazis/core/di` остались только согласованные формы.** Убраны третий аргумент `scoped`/`singleton`/`transient` (список зависимостей), `singletonFactory`, `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` и объект `DI`. В модулях приложения codegen отклонял их и раньше. Пакету, который расширяет фреймворк, они доступны отдельно: `import { DI } from "bazis/core/di/lowLevel"`.
+
+  | Было | Стало |
+  | --- | --- |
+  | `scoped(A, B, [Dep])` | `scoped(A, B)` — зависимости берутся из конструктора |
+  | `singletonFactory(T, [deps], f)` | Класс с конструктором: `singleton(T, Impl)`; в пакете — `DI.singleton(DI.factoryProvider(T, [deps], f))` |
+  | `singletonFactoryWithResolver`, `singletonAsyncFactoryWithResolver` | В пакете — `DI.singleton(DI.factoryProviderWithResolver(…))`, `DI.singleton(DI.asyncFactoryProviderWithResolver(…))` |
+  | `import { DI } from "bazis/core/di"` | `import { DI } from "bazis/core/di/lowLevel"` |
+- **`ormEntityTools` возвращает набор, а не массив.** В модуле замените `tools: [...ormEntityTools(Order, {…})]` на `tools: [ormEntityTools(Order, {…})]`, а лучше вынесите набор в константу и называйте инструмент в процессе ссылкой: `tool: orderTools.find`. Имена инструментов (`orm.order.find`) не изменились, сохранённые процессы работают.
+- **Объект в `tools`** теперь читается как набор инструментов `defineTool`. Раньше в списке могли стоять только классы, так что существующий код это не задевает.
+- **`defineProcess` проверяет документ-литерал.** Процесс, записанный в коде, может перестать компилироваться там, где раньше ошибку находил только запуск: поток в несуществующий узел, лишнее или пропущенное поле настроек узла, `attachedTo` у узла, который не `boundary…`. Исправьте документ. Документ, который пришёл как данные, объявите с типом `ProcessDocument` — он проверяется при запуске, как раньше.
+- **Типы `CodeProcess` и `ProcessDefinition` стали обобщёнными,** `StartInstance`, `StartMany` и `StartManyItem` получили параметр входа. Код, который называл эти типы без параметров, менять не нужно. Свои реализации `IWorkflowRuntime` должны принять в `start` и `startMany` и ключ, и сам процесс.
+- **`lookup` из `permissions` регистрируется сам.** Строку `scoped(MyLookup)` в `providers` можно убрать; оставленная работает. `lookup`, общий для нескольких модулей, регистрирует и экспортирует его владелец. Текст ошибки `… is not registered: add it to the module's providers.` стал короче: `… is not registered.`
+- **Тексты сообщений.** Подсказки называют `@App` вместо `runApp`: `add cache: memory() to @App`, `@App: language "de" is not supported`, `set BAZIS_HTTP__HOST=0.0.0.0`. Если тест или мониторинг искал прежний текст, поправьте.
+- **Шаблон `bazis new`** создаёт `src/app/App.ts`, точку входа без опций, `.env.example` с `BAZIS_HTTP__HOST` и `BAZIS_HTTP__PORT` и тест, который поднимает приложение через `startTestApp(Application)`, а не отдельным процессом.
+
 ## 0.137.0
 
 Хранилища не меняются. Проверьте вот что:

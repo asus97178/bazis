@@ -12,7 +12,7 @@
 | | `@Cacheable` | `@CacheableRedis` |
 | --- | --- | --- |
 | Где хранится | В памяти процесса | В Redis (Valkey), общий для всех экземпляров |
-| Что подключить | `cache: memory()` в `runApp` | Плюс `redisConnect(…, { cache: "distributed" })` в `@Infra` |
+| Что подключить | `cache: memory()` в `@App` | Плюс `redisConnect(…, { cache: "distributed" })` в `@Infra` |
 | Значения | Любые — возвращается тот же объект | Только простые данные JSON |
 | Скорость | Без сети | Запрос к Redis |
 | Переживает перезапуск | Нет | Да, если ключ задан явно |
@@ -40,7 +40,8 @@ add cache: memory() to @App (startTestApp takes the same option).
 // index.ts
 import { memory } from "bazis/core/cache";
 
-await runApp(AppModule, { cache: memory({ maxEntries: 1000 }), http: { port: 3000 } });
+@App({ modules: [AppModule], cache: memory({ maxEntries: 1000 }), http: {} })
+export class Application {}
 ```
 
 ```ts
@@ -134,11 +135,10 @@ this.orders.order(this.current.get().tenantId, id);
 
 ```ts
 // infra/App.infra.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 import { Infra, redisConnect } from "bazis/core/infra";
 
-export interface RedisConfig { url: Secret }
-export const redisConfig = defineConfig<RedisConfig>("redis", {
+export const redisConfig = defineConfig("redis", {
   default: { url: secret("redis://127.0.0.1:6379") },
   production: { url: secret() },
 });

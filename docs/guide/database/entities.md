@@ -367,11 +367,9 @@ const emptyAsNull: ValueConverter<string | null, string | null> = {
 
 ```ts
 // config/crypto.config.ts
-import { defineConfig, secret, type Secret } from "bazis/core/kernel";
+import { defineConfig, secret } from "bazis/core/kernel";
 
-export interface CryptoConfig { phoneKey: Secret; phoneHashKey: Secret }
-
-export const cryptoConfig = defineConfig<CryptoConfig>("crypto", {
+export const cryptoConfig = defineConfig("crypto", {
   default: { phoneKey: secret("dev-phone-key-not-for-production"), phoneHashKey: secret("dev-phone-hash-key") },
   production: { phoneKey: secret(), phoneHashKey: secret() },
 });
@@ -457,7 +455,7 @@ import { createHmac } from "node:crypto";
 import type { ConfigView } from "bazis/core/kernel";
 
 export class PhoneHash {
-  constructor(private readonly config: ConfigView<CryptoConfig>) {}
+  constructor(private readonly config: ConfigView<typeof cryptoConfig>) {}
 
   of(phone: string): string {
     const normalized = phone.replace(/[^\d+]/g, "");
