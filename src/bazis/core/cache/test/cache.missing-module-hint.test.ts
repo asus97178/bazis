@@ -10,6 +10,6 @@ test("a missing ICache says to add a cache module; a dependency without a hint e
   class App {}
   let message = "";
   try { createContainer(App, { validateOnBuild: true }); } catch (error) { message = (error as Error).message; }
-  expect(message).toContain('Missing dependency "ICache" for "Catalog". The cache is provided by a cache module: add cache: memory() to the runApp options (startTestApp takes the same options).');
+  expect(message).toContain('Missing dependency "ICache" for "Catalog". The cache is provided by a cache module: add cache: memory() to @App (startTestApp takes the same option).');
   expect(message.split("\n")).toContain('Missing dependency "IClock" for "Catalog"');
 });

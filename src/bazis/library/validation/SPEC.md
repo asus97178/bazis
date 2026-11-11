@@ -473,7 +473,7 @@ so a valid object pays no allocations for it.
 Template priority: **the decorator's local `message` > global (`setDefaultMessages`) >
 built-in**. A string returned from `custom` wins over all of them.
 Built-in messages are English (`EN_VALIDATION_MESSAGES`); `RU_VALIDATION_MESSAGES` is a Russian set for `setDefaultMessages`.
-An HTTP application picks the language with `runApp({ language: "ru", messages })`: each
+An HTTP application picks the language with `@App({ language: "ru", messages })`: each
 `ValidationError` built from a template carries `params`, and the HTTP error handler
 re-renders it in the application language (a rule's own `message` has no `params` and
 stays as is). Priority there: `messages` > `setDefaultMessages` > the language set > English.

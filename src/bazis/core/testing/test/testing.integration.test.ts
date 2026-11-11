@@ -31,9 +31,11 @@ import { ITaskStore, PgTaskStore, TaskController, TaskService } from "./Task";
 @Module({ providers: [scoped(ITaskStore, PgTaskStore), scoped(TaskService)], controllers: [TaskController], exports: [TaskService] })
 export class AppModule {}
 `,
-  "src/index.ts": `import { runApp } from "bazis/core/app";
+  "src/index.ts": `import { App, runApp } from "bazis/core/app";
 import { AppModule } from "./app/App.module";
-await runApp(AppModule, { http: { port: 3000 } });
+@App({ modules: [AppModule], http: { port: 3000 } })
+class Application {}
+await runApp(Application);
 `,
   "test/task.test.ts": `import { expect, test } from "bun:test";
 import { singleton } from "bazis/core/di";

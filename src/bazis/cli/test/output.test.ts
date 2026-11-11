@@ -71,15 +71,21 @@ describe("CLI output", () => {
     expect(output).toContain("Use bazis --help");
   });
 
-  test("a new project records its language and checks /health on a port from the operating system", async () => {
+  test("a new project records its language and its test starts the declared application on a free port", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "bazis-cli-output-"));
     try {
       const result = await generateProject({ name: "Demo", outputPath: path.join(root, "demo") });
       const config = await Bun.file(path.join(result.projectDir, "bazis.config.json")).json() as { language?: string };
       expect(["en", "ru"]).toContain(config.language!);
       const health = await Bun.file(path.join(result.projectDir, "src/app/test/health.test.ts")).text();
-      expect(health).toContain("port: 0");
+      // startTestApp listens on a port the operating system gives, not on a random guess.
+      expect(health).toContain("startTestApp(Application)");
       expect(health).not.toContain("Math.random");
+      const app = await Bun.file(path.join(result.projectDir, "src/app/App.ts")).text();
+      expect(app).toContain("@App({\n  modules: [AppModule],\n  http: { health: true },\n})\nexport class Application {}");
+      const entry = await Bun.file(path.join(result.projectDir, "src/index.ts")).text();
+      expect(entry).toContain("await runApp(Application);");
+      expect(entry).not.toContain("process.env");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

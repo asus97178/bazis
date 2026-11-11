@@ -233,7 +233,7 @@ enabled: false
 `SIGN_IN_REQUIRED`, `BUSY`, `MODEL_UNAVAILABLE`, `REASONING_UNAVAILABLE`,
 `PROTOCOL_ERROR`, `RESPONSE_FAILED`, `TIMEOUT`, `LOGIN_FAILED`,
 `LOGIN_EXPIRED`. Текст `message` рассчитан на показ пользователю, его язык
-задаёт `runApp({ language })`:
+задаёт `@App({ language })`:
 
 ```ts
 try {

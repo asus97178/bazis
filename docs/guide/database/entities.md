@@ -411,7 +411,7 @@ SELECT phone FROM customers        → rJfNG/P39GOy4F+RVyPQ/9fv6+5K6vnF6DTLqPU0G
 
 ```text
 OrmError: Customer.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application;
-add it to `config` of the module that owns Customer or to runApp({ config }).
+add it to `config` of the module that owns Customer or to @App({ config }).
 ```
 
 - **Ключ — случайные 32 байта**, а не пароль: `openssl rand -base64 32`.

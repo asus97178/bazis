@@ -82,7 +82,7 @@ dependencies (`@WebSocketGateway` is a codegen channel decorator).
 (`collectModuleGateways`) and fails fast when none is found; the singleton resolver
 factory `WEBSOCKET_UPGRADE` resolves them and builds the server through
 WebSocketExplorer. `runApp` installs the module next to HTTP whenever a module
-declares gateways; `runApp({ websocket })` carries the server-wide settings
+declares gateways; `@App({ websocket })` carries the server-wide settings
 (`WebSocketOptions`), and settings without any gateway are a `KernelError`.
 `WebSocketModule` is global and exports `[WEBSOCKET_UPGRADE, WebSocketService]`:
 [WebSocketService](WebSocketService.ts) is `to(room).emit(event, data)` (and

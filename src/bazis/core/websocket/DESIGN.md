@@ -101,7 +101,7 @@ default, `replayDelivery: "transport"`.
 ### Client-confirmed replay
 
 Opt in with `?replay=client-ack` on each connection, or require it for all clients
-with `runApp({ websocket: { replayDelivery: "client-ack" } })`. The adapter
+with `@App({ websocket: { replayDelivery: "client-ack" } })`. The adapter
 must support CAS. A saved client-ack session cannot reconnect in transport mode;
 such an upgrade returns 409. Invalid/duplicate replay query values return 400.
 

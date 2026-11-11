@@ -52,7 +52,7 @@ const EN_CODEX_MESSAGES: Readonly<Record<CodexErrorCode, string>> = Object.freez
   LOGIN_EXPIRED: "The sign-in window expired. Start signing in again.",
 });
 
-/** Russian texts for every code; `runApp({ language: "ru" })` turns them on. */
+/** Russian texts for every code; `@App({ language: "ru" })` turns them on. */
 export const RU_CODEX_MESSAGES: Readonly<Record<CodexErrorCode, string>> = Object.freeze({
   NOT_CONFIGURED: "Подключение ChatGPT не настроено на сервере.",
   UNAVAILABLE: "Codex App Server недоступен. Проверьте его установку и настройки.",
@@ -73,7 +73,7 @@ let own: Partial<Record<CodexErrorCode, string>> = {};
 let messages: Readonly<Record<CodexErrorCode, string>> = EN_CODEX_MESSAGES;
 
 /**
- * @internal `runApp({ language })` sets the language of the texts. It is
+ * @internal `@App({ language })` sets the language of the texts. It is
  * process-wide, like the texts themselves: the last started application wins.
  */
 export function useCodexLanguage(name: keyof typeof CODEX_LANGUAGES): void {
@@ -81,7 +81,7 @@ export function useCodexLanguage(name: keyof typeof CODEX_LANGUAGES): void {
   messages = Object.freeze({ ...language, ...own });
 }
 
-/** `message` is user-facing text for `code`, in the language of `runApp({ language })`. */
+/** `message` is user-facing text for `code`, in the language of `@App({ language })`. */
 export class CodexError extends Error {
   constructor(readonly code: CodexErrorCode) { super(messages[code]); this.name = "CodexError"; }
 

@@ -59,5 +59,5 @@ test("encryptedWith names the config that is not declared in the application", a
   @Module({ imports: [ormModule({ provider, healthCheck: false })], ormBazis: { context: LeadsDb, entities: [Lead] }, exports: [] })
   class App {}
   const kernel = await new KernelBuilder(App).useStartupReport(false).addConfigSource(memorySource({})).build();
-  await expect(kernel.start()).rejects.toThrow('Lead.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application; add it to `config` of the module that owns Lead or to runApp({ config }).');
+  await expect(kernel.start()).rejects.toThrow('Lead.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application; add it to `config` of the module that owns Lead or to @App({ config }).');
 });

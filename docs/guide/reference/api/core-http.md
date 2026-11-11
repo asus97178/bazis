@@ -93,7 +93,7 @@ middleware, авторизация, списки. Основная точка в
 
 | Экспорт | Что это |
 | --- | --- |
-| `httpModule(options)`, `HttpServer` | HTTP-модуль и сервер; `runApp({ http })` создаёт их сам |
+| `httpModule(options)`, `HttpServer` | HTTP-модуль и сервер; `@App({ http })` создаёт их сам |
 | `SERVER_MIDDLEWARE`, `ROUTE_MIDDLEWARE_COMPOSER`, `HTTP_ERROR_HOOK`, `HTTP_ERROR_MAPPER` | Токены, через которые пакет добавляет свой middleware, обработчик ошибок или ответ на свои ошибки |
 | `composeRouteMiddlewareComposers`, `createAuthorizeComposer`, `resolveAuthorizeMeta`, `sortByOrder` | Сборка middleware маршрута |
 | `WEBSOCKET_UPGRADE` | Токен: WebSocket на порту HTTP-сервера |

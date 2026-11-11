@@ -27,7 +27,7 @@
 ```text
 [bazis] configuration error: Service graph validation failed:
 Missing dependency "ICache" for "StockService". The cache is provided by a cache module:
-add cache: memory() to the runApp options (startTestApp takes the same options).
+add cache: memory() to @App (startTestApp takes the same option).
 ```
 
 > [!NOTE]

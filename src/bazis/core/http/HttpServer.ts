@@ -23,6 +23,7 @@ import { HTTP_ERROR_HOOK, HTTP_ERROR_MAPPER, ROUTE_MIDDLEWARE_COMPOSER, SERVER_M
 import type { HealthEndpointOptions, RouteMiddlewareComposer, HttpModuleOptions, HttpServerOptions } from "./options";
 import { WEBSOCKET_UPGRADE, type WebSocketUpgrade } from "./WebSocketUpgrade";
 import { HttpSetupError, type HttpError } from "./Errors/HttpError";
+import { httpConfig } from "./Http.config";
 import { clientAddress, trustedProxies, type TrustedProxies } from "./HttpContext/clientAddress";
 import { EN_HTTP_MESSAGES, formatMessage, languageHeaders, type HttpMessageKey, type MessageParams, type SelectedLanguage } from "./Errors/messages";
 import { getModelValidator, type ModelValidator } from "./Binding/modelValidator";
@@ -282,14 +283,14 @@ export class HttpServer implements HostedService {
   }
 
   private async startBunServer(create: (listen: ListenOptions) => ReturnType<typeof Bun.serve>): Promise<ReturnType<typeof Bun.serve>> {
-    const attempts = this.options.port === 0 ? 10 : 1;
+    const listen = this.listenOptions();
+    const attempts = listen.port === 0 ? 10 : 1;
     let lastError: unknown;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const listen = await this.resolveListenOptions();
       try {
         return create(listen);
       } catch (error) {
-        if (this.options.port !== 0 || !isAddressInUse(error)) {
+        if (listen.port !== 0 || !isAddressInUse(error)) {
           throw error;
         }
         lastError = error;
@@ -298,12 +299,14 @@ export class HttpServer implements HostedService {
     throw lastError;
   }
 
-  private async resolveListenOptions(): Promise<ListenOptions> {
-    const hostname = this.options.hostname ?? (this.options.port === 0 ? "127.0.0.1" : undefined);
+  /** The address: what the options fix in code, otherwise the `http` settings. */
+  private listenOptions(): ListenOptions {
+    const settings = this.resolver.tryResolve(httpConfig.token);
     // Let the operating system reserve an ephemeral port atomically. Picking a
     // random port in user space creates a check/use race between concurrent
     // application or test processes and can still exhaust every retry.
-    const port = this.options.port ?? 3000;
+    const port = this.options.port ?? settings?.get("port") ?? 3000;
+    const hostname = this.options.hostname ?? (this.options.port === 0 ? "127.0.0.1" : settings?.get("host"));
     return {
       port,
       ...(hostname !== undefined ? { hostname } : {}),
@@ -417,7 +420,7 @@ export class HttpServer implements HostedService {
     return request.method === "HEAD" ? stripBody(response) : response;
   }
 
-  /** The response language of a request; `undefined` without `runApp({ language })`. */
+  /** The response language of a request; `undefined` without `@App({ language })`. */
   private selected(request: Request | undefined): SelectedLanguage | undefined {
     try {
       return this.options.languages?.select(request?.headers.get("accept-language"));

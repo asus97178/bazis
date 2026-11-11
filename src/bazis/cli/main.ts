@@ -48,7 +48,7 @@ Generation options:
   --minimal             Compact example CRUD and MODULE.md (default)
   --full                Example CRUD/list/cache/auth/background/AI and MODULE.md;
                         uses src/app/modules/auth helpers when the project has them.
-                        To run, the host needs a cache (runApp({ cache: memory() }))
+                        To run, the host needs a cache (@App({ cache: memory() }))
                         and a database provider. Legacy alias: --enterprise
   --parts <a,b,...>      Independent empty atomic parts; pack only, at least two
   --dry-run             Validate and list planned changes without writing

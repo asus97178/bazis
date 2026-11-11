@@ -47,7 +47,7 @@ GET /tasks → метод вызван снова
 
 ```text
 warn: [cache] @OutputCache on TasksController.getAll has no effect: no cache module is installed,
-so every request runs the action. Add `cache: memory()` to the runApp options.
+so every request runs the action. Add `cache: memory()` to @App.
 ```
 
 > [!NOTE]

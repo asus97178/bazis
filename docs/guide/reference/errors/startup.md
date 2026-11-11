@@ -166,8 +166,8 @@ Event "order.paid" handler exceeded 5000ms.
 `KernelError` — ошибка настройки самого приложения. Примеры:
 
 ```text
-runApp: language "de" is not supported. Use one of: en, ru.
-runApp: websocket options are set, but no module declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.
+@App: language "de" is not supported. Use one of: en, ru.
+@App: websocket options are set, but no module declares gateways. Add gateways: [ChatGateway] to the module that owns the gateway.
 ```
 
 Текст подсказывает, что поменять в `runApp` или в модуле.

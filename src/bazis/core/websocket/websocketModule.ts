@@ -54,13 +54,13 @@ export interface WebSocketModuleConfig {
   readonly exposeHandlerErrors?: boolean;
 }
 
-/** Server-wide WebSocket settings of `runApp({ websocket })`; gateways come from the modules. */
+/** Server-wide WebSocket settings of `@App({ websocket })`; gateways come from the modules. */
 export type WebSocketOptions = Omit<WebSocketModuleConfig, "imports">;
 
 /**
  * Serves the gateways declared by the modules of `imports` on the shared HTTP
  * listener. `runApp` installs it next to the HTTP module whenever a module
- * declares `gateways`; `runApp({ websocket })` passes the settings.
+ * declares `gateways`; `@App({ websocket })` passes the settings.
  *
  * ```ts
  * @Module({ gateways: [ChatGateway], providers: [singleton(ChatHistory)] })

@@ -136,7 +136,7 @@ function buildInfraDefinitions(manifest: InfraManifest): {
 
 /**
  * Dynamic infrastructure module (a plain metadata object): the same as
- * `@Infra`, but without a class. Handy for `imports` or `runApp({ infra })`.
+ * `@Infra`, but without a class. Handy for `imports` or `@App({ infra })`.
  */
 export function infraModule(manifest: InfraManifest): BazisModuleRef {
   try {
@@ -153,7 +153,7 @@ export function infraModule(manifest: InfraManifest): BazisModuleRef {
 /**
  * Infrastructure decorator. Puts the metadata of a regular **global module**
  * on the class, so the class becomes a valid `BazisModuleRef`: it can be passed
- * to `runApp({ infra: AppInfra })` or to `imports`.
+ * to `@App({ infra: AppInfra })` or to `imports`.
  *
  * The class stays pure metadata (like `@Module`) and is **never instantiated**:
  * only the clients it lists live and hold state.

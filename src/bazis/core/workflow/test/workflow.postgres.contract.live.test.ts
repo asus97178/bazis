@@ -27,6 +27,7 @@ import {
 } from "@/core/workflow";
 import { postgres } from "@/library/orm";
 import type { ProcessDocument } from "@/library/workflow";
+import { dropWorkflowTables } from "@/core/workflow/testing";
 
 /**
  * The contract of WORKFLOW-002 stage 1 on PostgreSQL: lists in the style of
@@ -157,14 +158,8 @@ const eventsOf = (name: string) => seen.filter((event) => event.name === name).m
 
 beforeAll(async () => {
   if (!enabled) return;
-  const sql = postgres({ url });
-  try {
-    const tables = (await sql.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'bazis\\_wf%'", [])) as { tablename: string }[];
-    if (tables.length > 0) await sql.execute(`DROP TABLE ${tables.map((t) => `"${t.tablename}"`).join(", ")} CASCADE`, []);
-    await sql.execute(`DO $$ BEGIN IF to_regclass('public.__bazis_orm_owned_stores_v1') IS NOT NULL THEN DELETE FROM "__bazis_orm_owned_stores_v1" WHERE store_key LIKE 'bazis.workflow.%'; END IF; END $$`, []);
-  } finally {
-    await sql.close();
-  }
+  // The database is a throwaway one: its name was checked above.
+  await dropWorkflowTables(url!, { force: true });
   app = await startTestApp(root(url!), { http: { authorize: signedIn } });
 });
 

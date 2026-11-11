@@ -15,7 +15,7 @@ gRPC: сервер на встроенном HTTP/2 Bun и клиент, без 
 | `@GrpcClient(service, { config, ...options })`, `GrpcClientBase` | Объявление клиента чужого сервиса (поле модуля `grpcClients`, внедряется по классу) и сам клиент | [Клиент в DI](../../realtime/grpc.md#клиент-в-di) |
 | `GrpcClientConfig`, `GrpcClientDeclaration` | Настройки клиента (`address`, `timeoutMs`) и опции декоратора | там же |
 | `ServerCredentials` | TLS сервера | [Безопасность и пределы](../../realtime/grpc.md#безопасность-и-пределы) |
-| `grpcModule`, `GrpcServer`, `GRPC_REQUEST_BINDINGS` | Модуль и сервер; `runApp({ grpc })` создаёт их сам | — |
+| `grpcModule`, `GrpcServer`, `GRPC_REQUEST_BINDINGS` | Модуль и сервер; `@App({ grpc })` создаёт их сам | — |
 
 Типы: `GrpcContext`, `GrpcModuleOptions`, `GrpcCallOptions`,
 `GrpcClientOptions`, `GrpcClientTlsOptions`, `GrpcResponse`,

@@ -14,7 +14,7 @@ export class HttpError extends Error {
     readonly details?: unknown,
     /**
      * Key and parameters of the message: the error handler renders it in the
-     * application language (`runApp({ language, messages })`); `message` is the
+     * application language (`@App({ language, messages })`); `message` is the
      * English text. Errors created with their own text have no key.
      */
     readonly localized?: LocalizedMessage,

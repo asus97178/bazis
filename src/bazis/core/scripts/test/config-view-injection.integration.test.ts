@@ -56,7 +56,7 @@ import { greetingConfig } from "./z.config";
 @Module({ config: greetingConfig, providers: [scoped(GreetingService), scoped(LoudGreetingService)], controllers: [GreetController], exports: [] })
 export class AppModule {}
 `,
-    "server.ts": `import { runApp } from "bazis/core/app";
+    "server.ts": `import { App, runApp } from "bazis/core/app";
 import { AppModule } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
@@ -64,7 +64,9 @@ await registerBazisGeneratedRuntime();
 const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
 const port = probe.port;
 probe.stop(true);
-void runApp(AppModule, { http: { hostname: "127.0.0.1", port } });
+@App({ modules: [AppModule], http: { hostname: "127.0.0.1", port } })
+class Application {}
+void runApp(Application);
 const url = "http://127.0.0.1:" + port + "/greet/Ann";
 // A loaded CI runner can take several seconds to start the app: wait up to 20.
 for (let i = 0; i < 400 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);
@@ -138,14 +140,16 @@ import { greetingConfig, plainConfig } from "./z.config";
 @Module({ config: [greetingConfig, plainConfig], providers: [scoped(GreetingService), scoped(LoudGreetingService)], controllers: [GreetController], exports: [] })
 export class AppModule {}
 `,
-    "server.ts": `import { runApp } from "bazis/core/app";
+    "server.ts": `import { App, runApp } from "bazis/core/app";
 import { AppModule } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
 const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
 const port = probe.port;
 probe.stop(true);
-void runApp(AppModule, { http: { hostname: "127.0.0.1", port } });
+@App({ modules: [AppModule], http: { hostname: "127.0.0.1", port } })
+class Application2 {}
+void runApp(Application2);
 const url = "http://127.0.0.1:" + port + "/greet/Ann";
 for (let i = 0; i < 400 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);
 console.log(JSON.stringify(await fetch(url).then((r) => r.json())));

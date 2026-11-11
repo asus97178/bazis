@@ -26,7 +26,7 @@ export interface WsAuthenticationContext {
   readonly request?: Request;
   /**
    * The application's services, for a token check that needs them
-   * (`services.resolve(AuthTokens)`). Set by `runApp({ websocket })`.
+   * (`services.resolve(AuthTokens)`). Set by `@App({ websocket })`.
    */
   readonly services?: ServiceResolver;
 }

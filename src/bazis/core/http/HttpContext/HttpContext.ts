@@ -50,7 +50,7 @@ export class HttpContext {
     /** Validator captured by the owning HTTP server. */
     readonly modelValidator?: ModelValidator,
     /**
-     * Response language of this request: `runApp({ language })`, or the best
+     * Response language of this request: `@App({ language })`, or the best
      * match of `Accept-Language` when several languages are supported.
      * `undefined` without `language`.
      */

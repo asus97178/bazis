@@ -51,7 +51,7 @@ import { Db, Warmup, connect } from "./services";
 @Module({ providers: [singletonAsyncFactory(Db, [] as const, connect)], background: [Warmup], controllers: [DbController], exports: [] })
 export class AppModule {}
 `;
-const server = `import { runApp } from "bazis/core/app";
+const server = `import { App, runApp } from "bazis/core/app";
 import { AppModule } from "./src/index";
 import { registerBazisGeneratedRuntime } from "./src/generated/bazis/runtime";
 await registerBazisGeneratedRuntime();
@@ -59,7 +59,9 @@ await registerBazisGeneratedRuntime();
 const probe = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
 const port = probe.port;
 probe.stop(true);
-const running = runApp(AppModule, { http: { hostname: "127.0.0.1", port } });
+@App({ modules: [AppModule], http: { hostname: "127.0.0.1", port } })
+class Application {}
+const running = runApp(Application);
 const url = "http://127.0.0.1:" + port + "/db";
 for (let i = 0; i < 60 && !(await fetch(url).then(() => true, () => false)); i++) await Bun.sleep(50);
 const answer = await fetch(url).then((r) => r.json(), () => "no server");

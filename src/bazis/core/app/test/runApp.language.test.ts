@@ -7,7 +7,7 @@ import { BooksModule } from "./fixtures/languageControllers";
 // "test"); its generated bindings are registered before the app starts.
 import "../../../../generated/bazis/targets/test/bootstrap";
 
-// 0.100.7: `runApp({ language, messages })` translates every text the framework
+// 0.100.7: `@App({ language, messages })` translates every text the framework
 // writes into a response. On 0.100.6 only validation rules followed the global
 // MessageRegistry; "Not Found", "Unauthorized", a missing parameter, malformed
 // JSON and the 404/405 written before routing stayed English.
@@ -117,5 +117,5 @@ test("two apps in one process keep their own languages", async () => {
 });
 
 test("an unknown language stops the start and names the supported ones", async () => {
-  await expect(startTestApp(BooksModule, { language: "de" as never })).rejects.toThrow('runApp: language "de" is not supported. Use one of: en, ru.');
+  await expect(startTestApp(BooksModule, { language: "de" as never })).rejects.toThrow('@App: language "de" is not supported. Use one of: en, ru.');
 });
