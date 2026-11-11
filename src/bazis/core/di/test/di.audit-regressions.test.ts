@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   Application,
   CircularDependencyError,
-  DI,
   HOSTED_SERVICE,
   ProviderDefinition,
   ScopeDisposedError,
@@ -13,6 +12,7 @@ import {
   lazyDependency,
   type Lazy,
 } from "../index";
+import { DI } from "../lowLevel";
 
 describe("DI regressions", () => {
   test.each(["scope", "root"] as const)("cached Lazy rejects access after %s disposal", async (disposedOwner) => {

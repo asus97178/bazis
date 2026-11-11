@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
   CircularDependencyError,
-  DI,
   ServiceCollection,
   createOpenGenericTokenFamily,
   createToken,
   createContainer,
   type BazisModuleRef,
 } from "../index";
+import { DI } from "../lowLevel";
 import { KeyedAppService, LOGGER, TestLogger } from "./test-fixtures";
 
 describe("DI keyed and collection", () => {

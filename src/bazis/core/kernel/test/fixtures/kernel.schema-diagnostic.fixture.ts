@@ -1,4 +1,5 @@
-import { DI, HOSTED_SERVICE, type HostedService } from "../../../di";
+import { HOSTED_SERVICE, type HostedService } from "../../../di";
+import { DI } from "../../../di/lowLevel";
 import { SchemaMigrationRequiredError } from "../../../../library/orm";
 import { Bazis } from "../../index";
 

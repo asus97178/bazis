@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DI,
   ModuleEncapsulationError,
   createContainer,
   createOpenGenericTokenFamily,
@@ -9,6 +8,7 @@ import {
   namedDependency,
   type BazisModuleRef,
 } from "../index";
+import { DI } from "../lowLevel";
 import { registerGeneratedClassDeps, restoreGeneratedClassDeps, snapshotGeneratedClassDeps } from "../module/autoDeps";
 
 describe("DI open generic module ownership", () => {

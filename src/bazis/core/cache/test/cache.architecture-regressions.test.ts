@@ -4,7 +4,8 @@ import {
   ICache, MemoryCache, memory, DistributedCache, NamedCacheRegistry,
   DISTRIBUTED_SERVICE_CACHE, jsonCacheCodec,
 } from "../index";
-import { DI, ServiceCollection, ServiceValidationError, createContainer, createToken, singleton, singletonValue } from "../../di";
+import { ServiceCollection, ServiceValidationError, createContainer, createToken, singleton, singletonValue } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { registerGeneratedClassDeps, restoreGeneratedClassDeps, snapshotGeneratedClassDeps } from "../../di/module/autoDeps";
 import { InMemoryCacheDriver } from "./support/InMemoryCacheDriver";
 
@@ -24,7 +25,7 @@ describe("architecture: cached class activation", () => {
     }
     const snapshot = snapshotGeneratedClassDeps();
     const cache = memory();
-    const definition = kind === "explicit" ? singleton(Consumer, Consumer, [Dependency]) : singleton(Consumer);
+    const definition = kind === "explicit" ? DI.singleton(DI.classProvider(Consumer, Consumer, [Dependency])) : singleton(Consumer);
     if (kind === "bound") DI.bindDeps(Consumer, Dependency);
     if (kind === "static") Object.assign(Consumer, { inject: [Dependency] });
     // Deliberately publish after creating both the module and cached provider.
@@ -87,7 +88,7 @@ describe("architecture: cached class activation", () => {
       providers: [
         singletonValue(sourceA, "A"), singletonValue(sourceB, "B"),
         singletonValue(DISTRIBUTED_SERVICE_CACHE, new NamedCacheRegistry(new Map([["default", distributed]]))),
-        singleton(a, Catalog, [sourceA]), singleton(b, Catalog, [sourceB]),
+        DI.singleton(DI.classProvider(a, Catalog, [sourceA])), DI.singleton(DI.classProvider(b, Catalog, [sourceB])),
         DI.keyedSingleton("keyed", DI.classProvider(a, Catalog, [sourceB])),
       ],
     }, { validateOnBuild: true });

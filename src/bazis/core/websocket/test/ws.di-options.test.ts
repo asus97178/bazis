@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module, singleton } from "@/core/di";
+import { Module, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { startTestApp, type TestApp } from "@/core/testing";
 import { InMemoryWebSocketAdapter, SubscribeMessage, WebSocketGateway, type BazisSocket, type WebSocketAdapter } from "@/core/websocket";
 

@@ -1,4 +1,5 @@
-import { DI, registerModuleMetadataExpander, type BazisModuleMetadata, type BazisModuleRef, type ServiceResolver } from "../di";
+import { registerModuleMetadataExpander, type BazisModuleMetadata, type BazisModuleRef, type ServiceResolver } from "../di";
+import { DI } from "../di/lowLevel";
 import { getOutboundCorrelationHeaders, type ConfigDefinition } from "../kernel";
 import { HttpClientBase, HttpClientError, type RequestConfig } from "../../library/http-client";
 

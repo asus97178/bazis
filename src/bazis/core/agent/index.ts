@@ -1,14 +1,16 @@
 import type { Class } from "../di";
 import { registerModuleDescriber } from "../kernel/report/moduleTree";
+import { moduleToolsOf, type DefinedTool, type ToolSet } from "./defineTool";
 import { toolMetadataOf } from "./metadata";
 
 // The module tree of the startup screen: `orders.summary · read`.
-registerModuleDescriber((metadata) => (metadata.tools ?? []).map((tool) => {
+registerModuleDescriber((metadata) => moduleToolsOf(metadata.tools).map((tool) => {
   const meta = toolMetadataOf(tool);
   return { kind: "tool" as const, text: meta === undefined ? tool.name : `${meta.name} · ${meta.sideEffect}` };
 }));
 
 export { Tool } from "./decorators/Tool";
+export { defineTool, isDefinedTool, toolNameOf, type DefinedTool, type DefinedToolOptions, type ToolSet } from "./defineTool";
 export { describeTool } from "./Tool.contract";
 export type {
   AgentToolHookKindV1, AgentToolHookRefV1, AgentToolRequiredHookRefV1, AgentToolHookRegistrationBaseV1,
@@ -149,8 +151,11 @@ export {
 // depend on program file order and silently stop merging in some projects.
 declare module "../di/module/types/BazisModule" {
   interface BazisModuleMetadata {
-    /** Tools agents may call: classes with `@Tool`. An agent definition names them in `toolNames`. */
-    readonly tools?: readonly Class<object>[];
+    /**
+     * The Tools of the module: classes with `@Tool`, Tools made by `defineTool`
+     * and sets of them (`ormEntityTools(...)`). An agent definition names them in `toolNames`.
+     */
+    readonly tools?: readonly (Class<object> | DefinedTool | ToolSet)[];
     readonly agentToolHooks?: readonly import("./AgentToolHooks").AgentToolHookRegistrationV1[];
   }
 }

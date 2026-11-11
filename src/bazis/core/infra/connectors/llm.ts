@@ -1,6 +1,7 @@
 import type { AppConfig, ConfigRegistry, Secret } from "../../kernel";
 import { AGENT_MODEL_PROVIDER, AGENT_RUNTIME_OPTIONS, AgentRuntime, type AgentModelProvider } from "../../agent";
-import { DI, DiError, HOSTED_SERVICE, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
+import { DiError, HOSTED_SERVICE, SERVICE_PROVIDER, type ProviderDefinition } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { LOGGER } from "../../kernel/logging/Logger";
 import { reader, requireValue, settingNames } from "../connectorConfig";
 import { InfraError, type InfraConnector } from "../InfraConnector";

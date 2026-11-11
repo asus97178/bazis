@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module, ModuleEncapsulationError, createContainer } from "@/core/di";
+import { Module, ModuleEncapsulationError, createContainer } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Column, DbContext, Entity, IRepository, Key, registerRepositories, repositoryFor, Nullable } from "@/core/orm";
 
 @Entity()

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createContainer, DI } from "../../di";
+import { createContainer } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { HEALTH_CHECK, HealthService, type HealthCheck } from "../index";
 import { OpenSearchClient } from "../../infra";
 

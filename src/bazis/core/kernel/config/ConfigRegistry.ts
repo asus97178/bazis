@@ -1,4 +1,5 @@
-import { DI, type ProviderDefinition } from "../../di";
+import { type ProviderDefinition } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { KernelError } from "../errors";
 import type { EnvironmentName } from "../types";
 import type { Configuration } from "./Configuration";

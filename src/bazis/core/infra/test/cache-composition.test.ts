@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { RedisClient } from "bun";
-import { createContainer, createToken, DI, HOSTED_SERVICE, namedDependency, type BazisModuleRef } from "../../di";
+import { createContainer, createToken, HOSTED_SERVICE, namedDependency, type BazisModuleRef } from "../../di";
+import { DI } from "../../di/lowLevel";
 import { CacheError, DISTRIBUTED_CACHE_BACKEND, DISTRIBUTED_OUTPUT_CACHE, DISTRIBUTED_SERVICE_CACHE, IDistributedCache, type DistributedCacheStores } from "../../cache";
 import { buildCacheModule } from "../../cache/internal/buildCacheProviders";
 import { defineConfig, HEALTH_CHECK, LifecycleCoordinator } from "../../kernel";

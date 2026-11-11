@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, HOSTED_SERVICE, ServiceCollection, type HostedService, type BazisModuleRef } from "../../di";
+import { HOSTED_SERVICE, ServiceCollection, type HostedService, type BazisModuleRef } from "../../di";
+import { DI } from "../../di/lowLevel";
 import {
   APPLICATION_STARTED,
   APPLICATION_STOPPING,

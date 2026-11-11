@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createContainer, DI, Global, HOSTED_SERVICE, Module, type HostedService } from "@/core/di";
+import { createContainer, Global, HOSTED_SERVICE, Module, type HostedService } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { HEALTH_CHECK, LifecycleCoordinator } from "@/core/kernel";
 import { Column, DATABASE_PROVIDER, DbContext, DbContextOptions, defineOrmOwnedStoreV1, Entity, EntityNotMappedError, ForeignKey, Key, ormModule, type DatabaseProvider, Nullable } from "bazis/core/orm";
 import { canonicalOwnedStoreModelHashV1, canonicalOwnedStoreScopeHashV1 } from "../../../library/orm/Schema/OwnedStoreCanonical";

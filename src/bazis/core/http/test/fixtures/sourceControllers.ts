@@ -2,7 +2,8 @@
  * Fixture for http.explicit-sources.test.ts: the file is NOT *.test.ts, so
  * di:generate scans it and infers the argument bindings from the markers.
  */
-import { DI, Module } from "@/core/di";
+import { Module } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Controller, FromBody, FromHeader, FromQuery, Get, Post, RequestModel, type FromRoute } from "@/core/http";
 import { Validator } from "@/library/validation";
 

@@ -3,7 +3,8 @@ import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 setDefaultTimeout(60_000);
 import { AccessPolicy, type References, type AccessSubject, type Grants, type Scope, type ScopePrincipals } from "@/core/access";
 import { TOOL_EXECUTION_OPTIONS, ToolRunner, type AgentToolResult, type BoundToolRunner } from "@/core/agent";
-import { DI, Module, singleton } from "@/core/di";
+import { Module, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import type { AuthorizeContext } from "@/core/http";
 import { Infra } from "@/core/infra";
 import { defineConfig, secret } from "@/core/kernel";
@@ -112,7 +113,7 @@ function root(dsn: string) {
   @Module({
     imports: [TestInfra, WorkflowModule, StandardToolsModule],
     ormBazis: { context: ToolsDbContext, entities: [ToolOrder, ToolNote], ensureCreated: true },
-    tools: [...orderTools, ...noteTools],
+    tools: [orderTools, noteTools],
     processes: [PROCESS],
     providers: [
       singleton(AccessPolicy, OpenPolicy),

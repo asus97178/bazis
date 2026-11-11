@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  DI,
   ModuleEncapsulationError,
   createContainer,
   createOpenGenericTokenFamily,
@@ -8,6 +7,7 @@ import {
   singleton,
   type DiRegistrar,
 } from "../index";
+import { DI } from "../lowLevel";
 import { namedDependency } from "../provider";
 import { tokenToDebugName } from "../token";
 import { testModule } from "./test-fixtures";

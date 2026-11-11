@@ -35,6 +35,7 @@
     "./core/background": "./core/background/index.ts",
     "./core/cache": "./core/cache/index.ts",
     "./core/di": "./core/di/index.ts",
+    "./core/di/lowLevel": "./core/di/lowLevel.ts",
     "./core/generatedRuntime": "./core/generatedRuntime.ts",
     "./core/grpc": "./core/grpc/index.ts",
     "./core/http": "./core/http/index.ts",

@@ -1,4 +1,5 @@
-import { DI, HOSTED_SERVICE, singletonValue, type BazisModuleRef, type ProviderDefinition } from "../di";
+import { HOSTED_SERVICE, singletonValue, type BazisModuleRef, type ProviderDefinition } from "../di";
+import { DI } from "../di/lowLevel";
 import {
   OrmError,
   type DatabaseProvider,

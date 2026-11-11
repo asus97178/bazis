@@ -994,6 +994,35 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
     if (properties.has("provide") && properties.has("useClass")
       && (!properties.has("deps") || properties.get("deps")!.getText() === "undefined")) record(properties.get("useClass"));
   };
+  /** The `lookup` classes of a `definePermissions({...})` result: of `scope` and of the attributes in `on`. */
+  const permissionLookups = (expression: ts.Expression | undefined): ts.Expression[] => {
+    const declared = (node: ts.Expression | undefined, depth = 0): ts.ObjectLiteralExpression | undefined => {
+      if (!node || depth > 5) return undefined;
+      if (ts.isCallExpression(node)) return objectFor(node.arguments[0]);
+      if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return declared(node.expression, depth + 1);
+      let symbol = checker.getSymbolAtLocation(node);
+      if (symbol && (symbol.flags & ts.SymbolFlags.Alias)) symbol = checker.getAliasedSymbol(symbol);
+      const declaration = symbol?.valueDeclaration;
+      return declaration && ts.isVariableDeclaration(declaration) ? declared(declaration.initializer, depth + 1) : undefined;
+    };
+    const permissions = declared(expression);
+    const found: ts.Expression[] = [];
+    if (!permissions) return found;
+    const lookupOf = (holder: ts.Expression | undefined): void => {
+      const object = objectFor(holder);
+      const lookup = object && propertiesOf(object).get("lookup");
+      if (lookup) found.push(lookup);
+    };
+    for (const spec of propertiesOf(permissions).values()) {
+      const permission = objectFor(spec);
+      if (!permission) continue;
+      const fields = propertiesOf(permission);
+      lookupOf(fields.get("scope"));
+      const attributes = objectFor(fields.get("on"));
+      if (attributes) for (const attribute of propertiesOf(attributes).values()) lookupOf(attribute);
+    }
+    return found;
+  };
   const visitedModules = new Set<ts.ObjectLiteralExpression>();
   const recordModule = (expression: ts.Expression | undefined): void => {
     const object = objectFor(expression);
@@ -1007,6 +1036,8 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
     // `references: { "orders.order": OrderReferences }`: the field registers the classes.
     const references = objectFor(properties.get("references"));
     if (references) for (const entry of propertiesOf(references).values()) record(entry);
+    // `permissions: orderPermissions`: the field registers the `lookup` classes its permissions name.
+    for (const lookup of permissionLookups(properties.get("permissions"))) record(lookup);
     const imports = properties.get("imports");
     if (imports && ts.isArrayLiteralExpression(imports)) for (const entry of imports.elements) recordModule(entry);
   };
@@ -1106,13 +1137,26 @@ function collectProviderFormErrors(source: ts.SourceFile): void {
     }
     fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: providers of ${module}: "${text(element)}" is not an agreed registration. A computed service is a class with a constructor: scoped(IService, Service). Agreed forms: ${AGREED_PROVIDERS}.`);
   };
-  /** Tools made from an entity: they are classes too, and carry their own wiring. */
-  const isOrmEntityTools = (element: ts.Expression): boolean => {
-    if (!ts.isSpreadElement(element)) return false;
-    const call = resolved(element.expression, ts.isCallExpression);
-    const target = call && callee(call);
-    return target?.name === "ormEntityTools" && target.file?.endsWith("/core/tools/orm/ormEntityTools.ts") === true;
+  /**
+   * Tools made by a function: a Tool of `defineTool`, a set of them, or a call (or a
+   * spread) that gives them. They carry their own wiring, so codegen has nothing to add.
+   */
+  const madeToolType = (type: ts.Type, depth = 0): boolean => {
+    if (depth > 3) return false;
+    const alias = type.aliasSymbol;
+    if (alias && (alias.name === "DefinedTool" || alias.name === "ToolSet")
+      && alias.declarations?.some((entry) => entry.getSourceFile().fileName.replace(/\\/g, "/").endsWith("/core/agent/defineTool.ts"))) return true;
+    if (type.isUnion()) return type.types.every((part) => madeToolType(part, depth + 1));
+    if (checker.isArrayType(type) || checker.isTupleType(type)) {
+      const items = checker.getTypeArguments(type as ts.TypeReference);
+      return items.length > 0 && items.every((item) => madeToolType(item, depth + 1));
+    }
+    if ((type.flags & ts.TypeFlags.Object) === 0 || type.getCallSignatures().length > 0 || type.getConstructSignatures().length > 0) return false;
+    const members = type.getProperties();
+    return members.length > 0 && members.every((member) => madeToolType(checker.getTypeOfSymbol(member), depth + 1));
   };
+  const isMadeTools = (element: ts.Expression): boolean =>
+    madeToolType(checker.getTypeAtLocation(ts.isSpreadElement(element) ? element.expression : element));
   /**
    * `permissions: orderPermissions`: the exported constant goes to the generated
    * `permissions.ts`, which makes its keys the type of `can` and `defineRoles`.
@@ -1148,9 +1192,9 @@ function collectProviderFormErrors(source: ts.SourceFile): void {
       }
       for (const element of list.elements) {
         if (field === "providers") checkProvider(module, element);
-        else if (field === "tools" && isOrmEntityTools(element)) continue;
+        else if (field === "tools" && isMadeTools(element)) continue;
         else if (!ts.isIdentifier(element) && !ts.isPropertyAccessExpression(element)) {
-          fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: ${field} of ${module}: "${text(element)}" — list the class itself; its constructor dependencies come from codegen.`);
+          fatalErrors.push(`BAZIS_DI_PROVIDER_FORM: ${sourceLocation(element)}: ${field} of ${module}: "${text(element)}" — list the class itself; its constructor dependencies come from codegen.${field === "tools" ? " A Tool made by a function comes from defineTool(...)." : ""}`);
         }
       }
     }

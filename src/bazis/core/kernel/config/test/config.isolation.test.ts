@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createToken, DI } from "../../../di";
+import { createToken } from "../../../di";
+import { DI } from "../../../di/lowLevel";
 import { infraModule, reader, type InfraConnector } from "../../../infra";
 import { ConfigRegistry, Configuration, Bazis, configEnum, defineConfig, envSource, loadConfiguration, memorySource, secret } from "../../index";
 

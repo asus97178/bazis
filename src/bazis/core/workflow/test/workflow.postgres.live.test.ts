@@ -2,7 +2,8 @@ import { afterAll, beforeAll, expect, setDefaultTimeout, test } from "bun:test";
 
 setDefaultTimeout(30_000);
 import { AccessPolicy, type AccessSubject, type Grants, type Scope, type ScopePrincipals } from "@/core/access";
-import { DI, Module, singleton } from "@/core/di";
+import { Module, singleton } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Infra } from "@/core/infra";
 import { defineConfig, eventsModule, OnEvent, secret } from "@/core/kernel";
 import { ormBazisConnect } from "@/core/orm";

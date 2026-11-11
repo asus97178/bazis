@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module, ModuleOwnedProviderConflictError, ServiceCollection, createContainer, scoped, singleton, transient } from "@/core/di";
+import { Module, ModuleOwnedProviderConflictError, ServiceCollection, createContainer, scoped, singleton, transient } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { AgentSetupError, Tool } from "../index";
 import { AgentToolExecutor } from "../AgentToolExecutor";
 import { AgentRegistry } from "../AgentRegistry";

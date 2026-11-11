@@ -2,13 +2,13 @@ import {
   collectModuleUiProfiles,
   collectModuleControllers,
   collectModuleGateways,
-  DI,
   Global,
   Module,
   singletonValue,
   CLASS_PROVIDER_HOOK,
   type BazisModuleRef,
 } from "../di";
+import { DI } from "../di/lowLevel";
 import { loadBazisGeneratedRuntime } from "../generatedRuntime";
 import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
 import { cacheableClassProviderHook } from "../cache/di/classProviderHook";

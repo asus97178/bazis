@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DI, Module } from "@/core/di";
+import { Module } from "@/core/di";
+import { DI } from "@/core/di/lowLevel";
 import { Controller, Get } from "@/core/http";
 import { startTestApp } from "@/core/testing";
 import { memory } from "@/core/cache";

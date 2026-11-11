@@ -22,11 +22,11 @@ class NotesDbContext extends DbContext {
 const tools = ormEntityTools(Note, { context: NotesDbContext, ops: ["find"], fields: ["text"] });
 
 test("bazis workflow check tells of a kind no module owns", () => {
-  @Module({ imports: [WorkflowModule], tools })
+  @Module({ imports: [WorkflowModule], tools: [tools] })
   class Without {}
   expect(inspectProcesses(Without).errors).toEqual(expect.arrayContaining([expect.stringContaining("orm.field")]));
 
-  @Module({ imports: [WorkflowModule, StandardToolsModule], tools })
+  @Module({ imports: [WorkflowModule, StandardToolsModule], tools: [tools] })
   class With {}
   const inspection = inspectProcesses(With);
   expect(inspection.errors).toEqual([]);

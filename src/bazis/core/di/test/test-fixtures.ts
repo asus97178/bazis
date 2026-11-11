@@ -1,4 +1,5 @@
-import { DI, createToken, type BazisModule, type BazisModuleMetadata } from "../index";
+import { createToken, type BazisModule, type BazisModuleMetadata } from "../index";
+import { DI } from "../lowLevel";
 
 export interface ILogger {
   log(message: string): void;

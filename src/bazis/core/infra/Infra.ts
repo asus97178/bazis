@@ -1,5 +1,4 @@
 import {
-  DI,
   HOSTED_SERVICE,
   Module,
   createToken,
@@ -12,6 +11,7 @@ import {
   type BazisModuleRef,
   type ProviderDefinition,
 } from "../di";
+import { DI } from "../di/lowLevel";
 import { ConfigRegistry, HEALTH_CHECK, StartupReport } from "../kernel";
 import { InfraError, type InfraConnector } from "./InfraConnector";
 import { InfraLifecycle } from "./InfraLifecycle";

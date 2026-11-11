@@ -1,4 +1,5 @@
-import { DI, DiError, Global, HOSTED_SERVICE, Module, registerModuleMetadataExpander, SERVICE_PROVIDER, type BazisModuleMetadata, type ServiceProvider } from "../di";
+import { DiError, Global, HOSTED_SERVICE, Module, registerModuleMetadataExpander, SERVICE_PROVIDER, type BazisModuleMetadata, type ServiceProvider } from "../di";
+import { DI } from "../di/lowLevel";
 import { LOGGER } from "../kernel/logging/Logger";
 import { modelValidatorAdapter } from "../../library/validation";
 import { AgentRegistry, type ToolDefinition } from "./AgentRegistry";

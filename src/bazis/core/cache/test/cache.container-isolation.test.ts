@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { Cacheable, memory } from "../index";
-import { type DiRegistrar, CLASS_PROVIDER_HOOK, DI, ServiceCollection, createContainer, createOpenGenericTokenFamily, createToken, singleton, singletonValue } from "../../di";
+import { type DiRegistrar, CLASS_PROVIDER_HOOK, ServiceCollection, createContainer, createOpenGenericTokenFamily, createToken, singleton, singletonValue } from "../../di";
+import { DI } from "../../di/lowLevel";
 
 test("cache activation belongs to a container, independent of declaration/build order", async () => {
   class CounterService {

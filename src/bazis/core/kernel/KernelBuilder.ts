@@ -1,4 +1,5 @@
-import { DI, Global, Module, collectModuleConfigs, createContainer, type BazisModule, type BazisModuleRef, type ProviderDefinition } from "../di";
+import { Global, Module, collectModuleConfigs, createContainer, type BazisModule, type BazisModuleRef, type ProviderDefinition } from "../di";
+import { DI } from "../di/lowLevel";
 import { isBazisModuleClass } from "../di/module/Module";
 import { ApplicationLifetime } from "./ApplicationLifetime";
 import { Configuration, loadConfiguration } from "./config/Configuration";

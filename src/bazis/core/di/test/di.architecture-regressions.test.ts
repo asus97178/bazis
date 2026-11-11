@@ -1,9 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  DI, Module, ModuleEncapsulationError, SERVICE_PROVIDER, ServiceCollection, ServiceProvider, createContainer,
-  createOpenGenericTokenFamily, createToken, lazyDependency, namedDependency,
-  singleton, singletonValue, type Lazy, type BazisModuleRef,
+  Module,
+  ModuleEncapsulationError,
+  SERVICE_PROVIDER,
+  ServiceCollection,
+  ServiceProvider,
+  createContainer,
+  createOpenGenericTokenFamily,
+  createToken,
+  lazyDependency,
+  namedDependency,
+  singleton,
+  singletonValue,
+  type Lazy,
+  type BazisModuleRef,
 } from "../index";
+import { DI } from "../lowLevel";
 import { registerGeneratedClassDeps, restoreGeneratedClassDeps, snapshotGeneratedClassDeps } from "../module/autoDeps";
 
 const originalDeps = snapshotGeneratedClassDeps();
@@ -38,7 +50,7 @@ describe("architecture: generated constructor identity", () => {
     const overridden = build();
     expect(overridden.resolve(Service).value).toBe("bound");
     await overridden.dispose();
-    const explicit = createContainer({ providers: [singletonValue(old, "explicit"), singleton(Service, Service, [old])] });
+    const explicit = createContainer({ providers: [singletonValue(old, "explicit"), DI.singleton(DI.classProvider(Service, Service, [old]))] });
     expect(explicit.resolve(Service).value).toBe("explicit");
     await explicit.dispose();
   });
