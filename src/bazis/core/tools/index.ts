@@ -8,4 +8,4 @@ export { StandardToolsModule } from "./StandardTools.module";
 export { toolsConfig, type ToolsSettings } from "./contracts/Tools.config";
 export { HttpRequestTool } from "./http/HttpRequest.tool";
 export { ConfigSecretStore, SecretStore, type SecretContext } from "./secrets/SecretStore";
-export { ormEntityTools, type OrmEntityOperation, type OrmEntityToolsOptions } from "./orm/ormEntityTools";
+export { ormEntityTools, type OrmEntityOperation, type OrmEntityToolInputs, type OrmEntityToolOutputs, type OrmEntityToolSet, type OrmEntityToolsOptions, type OrmEntityWhere } from "./orm/ormEntityTools";

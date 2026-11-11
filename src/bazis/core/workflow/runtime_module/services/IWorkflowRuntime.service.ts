@@ -1,13 +1,15 @@
 import type { AccessFilter } from "../../../access";
 import type { FormIssue } from "../../../../library/workflow";
 import type { OrmTransaction } from "../../../orm";
+import type { CodeProcess } from "../../definitions_module/code/defineProcess";
 import type { WorkflowActor, WorkflowAuditOptions, WorkflowPage, WorkflowPaging } from "../../contracts/types";
 import type { HistoryType } from "../model/WfHistory.model";
 import type { InstanceStatus, StartedVia } from "../model/WfInstance.model";
 import type { TokenStatus } from "../model/WfToken.model";
 
-export interface StartInstance extends WorkflowAuditOptions {
-  readonly input?: unknown;
+export interface StartInstance<Input = unknown> extends WorkflowAuditOptions {
+  /** The `in` variables of the process. */
+  readonly input?: Input;
   /** The application's scope: a space, an organization. */
   readonly partition?: string | null;
   /** The application's own key of what the instance is about: `order:42`. */
@@ -24,14 +26,14 @@ export interface StartInstance extends WorkflowAuditOptions {
 }
 
 /** One element of a mass start. */
-export interface StartManyItem {
-  readonly input?: unknown;
+export interface StartManyItem<Input = unknown> {
+  readonly input?: Input;
   /** What the instance is about: required, it is what `sameKey` compares. */
   readonly businessKey: string;
 }
 
-export interface StartMany extends WorkflowAuditOptions {
-  readonly items: readonly StartManyItem[];
+export interface StartMany<Input = unknown> extends WorkflowAuditOptions {
+  readonly items: readonly StartManyItem<Input>[];
   readonly partition?: string | null;
   readonly actor: WorkflowActor;
   readonly language?: string;
@@ -163,8 +165,10 @@ export interface InstanceListQuery extends WorkflowPaging {
  */
 export abstract class IWorkflowRuntime {
   /** Starts the latest version of a process from its manual start. It may wait as `pending` (`maxConcurrent`, `sameKey: "queue"`). */
+  abstract start<Input>(process: CodeProcess<Input, unknown>, options: StartInstance<Input>): Promise<InstanceDetails>;
   abstract start(processKey: string, options: StartInstance): Promise<InstanceDetails>;
   /** Starts an instance per element, each in its own transaction, and says what became of each. */
+  abstract startMany<Input>(process: CodeProcess<Input, unknown>, options: StartMany<Input>): Promise<readonly StartManyResult[]>;
   abstract startMany(processKey: string, options: StartMany): Promise<readonly StartManyResult[]>;
   abstract cancel(instanceId: string, options: CancelInstance): Promise<InstanceDetails>;
   /** Retries the failed steps of a `failed` instance. An instance called by another one is retried through its caller. */

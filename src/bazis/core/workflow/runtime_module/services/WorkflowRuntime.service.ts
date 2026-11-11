@@ -1,3 +1,4 @@
+import type { CodeProcess } from "../../definitions_module/code/defineProcess";
 import { grantsToWhere } from "../../../access";
 import { paginate, type OrmTransaction } from "../../../orm";
 import { inputSpecOf, type FormSpec } from "../../../../library/workflow";
@@ -46,7 +47,8 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     super();
   }
 
-  async start(processKey: string, options: StartInstance): Promise<InstanceDetails> {
+  async start(process: string | CodeProcess<unknown, unknown>, options: StartInstance): Promise<InstanceDetails> {
+    const processKey = typeof process === "string" ? process : process.key;
     actorOf(options.actor);
     const partition = optionalText(options.partition, "partition");
     const businessKey = optionalText(options.businessKey, "businessKey");
@@ -60,7 +62,8 @@ export class WorkflowRuntime extends IWorkflowRuntime {
     return await this.instance(id);
   }
 
-  async startMany(processKey: string, options: StartMany): Promise<readonly StartManyResult[]> {
+  async startMany(process: string | CodeProcess<unknown, unknown>, options: StartMany): Promise<readonly StartManyResult[]> {
+    const processKey = typeof process === "string" ? process : process.key;
     actorOf(options.actor);
     const partition = optionalText(options.partition, "partition");
     if (!Array.isArray(options.items) || options.items.length === 0 || options.items.length > MAX_START_MANY) throw new WorkflowError("invalid_input", `items must be a list of 1–${MAX_START_MANY}`);
