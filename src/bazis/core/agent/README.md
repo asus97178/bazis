@@ -176,6 +176,13 @@ reasoning wherever it rewrites a dialog (compaction, trimming by
 cached tokens included. Claude is served by `anthropicAdapter` from
 `bazis/core/infra/anthropic`, on the official SDK.
 
+A run tells what happens in it: `onEvent` gets `AgentRunEvent`s (step, text,
+Tool call and result, repeat, compaction, the end) and `runtime.stream(...)`
+gives the same as an async iterator; leaving it early cancels the run.
+`agentTool({ name, description, agent })` makes an agent a Tool of another
+agent: the nested agent gets only the task, works in its own dialog, and its
+answer comes back; `maxDepth` (3) stops agents that call each other.
+
 With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
 not serve; a fallback to another profile is logged as `LLM model profile
 failed, using fallback`. A model provider that gives up after its own deadline

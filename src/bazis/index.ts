@@ -122,6 +122,7 @@ export {
   type AgentRuntimeOptions,
   type AgentModelRetryPolicy,
   type AgentCompactionOptions,
+  type AgentRunEvent,
   type AgentRuntimeResult,
   type AgentRuntimeStatus,
   type AgentRuntimeToolExecutionOptions,

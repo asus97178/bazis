@@ -11,6 +11,7 @@ registerModuleDescriber((metadata) => moduleToolsOf(metadata.tools).map((tool) =
 
 export { Tool } from "./decorators/Tool";
 export { defineTool, isDefinedTool, toolNameOf, type DefinedTool, type DefinedToolOptions, type ToolSet } from "./defineTool";
+export { agentTool, type AgentToolInput, type AgentToolOptions, type AgentToolOutput } from "./agentTool";
 export { describeTool } from "./Tool.contract";
 export type {
   AgentToolHookKindV1, AgentToolHookRefV1, AgentToolRequiredHookRefV1, AgentToolHookRegistrationBaseV1,
@@ -37,6 +38,15 @@ export {
   type AgentRuntimeOptions,
   type AgentModelRetryPolicy,
   type AgentCompactionOptions,
+  type AgentRunEvent,
+  type AgentStepStartedEvent,
+  type AgentTextDeltaEvent,
+  type AgentModelRetryEvent,
+  type AgentModelAnsweredEvent,
+  type AgentToolStartedEvent,
+  type AgentToolFinishedEvent,
+  type AgentCompactedEvent,
+  type AgentRunFinishedEvent,
   type AgentRuntimeResult,
   type AgentRuntimeStatus,
   type AgentRuntimeToolCallContext,
@@ -139,7 +149,6 @@ export {
   type AgentOutputContract,
   type AgentOutputMode,
   type AgentSchemaContract,
-  type AgentStreamEvent,
   type AgentTextPart,
   type AgentToolCall,
   type AgentToolCallPart,

@@ -68,6 +68,41 @@ const RUNTIME_CONTINUE = "continue-output";
 const RUNTIME_REPAIR = "repair-output";
 const CONTINUE_TEXT = "Your previous message was cut off by the output limit. Continue exactly where it stopped: do not repeat, apologize or summarize what is already written.";
 
+/**
+ * What happens during a run, in the order it happens: for a progress line, a
+ * chat that shows the agent at work, a trace. Every event names its run.
+ */
+export type AgentRunEvent =
+  | AgentStepStartedEvent
+  | AgentTextDeltaEvent
+  | AgentModelRetryEvent
+  | AgentModelAnsweredEvent
+  | AgentToolStartedEvent
+  | AgentToolFinishedEvent
+  | AgentCompactedEvent
+  | AgentRunFinishedEvent;
+
+/** The model is asked for its next answer. */
+export interface AgentStepStartedEvent { readonly kind: "step-started"; readonly invocationId: string; readonly step: number; }
+/** A piece of the answer as the model writes it. Provisional: the answer is not checked yet. */
+export interface AgentTextDeltaEvent { readonly kind: "text-delta"; readonly invocationId: string; readonly step: number; readonly text: string; }
+/** The provider could not serve the request right now; it is sent again after `delayMs`. */
+export interface AgentModelRetryEvent { readonly kind: "model-retry"; readonly invocationId: string; readonly step: number; readonly attempt: number; readonly maxAttempts: number; readonly delayMs: number; }
+/** The model answered: its message, the Tools it wants to call, the usage of this call. */
+export interface AgentModelAnsweredEvent {
+  readonly kind: "model-answered"; readonly invocationId: string; readonly step: number;
+  readonly message?: AgentMessage; readonly toolCalls: AgentModelResponse["toolCalls"];
+  readonly finishReason: AgentModelResponse["finishReason"]; readonly usage?: AgentUsage;
+}
+/** A Tool call is handed to the Tool executor: approval, audit and the Tool itself follow. */
+export interface AgentToolStartedEvent { readonly kind: "tool-started"; readonly invocationId: string; readonly step: number; readonly call: AgentModelResponse["toolCalls"][number]; }
+/** A Tool call ended: its result is what the model gets. */
+export interface AgentToolFinishedEvent { readonly kind: "tool-finished"; readonly invocationId: string; readonly step: number; readonly result: AgentToolResult; }
+/** The older part of the dialog was replaced by a summary. */
+export interface AgentCompactedEvent { readonly kind: "compacted"; readonly invocationId: string; readonly reason: "size" | "overflow"; readonly messages: number; }
+/** The run ended; `result` is what `run` returns. Always the last event. */
+export interface AgentRunFinishedEvent { readonly kind: "finished"; readonly invocationId: string; readonly result: AgentRuntimeResult; }
+
 /** How a model request that the provider could not serve right now is repeated. */
 export interface AgentModelRetryPolicy {
   /** How many times one model request is sent, the first one included. 3 by default; 1 turns repeats off. */
@@ -210,6 +245,13 @@ export interface AgentRuntimeInvokeOptions {
   readonly toolExecution?: AgentRuntimeToolExecutionOptions;
   /** Ephemeral, provisional text; never persisted/replayed as a checkpoint or accepted output. */
   readonly onTextDelta?: (event: { readonly step: number; readonly text: string }) => void;
+  /**
+   * Watches the run as it goes: steps, text, Tool calls and their results,
+   * repeats, compaction, the end. Synchronous; an exception it throws is
+   * logged and does not stop the run. `AgentRuntime.stream` gives the same
+   * events as an async iterator.
+   */
+  readonly onEvent?: (event: AgentRunEvent) => void;
 }
 
 export interface AgentRuntimeResult {
@@ -836,7 +878,19 @@ export class AgentExecutionDriver {
 
   async invoke(agentName: string, options: AgentRuntimeInvokeOptions = {}): Promise<AgentRuntimeResult> {
     const prepared = await this.prepareAgent(agentName, options);
-    return prepared.ok ? this.drive(prepared.plan) : prepared.result;
+    const result = prepared.ok ? await this.drive(prepared.plan) : prepared.result;
+    this.emit(options, { kind: "finished", invocationId: result.invocationId, result });
+    return result;
+  }
+
+  /** Tells the run's observer what happened; an observer that throws does not stop the run. */
+  private emit(options: AgentRuntimeInvokeOptions, event: AgentRunEvent): void {
+    if (options.onEvent === undefined) return;
+    try {
+      options.onEvent(Object.freeze(event));
+    } catch (error) {
+      this.logger?.warn("Agent event observer failed", { invocationId: event.invocationId, event: event.kind, error: redactSensitive(error) });
+    }
   }
 
   async prepareSessionCheckpoint(request: AgentSessionPreparationV1): Promise<AgentSessionPreparationOutcomeV1> {
@@ -1129,14 +1183,19 @@ export class AgentExecutionDriver {
         const call = response.toolCalls[pending.nextToolIndex]!;
         const together = session ? [] : this.readTogether(plan, response.toolCalls, pending.nextToolIndex);
         if (together.length > 1) {
-          const results = await Promise.all(together.map((item) => this.toolExecutor.execute(item.call, {
-            ...plan.executorToolOptions,
-            agentName: plan.agent.name,
-            invocationId: plan.invocationId,
-            metadata: plan.metadata,
-            signal,
-            idempotencyKey: item.idempotencyKey,
-          })));
+          const results = await Promise.all(together.map(async (item) => {
+            this.emit(plan.options, { kind: "tool-started", invocationId: plan.invocationId, step: pending.step, call: item.call });
+            const result = await this.toolExecutor.execute(item.call, {
+              ...plan.executorToolOptions,
+              agentName: plan.agent.name,
+              invocationId: plan.invocationId,
+              metadata: plan.metadata,
+              signal,
+              idempotencyKey: item.idempotencyKey,
+            });
+            this.emit(plan.options, { kind: "tool-finished", invocationId: plan.invocationId, step: pending.step, result });
+            return result;
+          }));
           const unknown = results.findIndex((result) => result.error?.code?.endsWith("_OUTCOME_UNKNOWN") === true);
           const nextToolIndex = pending.nextToolIndex + together.length;
           const finished = nextToolIndex === response.toolCalls.length;
@@ -1179,6 +1238,7 @@ export class AgentExecutionDriver {
           return suspend("before-tool-rejected");
         }
         const toolTimeoutMs = plan.sessionToolTimeouts?.get(call.name);
+        this.emit(plan.options, { kind: "tool-started", invocationId: plan.invocationId, step: pending.step, call });
         const result = await this.toolExecutor.execute(call, {
           ...plan.executorToolOptions,
           ...(toolTimeoutMs === undefined ? {} : { timeoutMs: toolTimeoutMs }),
@@ -1188,6 +1248,7 @@ export class AgentExecutionDriver {
           signal,
           idempotencyKey,
         });
+        this.emit(plan.options, { kind: "tool-finished", invocationId: plan.invocationId, step: pending.step, result });
         const messages = [...checkpoint.messages, agentMessage("tool", agentToolResultPart(result), {
           toolCallId: call.id, metadata: { toolName: call.name },
         })];
@@ -1273,8 +1334,13 @@ export class AgentExecutionDriver {
       } catch {
         return suspend("before-model-rejected");
       }
+      this.emit(plan.options, { kind: "step-started", invocationId: plan.invocationId, step });
       const response = await this.completeModel(modelRequest, plan.agent.name, plan.modelProfile, plan.metadata, signal, plan.timeoutMs, plan.modelRetry,
-        plan.options.onTextDelta ? text => plan.options.onTextDelta!(Object.freeze({ step, text })) : undefined);
+        plan.options.onTextDelta !== undefined || plan.options.onEvent !== undefined ? (text) => {
+          plan.options.onTextDelta?.(Object.freeze({ step, text }));
+          this.emit(plan.options, { kind: "text-delta", invocationId: plan.invocationId, step, text });
+        } : undefined,
+        (attempt, delayMs) => this.emit(plan.options, { kind: "model-retry", invocationId: plan.invocationId, step, attempt, maxAttempts: plan.modelRetry.maxAttempts, delayMs }));
       if (!response.ok) {
         // The provider says the request is too long: the dialog is compacted and the step is asked again.
         if (response.cause instanceof AgentModelContextOverflowError && canCompact && overflowHandledAtStep !== step) {
@@ -1294,6 +1360,11 @@ export class AgentExecutionDriver {
         return stopped ?? terminal(candidate, this.resultFromCheckpoint(plan, candidate));
       }
       this.learnTokenScale(plan.modelProfile, tokenScale, context, response.value);
+      this.emit(plan.options, {
+        kind: "model-answered", invocationId: plan.invocationId, step, toolCalls: response.value.toolCalls, finishReason: response.value.finishReason,
+        ...(response.value.message === undefined ? {} : { message: response.value.message }),
+        ...(response.value.usage === undefined ? {} : { usage: response.value.usage }),
+      });
       const candidate = await this.modelCandidate(plan, checkpoint, step, response.value, bridge);
       try { await boundary.afterModelSettlement(checkpoint, candidate.state, step, { response: response.value }); } catch { throw bridge.boundaryError(checkpoint); }
       const stopped = await committedControl(candidate.state);
@@ -1494,6 +1565,7 @@ export class AgentExecutionDriver {
         return undefined;
       }
       plan.side.compactions += 1;
+      this.emit(plan.options, { kind: "compacted", invocationId: plan.invocationId, reason, messages: cut });
       this.logger?.info("Agent context compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, messages: cut, tokensBefore: before, tokensSummarized: summarized });
       return Object.freeze([
         agentMessage("user", `${SUMMARY_PREFIX}\n\n${summary}`, { metadata: { runtime: RUNTIME_SUMMARY, messages: cut } }),
@@ -1652,6 +1724,7 @@ export class AgentExecutionDriver {
     timeoutMs: number | undefined,
     retry: ModelRetrySettings,
     onTextDelta?: (text: string) => void,
+    onRetry?: (attempt: number, delayMs: number) => void,
   ): Promise<{ readonly ok: true; readonly value: AgentModelResponse } | { readonly ok: false; readonly error: AgentToolError; readonly cause?: unknown }> {
     for (let attempt = 1; ; attempt += 1) {
       const outcome = await this.completeModelOnce(request, agentName, modelProfile, metadata, sourceSignal, timeoutMs, onTextDelta);
@@ -1667,6 +1740,7 @@ export class AgentExecutionDriver {
       const asked = (outcome.cause as AgentModelUnavailableError).retryAfterMs ?? 0;
       const delayMs = Math.min(retry.maxDelayMs, Math.max(asked, retry.delayMs * 2 ** (attempt - 1)));
       this.logger?.warn("Agent model call failed, repeating", { agent: agentName, invocationId: request.invocationId, attempt, maxAttempts: retry.maxAttempts, delayMs, error: redactSensitive(outcome.cause) });
+      onRetry?.(attempt, delayMs);
       if (!await pause(delayMs, sourceSignal)) {
         return { ok: false, error: runtimeError("AGENT_ABORTED", "Agent runtime invocation was aborted.") };
       }

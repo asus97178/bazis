@@ -11,12 +11,13 @@
 | `ToolRunner` | Вызов инструментов без модели: `as(caller)` возвращает `BoundToolRunner`; внедряется по типу | [Вызов без модели](../../ai/tools.md#вызов-без-модели) |
 | `BoundToolRunner` | Инструменты одного вызывающего: `listTools(tags?)`, `getTool`, `describe`, `run(name, input, options)` | [Вызов без модели](../../ai/tools.md#вызов-без-модели) |
 | `TOOL_EXECUTION_OPTIONS` | Настройки исполнения инструментов для агентов и `ToolRunner`: подтверждение, журнал аудита, хуки, сроки, повторы | [Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение) |
-| `AgentRuntime` | Запуск агента: `run(definition, options)`, проверка определения `check(definition)`, `listTools()`; внедряется по типу | [Запуск](../../ai/agents.md#запуск) |
+| `AgentRuntime` | Запуск агента: `run(definition, options)`, события запуска итератором `stream(definition, options)`, проверка определения `check(definition)`, `listTools()`; внедряется по типу | [Запуск](../../ai/agents.md#запуск) |
 | `AGENT_RUNTIME_OPTIONS` | Настройки рантайма агента: пределы шагов и времени, сборка контекста | [Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение) |
 | `ToolError` | Ошибка, текст которой модель видит как есть | [Ошибки](../../ai/tools.md#ошибки) |
 | `AgentToolPreCommitError` | Ошибка «запись не началась»: вызов можно повторить с ключом идемпотентности | [Повторы](../../ai/tools.md#повторы) |
 | `AgentSetupError`, `AgentRuntimeError`, `AgentToolExecutionError`, `AgentSemanticError`, `AgentModelTimeoutError`, `AgentModelUnavailableError`, `AgentModelContextOverflowError` | Ошибки настройки и адаптеров | [Ошибки агентов](../errors/agents.md#классы-исключений) |
 | `defineTool({ name, description, callers, inputSchema?, outputSchema?, sideEffect?, …, execute(input, context, services) })` | Инструмент без класса — для инструментов, которые делает функция. С версии 0.138.0 | [Инструменты, созданные функцией](../../ai/tools.md#инструменты-созданные-функцией) |
+| `agentTool({ name, description, agent, output?, maxSteps?, modelProfile?, timeoutMs?, maxDepth? })` | Агент как инструмент другого агента: вложенный агент получает задачу и возвращает ответ. С версии 0.140.0 | [Агент как инструмент](../../ai/agents.md#агент-как-инструмент) |
 | `DefinedTool<Input, Output>`, `ToolSet<Names>`, `DefinedToolOptions` | Типы: инструмент `defineTool` (с `toolName`), набор «имя → инструмент», опции | там же |
 | `isDefinedTool(value)`, `toolNameOf(tool)` | Сделан ли инструмент `defineTool`; имя класса с `@Tool` или инструмента `defineTool` | — |
 | `describeTool(Tool)`, `toolMetadataOf(Tool)` | Контракт и метаданные инструмента | — |
@@ -39,11 +40,14 @@
 
 ## Типы
 
-- **Агент и запуск:** `AgentDataDefinition`, `AgentRuntimeOptions`, `AgentModelRetryPolicy`, `AgentCompactionOptions`,
+- **Агент и запуск:** `AgentDataDefinition`, `AgentToolOptions`, `AgentToolInput`, `AgentToolOutput`, `AgentRuntimeOptions`, `AgentModelRetryPolicy`, `AgentCompactionOptions`,
   `AgentRuntimeInvokeOptions`, `AgentRuntimeResult`, `AgentRuntimeStatus`,
   `AgentRuntimeToolCallContext`, `AgentRuntimeToolExecutionOptions`,
   `AgentInvocation`, `AgentInvocationOptions`, `AgentUsage`,
-  `AgentFinishReason`, `AgentStreamEvent`.
+  `AgentFinishReason`, `AgentRunEvent` и события по видам (`AgentStepStartedEvent`,
+  `AgentTextDeltaEvent`, `AgentModelRetryEvent`, `AgentModelAnsweredEvent`,
+  `AgentToolStartedEvent`, `AgentToolFinishedEvent`, `AgentCompactedEvent`,
+  `AgentRunFinishedEvent`).
 - **Инструменты:** `ToolOptions`, `ToolActor`, `ToolExecutionOptions`, `ToolRunOptions`, `ToolDefinition`, `ToolMetadata`,
   `ToolSideEffect`, `ToolApproval`, `ToolDryRun`, `AgentExecutableTool`,
   `AgentToolContract`, `AgentToolCall`, `AgentToolResult`,
