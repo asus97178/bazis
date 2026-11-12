@@ -4,6 +4,46 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.140.1 — 2026-11-13
+
+Fixes for the permission sources of 0.140.0, found by a review of the code. Nothing to
+change in an application.
+
+### Fixed
+
+- A specification of a source that cannot be checked — `scope: null`, an object whose
+  reading throws — is one rejected permission. It used to fail the reading of the whole
+  prefix: at start no permission of the source existed.
+- `PermissionSource.version()` must return a number, a bigint or a non-empty string.
+  `undefined`, `null` and an empty string are a failed reading; they used to become the
+  version `"undefined"`, which never changes, so other instances never read again. A
+  counter may now be returned as a number (`PermissionSourceVersion`).
+- A call of a source has `access.sourceTimeoutSeconds` (10). A source that hangs holds
+  neither the start of the application nor a request, and no second call starts beside
+  the one that has not answered.
+- `/health` is unhealthy for a source that has never been read or failed three times in a
+  row, not for one failure. Without a poll (`sourcePollSeconds: 0`) a failed source is
+  tried again every 5 seconds; its error used to stay for good.
+- A system clock set back no longer switches off the version comparison for a missing
+  key.
+- The catalog builds its merged list of permissions once per reading of a source, not on
+  every call.
+
+### Changed
+
+- Inside the pack: `PermissionSources` is `PermissionSourcesService` in
+  `PermissionSources.service.ts`; the loader's file is
+  `PermissionSourceLoader.background.ts`. The public entry and the `/health` check name
+  are the same.
+- `PermissionSourceState` has `failures`: the readings that failed in a row.
+
+### Known limits
+
+- The comparison of number attributes is exact for `decimal` columns. The ORM reads and
+  compares `integer` and `real` columns as doubles: integers are exact up to 2^53.
+- After `changed(prefix, keys)` the next comparison of versions reads the whole prefix
+  again: `keys` makes a change visible at once, it does not save the reading.
+
 ## 0.140.0 — 2026-11-13
 
 Access ([ACCESS-001 v1.4](docs/architecture/ACCESS.md)): permissions that appear while
