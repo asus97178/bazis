@@ -540,7 +540,7 @@ function runtimeError(code: string, message: string, details?: JsonValue): Agent
 
 /** The sum of what the provider reported for every model call. */
 function totalUsage(usages: readonly (AgentUsage | undefined)[]): AgentUsage | undefined {
-  const total: { inputTokens?: number; outputTokens?: number; totalTokens?: number; latencyMs?: number } = {};
+  const total: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number; reasoningTokens?: number; latencyMs?: number } = {};
   let amount: number | undefined;
   let currency: string | undefined;
   let mixedCurrency = false;
@@ -548,7 +548,7 @@ function totalUsage(usages: readonly (AgentUsage | undefined)[]): AgentUsage | u
   for (const usage of usages) {
     if (usage === undefined) continue;
     reported = true;
-    for (const field of ["inputTokens", "outputTokens", "totalTokens", "latencyMs"] as const) {
+    for (const field of ["inputTokens", "outputTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "latencyMs"] as const) {
       if (usage[field] !== undefined) total[field] = (total[field] ?? 0) + usage[field];
     }
     if (usage.cost !== undefined) {
@@ -583,8 +583,21 @@ function runtimeChain(messages: readonly AgentMessage[]): { readonly start: numb
   return { start, drafts, continues, repairs };
 }
 
+/** An answer in words: text, with or without the reasoning that led to it. */
 function isTextOnly(message: AgentMessage): boolean {
-  return message.content.every((part) => part.kind === "text");
+  return message.content.every((part) => part.kind === "text" || part.kind === "reasoning");
+}
+
+/**
+ * A message without its reasoning parts. A provider ties reasoning to the
+ * dialog it was written in, so it is dropped wherever the runtime rewrites
+ * that dialog; the words and Tool calls stay.
+ */
+function withoutReasoning(message: AgentMessage): AgentMessage {
+  if (!message.content.some((part) => part.kind === "reasoning")) return message;
+  const content = message.content.filter((part) => part.kind !== "reasoning");
+  if (content.length === 0) return message;
+  return agentMessage(message.role, content, { id: message.id, name: message.name, toolCallId: message.toolCallId, createdAtUnixMs: message.createdAtUnixMs, metadata: message.metadata });
 }
 
 /** One answer out of the pieces the output limit cut it into. */
@@ -601,6 +614,10 @@ function repairRequest(error: AgentToolError): string {
   return `Your answer was not accepted: ${error.message}${listed} Reply again with the corrected JSON only, without any other text.`;
 }
 
+function isInlineData(uri: string): boolean {
+  return uri.startsWith("data:");
+}
+
 function clip(text: string, maxChars: number): string {
   return text.length <= maxChars ? text : `${text.slice(0, maxChars)}… [${text.length - maxChars} more characters]`;
 }
@@ -614,8 +631,10 @@ function renderDialog(messages: readonly AgentMessage[], maxChars: number): stri
       switch (part.kind) {
         case "text": lines.push(`${speaker}: ${clip(part.text, 8_000)}`); break;
         case "data": lines.push(`${speaker} (data${part.name === undefined ? "" : ` "${part.name}"`}): ${clip(JSON.stringify(part.value), 4_000)}`); break;
-        case "image": lines.push(`${speaker}: [image ${clip(part.uri, 200)}]`); break;
-        case "file": lines.push(`${speaker}: [file ${part.name ?? clip(part.uri, 200)}]`); break;
+        case "image": lines.push(`${speaker}: [image${isInlineData(part.uri) ? "" : ` ${clip(part.uri, 200)}`}]`); break;
+        case "file": lines.push(`${speaker}: [file ${part.name ?? (isInlineData(part.uri) ? "" : clip(part.uri, 200))}]`); break;
+        // Reasoning is the model's own working; the summary is written from what was said and done.
+        case "reasoning": break;
         case "tool-call": lines.push(`Assistant called ${part.call.name}: ${clip(JSON.stringify(part.call.input), 2_000)}`); break;
         case "tool-result": lines.push(`Result of ${part.result.name} (${part.result.status}): ${clip(JSON.stringify(part.result.status === "success" ? part.result.output : part.result.error), 4_000)}`); break;
       }
@@ -1333,7 +1352,8 @@ export class AgentExecutionDriver {
     // The finished dialog keeps one answer: the pieces joined, without rejected drafts and the runtime's requests.
     const finalMessage = !json && chain.continues > 0 && chain.repairs === 0 && isTextOnly(answer) && chain.drafts.every(isTextOnly)
       ? joinedAnswer([...chain.drafts, answer])
-      : answer;
+      // Drafts are dropped from the dialog, so the answer's reasoning no longer matches it.
+      : chain.drafts.length > 0 ? withoutReasoning(answer) : answer;
     const messages = [...checkpoint.messages.slice(0, chain.start), finalMessage];
     let result: AgentRuntimeResult;
     if (response.finishReason !== "stop") {
@@ -1477,7 +1497,8 @@ export class AgentExecutionDriver {
       this.logger?.info("Agent context compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, messages: cut, tokensBefore: before, tokensSummarized: summarized });
       return Object.freeze([
         agentMessage("user", `${SUMMARY_PREFIX}\n\n${summary}`, { metadata: { runtime: RUNTIME_SUMMARY, messages: cut } }),
-        ...messages.slice(cut),
+        // The kept messages were reasoned about with the whole dialog in front of the model.
+        ...messages.slice(cut).map(withoutReasoning),
       ]);
     } catch (error) {
       this.logger?.warn("Agent context was not compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, error: redactSensitive(error) });
@@ -1521,13 +1542,14 @@ export class AgentExecutionDriver {
     if (message === undefined) {
       throw new AgentRuntimeError("Model response does not contain a final message.");
     }
-    if (message.content.length === 1 && message.content[0]?.kind === "data") {
-      return message.content[0].value;
+    const content = message.content.filter((part) => part.kind !== "reasoning");
+    if (content.length === 1 && content[0]?.kind === "data") {
+      return content[0].value;
     }
-    if (!message.content.every((part) => part.kind === "text")) {
+    if (!content.every((part) => part.kind === "text")) {
       throw new AgentRuntimeError("JSON output must contain only text or one data part.");
     }
-    const text = message.content.map((part) => part.kind === "text" ? part.text : "").join("\n").trim();
+    const text = content.map((part) => part.kind === "text" ? part.text : "").join("\n").trim();
     if (text.length === 0) {
       throw new AgentRuntimeError("JSON output is empty.");
     }

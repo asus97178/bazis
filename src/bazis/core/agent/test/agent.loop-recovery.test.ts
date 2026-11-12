@@ -8,6 +8,8 @@ import {
   agentMessage,
   agentModelResponse,
   agentOutputContract,
+  agentReasoning,
+  agentText,
   agentToolCall,
   type AgentModelProvider,
   type AgentModelProviderContext,
@@ -198,6 +200,23 @@ describe("agent loop recovery", () => {
         expect(lastText(model.requests[1])).toContain("JSON output is malformed.");
         expect(lastText(model.requests[2])).toContain("Issues:");
         expect(model.requests[2]?.messages.at(-1)?.metadata).toEqual({ runtime: "repair-output" });
+      } finally { await dispose(); }
+    });
+
+    test("is read past the model's reasoning, which stays in the dialog", async () => {
+      const thinking: Reply = (request) => agentModelResponse({
+        invocationId: request.invocationId, finishReason: "stop",
+        message: agentMessage("assistant", [agentReasoning("The goal is about promo codes.", { data: { signature: "sig" } }), agentText("{\"goal\":\"Promo codes work.\"}")]),
+        usage: { inputTokens: 100, outputTokens: 30, cacheReadTokens: 80, reasoningTokens: 20 },
+      });
+      const model = new ScriptedModel([thinking]);
+      const { runtime, dispose } = runtimeOf(model);
+      try {
+        const result = await runtime.run(plainAgent, { input: "Checkout", output });
+        expect(result.status).toBe("completed");
+        expect(result.output).toEqual({ goal: "Promo codes work." });
+        expect(result.finalMessage?.content[0]).toEqual({ kind: "reasoning", text: "The goal is about promo codes.", data: { signature: "sig" } });
+        expect(result.usage).toEqual({ inputTokens: 100, outputTokens: 30, cacheReadTokens: 80, reasoningTokens: 20 });
       } finally { await dispose(); }
     });
 

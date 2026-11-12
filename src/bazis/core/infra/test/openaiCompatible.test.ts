@@ -2,8 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   AgentModelContextOverflowError,
   AgentModelUnavailableError,
+  agentFile,
+  agentImage,
   agentMessage,
   agentModelRequest,
+  agentReasoning,
+  agentText,
   agentOutputContract,
   agentJsonSchema,
   agentClassSchema,
@@ -368,6 +372,45 @@ describe("OpenAI-compatible LLM adapter", () => {
 
     expect(create(async () => new Response("{}"), 128_000).contextTokens()).toBe(128_000);
     expect(create(async () => new Response("{}")).contextTokens()).toBeUndefined();
+  });
+
+  test("sends an image and an inline file as content parts, and reads cache and reasoning counts", async () => {
+    let sent: { messages: { role: string; content: unknown }[] } | undefined;
+    const provider = openAiCompatibleAdapter({
+      fetch: async (_url, init) => {
+        sent = JSON.parse(String(init?.body));
+        return response({
+          choices: [{ finish_reason: "stop", message: { content: "A cat." } }],
+          usage: { prompt_tokens: 1200, completion_tokens: 40, total_tokens: 1240, prompt_tokens_details: { cached_tokens: 1000 }, completion_tokens_details: { reasoning_tokens: 32 } },
+        });
+      },
+    }).create({ provider: "openai-compatible", model: "gpt-test", baseUrl: "https://llm.example/v1", apiKey: "secret-key" }) as OpenAiCompatibleModelProvider;
+
+    const answer = await provider.complete(agentModelRequest({
+      invocationId: "inv-1",
+      messages: [
+        agentMessage("user", [
+          agentText("What is in the picture and in the contract?"),
+          agentImage("https://files.example/cat.png", { detail: "low" }),
+          agentFile("data:application/pdf;base64,JVBERi0=", { name: "contract.pdf" }),
+          agentFile("https://files.example/terms.pdf", { name: "terms.pdf" }),
+        ]),
+        // Reasoning of another provider is not sent to this one.
+        agentMessage("assistant", [agentReasoning("Looking at the picture…", { data: { signature: "abc" } }), agentText("A cat.")]),
+        agentMessage("user", "Thanks"),
+      ],
+    }), context());
+
+    expect(sent?.messages[0]).toEqual({ role: "user", content: [
+      { type: "text", text: "What is in the picture and in the contract?" },
+      { type: "image_url", image_url: { url: "https://files.example/cat.png", detail: "low" } },
+      { type: "file", file: { file_data: "data:application/pdf;base64,JVBERi0=", filename: "contract.pdf" } },
+      { type: "text", text: JSON.stringify({ kind: "file", uri: "https://files.example/terms.pdf", mediaType: null, name: "terms.pdf" }) },
+    ] });
+    expect(sent?.messages[1]).toEqual({ role: "assistant", content: "A cat." });
+    // Words alone stay one string.
+    expect(sent?.messages[2]).toEqual({ role: "user", content: "Thanks" });
+    expect(answer.usage).toEqual({ inputTokens: 1200, outputTokens: 40, totalTokens: 1240, cacheReadTokens: 1000, reasoningTokens: 32 });
   });
 
   test("bounds successful provider response bodies", async () => {

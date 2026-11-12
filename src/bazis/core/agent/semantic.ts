@@ -15,6 +15,7 @@ export type AgentContentPart =
   | AgentDataPart
   | AgentImagePart
   | AgentFilePart
+  | AgentReasoningPart
   | AgentToolCallPart
   | AgentToolResultPart;
 export type AgentContentInput = string | AgentContentPart | readonly AgentContentPart[];
@@ -42,6 +43,19 @@ export interface AgentFilePart {
   readonly uri: string;
   readonly mediaType?: string;
   readonly name?: string;
+}
+
+/**
+ * What a model thought before it answered or called a Tool. It stands in the
+ * assistant message it belongs to and goes back to the same provider with the
+ * dialog, unchanged: a provider may refuse reasoning it did not write.
+ */
+export interface AgentReasoningPart {
+  readonly kind: "reasoning";
+  /** What the provider lets an application see of the reasoning; may be empty. */
+  readonly text: string;
+  /** The provider's own record of the block (a signature, encrypted reasoning); opaque to everything else. */
+  readonly data?: JsonObject;
 }
 
 export interface AgentToolResultPart {
@@ -255,9 +269,16 @@ export interface AgentModelRequestOptions {
 export type AgentFinishReason = "stop" | "tool-calls" | "length" | "content-filter" | "error";
 
 export interface AgentUsage {
+  /** The whole request as the provider counted it, tokens read from its prompt cache included. */
   readonly inputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
+  /** The part of `inputTokens` the provider read from its prompt cache, at a lower price. */
+  readonly cacheReadTokens?: number;
+  /** The part of `inputTokens` the provider wrote to its prompt cache. */
+  readonly cacheWriteTokens?: number;
+  /** The part of `outputTokens` the model spent on reasoning. */
+  readonly reasoningTokens?: number;
   readonly latencyMs?: number;
   readonly cost?: AgentUsageCost;
   readonly cacheHit?: boolean;
@@ -272,6 +293,9 @@ export interface AgentUsageInput {
   readonly inputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
+  readonly cacheReadTokens?: number;
+  readonly cacheWriteTokens?: number;
+  readonly reasoningTokens?: number;
   readonly latencyMs?: number;
   readonly cost?: {
     readonly amount: number;
@@ -417,6 +441,15 @@ export function agentFile(uri: string, options: { readonly mediaType?: string; r
   });
 }
 
+export function agentReasoning(text: string, options: { readonly data?: unknown } = {}): AgentReasoningPart {
+  if (typeof text !== "string") throw new AgentSemanticError("reasoning.text must be a string.");
+  return freezeWithoutUndefined({
+    kind: "reasoning" as const,
+    text,
+    data: options.data === undefined ? undefined : normalizeJsonObject(options.data, "reasoning.data"),
+  });
+}
+
 export function agentToolResultPart(result: AgentToolResult): AgentToolResultPart {
   return Object.freeze({ kind: "tool-result", result: normalizeToolResult(result) });
 }
@@ -438,6 +471,9 @@ export function agentMessage(role: AgentMessageRole, content: AgentContentInput,
   }
   if (role !== "assistant" && parts.some((part) => part.kind === "tool-call")) {
     throw new AgentSemanticError("tool-call content parts require an assistant message.");
+  }
+  if (role !== "assistant" && parts.some((part) => part.kind === "reasoning")) {
+    throw new AgentSemanticError("reasoning content parts require an assistant message.");
   }
   const resultParts = parts.filter((part) => part.kind === "tool-result");
   if (role === "tool") {
@@ -670,6 +706,8 @@ function normalizeContentPart(part: AgentContentPart, field: string): AgentConte
       return agentImage(part.uri, { mediaType: part.mediaType, detail: part.detail });
     case "file":
       return agentFile(part.uri, { mediaType: part.mediaType, name: part.name });
+    case "reasoning":
+      return agentReasoning(part.text, { data: part.data });
     case "tool-result":
       return agentToolResultPart(part.result);
     case "tool-call":
@@ -724,6 +762,9 @@ function normalizeUsage(usage: AgentUsageInput): AgentUsage {
     inputTokens: optionalNonNegativeInteger(usage.inputTokens, "usage.inputTokens"),
     outputTokens: optionalNonNegativeInteger(usage.outputTokens, "usage.outputTokens"),
     totalTokens: optionalNonNegativeInteger(usage.totalTokens, "usage.totalTokens"),
+    cacheReadTokens: optionalNonNegativeInteger(usage.cacheReadTokens, "usage.cacheReadTokens"),
+    cacheWriteTokens: optionalNonNegativeInteger(usage.cacheWriteTokens, "usage.cacheWriteTokens"),
+    reasoningTokens: optionalNonNegativeInteger(usage.reasoningTokens, "usage.reasoningTokens"),
     latencyMs: optionalNonNegativeInteger(usage.latencyMs, "usage.latencyMs"),
     cost: usage.cost
       ? Object.freeze({

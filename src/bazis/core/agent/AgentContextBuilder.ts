@@ -176,6 +176,18 @@ function jsonLength(value: unknown): number {
   return JSON.stringify(value)?.length ?? 0;
 }
 
+/** Tokens of an image whatever its size: providers scale images down to about this much. */
+const IMAGE_TOKENS = 1_200;
+
+function isDataUri(uri: string): boolean {
+  return uri.startsWith("data:");
+}
+
+/** A file in the request costs what its content does; an address alone says nothing about it. */
+function fileTokens(uri: string): number {
+  return isDataUri(uri) ? Math.min(200_000, Math.max(500, Math.ceil(uri.length / 12))) : 2_000;
+}
+
 function contentPartChars(part: AgentContentPart): number {
   switch (part.kind) {
     case "text":
@@ -183,9 +195,12 @@ function contentPartChars(part: AgentContentPart): number {
     case "data":
       return jsonLength(part.value) + (part.name?.length ?? 0);
     case "image":
-      return part.uri.length + (part.mediaType?.length ?? 0) + part.detail.length;
+      // Bytes written into the dialog are not characters of a prompt.
+      return (isDataUri(part.uri) ? IMAGE_TOKENS * 4 : part.uri.length) + (part.mediaType?.length ?? 0) + part.detail.length;
     case "file":
-      return part.uri.length + (part.mediaType?.length ?? 0) + (part.name?.length ?? 0);
+      return (isDataUri(part.uri) ? fileTokens(part.uri) * 4 : part.uri.length) + (part.mediaType?.length ?? 0) + (part.name?.length ?? 0);
+    case "reasoning":
+      return part.text.length + (part.data === undefined ? 0 : jsonLength(part.data));
     case "tool-result":
       return jsonLength(part.result);
     case "tool-call":
@@ -231,9 +246,12 @@ function contentPartTokens(part: AgentContentPart): number {
     case "data":
       return textTokenCount(JSON.stringify(part.value) ?? "") + (part.name === undefined ? 0 : textTokenCount(part.name));
     case "image":
-      return textTokenCount(JSON.stringify({ uri: part.uri, mediaType: part.mediaType ?? null, detail: part.detail }));
+      return IMAGE_TOKENS;
     case "file":
-      return textTokenCount(JSON.stringify({ uri: part.uri, mediaType: part.mediaType ?? null, name: part.name ?? null }));
+      return fileTokens(part.uri);
+    case "reasoning":
+      // The provider's record of a block is about as long as the reasoning it holds.
+      return Math.max(textTokenCount(part.text), part.data === undefined ? 0 : Math.ceil(jsonLength(part.data) / 4));
     case "tool-result":
       return textTokenCount(JSON.stringify(part.result) ?? "");
     case "tool-call":
