@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AgentModelUnavailableError,
   agentMessage,
   agentModelRequest,
   agentOutputContract,
@@ -12,7 +13,7 @@ import {
   agentToolResultPart,
   type AgentModelProviderContext,
 } from "@/core/agent";
-import { openAiCompatibleAdapter, type OpenAiCompatibleFetch, type OpenAiCompatibleModelProvider } from "../index";
+import { openAiCompatibleAdapter, OpenAiCompatibleProviderError, type OpenAiCompatibleFetch, type OpenAiCompatibleModelProvider } from "../index";
 
 interface CapturedRequest {
   readonly url: string;
@@ -307,16 +308,41 @@ describe("OpenAI-compatible LLM adapter", () => {
       apiKey: "secret-key",
     }) as OpenAiCompatibleModelProvider;
 
-    await expect(
-      invalidToolProvider.complete(
-        agentModelRequest({
-          invocationId: "inv-1",
-          messages: [agentMessage("user", "Hello")],
-          tools: [agentToolContract({ name: "catalog.search", description: "Searches the catalog." })],
-        }),
-        context(),
-      ),
-    ).rejects.toThrow(/tool arguments/);
+    // Broken arguments are the model's mistake, not a provider failure: the call
+    // comes back marked, so the runtime answers the model with a Tool error.
+    const marked = await invalidToolProvider.complete(
+      agentModelRequest({
+        invocationId: "inv-1",
+        messages: [agentMessage("user", "Hello")],
+        tools: [agentToolContract({ name: "catalog.search", description: "Searches the catalog." })],
+      }),
+      context(),
+    );
+    expect(marked.finishReason).toBe("tool-calls");
+    expect(marked.toolCalls[0]).toMatchObject({ id: "call-1", name: "catalog.search", input: {} });
+    expect(marked.toolCalls[0]?.inputError).toMatch(/JSON/);
+  });
+
+  test("reports 429, 5xx and a broken connection as unavailable, with Retry-After", async () => {
+    const create = (fetch: () => Promise<Response>) => openAiCompatibleAdapter({ fetch }).create({
+      provider: "openai-compatible", model: "gpt-test", baseUrl: "https://llm.example/v1", apiKey: "secret-key",
+    }) as OpenAiCompatibleModelProvider;
+    const ask = (provider: OpenAiCompatibleModelProvider) => provider.complete(
+      agentModelRequest({ invocationId: "inv-1", messages: [agentMessage("user", "Hello")] }), context(),
+    ).then(() => undefined, (error: unknown) => error);
+
+    const limited = await ask(create(async () => new Response("{}", { status: 429, headers: { "retry-after": "2" } })));
+    expect(limited).toBeInstanceOf(AgentModelUnavailableError);
+    expect((limited as AgentModelUnavailableError).retryAfterMs).toBe(2000);
+
+    expect(await ask(create(async () => new Response("{}", { status: 503 })))).toBeInstanceOf(AgentModelUnavailableError);
+    const broken = await ask(create(async () => { throw new TypeError("socket closed"); }));
+    expect(broken).toBeInstanceOf(AgentModelUnavailableError);
+    expect((broken as Error).message).toContain("could not reach the provider");
+
+    // A wrong request or key is not repeated.
+    const refused = await ask(create(async () => new Response("{}", { status: 401 })));
+    expect(refused).toBeInstanceOf(OpenAiCompatibleProviderError);
   });
 
   test("bounds successful provider response bodies", async () => {

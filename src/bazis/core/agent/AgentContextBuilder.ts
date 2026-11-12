@@ -2,6 +2,8 @@ import type { AgentDefinition } from "./AgentRegistry";
 import { AgentRuntimeError } from "./errors";
 import {
   agentMessage,
+  agentToolResult,
+  agentToolResultPart,
   type AgentContentPart,
   type AgentMessage,
   type AgentMessageRole,
@@ -9,10 +11,20 @@ import {
   type JsonValue,
 } from "./semantic";
 
+/** A Tool result longer than this reaches the model cut, unless `maxToolResultChars` says otherwise. */
+export const DEFAULT_MAX_TOOL_RESULT_CHARS = 100_000;
+
 export interface AgentContextLimits {
   readonly maxMessages?: number;
   readonly maxChars?: number;
   readonly maxTokens?: number;
+  /**
+   * The longest Tool output, as JSON text, the model gets in full. A longer
+   * one is sent as `{ truncated: true, totalChars, text }` with its beginning,
+   * so one large result does not fill the model's window; `result.toolResults`
+   * and `result.messages` keep the whole output. 100 000 by default.
+   */
+  readonly maxToolResultChars?: number;
 }
 
 export interface AgentContextBuildInput {
@@ -55,6 +67,8 @@ interface ContextCandidate {
   readonly message: AgentMessage;
   readonly chars: number;
   readonly tokens: number;
+  /** The Tool result was too long and is sent cut. */
+  readonly cut?: true;
 }
 
 function errorMessageOf(error: unknown): string {
@@ -83,7 +97,11 @@ export function normalizeAgentContextLimits(
     return undefined;
   }
 
-  const normalized: { maxMessages?: number; maxChars?: number; maxTokens?: number } = {};
+  const normalized: { maxMessages?: number; maxChars?: number; maxTokens?: number; maxToolResultChars?: number } = {};
+  const maxToolResultChars = optionalPositiveInteger(limits.maxToolResultChars, `${field}.maxToolResultChars`);
+  if (maxToolResultChars !== undefined) {
+    normalized.maxToolResultChars = maxToolResultChars;
+  }
   const maxMessages = optionalPositiveInteger(limits.maxMessages, `${field}.maxMessages`);
   const maxChars = optionalPositiveInteger(limits.maxChars, `${field}.maxChars`);
   const maxTokens = optionalPositiveInteger(limits.maxTokens, `${field}.maxTokens`);
@@ -127,6 +145,25 @@ function cloneMessage(message: AgentMessage, field: string): AgentMessage {
   } catch (error) {
     throw new AgentRuntimeError(`${field} is invalid: ${errorMessageOf(error)}`);
   }
+}
+
+/** The message the model gets instead of a Tool result that is too long; `undefined` when it fits. */
+function cutToolResult(message: AgentMessage, maxChars: number): AgentMessage | undefined {
+  const part = message.content[0];
+  if (message.role !== "tool" || part?.kind !== "tool-result" || part.result.status !== "success") return undefined;
+  const json = JSON.stringify(part.result.output) ?? "";
+  if (json.length <= maxChars) return undefined;
+  const result = agentToolResult({
+    callId: part.result.callId,
+    name: part.result.name,
+    status: "success",
+    output: { truncated: true, totalChars: json.length, text: json.slice(0, maxChars) },
+    durationMs: part.result.durationMs,
+    metadata: part.result.metadata,
+  });
+  return agentMessage("tool", agentToolResultPart(result), {
+    id: message.id, name: message.name, toolCallId: message.toolCallId, createdAtUnixMs: message.createdAtUnixMs, metadata: message.metadata,
+  });
 }
 
 function jsonLength(value: unknown): number {
@@ -387,13 +424,14 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
 
   build(input: AgentContextBuildInput): AgentContext {
     const limits = normalizeAgentContextLimits(input.limits);
-    const candidates = this.candidates(input.agent, input.messages);
+    const candidates = this.candidates(input.agent, input.messages, limits?.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS);
     if (candidates.length === 0) {
       throw new AgentRuntimeError("agent context requires at least one message.");
     }
 
     const included = candidates.map(() => true);
-    const reasons = candidates.map(() => undefined as string | undefined);
+    // A result sent cut stays in the context; the trace says why it is shorter.
+    const reasons = candidates.map((candidate) => candidate.cut ? "maxToolResultChars" : undefined as string | undefined);
     const protectedItems = protectedIndexes(candidates);
     const selection = new ContextSelection(candidates, included, reasons, protectedItems);
     selection.apply("maxMessages", limits?.maxMessages);
@@ -426,7 +464,7 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     });
   }
 
-  private candidates(agent: AgentDefinition, messages: readonly AgentMessage[]): readonly ContextCandidate[] {
+  private candidates(agent: AgentDefinition, messages: readonly AgentMessage[], maxToolResultChars: number): readonly ContextCandidate[] {
     const candidates: ContextCandidate[] = [];
     const prompt = this.promptMessage(agent);
     if (prompt !== undefined) {
@@ -440,13 +478,16 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     }
 
     for (let index = 0; index < messages.length; index += 1) {
-      const message = cloneMessage(messages[index] as AgentMessage, `agentContext.messages[${index}]`);
+      const whole = cloneMessage(messages[index] as AgentMessage, `agentContext.messages[${index}]`);
+      const cut = cutToolResult(whole, maxToolResultChars);
+      const message = cut ?? whole;
       const tokens = this.estimatedTokens(message, `conversation[${index}]`);
       candidates.push(Object.freeze({
         section: `conversation[${index}]`,
         message,
         chars: messageChars(message),
         tokens,
+        ...(cut === undefined ? {} : { cut: true as const }),
       }));
     }
     return Object.freeze(candidates);

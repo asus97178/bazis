@@ -4,7 +4,7 @@ import type { ServiceProvider } from "../../di";
 import { getGeneratedOpenApiMetadata } from "../../http/OpenApi/generatedOpenApiRegistry";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 import type { Logger } from "../../kernel/logging/Logger";
-import { AgentModelTimeoutError, AgentRuntimeError } from "../errors";
+import { AgentModelTimeoutError, AgentModelUnavailableError, AgentRuntimeError } from "../errors";
 import { validateAgentJsonSchema } from "./AgentJsonSchema";
 import type { AgentDefinition, AgentRegistry } from "../AgentRegistry";
 import {
@@ -46,6 +46,7 @@ import {
   type AgentToolError,
   type AgentToolContract,
   type AgentToolResult,
+  type AgentUsage,
   type JsonObject,
   type JsonValue,
 } from "../semantic";
@@ -53,6 +54,33 @@ import {
 const DEFAULT_MAX_STEPS = 8;
 const DEFAULT_MAX_TOOL_CALLS_PER_STEP = 16;
 const DEFAULT_MODEL_TIMEOUT_MS = 60_000;
+const DEFAULT_MODEL_ATTEMPTS = 3;
+const DEFAULT_MODEL_RETRY_DELAY_MS = 500;
+const DEFAULT_MODEL_RETRY_MAX_DELAY_MS = 20_000;
+const DEFAULT_MAX_OUTPUT_CONTINUATIONS = 3;
+const DEFAULT_MAX_OUTPUT_REPAIRS = 2;
+const DEFAULT_MAX_PARALLEL_TOOL_CALLS = 8;
+
+/** `message.metadata.runtime` of the messages the runtime writes itself. */
+const RUNTIME_CONTINUE = "continue-output";
+const RUNTIME_REPAIR = "repair-output";
+const CONTINUE_TEXT = "Your previous message was cut off by the output limit. Continue exactly where it stopped: do not repeat, apologize or summarize what is already written.";
+
+/** How a model request that the provider could not serve right now is repeated. */
+export interface AgentModelRetryPolicy {
+  /** How many times one model request is sent, the first one included. 3 by default; 1 turns repeats off. */
+  readonly maxAttempts?: number;
+  /** The wait before the second attempt, doubled before each next one. 500 ms by default. */
+  readonly delayMs?: number;
+  /** The longest single wait, a provider's `Retry-After` included. 20 seconds by default. */
+  readonly maxDelayMs?: number;
+}
+
+interface ModelRetrySettings {
+  readonly maxAttempts: number;
+  readonly delayMs: number;
+  readonly maxDelayMs: number;
+}
 
 export type AgentRuntimeStatus = "completed" | "failed";
 
@@ -78,6 +106,27 @@ export interface AgentRuntimeOptions {
   readonly modelProfile?: string;
   /** Provider-call timeout. Defaults to 60 seconds; 0 explicitly disables it. */
   readonly timeoutMs?: number;
+  /** The deadline of a whole run: every model call, Tool call and wait. No deadline by default. */
+  readonly runTimeoutMs?: number;
+  /** Repeats of a model request the provider could not serve right now (429, 5xx, a broken connection). */
+  readonly modelRetry?: AgentModelRetryPolicy;
+  /**
+   * How many times the model is asked to go on when the output limit cut its
+   * text answer (`finishReason: "length"`). 3 by default; 0 fails the run at once.
+   */
+  readonly maxOutputContinuations?: number;
+  /**
+   * How many times the model is asked to correct a structured answer that is
+   * not valid JSON or does not match the schema. 2 by default; 0 fails the run at once.
+   */
+  readonly maxOutputRepairs?: number;
+  /**
+   * How many Tools of one model step run at the same time. Only Tools with
+   * `sideEffect: "none"` or `"read"` standing next to each other run together;
+   * `write` and `external` always run one by one, in the order the model wrote
+   * them. 8 by default; 1 runs every Tool one by one.
+   */
+  readonly maxParallelToolCalls?: number;
   readonly contextBuilder?: AgentContextBuilder;
   readonly contextLimits?: AgentContextLimits;
   /**
@@ -109,6 +158,8 @@ export interface AgentRuntimeInvokeOptions {
   readonly temperature?: number;
   /** Per-provider-call timeout override; 0 explicitly disables it. */
   readonly timeoutMs?: number;
+  /** The deadline of this whole run instead of the runtime's; 0 explicitly disables it. */
+  readonly runTimeoutMs?: number;
   readonly contextLimits?: AgentContextLimits;
   readonly signal?: AbortSignal;
   readonly toolExecution?: AgentRuntimeToolExecutionOptions;
@@ -127,6 +178,8 @@ export interface AgentRuntimeResult {
   readonly finalMessage?: AgentMessage;
   /** Validated structured value when `output` requested JSON. */
   readonly output?: JsonValue;
+  /** The sum over every model call of the run, when the provider reports usage. */
+  readonly usage?: AgentUsage;
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
 }
@@ -138,6 +191,11 @@ type PreparedAgentPlan = {
   readonly maxSteps: number;
   readonly maxToolCallsPerStep: number;
   readonly timeoutMs: number | undefined;
+  readonly runTimeoutMs: number | undefined;
+  readonly modelRetry: ModelRetrySettings;
+  readonly maxOutputContinuations: number;
+  readonly maxOutputRepairs: number;
+  readonly maxParallelToolCalls: number;
   readonly modelProfile: string | undefined;
   readonly contextLimits: AgentContextLimits | undefined;
   readonly messages: AgentMessage[];
@@ -403,6 +461,7 @@ function normalizeProviderResponse(value: unknown): AgentModelResponse {
       id: call.id as string,
       name: call.name as string,
       input: call.input,
+      inputError: call.inputError as string | undefined,
       metadata: call.metadata,
     });
   });
@@ -424,6 +483,81 @@ function runtimeError(code: string, message: string, details?: JsonValue): Agent
   });
 }
 
+/** The sum of what the provider reported for every model call. */
+function totalUsage(responses: readonly AgentModelResponse[]): AgentUsage | undefined {
+  const total: { inputTokens?: number; outputTokens?: number; totalTokens?: number; latencyMs?: number } = {};
+  let amount: number | undefined;
+  let currency: string | undefined;
+  let mixedCurrency = false;
+  let reported = false;
+  for (const response of responses) {
+    const usage = response.usage;
+    if (usage === undefined) continue;
+    reported = true;
+    for (const field of ["inputTokens", "outputTokens", "totalTokens", "latencyMs"] as const) {
+      if (usage[field] !== undefined) total[field] = (total[field] ?? 0) + usage[field];
+    }
+    if (usage.cost !== undefined) {
+      if (currency !== undefined && currency !== usage.cost.currency) mixedCurrency = true;
+      currency = usage.cost.currency;
+      amount = (amount ?? 0) + usage.cost.amount;
+    }
+  }
+  if (!reported) return undefined;
+  return Object.freeze({
+    ...total,
+    ...(amount !== undefined && currency !== undefined && !mixedCurrency ? { cost: Object.freeze({ amount, currency }) } : {}),
+  });
+}
+
+/** The drafts at the end of a dialog that the runtime asked the model to continue or correct. */
+function runtimeChain(messages: readonly AgentMessage[]): { readonly start: number; readonly drafts: readonly AgentMessage[]; readonly continues: number; readonly repairs: number } {
+  let start = messages.length;
+  let continues = 0;
+  let repairs = 0;
+  const drafts: AgentMessage[] = [];
+  while (start >= 2) {
+    const ask = messages[start - 1]!;
+    const draft = messages[start - 2]!;
+    const kind = ask.role === "user" ? ask.metadata.runtime : undefined;
+    if ((kind !== RUNTIME_CONTINUE && kind !== RUNTIME_REPAIR) || draft.role !== "assistant" || draft.content.some((part) => part.kind === "tool-call")) break;
+    drafts.unshift(draft);
+    if (kind === RUNTIME_CONTINUE) continues += 1;
+    else repairs += 1;
+    start -= 2;
+  }
+  return { start, drafts, continues, repairs };
+}
+
+function isTextOnly(message: AgentMessage): boolean {
+  return message.content.every((part) => part.kind === "text");
+}
+
+/** One answer out of the pieces the output limit cut it into. */
+function joinedAnswer(pieces: readonly AgentMessage[]): AgentMessage {
+  const last = pieces[pieces.length - 1]!;
+  const text = pieces.map((piece) => piece.content.map((part) => part.kind === "text" ? part.text : "").join("")).join("");
+  return agentMessage("assistant", text, { id: last.id, name: last.name, createdAtUnixMs: last.createdAtUnixMs, metadata: last.metadata });
+}
+
+function repairRequest(error: AgentToolError): string {
+  const details = error.details;
+  const issues = details !== undefined && details !== null && typeof details === "object" && !Array.isArray(details) ? (details as JsonObject).issues : undefined;
+  const listed = issues === undefined ? "" : ` Issues: ${JSON.stringify(issues).slice(0, 2_000)}.`;
+  return `Your answer was not accepted: ${error.message}${listed} Reply again with the corrected JSON only, without any other text.`;
+}
+
+/** Waits unless the run is cancelled first; resolves `false` when it was. */
+function pause(ms: number, signal: AbortSignal | undefined): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  if (ms <= 0) return Promise.resolve(true);
+  return new Promise<boolean>((resolve) => {
+    const onAbort = (): void => { clearTimeout(timer); resolve(false); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(true); }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 function runtimeResult(options: {
   readonly invocationId: string;
   readonly agentName: string;
@@ -437,6 +571,7 @@ function runtimeResult(options: {
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
 }): AgentRuntimeResult {
+  const usage = totalUsage(options.responses);
   return Object.freeze({
     invocationId: options.invocationId,
     agentName: options.agentName,
@@ -447,6 +582,7 @@ function runtimeResult(options: {
     toolResults: Object.freeze([...options.toolResults]),
     ...(options.finalMessage !== undefined ? { finalMessage: options.finalMessage } : {}),
     ...(options.output !== undefined ? { output: options.output } : {}),
+    ...(usage !== undefined ? { usage } : {}),
     ...(options.error !== undefined ? { error: options.error } : {}),
     metadata: options.metadata,
   });
@@ -514,6 +650,11 @@ export class AgentExecutionDriver {
   private readonly defaultMaxToolCallsPerStep: number;
   private readonly defaultModelProfile?: string;
   readonly defaultTimeoutMs?: number;
+  private readonly defaultRunTimeoutMs?: number;
+  private readonly modelRetry: ModelRetrySettings;
+  private readonly maxOutputContinuations: number;
+  private readonly maxOutputRepairs: number;
+  private readonly maxParallelToolCalls: number;
   private readonly defaultContextLimits?: AgentContextLimits;
   private readonly contextBuilder: AgentContextBuilder;
   private readonly logger?: Logger;
@@ -527,6 +668,22 @@ export class AgentExecutionDriver {
     assertPositiveInteger(options.maxSteps, "AgentRuntime.maxSteps");
     assertPositiveInteger(options.maxToolCallsPerStep, "AgentRuntime.maxToolCallsPerStep");
     assertNonNegativeInteger(options.timeoutMs, "AgentRuntime.timeoutMs");
+    assertNonNegativeInteger(options.runTimeoutMs, "AgentRuntime.runTimeoutMs");
+    assertPositiveInteger(options.modelRetry?.maxAttempts, "AgentRuntime.modelRetry.maxAttempts");
+    assertNonNegativeInteger(options.modelRetry?.delayMs, "AgentRuntime.modelRetry.delayMs");
+    assertNonNegativeInteger(options.modelRetry?.maxDelayMs, "AgentRuntime.modelRetry.maxDelayMs");
+    assertNonNegativeInteger(options.maxOutputContinuations, "AgentRuntime.maxOutputContinuations");
+    assertNonNegativeInteger(options.maxOutputRepairs, "AgentRuntime.maxOutputRepairs");
+    assertPositiveInteger(options.maxParallelToolCalls, "AgentRuntime.maxParallelToolCalls");
+    this.defaultRunTimeoutMs = options.runTimeoutMs === 0 ? undefined : options.runTimeoutMs;
+    this.modelRetry = Object.freeze({
+      maxAttempts: options.modelRetry?.maxAttempts ?? DEFAULT_MODEL_ATTEMPTS,
+      delayMs: options.modelRetry?.delayMs ?? DEFAULT_MODEL_RETRY_DELAY_MS,
+      maxDelayMs: options.modelRetry?.maxDelayMs ?? DEFAULT_MODEL_RETRY_MAX_DELAY_MS,
+    });
+    this.maxOutputContinuations = options.maxOutputContinuations ?? DEFAULT_MAX_OUTPUT_CONTINUATIONS;
+    this.maxOutputRepairs = options.maxOutputRepairs ?? DEFAULT_MAX_OUTPUT_REPAIRS;
+    this.maxParallelToolCalls = options.maxParallelToolCalls ?? DEFAULT_MAX_PARALLEL_TOOL_CALLS;
     this.defaultMaxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
     this.defaultMaxToolCallsPerStep = options.maxToolCallsPerStep ?? DEFAULT_MAX_TOOL_CALLS_PER_STEP;
     this.defaultModelProfile = optionalText(options.modelProfile, "AgentRuntime.modelProfile");
@@ -667,6 +824,12 @@ export class AgentExecutionDriver {
       maxSteps,
       maxToolCallsPerStep,
       timeoutMs: providerTimeoutMs,
+      // A Session owns its run deadline and runs Tools one by one behind its durable boundary.
+      runTimeoutMs: undefined,
+      modelRetry: this.modelRetry,
+      maxOutputContinuations: this.maxOutputContinuations,
+      maxOutputRepairs: this.maxOutputRepairs,
+      maxParallelToolCalls: 1,
       modelProfile,
       contextLimits,
       messages: [...checkpoint.messages],
@@ -691,6 +854,7 @@ export class AgentExecutionDriver {
     let maxSteps: number;
     let maxToolCallsPerStep: number;
     let timeoutMs: number | undefined;
+    let runTimeoutMs: number | undefined;
     let modelProfile: string | undefined;
     let contextLimits: AgentContextLimits | undefined;
     try {
@@ -698,6 +862,8 @@ export class AgentExecutionDriver {
       assertPositiveInteger(options.maxSteps, "agentRuntime.maxSteps");
       assertPositiveInteger(options.maxToolCallsPerStep, "agentRuntime.maxToolCallsPerStep");
       assertNonNegativeInteger(options.timeoutMs, "agentRuntime.timeoutMs");
+      assertNonNegativeInteger(options.runTimeoutMs, "agentRuntime.runTimeoutMs");
+      runTimeoutMs = options.runTimeoutMs === 0 ? undefined : options.runTimeoutMs ?? this.defaultRunTimeoutMs;
       maxSteps = options.maxSteps ?? this.defaultMaxSteps;
       maxToolCallsPerStep = options.maxToolCallsPerStep ?? this.defaultMaxToolCallsPerStep;
       timeoutMs = options.timeoutMs === 0 ? undefined : options.timeoutMs ?? this.defaultTimeoutMs;
@@ -733,6 +899,11 @@ export class AgentExecutionDriver {
         maxSteps,
         maxToolCallsPerStep,
         timeoutMs,
+        runTimeoutMs,
+        modelRetry: this.modelRetry,
+        maxOutputContinuations: this.maxOutputContinuations,
+        maxOutputRepairs: this.maxOutputRepairs,
+        maxParallelToolCalls: this.maxParallelToolCalls,
         modelProfile,
         contextLimits,
         messages,
@@ -800,6 +971,42 @@ export class AgentExecutionDriver {
         const pending = checkpoint.pendingToolBatch!;
         const response = checkpoint.responses[pending.responseIndex]!;
         const call = response.toolCalls[pending.nextToolIndex]!;
+        const together = session ? [] : this.readTogether(plan, response.toolCalls, pending.nextToolIndex);
+        if (together.length > 1) {
+          const results = await Promise.all(together.map((item) => this.toolExecutor.execute(item.call, {
+            ...plan.executorToolOptions,
+            agentName: plan.agent.name,
+            invocationId: plan.invocationId,
+            metadata: plan.metadata,
+            signal,
+            idempotencyKey: item.idempotencyKey,
+          })));
+          const unknown = results.findIndex((result) => result.error?.code?.endsWith("_OUTCOME_UNKNOWN") === true);
+          const nextToolIndex = pending.nextToolIndex + together.length;
+          const finished = nextToolIndex === response.toolCalls.length;
+          const candidate = bridge.evolve(checkpoint, {
+            phase: unknown >= 0 ? "terminal" : finished ? "ready-model" : "pending-tools",
+            steps: checkpoint.steps,
+            // Results stand in the order the model wrote the calls, whichever finished first.
+            messages: [...checkpoint.messages, ...results.map((result, index) => agentMessage("tool", agentToolResultPart(result), {
+              toolCallId: together[index]!.call.id, metadata: { toolName: together[index]!.call.name },
+            }))],
+            responses: checkpoint.responses,
+            toolResults: [...checkpoint.toolResults, ...results],
+            seenToolCallIds: checkpoint.seenToolCallIds,
+            pendingToolBatch: finished ? undefined : { ...pending, nextToolIndex },
+            terminal: unknown >= 0 ? {
+              status: "failed",
+              error: runtimeError("AGENT_TOOL_OUTCOME_UNKNOWN", `Tool "${together[unknown]!.call.name}" finished with an unknown retry-safe side-effect outcome; automatic model continuation is blocked.`, {
+                callId: together[unknown]!.call.id, toolName: together[unknown]!.call.name, idempotencyKey: together[unknown]!.idempotencyKey, toolErrorCode: results[unknown]!.error?.code ?? null,
+              }),
+            } : undefined,
+          });
+          const stopped = await committedControl(candidate);
+          if (stopped !== undefined) return stopped;
+          if (candidate.phase === "terminal") return terminal(candidate, this.resultFromCheckpoint(plan, candidate));
+          continue;
+        }
         let idempotencyKey: string;
         try {
           idempotencyKey = !session
@@ -896,7 +1103,7 @@ export class AgentExecutionDriver {
       } catch {
         return suspend("before-model-rejected");
       }
-      const response = await this.completeModel(modelRequest, plan.agent.name, plan.modelProfile, plan.metadata, signal, plan.timeoutMs,
+      const response = await this.completeModel(modelRequest, plan.agent.name, plan.modelProfile, plan.metadata, signal, plan.timeoutMs, plan.modelRetry,
         plan.options.onTextDelta ? text => plan.options.onTextDelta!(Object.freeze({ step, text })) : undefined);
       if (!response.ok) {
         const candidate = bridge.evolve(checkpoint, {
@@ -947,14 +1154,38 @@ export class AgentExecutionDriver {
       const state = bridge.evolve(checkpoint, { phase: "pending-tools", steps: step, messages: [...checkpoint.messages, assistant], responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, seenToolCallIds: [...seen], pendingToolBatch: { step, responseIndex: checkpoint.responses.length, assistantMessageIndex: checkpoint.messages.length, nextToolIndex: 0 }, terminal: undefined });
       return { state };
     }
-    const messages = message === undefined ? checkpoint.messages : [...checkpoint.messages, message];
+    // No tool calls: a model response always carries a message then.
+    const answer = message!;
+    const chain = runtimeChain(checkpoint.messages);
+    const responses = [...checkpoint.responses, response];
+    const json = plan.options.output?.mode === "json";
+    /** The draft stays in the dialog with the runtime's request, and the model is called again. */
+    const askAgain = (kind: string, text: string): { readonly state: TState } => ({ state: bridge.evolve(checkpoint, {
+      phase: "ready-model", steps: step,
+      messages: [...checkpoint.messages, answer, agentMessage("user", text, { metadata: { runtime: kind } })],
+      responses, toolResults: checkpoint.toolResults, seenToolCallIds: checkpoint.seenToolCallIds, pendingToolBatch: undefined, terminal: undefined,
+    }) });
+    const mayAskAgain = step < plan.maxSteps;
+    if (response.finishReason === "length" && !json && isTextOnly(answer) && mayAskAgain && chain.continues < plan.maxOutputContinuations) {
+      return askAgain(RUNTIME_CONTINUE, CONTINUE_TEXT);
+    }
+    // The finished dialog keeps one answer: the pieces joined, without rejected drafts and the runtime's requests.
+    const finalMessage = !json && chain.continues > 0 && chain.repairs === 0 && isTextOnly(answer) && chain.drafts.every(isTextOnly)
+      ? joinedAnswer([...chain.drafts, answer])
+      : answer;
+    const messages = [...checkpoint.messages.slice(0, chain.start), finalMessage];
     let result: AgentRuntimeResult;
-    if (response.finishReason !== "stop" || message === undefined) {
-      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: "failed", steps: step, messages, responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, finalMessage: message, metadata: plan.metadata,
+    if (response.finishReason !== "stop") {
+      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: "failed", steps: step, messages, responses, toolResults: checkpoint.toolResults, finalMessage, metadata: plan.metadata,
         error: runtimeError("AGENT_PROVIDER_STOPPED", `Model provider stopped with finishReason "${response.finishReason}".`) });
     } else {
-      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: "completed", steps: step, messages, responses: [...checkpoint.responses, response], toolResults: checkpoint.toolResults, finalMessage: message, metadata: plan.metadata });
-      if (plan.options.output?.mode === "json") result = this.validateExplicitOutput(result, plan.options.output);
+      result = runtimeResult({ invocationId: plan.invocationId, agentName: plan.agent.name, status: "completed", steps: step, messages, responses, toolResults: checkpoint.toolResults, finalMessage, metadata: plan.metadata });
+      if (plan.options.output?.mode === "json") {
+        result = this.validateExplicitOutput(result, plan.options.output);
+        if (result.error?.code === "AGENT_OUTPUT_INVALID" && mayAskAgain && chain.repairs < plan.maxOutputRepairs) {
+          return askAgain(RUNTIME_REPAIR, repairRequest(result.error));
+        }
+      }
     }
     const state = bridge.evolve(checkpoint, { phase: "terminal", steps: step, messages: result.messages, responses: result.responses, toolResults: result.toolResults, seenToolCallIds: checkpoint.seenToolCallIds, pendingToolBatch: undefined,
       terminal: result.status === "completed" ? { status: "completed", finalMessage: result.finalMessage, output: result.output } : { status: "failed", finalMessage: result.finalMessage, error: result.error! } });
@@ -992,9 +1223,47 @@ export class AgentExecutionDriver {
       boundaryError() { return new AgentRuntimeError("in-memory execution boundary rejected a transition."); },
     };
     const resolvedPlan = { ...plan, modelProfile: plan.modelProfile ?? plan.agent.modelProfile ?? this.defaultModelProfile };
-    const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, plan.options.signal, inMemoryBridge, false);
-    if (outcome.kind === "terminal") return outcome.result;
-    throw new AgentRuntimeError("in-memory execution cannot suspend.");
+    if (plan.runTimeoutMs === undefined) {
+      const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, plan.options.signal, inMemoryBridge, false);
+      if (outcome.kind === "terminal") return outcome.result;
+      throw new AgentRuntimeError("in-memory execution cannot suspend.");
+    }
+    // The run deadline cancels whatever is in flight, like the caller's signal does.
+    const deadline = new AbortController();
+    const detach = attachAbortForwarding(plan.options.signal, deadline);
+    let expired = false;
+    const timer = setTimeout(() => { expired = true; deadline.abort(); }, plan.runTimeoutMs);
+    try {
+      const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, deadline.signal, inMemoryBridge, false);
+      if (outcome.kind !== "terminal") throw new AgentRuntimeError("in-memory execution cannot suspend.");
+      return expired && outcome.result.error?.code === "AGENT_ABORTED"
+        ? this.failedResult(outcome.result, runtimeError("AGENT_RUN_TIMEOUT", `Agent "${plan.agent.name}" did not finish within runTimeoutMs (${plan.runTimeoutMs}).`, { runTimeoutMs: plan.runTimeoutMs }))
+        : outcome.result;
+    } finally {
+      clearTimeout(timer);
+      detach?.();
+    }
+  }
+
+  /**
+   * The calls from `from` on that may run at the same time: Tools that change
+   * nothing, standing next to each other. One call, or a call that changes
+   * something, runs alone through the ordinary path.
+   */
+  private readTogether(plan: PreparedAgentPlan, calls: readonly AgentModelResponse["toolCalls"][number][], from: number): readonly { readonly call: AgentModelResponse["toolCalls"][number]; readonly idempotencyKey: string }[] {
+    const together: { call: AgentModelResponse["toolCalls"][number]; idempotencyKey: string }[] = [];
+    for (let index = from; index < calls.length && together.length < plan.maxParallelToolCalls; index += 1) {
+      const call = calls[index]!;
+      const sideEffect = plan.agent.tools.find((tool) => tool.metadata.name === call.name)?.metadata.sideEffect;
+      if (sideEffect !== "none" && sideEffect !== "read") break;
+      try {
+        together.push({ call, idempotencyKey: this.toolIdempotencyKey(plan.options.toolExecution, { invocationId: plan.invocationId, agentName: plan.agent.name, call }) });
+      } catch {
+        // A wrong idempotency setting is reported by the ordinary one-call path.
+        break;
+      }
+    }
+    return together;
   }
   private parseJsonOutput(message: AgentMessage | undefined): unknown {
     if (message === undefined) {
@@ -1099,6 +1368,7 @@ export class AgentExecutionDriver {
     return agentOutputContract({ ...output, schema: agentJsonSchema(output.schema.name, inlineGeneratedSchema(generated, schemas), { strict: output.schema.strict }) });
   }
 
+  /** One model request, repeated while the provider cannot serve it right now. */
   private async completeModel(
     request: AgentModelRequest,
     agentName: string,
@@ -1106,11 +1376,42 @@ export class AgentExecutionDriver {
     metadata: JsonObject,
     sourceSignal: AbortSignal | undefined,
     timeoutMs: number | undefined,
+    retry: ModelRetrySettings,
     onTextDelta?: (text: string) => void,
   ): Promise<{ readonly ok: true; readonly value: AgentModelResponse } | { readonly ok: false; readonly error: AgentToolError }> {
+    for (let attempt = 1; ; attempt += 1) {
+      const outcome = await this.completeModelOnce(request, agentName, modelProfile, metadata, sourceSignal, timeoutMs, onTextDelta);
+      if (outcome.ok) return outcome;
+      // Text already shown to the user is not followed by a second answer.
+      const repeat = outcome.cause instanceof AgentModelUnavailableError && attempt < retry.maxAttempts && !outcome.textEmitted && sourceSignal?.aborted !== true;
+      if (!repeat) {
+        if (outcome.error.code !== "AGENT_ABORTED" && !outcome.logged) {
+          this.logger?.error("Agent model call failed", { agent: agentName, invocationId: request.invocationId, code: outcome.error.code, ...(attempt > 1 ? { attempts: attempt } : {}), error: redactSensitive(outcome.cause) });
+        }
+        return { ok: false, error: outcome.error };
+      }
+      const asked = (outcome.cause as AgentModelUnavailableError).retryAfterMs ?? 0;
+      const delayMs = Math.min(retry.maxDelayMs, Math.max(asked, retry.delayMs * 2 ** (attempt - 1)));
+      this.logger?.warn("Agent model call failed, repeating", { agent: agentName, invocationId: request.invocationId, attempt, maxAttempts: retry.maxAttempts, delayMs, error: redactSensitive(outcome.cause) });
+      if (!await pause(delayMs, sourceSignal)) {
+        return { ok: false, error: runtimeError("AGENT_ABORTED", "Agent runtime invocation was aborted.") };
+      }
+    }
+  }
+
+  private async completeModelOnce(
+    request: AgentModelRequest,
+    agentName: string,
+    modelProfile: string | undefined,
+    metadata: JsonObject,
+    sourceSignal: AbortSignal | undefined,
+    timeoutMs: number | undefined,
+    onTextDelta?: (text: string) => void,
+  ): Promise<{ readonly ok: true; readonly value: AgentModelResponse } | { readonly ok: false; readonly error: AgentToolError; readonly cause: unknown; readonly textEmitted: boolean; readonly logged: boolean }> {
     const abortController = new AbortController();
     const detach = attachAbortForwarding(sourceSignal, abortController);
     let acceptingText = true;
+    let textEmitted = false;
     const context: AgentModelProviderContext = Object.freeze({
       invocationId: request.invocationId,
       agentName,
@@ -1120,7 +1421,7 @@ export class AgentExecutionDriver {
       ...(onTextDelta ? { onTextDelta: (text: string) => {
         if (!acceptingText || abortController.signal.aborted) return;
         if (typeof text !== "string") throw new AgentRuntimeError("Model text delta must be a string.");
-        if (text) onTextDelta(text);
+        if (text) { textEmitted = true; onTextDelta(text); }
       } } : {}),
     });
 
@@ -1139,7 +1440,7 @@ export class AgentExecutionDriver {
       } catch (error) {
         this.logger?.error("Agent model call failed", { agent: agentName, invocationId: request.invocationId, code: "AGENT_PROVIDER_RESPONSE_INVALID", error: redactSensitive(error) });
         return {
-          ok: false,
+          ok: false, cause: error, textEmitted, logged: true,
           error: runtimeError("AGENT_PROVIDER_RESPONSE_INVALID", `Model provider returned an invalid response: ${errorMessageOf(error)}`),
         };
       }
@@ -1149,10 +1450,7 @@ export class AgentExecutionDriver {
         : error instanceof AgentRuntimeAbortError
           ? "AGENT_ABORTED"
           : "AGENT_PROVIDER_FAILED";
-      if (code !== "AGENT_ABORTED") {
-        this.logger?.error("Agent model call failed", { agent: agentName, invocationId: request.invocationId, code, error: redactSensitive(error) });
-      }
-      return { ok: false, error: runtimeError(code, errorMessageOf(error)) };
+      return { ok: false, cause: error, textEmitted, logged: false, error: runtimeError(code, errorMessageOf(error)) };
     } finally {
       acceptingText = false;
       detach?.();

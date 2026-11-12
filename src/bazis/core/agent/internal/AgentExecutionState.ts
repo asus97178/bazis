@@ -393,11 +393,16 @@ function parseContentPart(value: BoundaryJsonValue): AgentContentPart {
 }
 
 function parseToolCall(value: BoundaryJsonValue): AgentToolCall {
-  const record = closed(value, ["id", "name", "input", "metadata"]);
+  // `inputError` is written only for a call whose arguments could not be read.
+  const withError = Object.prototype.hasOwnProperty.call(object(value), "inputError");
+  const record: { readonly id: BoundaryJsonValue; readonly name: BoundaryJsonValue; readonly input: BoundaryJsonValue; readonly metadata: BoundaryJsonValue; readonly inputError?: BoundaryJsonValue } = withError
+    ? closed(value, ["id", "name", "input", "inputError", "metadata"])
+    : closed(value, ["id", "name", "input", "metadata"]);
   return agentToolCall({
     id: requiredString(record.id),
     name: requiredString(record.name),
     input: asJsonValue(record.input),
+    ...(record.inputError === undefined ? {} : { inputError: requiredString(record.inputError) }),
     metadata: asJsonObject(record.metadata),
   });
 }
@@ -660,7 +665,7 @@ function contentPartRecord(part: AgentContentPart): Record<string, unknown> {
 }
 
 function toolCallRecord(call: AgentToolCall): Record<string, unknown> {
-  return { id: call.id, name: call.name, input: call.input, metadata: call.metadata };
+  return { id: call.id, name: call.name, input: call.input, ...(call.inputError === undefined ? {} : { inputError: call.inputError }), metadata: call.metadata };
 }
 
 function toolResultRecord(result: AgentToolResult): Record<string, unknown> {

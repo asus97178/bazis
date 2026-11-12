@@ -1,5 +1,6 @@
 import {
   AgentModelTimeoutError,
+  AgentModelUnavailableError,
   agentMessage,
   agentModelResponse,
   agentToolCall,
@@ -266,15 +267,31 @@ function finishReasonOf(reason: string | undefined, hasToolCalls: boolean): Agen
   return "error";
 }
 
-function parseToolArguments(raw: string, callId: string): JsonValue {
+/** Arguments the model wrote: the value, or why they could not be read. */
+function parseToolArguments(raw: string, callId: string): { readonly input: JsonValue } | { readonly inputError: string } {
   if (raw.trim().length === 0) {
-    return Object.freeze({});
+    return { input: Object.freeze({}) };
   }
   try {
-    return normalizeJsonValue(JSON.parse(raw), `toolCall.${callId}.arguments`);
+    return { input: normalizeJsonValue(JSON.parse(raw), `toolCall.${callId}.arguments`) };
   } catch (error) {
-    throw new OpenAiCompatibleProviderError(`OpenAI-compatible tool arguments for "${callId}" are invalid JSON: ${errorMessageOf(error)}`);
+    // Not a provider failure: the model gets the reason as a Tool error and writes the call again.
+    return { inputError: errorMessageOf(error) };
   }
+}
+
+/** HTTP statuses that mean "not now": the runtime repeats the request. */
+function isUnavailableStatus(status: number): boolean {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+/** `Retry-After`: seconds or an HTTP date. */
+function retryAfterMsOf(header: string | null): number | undefined {
+  if (header === null) return undefined;
+  const text = header.trim();
+  if (/^\d+(\.\d+)?$/.test(text)) return Math.round(Number(text) * 1000);
+  const date = Date.parse(text);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
 }
 
 function normalizeToolCalls(
@@ -298,7 +315,7 @@ function normalizeToolCalls(
     out.push(agentToolCall({
       id: call.id,
       name,
-      input: parseToolArguments(call.function?.arguments ?? "", call.id),
+      ...parseToolArguments(call.function?.arguments ?? "", call.id),
     }));
   }
   return Object.freeze(out);
@@ -507,19 +524,28 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
       : setTimeout(() => abort.abort(new AgentModelTimeoutError("OpenAI-compatible request timed out.")), this.requestTimeoutMs);
     try {
       abort.signal.throwIfAborted();
-      const response = await this.fetcher(`${this.baseUrl}${path}`, {
-        method,
-        headers: this.headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: abort.signal,
-      });
+      let response: Response;
+      try {
+        response = await this.fetcher(`${this.baseUrl}${path}`, {
+          method,
+          headers: this.headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: abort.signal,
+        });
+      } catch (error) {
+        // A cancelled or timed-out request keeps its own reason; a broken connection can be repeated.
+        if (abort.signal.aborted) throw error;
+        throw new AgentModelUnavailableError(`OpenAI-compatible ${method} ${path} could not reach the provider: ${errorMessageOf(error)}`);
+      }
       if (!response.ok) {
         // Cancel the provider-controlled body without exposing it: error bodies
         // may echo prompts, credentials or tenant data.
         cancelBodyBestEffort(response.body);
-        throw new OpenAiCompatibleProviderError(
-          `OpenAI-compatible ${method} ${path} failed with HTTP ${response.status}.`,
-        );
+        const message = `OpenAI-compatible ${method} ${path} failed with HTTP ${response.status}.`;
+        if (isUnavailableStatus(response.status)) {
+          throw new AgentModelUnavailableError(message, { retryAfterMs: retryAfterMsOf(response.headers.get("retry-after")) });
+        }
+        throw new OpenAiCompatibleProviderError(message);
       }
       if (response.status === 204) {
         return {};

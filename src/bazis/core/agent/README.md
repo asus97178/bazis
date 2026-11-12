@@ -144,6 +144,20 @@ await this.agents.run(support, {
 conversation message when trimming old history. Provider requests include
 `metadata.agentContext.trace` so context assembly is inspectable.
 
+The runtime recovers before it fails a run. A model request the provider
+cannot serve right now (`AgentModelUnavailableError`: HTTP 429, 5xx, a broken
+connection) is repeated, three attempts by default (`modelRetry`). A text
+answer cut by the output limit is continued (`maxOutputContinuations`, 3), a
+structured answer that is not valid is sent back to the model with the issues
+(`maxOutputRepairs`, 2); the finished dialog keeps one answer. Tool arguments
+the provider could not read (`AgentToolCall.inputError`) give the model
+`TOOL_ARGUMENTS_INVALID` instead of failing the run. Tools of one step that
+change nothing (`none`, `read`) and stand next to each other run together
+(`maxParallelToolCalls`, 8); `write` and `external` run one by one.
+`runTimeoutMs` bounds a whole run (`AGENT_RUN_TIMEOUT`), `result.usage` sums
+the tokens of every model call, and a Tool output longer than
+`contextLimits.maxToolResultChars` (100 000) reaches the model cut.
+
 With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
 not serve; a fallback to another profile is logged as `LLM model profile
 failed, using fallback`. A model provider that gives up after its own deadline

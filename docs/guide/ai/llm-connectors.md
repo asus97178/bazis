@@ -189,7 +189,7 @@ check({ name: "support", modelProfile: "creative" })
 reasoning отвечает HTTP 503:
 → ответ от fast
 → warn: LLM model profile failed, using fallback {"profile":"reasoning","fallback":"fast",
-    "agent":"support","error":{"name":"OpenAiCompatibleProviderError",
+    "agent":"support","error":{"name":"AgentModelUnavailableError",
     "message":"OpenAI-compatible POST /chat/completions failed with HTTP 503."}}
 
 reasoning не ответил за 1 с (timeoutMs: 1000):
@@ -215,7 +215,8 @@ reasoning прислал «Начинаю отв» и оборвался
 
 | Что случилось | Код запуска | В журнале |
 | --- | --- | --- |
-| Провайдер ответил HTTP-ошибкой | `AGENT_PROVIDER_FAILED` | `OpenAI-compatible POST /chat/completions failed with HTTP 503.` |
+| Провайдер занят (HTTP 408, 409, 425, 429, 5xx) или оборвалось соединение — и после [повторов](agents.md#что-рантайм-исправляет-сам) тоже | `AGENT_PROVIDER_FAILED` | `OpenAI-compatible POST /chat/completions failed with HTTP 503.` |
+| Провайдер отказал: другой HTTP-код (400, 401, 404) — без повторов | `AGENT_PROVIDER_FAILED` | `OpenAI-compatible POST /chat/completions failed with HTTP 401.` |
 | Не уложились в `timeoutMs` коннектора | `AGENT_PROVIDER_TIMEOUT` | `OpenAI-compatible request timed out.` |
 | Не уложились в срок рантайма (`timeoutMs` в [настройках](agents.md#настройки-аудит-и-подтверждение), 60 с) | `AGENT_PROVIDER_TIMEOUT` | |
 | Запуск отменён через `signal` | `AGENT_ABORTED` | — |
@@ -271,6 +272,24 @@ export class AppInfra {}
 Передавайте `context.signal` в запросы — тогда отмена запуска и срок
 рантайма прерывают запрос. Свой срок сообщайте ошибкой
 `AgentModelTimeoutError`: запуск получит код `AGENT_PROVIDER_TIMEOUT`.
+
+Если провайдер не может ответить сейчас — перегружен, ограничивает частоту,
+оборвалось соединение, — бросайте `AgentModelUnavailableError`: такой запрос
+рантайм [повторит](agents.md#что-рантайм-исправляет-сам). Пауза, которую
+просит провайдер, передаётся в `retryAfterMs`. Любую другую ошибку рантайм
+не повторяет.
+
+```ts
+if (response.status === 429 || response.status >= 500) {
+  throw new AgentModelUnavailableError(`echo model: HTTP ${response.status}`, { retryAfterMs: 2_000 });
+}
+```
+
+Аргументы инструмента, которые модель написала битым JSON, — не сбой
+провайдера. Вместо исключения верните вызов с причиной:
+`agentToolCall({ id, name, inputError: "Unexpected end of JSON input" })`.
+Инструмент не будет вызван, а модель получит ошибку
+`TOOL_ARGUMENTS_INVALID` и напишет вызов заново.
 
 ```text
 модель не ответила за timeoutMs: 200

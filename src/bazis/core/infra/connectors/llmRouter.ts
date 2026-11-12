@@ -4,6 +4,7 @@ import { redactSensitive } from "../../../library/redaction";
 import {
   AGENT_MODEL_PROVIDER,
   AgentModelTimeoutError,
+  AgentModelUnavailableError,
   AgentRuntime,
   agentModelRequest,
   type AgentModelProvider,
@@ -387,6 +388,8 @@ export class LlmModelRouter implements AgentModelProvider {
       const message = `LLM model profile "${profileName}" failed: ${errorMessageOf(error)}`;
       // Keep a timeout a timeout: the run reports it as AGENT_PROVIDER_TIMEOUT.
       if (error instanceof AgentModelTimeoutError) throw new AgentModelTimeoutError(message);
+      // Keep "not now" what it is: the runtime repeats the request.
+      if (error instanceof AgentModelUnavailableError) throw new AgentModelUnavailableError(message, { retryAfterMs: error.retryAfterMs });
       throw new LlmModelRouterError(message);
     } finally {
       acceptingText = false;
