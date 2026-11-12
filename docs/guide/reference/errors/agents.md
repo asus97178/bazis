@@ -33,6 +33,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `AGENT_TOOL_CALL_LIMIT_EXCEEDED` | `Model requested 12 tool calls; the per-step limit is 8.` | Модель запросила за шаг больше вызовов, чем разрешено |
 | `AGENT_RUN_TIMEOUT` | `Agent "support" did not finish within runTimeoutMs (30000).` | Запуск целиком не уложился в `runTimeoutMs` |
 | `AGENT_PROVIDER_FAILED` | — | Провайдер ответил ошибкой, в том числе после [повторов](../../ai/agents.md#что-рантайм-исправляет-сам); в журнале — `Agent model call failed` |
+| `AGENT_CONTEXT_OVERFLOW` | `… The request does not fit the model's context window.` | Запрос длиннее окна модели и после [сжатия диалога](../../ai/agents.md#длинный-диалог-сжатие), или сжатие выключено |
 | `AGENT_PROVIDER_TIMEOUT` | — | Провайдер не ответил в срок коннектора или рантайма |
 | `AGENT_PROVIDER_STOPPED` | `Model provider stopped with finishReason "length".` | Модель остановилась не по своей воле: лимит ответа исчерпан и после продолжений, фильтр |
 | `AGENT_PROVIDER_RESPONSE_INVALID` | `Model provider returned a response for another invocation.` | Адаптер провайдера вернул неверный ответ (повтор id вызова, чужой запуск) |

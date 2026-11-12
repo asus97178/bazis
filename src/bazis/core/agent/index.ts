@@ -26,6 +26,7 @@ export {
   AgentToolExecutionError,
   AgentModelTimeoutError,
   AgentModelUnavailableError,
+  AgentModelContextOverflowError,
   AgentToolPreCommitError,
   ToolError,
 } from "./errors";
@@ -35,6 +36,7 @@ export {
   type AgentRuntimeInvokeOptions,
   type AgentRuntimeOptions,
   type AgentModelRetryPolicy,
+  type AgentCompactionOptions,
   type AgentRuntimeResult,
   type AgentRuntimeStatus,
   type AgentRuntimeToolCallContext,

@@ -197,6 +197,27 @@ describe("LLM model router", () => {
     }
   });
 
+  test("states the context window of each profile's model", async () => {
+    const providers: CapturingProvider[] = [];
+    const container = containerFor({
+      llm: llmRouter({
+        large: llmProfile(sharedConfig, adapter("large", providers), { contextTokens: 200_000 }),
+        small: llmProfile(fastConfig, adapter("small", providers), { contextTokens: 8_000 }),
+        unknown: llmProfile(fastConfig, adapter("unknown", providers)),
+      }, { defaultProfile: "large" }),
+    });
+    try {
+      const router = container.resolve(AGENT_MODEL_PROVIDER) as LlmModelRouter;
+      await router.connect();
+      expect(router.contextTokens()).toBe(200_000);
+      expect(router.contextTokens("small")).toBe(8_000);
+      expect(router.contextTokens("unknown")).toBeUndefined();
+      expect(() => llmProfile(sharedConfig, adapter("bad", providers), { contextTokens: 0 })).toThrow(/contextTokens/);
+    } finally {
+      await container.dispose();
+    }
+  });
+
   test("keeps the profile-owned model while request sampling options override defaults", async () => {
     const providers: CapturingProvider[] = [];
     const container = containerFor({

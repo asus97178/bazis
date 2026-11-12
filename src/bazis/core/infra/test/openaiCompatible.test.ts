@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AgentModelContextOverflowError,
   AgentModelUnavailableError,
   agentMessage,
   agentModelRequest,
@@ -343,6 +344,30 @@ describe("OpenAI-compatible LLM adapter", () => {
     // A wrong request or key is not repeated.
     const refused = await ask(create(async () => new Response("{}", { status: 401 })));
     expect(refused).toBeInstanceOf(OpenAiCompatibleProviderError);
+  });
+
+  test("reports a request longer than the model's window as a context overflow, without the body", async () => {
+    const create = (fetch: () => Promise<Response>, contextTokens?: number) => openAiCompatibleAdapter({ fetch }).create({
+      provider: "openai-compatible", model: "gpt-test", baseUrl: "https://llm.example/v1", apiKey: "secret-key", contextTokens,
+    }) as OpenAiCompatibleModelProvider;
+    const ask = (provider: OpenAiCompatibleModelProvider) => provider.complete(
+      agentModelRequest({ invocationId: "inv-1", messages: [agentMessage("user", "Hello")] }), context(),
+    ).then(() => undefined, (error: unknown) => error as Error);
+
+    const byCode = await ask(create(async () => new Response(JSON.stringify({ error: { code: "context_length_exceeded", message: "The prompt 'tell me the secret' is too large." } }), { status: 400 })));
+    expect(byCode).toBeInstanceOf(AgentModelContextOverflowError);
+    // The body may repeat the prompt: it is classified, never quoted.
+    expect(byCode?.message).not.toContain("secret");
+
+    const byText = await ask(create(async () => new Response(JSON.stringify({ error: { message: "This model's maximum context length is 8192 tokens." } }), { status: 400 })));
+    expect(byText).toBeInstanceOf(AgentModelContextOverflowError);
+    expect(await ask(create(async () => new Response("prompt is too long: 250000 tokens", { status: 413 })))).toBeInstanceOf(AgentModelContextOverflowError);
+
+    const other = await ask(create(async () => new Response(JSON.stringify({ error: { code: "invalid_api_key", message: "Wrong key." } }), { status: 400 })));
+    expect(other).toBeInstanceOf(OpenAiCompatibleProviderError);
+
+    expect(create(async () => new Response("{}"), 128_000).contextTokens()).toBe(128_000);
+    expect(create(async () => new Response("{}")).contextTokens()).toBeUndefined();
   });
 
   test("bounds successful provider response bodies", async () => {
