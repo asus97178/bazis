@@ -11,19 +11,25 @@ import {
 } from "../../di";
 import { grantProblem } from "../check/conditions";
 import { AccessSetupError } from "../contracts/errors";
+import type { PermissionSource } from "../contracts/PermissionSource";
 import type { References } from "../contracts/References";
 import { isDeclaredRoles, rolePermission, type RoleDeclarations, type RolePermission } from "../roles/roles";
 import { IAccess } from "../check/IAccess.service";
 import type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./AccessCatalog";
-import { isDeclaredPermissions, isReferenceKind, lookupsOf, permissionProblems, type PermissionDeclarations, type PermissionSpec } from "./permissions";
+import { isDeclaredPermissions, isReferenceKind, isSourcePrefix, lookupsOf, permissionProblems, underPrefix, type PermissionDeclarations, type PermissionSpec } from "./permissions";
+import type { OwnedPermissionSource } from "./PermissionSources";
 
 interface PermissionPayload { readonly key: string; readonly spec: PermissionSpec }
 interface ReferencePayload { readonly kind: string; readonly type: Class<References> }
 interface RolePayload { readonly name: string; readonly permissions: "all" | readonly RolePermission[] }
+interface SourcePayload { readonly prefix: string; readonly type: Class<PermissionSource> }
 
 const PERMISSION_CHANNEL = createModuleOwnedMetadataChannel<PermissionPayload>("access.permission/v1");
 const REFERENCE_CHANNEL = createModuleOwnedMetadataChannel<ReferencePayload>("access.reference/v1");
 const ROLE_CHANNEL = createModuleOwnedMetadataChannel<RolePayload>("access.role/v1");
+const SOURCE_CHANNEL = createModuleOwnedMetadataChannel<SourcePayload>("access.permission-source/v1");
+/** The classes of `permissionSources`: the field registers them, like the classes of `references`. */
+const SOURCE_CLASS_CHANNEL = createModuleOwnedProviderChannel<{ readonly prefix: string }, object>("access.permission-source-class/v1");
 /** The classes of `references`: the field registers them, like `tools` and `controllers`. */
 const REFERENCE_CLASS_CHANNEL = createModuleOwnedProviderChannel<{ readonly kind: string }, object>("access.reference-class/v1");
 /** The `lookup` classes of `permissions`: the field registers them too. */
@@ -38,11 +44,12 @@ interface AccessModuleFields {
   readonly permissions?: unknown;
   readonly references?: unknown;
   readonly roles?: unknown;
+  readonly permissionSources?: unknown;
 }
 
 registerModuleOwnedProviderContributor((metadata: BazisModuleMetadata, context) => {
   const fields = metadata as BazisModuleMetadata & AccessModuleFields;
-  if (fields.permissions === undefined && fields.references === undefined && fields.roles === undefined) return;
+  if (fields.permissions === undefined && fields.references === undefined && fields.roles === undefined && fields.permissionSources === undefined) return;
   const module = moduleName(metadata);
   if (fields.permissions !== undefined) {
     if (!isDeclaredPermissions(fields.permissions)) throw new AccessSetupError(`${module}: permissions must be a definePermissions(...) result.`);
@@ -84,6 +91,27 @@ registerModuleOwnedProviderContributor((metadata: BazisModuleMetadata, context) 
       }
     }
   }
+  if (fields.permissionSources !== undefined) {
+    const sources = fields.permissionSources;
+    if (typeof sources !== "object" || sources === null || Array.isArray(sources)) throw new AccessSetupError(`${module}: permissionSources must map a key prefix to a PermissionSource class.`);
+    const problems: string[] = [];
+    for (const [prefix, type] of Object.entries(sources)) {
+      if (!isSourcePrefix(prefix)) problems.push(`prefix "${prefix}" must be one or several key segments in lower case, like "data" or "dm.records"`);
+      if (typeof type !== "function") problems.push(`prefix "${prefix}" must name a PermissionSource class`);
+    }
+    if (problems.length > 0) throw setupError(module, "permissionSources", problems);
+    const registered = new Set<unknown>();
+    for (const [prefix, type] of Object.entries(sources)) {
+      context.addMetadata(SOURCE_CHANNEL, { prefix, type: type as Class<PermissionSource> });
+      if (registered.has(type)) continue;
+      registered.add(type);
+      try {
+        context.registerScoped(SOURCE_CLASS_CHANNEL, scoped(type as Class<object>), { prefix });
+      } catch {
+        // The module registered the class its own way: that registration stands.
+      }
+    }
+  }
   if (fields.roles !== undefined) {
     if (!isDeclaredRoles(fields.roles)) throw new AccessSetupError(`${module}: roles must be a defineRoles(...) result.`);
     const problems: string[] = [];
@@ -102,10 +130,11 @@ registerModuleOwnedContributionValidator((snapshot) => {
   const permissions = snapshot.getMetadataContributions(PERMISSION_CHANNEL);
   const references = snapshot.getMetadataContributions(REFERENCE_CHANNEL);
   const roles = snapshot.getMetadataContributions(ROLE_CHANNEL);
-  const first = permissions[0] ?? references[0] ?? roles[0];
+  const sources = snapshot.getMetadataContributions(SOURCE_CHANNEL);
+  const first = permissions[0] ?? references[0] ?? roles[0] ?? sources[0];
   if (first === undefined) return;
   if (snapshot.countProviders(IAccess) === 0) {
-    throw new AccessSetupError(`${first.ownerName} declares access (permissions, references or roles), but the application does not import AccessModule (bazis/core/access).`);
+    throw new AccessSetupError(`${first.ownerName} declares access (permissions, references, roles or permission sources), but the application does not import AccessModule (bazis/core/access).`);
   }
 
   const owners = new Map<string, string>();
@@ -115,6 +144,24 @@ registerModuleOwnedContributionValidator((snapshot) => {
     if (other !== undefined) throw new AccessSetupError(`Permission "${payload.key}" is declared twice: in ${other} and in ${ownerName}.`);
     owners.set(payload.key, ownerName);
     specs.set(payload.key, payload.spec);
+  }
+
+  // A source owns every key under its prefix: no declared key and no other source may be there.
+  const prefixes = new Map<string, string>();
+  for (const { payload, ownerName } of sources) {
+    for (const [other, otherOwner] of prefixes) {
+      if (other === payload.prefix) throw new AccessSetupError(`Permission source prefix "${payload.prefix}" is declared twice: in ${otherOwner} and in ${ownerName}.`);
+      if (underPrefix(other, payload.prefix) || underPrefix(payload.prefix, other)) {
+        throw new AccessSetupError(`Permission source prefixes "${other}" (${otherOwner}) and "${payload.prefix}" (${ownerName}) overlap: one lies under the other.`);
+      }
+    }
+    prefixes.set(payload.prefix, ownerName);
+    if (snapshot.countProviders(payload.type) === 0) throw new AccessSetupError(`${ownerName}: ${payload.type.name} of permission source "${payload.prefix}" is not registered.`);
+    for (const [key, keyOwner] of owners) {
+      if (key === payload.prefix || underPrefix(key, payload.prefix)) {
+        throw new AccessSetupError(`Permission "${key}" of ${keyOwner} lies under the prefix "${payload.prefix}" of a permission source of ${ownerName}: a source owns every key of its prefix.`);
+      }
+    }
   }
 
   const kinds = new Map<string, string>();
@@ -160,12 +207,13 @@ function importsExport(metadata: BazisModuleMetadata, type: unknown): boolean {
 }
 
 /** What the modules of the application's container declared. */
-export function declarationsOf(services: ServiceProvider): { permissions: OwnedPermission[]; kinds: OwnedReferenceKind[]; roles: DeclaredRole[] } {
+export function declarationsOf(services: ServiceProvider): { permissions: OwnedPermission[]; kinds: OwnedReferenceKind[]; roles: DeclaredRole[]; sources: OwnedPermissionSource[] } {
   if (!(services instanceof DiContainer)) throw new AccessSetupError("Access declarations require the framework DiContainer.");
   const permissions: OwnedPermission[] = services.getModuleOwnedMetadataContributions(PERMISSION_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
   const kinds: OwnedReferenceKind[] = services.getModuleOwnedMetadataContributions(REFERENCE_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
   const roles: DeclaredRole[] = services.getModuleOwnedMetadataContributions(ROLE_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
-  return { permissions, kinds, roles };
+  const sources: OwnedPermissionSource[] = services.getModuleOwnedMetadataContributions(SOURCE_CHANNEL).map(({ payload, ownerName }) => ({ ...payload, module: ownerName }));
+  return { permissions, kinds, roles, sources };
 }
 
 function setupError(module: string, field: string, problems: readonly string[]): AccessSetupError {
@@ -186,5 +234,11 @@ declare module "../../di/module/types/BazisModule" {
     readonly references?: Readonly<Record<string, Class<References>>>;
     /** Roles of the default rights system, from `defineRoles` (ACCESS-001 §8). */
     readonly roles?: RoleDeclarations;
+    /**
+     * Permissions that appear while the application runs (ACCESS-001 §3.1):
+     * key prefix → its `PermissionSource` class. The field registers the class;
+     * the source owns every key under the prefix.
+     */
+    readonly permissionSources?: Readonly<Record<string, Class<PermissionSource>>>;
   }
 }

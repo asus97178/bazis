@@ -3,15 +3,21 @@ import type { Class } from "../../di";
 import type { PermissionSpec } from "../catalog/permissions";
 import type { AttributeLookup } from "../contracts/AttributeLookup";
 import { AccessFilterTooLargeError } from "../contracts/errors";
-import type { AccessValue, Condition, Grant, Scope, ValueTest } from "../contracts/types";
+import type { AccessValue, CompareTest, Condition, Grant, Scope, ValueTest } from "../contracts/types";
+import { decimalOf, decimalText } from "./decimal";
 
-/** A condition on the columns of the listed rows. */
+/**
+ * A condition on the columns of the listed rows. `op` — a comparison of a
+ * number column with a value (ACCESS-001 §4.2). A module that lists rows
+ * without the ORM translates this form itself.
+ */
 export type ColumnCondition =
   | { readonly all: readonly ColumnCondition[] }
   | { readonly any: readonly ColumnCondition[] }
   | { readonly not: ColumnCondition }
   | { readonly column: string; readonly in: readonly AccessValue[] }
-  | { readonly column: string; readonly isNull: boolean };
+  | { readonly column: string; readonly isNull: boolean }
+  | { readonly column: string; readonly op: CompareTest; readonly value: number };
 
 /** Which rows of a list the subject may see (ACCESS-001 §4.3). */
 export type AccessFilter =
@@ -67,13 +73,19 @@ async function whereCondition(input: FilterInput, condition: Condition): Promise
     if ("isNull" in test) return test.isNull ? await fromLookup(input, lookup, [null]) : not(await fromLookup(input, lookup, [null]));
     if ("eq" in test) return await fromLookup(input, lookup, [test.eq]);
     if ("in" in test) return await fromLookup(input, lookup, test.in);
-    return not(await fromLookup(input, lookup, test.notIn));
+    if ("notIn" in test) return not(await fromLookup(input, lookup, test.notIn));
+    // A lookup turns "one of the values" into a column and cannot turn a range: such a grant is dropped before it gets here.
+    throw new TypeError(`The list filter of "${input.permission}": attribute "${name}" has a lookup and cannot be compared.`);
   }
   const column = attribute.column ?? name;
   if ("isNull" in test) return { column, isNull: test.isNull };
-  if ("eq" in test) return { column, in: [test.eq] };
-  if ("in" in test) return test.in.length === 0 ? false : { column, in: test.in };
-  return test.notIn.length === 0 ? { column, isNull: false } : not({ column, in: test.notIn });
+  // A number given as a string ("1e3", "012.50") goes to the database in plain notation.
+  const values = (list: readonly AccessValue[]): readonly AccessValue[] => (attribute.type === "number" ? list.map(plainNumber) : list);
+  if ("eq" in test) return { column, in: values([test.eq]) };
+  if ("in" in test) return test.in.length === 0 ? false : { column, in: values(test.in) };
+  if ("notIn" in test) return test.notIn.length === 0 ? { column, isNull: false } : not({ column, in: values(test.notIn) });
+  const [op, value] = Object.entries(test)[0] as [CompareTest, number];
+  return { column, op, value };
 }
 
 async function fromLookup(input: FilterInput, type: Class<AttributeLookup>, values: readonly AccessValue[]): Promise<Built> {
@@ -82,6 +94,12 @@ async function fromLookup(input: FilterInput, type: Class<AttributeLookup>, valu
     throw new AccessFilterTooLargeError(`The list filter of "${input.permission}": ${type.name} gave ${found.in.length} values of "${found.column}", more than access.maxInList (${input.maxInList}).`);
   }
   return inColumn(found.column, found.in);
+}
+
+function plainNumber(value: AccessValue): AccessValue {
+  if (typeof value !== "string") return value;
+  const decimal = decimalOf(value);
+  return decimal === undefined ? value : decimalText(decimal);
 }
 
 /** `column in values`; `null` among them means an empty column. */
@@ -128,5 +146,18 @@ function toPredicate(condition: ColumnCondition): Predicate {
   if ("not" in condition) return toPredicate(condition.not).not();
   const column = new Operand(condition.column);
   if ("isNull" in condition) return condition.isNull ? column.isNull() : column.isNotNull();
-  return condition.in.length === 1 ? column.eq(condition.in[0]) : column.in(condition.in);
+  if ("op" in condition) return column[condition.op](parameter(condition.value));
+  const values = condition.in.map(parameter);
+  return values.length === 1 ? column.eq(values[0]) : column.in(values);
+}
+
+/**
+ * A fraction goes to the database as decimal text, not as a `double`: a
+ * `decimal` column of the ORM refuses a float, and the text keeps the number
+ * the rule names (`100000.01`) for `integer` and `real` columns too.
+ */
+function parameter(value: AccessValue): AccessValue {
+  if (typeof value !== "number" || Number.isSafeInteger(value)) return value;
+  const decimal = decimalOf(value);
+  return decimal === undefined ? value : decimalText(decimal);
 }

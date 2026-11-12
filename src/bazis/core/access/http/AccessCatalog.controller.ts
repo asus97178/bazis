@@ -2,6 +2,7 @@ import { contextOnlyController } from "../../http/Routing/contextOnlyControllers
 import { Authorize, BadRequestError, Controller, Get, NotFoundError, type HttpContext } from "../../http";
 import { IAccessCatalog } from "../catalog/IAccessCatalog.service";
 import { can } from "../check/can";
+import { comparable } from "../check/conditions";
 import type { Scope } from "../contracts/types";
 
 /**
@@ -15,13 +16,19 @@ export class AccessCatalogController {
   @Authorize(can("access.catalog.read"))
   catalogList(ctx: HttpContext) {
     return {
-      data: ctx.services.resolve(IAccessCatalog).permissions().map(({ key, spec, module }) => ({
+      data: ctx.services.resolve(IAccessCatalog).permissions().map(({ key, spec, module, source }) => ({
         key,
         module,
+        ...(source === undefined ? {} : { source }),
         title: spec.title,
         ...(spec.description === undefined ? {} : { description: spec.description }),
         scope: typeof spec.scope === "object" ? ("column" in spec.scope ? "column" : "lookup") : spec.scope ?? "none",
-        attributes: Object.entries(spec.on ?? {}).map(([name, attribute]) => ({ name, ...(attribute.ref === undefined ? { type: attribute.type } : { ref: attribute.ref }) })),
+        attributes: Object.entries(spec.on ?? {}).map(([name, attribute]) => ({
+          name,
+          ...(attribute.ref === undefined ? { type: attribute.type } : { ref: attribute.ref }),
+          // The administrator's screen offers >, ≥, <, ≤ only here (ACCESS-001 §4.2).
+          ...(comparable(attribute) ? { compare: true } : {}),
+        })),
         own: spec.owner !== undefined,
         fields: spec.fields === true,
       })),

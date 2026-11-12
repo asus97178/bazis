@@ -3,7 +3,8 @@ import { UnauthorizedError, type AuthorizeContext } from "../../http";
 import { LOGGER, type ConfigView } from "../../kernel";
 import type { AccessConfig } from "./accessConfig";
 import type { IAccessCatalog } from "../catalog/IAccessCatalog.service";
-import type { PermissionKey, PermissionSpec } from "../catalog/permissions";
+import type { OwnedPermission } from "../catalog/AccessCatalog";
+import type { AnyPermissionKey, PermissionSpec } from "../catalog/permissions";
 import { AccessPolicy, type ScopePrincipals } from "../contracts/AccessPolicy";
 import type { AttributeLookup } from "../contracts/AttributeLookup";
 import type { AccessObject, AccessSubject, Condition, Grant, Grants, Scope } from "../contracts/types";
@@ -56,9 +57,19 @@ export class Access extends IAccess {
   }
 }
 
-/** What one subject may do; grants are asked once per permission. */
+/** The grants of a permission with the specification they were checked against. */
+interface Given {
+  readonly spec: PermissionSpec;
+  readonly grants: Grants;
+}
+
+/**
+ * What one subject may do; grants are asked once per permission. A permission
+ * of a source that the source does not give now does not exist: nobody has it,
+ * and the rights system is not asked (ACCESS-001 §3.1).
+ */
 export class SubjectAccess {
-  private readonly grantCache = new Map<string, Promise<Grants>>();
+  private readonly grantCache = new Map<string, Promise<Given | undefined>>();
   private owners: Promise<readonly string[]> | undefined;
 
   constructor(
@@ -70,31 +81,28 @@ export class SubjectAccess {
   ) {}
 
   /** The grants of the permission; a grant the permission cannot use is dropped with a warning. */
-  grants(permission: PermissionKey): Promise<Grants> {
-    let grants = this.grantCache.get(permission);
-    if (grants === undefined) {
-      grants = this.load(permission);
-      this.grantCache.set(permission, grants);
-    }
-    return grants;
+  async grants(permission: AnyPermissionKey): Promise<Grants> {
+    return (await this.given(permission))?.grants ?? [];
   }
 
   /**
    * Whether the subject may do `permission` on `object`. Without an object —
    * whether it has the permission anywhere (a route before the object is known).
    */
-  async can(permission: PermissionKey, object?: AccessObject): Promise<boolean> {
-    const spec = this.catalog.require(permission).spec;
-    const grants = await this.grants(permission);
+  async can(permission: AnyPermissionKey, object?: AccessObject): Promise<boolean> {
+    const given = await this.given(permission);
+    if (given === undefined) return false;
+    const { spec, grants } = given;
     if (grants === "all") return true;
     if (object === undefined) return grants.length > 0;
     return (await this.matching(permission, spec, grants, object)).length > 0;
   }
 
   /** Which rows of a list the subject may see; `scope` — the partition of the request for `scope: "request"`. */
-  async filter(permission: PermissionKey, options: { readonly scope?: Scope } = {}): Promise<AccessFilter> {
-    const spec = this.catalog.require(permission).spec;
-    const grants = await this.grants(permission);
+  async filter(permission: AnyPermissionKey, options: { readonly scope?: Scope } = {}): Promise<AccessFilter> {
+    const given = await this.given(permission);
+    if (given === undefined) return { kind: "none" };
+    const { spec, grants } = given;
     return await buildFilter({
       permission,
       spec,
@@ -107,9 +115,10 @@ export class SubjectAccess {
   }
 
   /** The fields of `object` the subject may read and write (ACCESS-001 §4.4). */
-  async fields(permission: PermissionKey, object: AccessObject): Promise<FieldAccess> {
-    const spec = this.catalog.require(permission).spec;
-    const grants = await this.grants(permission);
+  async fields(permission: AnyPermissionKey, object: AccessObject): Promise<FieldAccess> {
+    const given = await this.given(permission);
+    if (given === undefined) return { read: [], write: [] };
+    const { spec, grants } = given;
     if (grants === "all") return { read: "all", write: "all" };
     const matching = await this.matching(permission, spec, grants, object);
     return { read: union(matching, "read"), write: union(matching, "write") };
@@ -126,19 +135,37 @@ export class SubjectAccess {
     return this.owners;
   }
 
-  private async load(permission: string): Promise<Grants> {
-    const spec = this.catalog.require(permission).spec;
+  private given(permission: string): Promise<Given | undefined> {
+    let given = this.grantCache.get(permission);
+    if (given === undefined) {
+      given = this.load(permission);
+      this.grantCache.set(permission, given);
+    }
+    return given;
+  }
+
+  /** `undefined` — a permission of a source that does not exist now. */
+  private async load(permission: string): Promise<Given | undefined> {
+    let owned: OwnedPermission | undefined = await this.catalog.find(permission);
+    if (owned === undefined) return undefined;
     const grants = await this.policy.grants(this.subject, permission);
-    if (grants === "all") return "all";
+    if (grants === "all") return { spec: owned.spec, grants: "all" };
     if (!Array.isArray(grants)) {
       this.warn(permission, "the rights system must answer \"all\" or a list of grants");
-      return [];
+      return { spec: owned.spec, grants: [] };
     }
-    return grants.filter((grant) => {
-      const problem = grantProblem(spec, grant, this.maxInList);
-      if (problem !== undefined) this.warn(permission, problem);
-      return problem === undefined;
-    });
+    let problems = grants.map((grant) => grantProblem(owned!.spec, grant, this.maxInList));
+    if (owned.source !== undefined && problems.some((problem) => problem !== undefined)) {
+      // The rule may name a field another instance has just added: compare the source's version before dropping it.
+      const fresh = await this.catalog.find(permission, { verify: true });
+      if (fresh === undefined) return undefined;
+      if (fresh !== owned) {
+        owned = fresh;
+        problems = grants.map((grant) => grantProblem(fresh.spec, grant, this.maxInList));
+      }
+    }
+    problems.forEach((problem) => { if (problem !== undefined) this.warn(permission, problem); });
+    return { spec: owned.spec, grants: grants.filter((_, index) => problems[index] === undefined) };
   }
 
   private async matching(permission: string, spec: PermissionSpec, grants: readonly Grant[], object: AccessObject): Promise<Grant[]> {

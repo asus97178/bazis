@@ -1,7 +1,7 @@
 import type { Class } from "../../di";
 import type { AttributeLookup } from "../contracts/AttributeLookup";
 import type { LocalizedText } from "../contracts/types";
-import type { BazisPermissions } from "../index";
+import type { BazisPermissions, BazisPermissionSources } from "../index";
 
 /** An attribute of the object of a permission: what a condition may test (ACCESS-001 §3). */
 export interface AttributeSpec {
@@ -46,6 +46,16 @@ export type PermissionsOf<T extends PermissionDeclarations> = { readonly [K in k
 /** A declared permission. */
 export type PermissionKey = Extract<keyof BazisPermissions, string>;
 
+/**
+ * A permission of a source (ACCESS-001 §3.1): any key under a prefix of
+ * `@Module({ permissionSources })`. Whether it exists is known only while the
+ * application runs; a key the source does not give is a permission nobody has.
+ */
+export type SourcePermissionKey = `${Extract<keyof BazisPermissionSources, string>}.${string}`;
+
+/** What `can`, `access.can`, `access.filter` and `access.fields` accept. */
+export type AnyPermissionKey = PermissionKey | SourcePermissionKey;
+
 /** A permission with an `owner`: the only kind `"<key>:own"` makes sense for. */
 export type OwnPermissionKey = { [K in keyof BazisPermissions]: BazisPermissions[K] extends { readonly owner: string } ? Extract<K, string> : never }[keyof BazisPermissions];
 
@@ -81,6 +91,8 @@ const RESERVED = new Set(["all", "any", "not", "own", "scope"]);
 export function permissionProblems(key: string, spec: PermissionSpec): string[] {
   const problems: string[] = [];
   const at = `permission "${key}"`;
+  if (typeof spec !== "object" || spec === null || Array.isArray(spec)) return [`${at}: must be an object with a title`];
+  if (spec.on !== undefined && (typeof spec.on !== "object" || spec.on === null || Array.isArray(spec.on))) return [`${at}: on must map attribute names to their descriptions`];
   if (!KEY.test(key) || key.length > 128) problems.push(`${at}: the key must look like "<module>.<object>.<action>" in lower case`);
   if (!isText(spec.title, 200)) problems.push(`${at}: title must be a non-empty text up to 200 characters`);
   if (spec.description !== undefined && !isText(spec.description, 2000)) problems.push(`${at}: description must be a non-empty text up to 2000 characters`);
@@ -95,6 +107,10 @@ export function permissionProblems(key: string, spec: PermissionSpec): string[] 
   for (const [name, attribute] of Object.entries(spec.on ?? {})) {
     if (!NAME.test(name)) problems.push(`${at}: attribute "${name}" must be a name of letters, digits and _`);
     else if (RESERVED.has(name)) problems.push(`${at}: attribute "${name}" is a reserved word of conditions`);
+    if (typeof attribute !== "object" || attribute === null) {
+      problems.push(`${at}: attribute "${name}" must be an object with ref or type`);
+      continue;
+    }
     if ((attribute.ref === undefined) === (attribute.type === undefined)) problems.push(`${at}: attribute "${name}" needs exactly one of ref and type`);
     if (attribute.ref !== undefined && !KEY.test(attribute.ref)) problems.push(`${at}: attribute "${name}": ref must be a reference kind like "<module>.<kind>"`);
     if (attribute.type !== undefined && !["string", "number", "boolean"].includes(attribute.type)) problems.push(`${at}: attribute "${name}": type must be string, number or boolean`);
@@ -119,6 +135,34 @@ export function isReferenceKind(value: string): boolean {
   return KEY.test(value) && value.length <= 128;
 }
 
+const PREFIX = /^[a-z][a-z0-9_-]*(\.[a-z][a-z0-9_-]*)*$/;
+
+/** A prefix of a permission source: one or several segments of a key (`data`, `dm.records`). */
+export function isSourcePrefix(value: string): boolean {
+  return PREFIX.test(value) && value.length <= 64;
+}
+
+/** Whether the key lies under the prefix: `data.orders.read` under `data`. */
+export function underPrefix(key: string, prefix: string): boolean {
+  return key.startsWith(`${prefix}.`);
+}
+
+/** A frozen copy of a specification a source gave: the catalog keeps it, the source may change its own. */
+export function frozenSpec(spec: PermissionSpec): PermissionSpec {
+  const scope = typeof spec.scope === "object" ? { ...spec.scope } : spec.scope;
+  const on = spec.on === undefined ? undefined : Object.fromEntries(Object.entries(spec.on).map(([name, attribute]) => [name, { ...attribute }]));
+  const title = typeof spec.title === "object" ? { ...spec.title } : spec.title;
+  const description = typeof spec.description === "object" ? { ...spec.description } : spec.description;
+  return deepFreeze({
+    title,
+    ...(description === undefined ? {} : { description }),
+    ...(scope === undefined ? {} : { scope }),
+    ...(on === undefined ? {} : { on }),
+    ...(spec.owner === undefined ? {} : { owner: spec.owner }),
+    ...(spec.fields === undefined ? {} : { fields: spec.fields }),
+  } as PermissionSpec);
+}
+
 function isText(value: unknown, max: number): boolean {
   if (typeof value === "string") return value.trim() !== "" && value.length <= max;
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
@@ -132,6 +176,7 @@ function isName(value: unknown): value is string {
 
 function deepFreeze<T>(value: T): T {
   if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
+  // A lookup is a class: a function, left as it is.
   for (const item of Object.values(value)) if (typeof item === "object") deepFreeze(item);
   return Object.freeze(value);
 }
