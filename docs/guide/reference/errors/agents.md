@@ -29,7 +29,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `AGENT_RUNTIME_OPTIONS_INVALID` | текст ошибки | Неверные параметры запуска или `AGENT_RUNTIME_OPTIONS` |
 | `AGENT_TOOL_OPTIONS_INVALID` | текст ошибки | Неверные настройки инструментов агента |
 | `AGENT_CONTEXT_INVALID` | текст ошибки | Неверные метаданные или контекст вызова |
-| `AGENT_MAX_STEPS_EXCEEDED` | `Agent "support" exceeded maxSteps (8).` | Модель не закончила за `maxSteps` шагов ([Пределы](../../ai/agents.md#пределы)) |
+| `AGENT_MAX_STEPS_EXCEEDED` | `Agent "support" exceeded maxSteps (30).` | Модель не закончила за `maxSteps` шагов ([Пределы](../../ai/agents.md#пределы)) |
 | `AGENT_TOOL_CALL_LIMIT_EXCEEDED` | `Model requested 12 tool calls; the per-step limit is 8.` | Модель запросила за шаг больше вызовов, чем разрешено |
 | `AGENT_RUN_TIMEOUT` | `Agent "support" did not finish within runTimeoutMs (30000).` | Запуск целиком не уложился в `runTimeoutMs` |
 | `AGENT_PROVIDER_FAILED` | — | Провайдер ответил ошибкой, в том числе после [повторов](../../ai/agents.md#что-рантайм-исправляет-сам); в журнале — `Agent model call failed` |
