@@ -1,5 +1,5 @@
 import type { AuthorizeCheck, AuthorizeContext } from "../../http";
-import type { PermissionKey } from "../catalog/permissions";
+import type { AnyPermissionKey } from "../catalog/permissions";
 import type { AccessObject } from "../contracts/types";
 import { IAccess } from "./IAccess.service";
 
@@ -14,7 +14,7 @@ import { IAccess } from "./IAccess.service";
  * @Post() create(ctx: HttpContext) { … }
  * ```
  */
-export function can(permission: PermissionKey, objectOf?: (ctx: AuthorizeContext) => AccessObject | Promise<AccessObject>): AuthorizeCheck {
+export function can(permission: AnyPermissionKey, objectOf?: (ctx: AuthorizeContext) => AccessObject | Promise<AccessObject>): AuthorizeCheck {
   return async (ctx) => {
     const access = await ctx.services.resolve(IAccess).for(ctx);
     return await access.can(permission, objectOf === undefined ? undefined : await objectOf(ctx));

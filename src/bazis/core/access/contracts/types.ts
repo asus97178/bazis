@@ -7,12 +7,22 @@ export type AccessValue = string | number | boolean | null;
 /** A partition of the application (a CMS space, a tenant); `null` — no partition. */
 export type Scope = string | null;
 
-/** A test of one attribute. */
+/**
+ * A test of one attribute. The comparisons `gt`, `gte`, `lt`, `lte` are for an
+ * attribute of `type: "number"` with a `column` only (ACCESS-001 §4.2).
+ */
 export type ValueTest =
   | { readonly eq: AccessValue }
   | { readonly in: readonly AccessValue[] }
   | { readonly notIn: readonly AccessValue[] }
-  | { readonly isNull: boolean };
+  | { readonly isNull: boolean }
+  | { readonly gt: number }
+  | { readonly gte: number }
+  | { readonly lt: number }
+  | { readonly lte: number };
+
+/** The comparisons of a number attribute. */
+export type CompareTest = "gt" | "gte" | "lt" | "lte";
 
 /**
  * A condition of a grant (ACCESS-001 §4.2): a tree over the attributes the

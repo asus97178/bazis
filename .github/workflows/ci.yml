@@ -26,7 +26,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # The examples run on it (scripts/ci.ts); the live suites start their own.
+    # The examples run on it (scripts/ci.ts); the access suite too; the other live suites start their own.
     services:
       postgres:
         image: postgres:17-alpine
@@ -42,6 +42,8 @@ jobs:
           --health-retries 30
     env:
       BAZIS_EXAMPLES_DB_HOST: 127.0.0.1
+      # The access suite on real rows (scripts/ci.ts): the same service, a schema of its own.
+      BAZIS_ACCESS_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/bazis_examples
     steps:
       - uses: actions/checkout@v5
 

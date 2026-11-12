@@ -1,5 +1,6 @@
-import type { PermissionSpec } from "../catalog/permissions";
-import type { AccessValue, Condition, Grant, Scope, ValueTest } from "../contracts/types";
+import type { AttributeSpec, PermissionSpec } from "../catalog/permissions";
+import type { AccessValue, CompareTest, Condition, Grant, Scope, ValueTest } from "../contracts/types";
+import { compareDecimals, decimalOf } from "./decimal";
 
 export const MAX_DEPTH = 8;
 export const MAX_NODES = 200;
@@ -41,28 +42,51 @@ function conditionProblem(spec: PermissionSpec, condition: Condition, depth: num
     if (value !== true) return "own must be true";
     return spec.owner === undefined ? "the permission declares no owner, own cannot be used" : undefined;
   }
-  if (spec.on?.[key] === undefined) return `unknown attribute "${key}"`;
-  return testProblem(key, value, maxInList);
+  const attribute = spec.on?.[key];
+  if (attribute === undefined) return `unknown attribute "${key}"`;
+  return testProblem(key, attribute, value, maxInList);
 }
 
-function testProblem(attribute: string, test: unknown, maxInList: number): string | undefined {
+function testProblem(attribute: string, spec: AttributeSpec, test: unknown, maxInList: number): string | undefined {
   if (typeof test !== "object" || test === null || Array.isArray(test)) return `the test of "${attribute}" must be an object`;
   const keys = Object.keys(test);
-  if (keys.length !== 1) return `the test of "${attribute}" must have exactly one of eq, in, notIn, isNull`;
+  if (keys.length !== 1) return `the test of "${attribute}" must have exactly one of eq, in, notIn, isNull, gt, gte, lt, lte`;
   const [op] = keys;
   const value = (test as Record<string, unknown>)[op!];
+  const numeric = spec.type === "number";
   switch (op) {
     case "eq":
+      if (numeric) return isNumeric(value) ? undefined : `${attribute}.eq must be a number: the attribute is a number`;
       return isValue(value) && value !== null ? undefined : `${attribute}.eq must be a string, number or boolean (an empty value is tested with isNull)`;
     case "in":
     case "notIn":
-      if (!Array.isArray(value) || !value.every((item) => isValue(item) && item !== null)) return `${attribute}.${op} must be a list of strings, numbers or booleans (an empty value is tested with isNull)`;
+      if (numeric) {
+        if (!Array.isArray(value) || !value.every(isNumeric)) return `${attribute}.${op} must be a list of numbers: the attribute is a number`;
+      } else if (!Array.isArray(value) || !value.every((item) => isValue(item) && item !== null)) {
+        return `${attribute}.${op} must be a list of strings, numbers or booleans (an empty value is tested with isNull)`;
+      }
       return value.length > maxInList ? `${attribute}.${op} has more than ${maxInList} values` : undefined;
     case "isNull":
       return typeof value === "boolean" ? undefined : `${attribute}.isNull must be true or false`;
+    case "gt":
+    case "gte":
+    case "lt":
+    case "lte":
+      if (!comparable(spec)) return `${attribute}.${op}: only an attribute of type "number" with a column can be compared${spec.lookup !== undefined ? " (this one has a lookup)" : ""}`;
+      return typeof value === "number" && Number.isFinite(value) ? undefined : `${attribute}.${op} must be a number`;
     default:
       return `unknown test "${op}" of "${attribute}"`;
   }
+}
+
+/** Whether `gt`, `gte`, `lt`, `lte` may test the attribute: a number in a column of the listed rows. */
+export function comparable(attribute: AttributeSpec): boolean {
+  return attribute.type === "number" && attribute.lookup === undefined;
+}
+
+/** A number, or a decimal string for a value a `double` cannot hold. */
+function isNumeric(value: unknown): boolean {
+  return (typeof value === "number" || typeof value === "string") && decimalOf(value) !== undefined;
 }
 
 /**
@@ -100,16 +124,50 @@ export function evaluate(condition: Condition, object: Readonly<Record<string, u
     return ownerIds.includes(String(owner));
   }
   const [attribute, test] = Object.entries(condition)[0] as [string, ValueTest];
-  return testValue(object[attribute], test);
+  return testValue(object[attribute], test, spec.on?.[attribute]?.type === "number");
 }
 
-function testValue(raw: unknown, test: ValueTest): boolean | undefined {
+const COMPARE: Readonly<Record<CompareTest, (order: number) => boolean>> = {
+  gt: (order) => order > 0,
+  gte: (order) => order >= 0,
+  lt: (order) => order < 0,
+  lte: (order) => order <= 0,
+};
+
+function testValue(raw: unknown, test: ValueTest, numeric: boolean): boolean | undefined {
   if (raw === undefined) return undefined;
   if ("isNull" in test) return (raw === null) === test.isNull;
   if (raw === null) return undefined;
+  if (numeric) return testNumber(raw, test);
   if ("eq" in test) return same(raw, test.eq);
-  const found = ("in" in test ? test.in : test.notIn).some((value) => same(raw, value));
-  return "in" in test ? found : !found;
+  if ("in" in test || "notIn" in test) {
+    const found = ("in" in test ? test.in : test.notIn).some((value) => same(raw, value));
+    return "in" in test ? found : !found;
+  }
+  // A comparison of an attribute that is not a number: such a grant is dropped before it gets here.
+  return undefined;
+}
+
+/**
+ * A number attribute is compared as a number, the way the database does it:
+ * `"100000.00"` of a `numeric` column equals `100000`. The comparison is exact
+ * and decimal, so a check and a list filter agree. Not a number — unknown.
+ */
+function testNumber(raw: unknown, test: Exclude<ValueTest, { readonly isNull: boolean }>): boolean | undefined {
+  const left = decimalOf(raw);
+  if (left === undefined) return undefined;
+  const order = (value: unknown): number | undefined => {
+    const right = decimalOf(value);
+    return right === undefined ? undefined : compareDecimals(left, right);
+  };
+  if ("in" in test || "notIn" in test) {
+    const found = ("in" in test ? test.in : test.notIn).some((value) => order(value) === 0);
+    return "in" in test ? found : !found;
+  }
+  const [op, value] = Object.entries(test)[0] as ["eq" | CompareTest, unknown];
+  const result = order(value);
+  if (result === undefined) return undefined;
+  return op === "eq" ? result === 0 : COMPARE[op](result);
 }
 
 /** Ids come as numbers from one side and as strings from the other. */
