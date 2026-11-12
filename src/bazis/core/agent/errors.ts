@@ -88,6 +88,19 @@ export class AgentModelUnavailableError extends Error {
   }
 }
 
+/**
+ * The request does not fit the model's context window. The runtime replaces
+ * the older part of the dialog with a summary and sends the request again
+ * (`AgentRuntimeOptions.compaction`); a run that still does not fit fails
+ * with AGENT_CONTEXT_OVERFLOW.
+ */
+export class AgentModelContextOverflowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentModelContextOverflowError";
+  }
+}
+
 /** Error thrown when the agent runtime is configured incorrectly. */
 export class AgentRuntimeError extends Error {
   constructor(message: string) {

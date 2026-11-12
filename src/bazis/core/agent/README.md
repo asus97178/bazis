@@ -158,6 +158,15 @@ change nothing (`none`, `read`) and stand next to each other run together
 the tokens of every model call, and a Tool output longer than
 `contextLimits.maxToolResultChars` (100 000) reaches the model cut.
 
+A long dialog is compacted: its older part is replaced by a summary the
+model writes (a user message with `metadata.runtime: "summary"`), the newest
+messages stay as written and a Tool call is never separated from its results.
+It starts at 80% of the model's window when the LLM connector states
+`contextTokens`, at `compaction.maxTokens`, or after the provider refuses a
+request as too long (`AgentModelContextOverflowError`); `result.compactions`
+says it happened and `compaction: false` turns it off. Token estimates are
+corrected by the usage a provider reports (`metadata.agentContext.tokenScale`).
+
 With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
 not serve; a fallback to another profile is logged as `LLM model profile
 failed, using fallback`. A model provider that gives up after its own deadline

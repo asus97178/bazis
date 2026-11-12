@@ -24,11 +24,19 @@ export interface LlmConnectionOptions {
   readonly apiKey: string;
   /** Request timeout. Defaults to 60s; `0` explicitly disables it. */
   readonly timeoutMs?: number;
+  /** The model's context window in tokens, when the application states it. */
+  readonly contextTokens?: number;
 }
 
 export interface LlmConnectorOptions {
   /** Request timeout. Defaults to 60s; `0` explicitly disables it. */
   readonly timeoutMs?: number;
+  /**
+   * The context window of the model, in tokens (128 000 for a 128k model).
+   * With it the agent runtime compacts a long dialog before the window is
+   * full; without it only when the provider refuses a request as too long.
+   */
+  readonly contextTokens?: number;
   /**
    * Check the provider at start (the adapter's `connect`: `GET /models` for an
    * OpenAI-compatible API, five seconds), so a wrong key or address stops the
@@ -58,7 +66,11 @@ export function resolveLlmConnectionOptions<T extends LlmConfigShape>(
   if (!Number.isSafeInteger(configuredTimeout) || configuredTimeout < 0) {
     throw new InfraError("llm timeoutMs must be a non-negative safe integer");
   }
+  if (options.contextTokens !== undefined && (!Number.isSafeInteger(options.contextTokens) || options.contextTokens <= 0)) {
+    throw new InfraError("llm contextTokens must be a positive safe integer");
+  }
   return {
+    ...(options.contextTokens === undefined ? {} : { contextTokens: options.contextTokens }),
     provider: requireValue(c.get("provider"), "provider", "llm"),
     model: requireValue(c.get("model"), "model", "llm"),
     baseUrl: requireValue(c.get("baseUrl"), "baseUrl", "llm"),

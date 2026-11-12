@@ -1,4 +1,5 @@
 import {
+  AgentModelContextOverflowError,
   AgentModelTimeoutError,
   AgentModelUnavailableError,
   agentMessage,
@@ -285,6 +286,48 @@ function isUnavailableStatus(status: number): boolean {
   return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
 }
 
+const MAX_ERROR_BODY_BYTES = 64 * 1024;
+
+/**
+ * Whether an error body says the request is longer than the model's window.
+ * The body is only classified: its text may repeat the prompt and never
+ * leaves this function.
+ */
+async function saysContextOverflow(response: Response, signal: AbortSignal): Promise<boolean> {
+  if (response.body === null) return false;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const cancel = (): void => { void reader.cancel().catch(() => undefined); };
+  signal.addEventListener("abort", cancel, { once: true });
+  try {
+    while (total < MAX_ERROR_BODY_BYTES) {
+      const item = await reader.read();
+      if (item.done) break;
+      chunks.push(item.value);
+      total += item.value.byteLength;
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    const text = new TextDecoder().decode(bytes.subarray(0, MAX_ERROR_BODY_BYTES));
+    let code: unknown;
+    let message: unknown = text;
+    try {
+      const error = (JSON.parse(text) as { error?: { code?: unknown; message?: unknown } }).error;
+      code = error?.code;
+      if (typeof error?.message === "string") message = error.message;
+    } catch { /* Not JSON: the plain text is looked at. */ }
+    return code === "context_length_exceeded"
+      || (typeof message === "string" && /context[ _-]?length|context window|maximum context|prompt is too long|too many (input )?tokens|input is too long/i.test(message));
+  } catch {
+    return false;
+  } finally {
+    signal.removeEventListener("abort", cancel);
+    cancel();
+  }
+}
+
 /** `Retry-After`: seconds or an HTTP date. */
 function retryAfterMsOf(header: string | null): number | undefined {
   if (header === null) return undefined;
@@ -418,6 +461,11 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
     }
   }
 
+  /** The context window the application stated for this model (`contextTokens`). */
+  public contextTokens(): number | undefined {
+    return this.connection.contextTokens;
+  }
+
   /** Base URL of the provider, for diagnostics. */
   public get address(): string {
     return this.baseUrl;
@@ -538,10 +586,14 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
         throw new AgentModelUnavailableError(`OpenAI-compatible ${method} ${path} could not reach the provider: ${errorMessageOf(error)}`);
       }
       if (!response.ok) {
+        const message = `OpenAI-compatible ${method} ${path} failed with HTTP ${response.status}.`;
+        // A refusal of a chat request may mean "too long": the runtime answers that by compacting the dialog.
+        if (method === "POST" && (response.status === 400 || response.status === 413 || response.status === 422) && await saysContextOverflow(response, abort.signal)) {
+          throw new AgentModelContextOverflowError(`${message} The request does not fit the model's context window.`);
+        }
         // Cancel the provider-controlled body without exposing it: error bodies
         // may echo prompts, credentials or tenant data.
         cancelBodyBestEffort(response.body);
-        const message = `OpenAI-compatible ${method} ${path} failed with HTTP ${response.status}.`;
         if (isUnavailableStatus(response.status)) {
           throw new AgentModelUnavailableError(message, { retryAfterMs: retryAfterMsOf(response.headers.get("retry-after")) });
         }

@@ -33,6 +33,12 @@ export interface AgentContextBuildInput {
   readonly messages: readonly AgentMessage[];
   readonly metadata: JsonObject;
   readonly limits?: AgentContextLimits;
+  /**
+   * How many real tokens one estimated token turned out to be for this model:
+   * the runtime measures it from the usage the provider reports. Estimates are
+   * multiplied by it before `maxTokens` is applied. 1 when nothing is known yet.
+   */
+  readonly tokenScale?: number;
 }
 
 export interface AgentContextTraceEntry {
@@ -187,9 +193,35 @@ function contentPartChars(part: AgentContentPart): number {
   }
 }
 
+/**
+ * An estimate close to what tokenizers produce, without a tokenizer: Latin
+ * letters and digits are about four characters a token, letters of other
+ * alphabets about two, a CJK character is a token, punctuation is about two
+ * marks a token. The runtime corrects the rest by the usage a provider reports.
+ */
 function textTokenCount(text: string): number {
-  const matches = text.match(/[\p{L}\p{N}_]+|[^\s]/gu);
-  return matches?.length ?? 0;
+  let latin = 0;
+  let letters = 0;
+  let marks = 0;
+  let whole = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code <= 0x20) continue;
+    if (code < 0x80) {
+      if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a) || code === 0x5f) latin += 1;
+      else marks += 1;
+    } else if (code === 0xa0 || (code >= 0x2000 && code <= 0x200b) || code === 0x3000) {
+      continue;
+    } else if ((code >= 0x2e80 && code <= 0x9fff) || (code >= 0xac00 && code <= 0xd7af) || (code >= 0xf900 && code <= 0xfaff)) {
+      whole += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      // The second half of a surrogate pair: its first half was counted.
+      continue;
+    } else {
+      letters += 1;
+    }
+  }
+  return Math.ceil(latin / 4 + letters / 2 + marks / 2 + whole);
 }
 
 function contentPartTokens(part: AgentContentPart): number {
@@ -424,7 +456,8 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
 
   build(input: AgentContextBuildInput): AgentContext {
     const limits = normalizeAgentContextLimits(input.limits);
-    const candidates = this.candidates(input.agent, input.messages, limits?.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS);
+    const tokenScale = input.tokenScale !== undefined && Number.isFinite(input.tokenScale) && input.tokenScale > 0 ? input.tokenScale : 1;
+    const candidates = this.candidates(input.agent, input.messages, limits?.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS, tokenScale);
     if (candidates.length === 0) {
       throw new AgentRuntimeError("agent context requires at least one message.");
     }
@@ -459,16 +492,17 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
         messageCount: messages.length,
         charCount,
         tokenCount,
+        ...(tokenScale === 1 ? {} : { tokenScale }),
         trace: traceToJson(trace),
       }),
     });
   }
 
-  private candidates(agent: AgentDefinition, messages: readonly AgentMessage[], maxToolResultChars: number): readonly ContextCandidate[] {
+  private candidates(agent: AgentDefinition, messages: readonly AgentMessage[], maxToolResultChars: number, tokenScale: number): readonly ContextCandidate[] {
     const candidates: ContextCandidate[] = [];
     const prompt = this.promptMessage(agent);
     if (prompt !== undefined) {
-      const tokens = this.estimatedTokens(prompt, "prompt");
+      const tokens = this.estimatedTokens(prompt, "prompt", tokenScale);
       candidates.push(Object.freeze({
         section: "prompt",
         message: prompt,
@@ -481,7 +515,7 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
       const whole = cloneMessage(messages[index] as AgentMessage, `agentContext.messages[${index}]`);
       const cut = cutToolResult(whole, maxToolResultChars);
       const message = cut ?? whole;
-      const tokens = this.estimatedTokens(message, `conversation[${index}]`);
+      const tokens = this.estimatedTokens(message, `conversation[${index}]`, tokenScale);
       candidates.push(Object.freeze({
         section: `conversation[${index}]`,
         message,
@@ -493,7 +527,7 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     return Object.freeze(candidates);
   }
 
-  private estimatedTokens(message: AgentMessage, field: string): number {
+  private estimatedTokens(message: AgentMessage, field: string, tokenScale: number): number {
     let estimate: unknown;
     try { estimate = this.tokenEstimator.estimateMessage(message); } catch (error) {
       throw new AgentRuntimeError(`agentContext token estimator failed for ${field}: ${errorMessageOf(error)}`);
@@ -501,7 +535,7 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     if (!Number.isFinite(estimate) || typeof estimate !== "number" || estimate < 0) {
       throw new AgentRuntimeError(`agentContext token estimator returned an invalid estimate for ${field}.`);
     }
-    return estimate;
+    return tokenScale === 1 ? estimate : Math.ceil(estimate * tokenScale);
   }
 
   /** The definition's instructions are the system prompt, sent as written. */

@@ -209,6 +209,18 @@ main fields.
 | `AgentRuntimeOptions.maxOutputRepairs` | Non-negative integer | 2; an invalid JSON answer is sent back with the issues |
 | `AgentRuntimeOptions.maxParallelToolCalls` | Positive integer | 8; adjacent `none`/`read` Tools of one step run together; a Session runs Tools one by one |
 
+| `compaction` | `{ maxTokens, keepTokens, modelProfile, instructions }` or `false` | On; starts at 80% of `contextTokens`, at `maxTokens`, or after `AgentModelContextOverflowError`; never in a Session |
+
+Compaction (version 11, 0.139.0). Before a step the dialog size is the sum of
+the context builder's trace; above the threshold the messages before a cut
+(never between a Tool call and its results) are rendered as plain text and
+summarized by one model request that is not a step. The run's dialog is
+rewritten: summary message plus the kept tail; `responses`, `toolResults` and
+seen call ids keep the whole run. A refusal of a step as too long is answered
+once the same way, then `AGENT_CONTEXT_OVERFLOW`. Real tokens per estimated
+token are learned per model profile from `usage.inputTokens` and passed to the
+builder as `tokenScale`. Checks: [agent.compaction.test.ts](test/agent.compaction.test.ts).
+
 Loop recovery (version 11, 0.139.0). Continuations and repairs are ordinary
 steps: the draft and a user message with `metadata.runtime`
 (`continue-output` / `repair-output`) are appended and the phase returns to

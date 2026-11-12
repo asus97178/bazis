@@ -4,13 +4,15 @@ import type { ServiceProvider } from "../../di";
 import { getGeneratedOpenApiMetadata } from "../../http/OpenApi/generatedOpenApiRegistry";
 import { redactSensitive, redactSensitiveText } from "../../../library/redaction";
 import type { Logger } from "../../kernel/logging/Logger";
-import { AgentModelTimeoutError, AgentModelUnavailableError, AgentRuntimeError } from "../errors";
+import { AgentModelContextOverflowError, AgentModelTimeoutError, AgentModelUnavailableError, AgentRuntimeError } from "../errors";
 import { validateAgentJsonSchema } from "./AgentJsonSchema";
 import type { AgentDefinition, AgentRegistry } from "../AgentRegistry";
 import {
+  ApproximateAgentContextTokenEstimator,
   DefaultAgentContextBuilder,
   mergeAgentContextLimits,
   normalizeAgentContextLimits,
+  type AgentContext,
   type AgentContextBuilder,
   type AgentContextLimits,
 } from "../AgentContextBuilder";
@@ -76,6 +78,39 @@ export interface AgentModelRetryPolicy {
   readonly maxDelayMs?: number;
 }
 
+/** `message.metadata.runtime` of the message that stands for the compacted part of a dialog. */
+const RUNTIME_SUMMARY = "summary";
+/** Compaction starts at this share of the model's context window, leaving room for the answer. */
+const COMPACTION_WINDOW_SHARE = 0.8;
+const SUMMARY_PREFIX = "Summary of the earlier part of this conversation (the original messages were replaced by it):";
+const SUMMARY_INSTRUCTIONS = [
+  "You summarize a conversation between a user and an AI assistant that uses tools, so that the assistant can continue the work without the original messages.",
+  "Keep everything needed to continue:",
+  "1. What the user asked for and wants: every request, in the user's own words where the wording matters.",
+  "2. Facts, names, identifiers, numbers and results obtained from tools that may be needed later.",
+  "3. What has been done and decided, and why.",
+  "4. What is in progress and what remains to be done.",
+  "5. Constraints, preferences and corrections the user gave.",
+  "Write plainly, in the language of the conversation. Do not invent anything, do not address the user, do not call tools. Output only the summary.",
+].join("\n");
+
+/** When and how the older part of a long dialog is replaced by a summary. */
+export interface AgentCompactionOptions {
+  /**
+   * The dialog size, in tokens, above which the older part is summarized.
+   * By default 80% of the model's context window, when the LLM connector
+   * states it (`contextTokens`); without both, only a provider's refusal of a
+   * request as too long starts compaction.
+   */
+  readonly maxTokens?: number;
+  /** How much of the newest dialog stays as written, in tokens. A quarter of `maxTokens` by default. */
+  readonly keepTokens?: number;
+  /** The model profile that writes the summary; the run's own by default. */
+  readonly modelProfile?: string;
+  /** Instructions for the summary instead of the built-in ones. */
+  readonly instructions?: string;
+}
+
 interface ModelRetrySettings {
   readonly maxAttempts: number;
   readonly delayMs: number;
@@ -127,6 +162,12 @@ export interface AgentRuntimeOptions {
    * them. 8 by default; 1 runs every Tool one by one.
    */
   readonly maxParallelToolCalls?: number;
+  /**
+   * Compaction of a long dialog: its older part is replaced by a summary the
+   * model writes, the newest messages stay as written. On by default;
+   * `false` turns it off, and a dialog that does not fit then fails the run.
+   */
+  readonly compaction?: AgentCompactionOptions | false;
   readonly contextBuilder?: AgentContextBuilder;
   readonly contextLimits?: AgentContextLimits;
   /**
@@ -142,6 +183,8 @@ export interface AgentRuntimeOptions {
  */
 export interface AgentExecutionDriverOptions extends AgentRuntimeOptions {
   readonly toolExecutorOptions?: AgentToolExecutorOptions;
+  /** Real tokens per estimated token, by model profile: one map for every run of a runtime. */
+  readonly tokenScales?: Map<string, number>;
 }
 
 export interface AgentRuntimeInvokeOptions {
@@ -160,6 +203,8 @@ export interface AgentRuntimeInvokeOptions {
   readonly timeoutMs?: number;
   /** The deadline of this whole run instead of the runtime's; 0 explicitly disables it. */
   readonly runTimeoutMs?: number;
+  /** Compaction settings of this run over the runtime's; `false` keeps the dialog as written. */
+  readonly compaction?: AgentCompactionOptions | false;
   readonly contextLimits?: AgentContextLimits;
   readonly signal?: AbortSignal;
   readonly toolExecution?: AgentRuntimeToolExecutionOptions;
@@ -178,8 +223,14 @@ export interface AgentRuntimeResult {
   readonly finalMessage?: AgentMessage;
   /** Validated structured value when `output` requested JSON. */
   readonly output?: JsonValue;
-  /** The sum over every model call of the run, when the provider reports usage. */
+  /** The sum over every model call of the run, summaries included, when the provider reports usage. */
   readonly usage?: AgentUsage;
+  /**
+   * How many times the older part of the dialog was replaced by a summary
+   * during this run. `messages` then start with the summary, a user message
+   * with `metadata.runtime: "summary"`, not with the original dialog.
+   */
+  readonly compactions?: number;
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
 }
@@ -196,6 +247,10 @@ type PreparedAgentPlan = {
   readonly maxOutputContinuations: number;
   readonly maxOutputRepairs: number;
   readonly maxParallelToolCalls: number;
+  /** `undefined`: the dialog is never compacted. */
+  readonly compaction: AgentCompactionOptions | undefined;
+  /** What the run did besides its steps; filled while it runs. */
+  readonly side: { readonly usage: AgentUsage[]; compactions: number };
   readonly modelProfile: string | undefined;
   readonly contextLimits: AgentContextLimits | undefined;
   readonly messages: AgentMessage[];
@@ -484,14 +539,13 @@ function runtimeError(code: string, message: string, details?: JsonValue): Agent
 }
 
 /** The sum of what the provider reported for every model call. */
-function totalUsage(responses: readonly AgentModelResponse[]): AgentUsage | undefined {
+function totalUsage(usages: readonly (AgentUsage | undefined)[]): AgentUsage | undefined {
   const total: { inputTokens?: number; outputTokens?: number; totalTokens?: number; latencyMs?: number } = {};
   let amount: number | undefined;
   let currency: string | undefined;
   let mixedCurrency = false;
   let reported = false;
-  for (const response of responses) {
-    const usage = response.usage;
+  for (const usage of usages) {
     if (usage === undefined) continue;
     reported = true;
     for (const field of ["inputTokens", "outputTokens", "totalTokens", "latencyMs"] as const) {
@@ -547,6 +601,53 @@ function repairRequest(error: AgentToolError): string {
   return `Your answer was not accepted: ${error.message}${listed} Reply again with the corrected JSON only, without any other text.`;
 }
 
+function clip(text: string, maxChars: number): string {
+  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}… [${text.length - maxChars} more characters]`;
+}
+
+/** A dialog as plain text for the model that writes its summary. */
+function renderDialog(messages: readonly AgentMessage[], maxChars: number): string {
+  const lines: string[] = [];
+  for (const message of messages) {
+    const speaker = message.metadata.runtime === RUNTIME_SUMMARY ? "Earlier summary" : message.role === "user" ? "User" : message.role === "assistant" ? "Assistant" : message.role === "tool" ? "Tool" : "Instructions";
+    for (const part of message.content) {
+      switch (part.kind) {
+        case "text": lines.push(`${speaker}: ${clip(part.text, 8_000)}`); break;
+        case "data": lines.push(`${speaker} (data${part.name === undefined ? "" : ` "${part.name}"`}): ${clip(JSON.stringify(part.value), 4_000)}`); break;
+        case "image": lines.push(`${speaker}: [image ${clip(part.uri, 200)}]`); break;
+        case "file": lines.push(`${speaker}: [file ${part.name ?? clip(part.uri, 200)}]`); break;
+        case "tool-call": lines.push(`Assistant called ${part.call.name}: ${clip(JSON.stringify(part.call.input), 2_000)}`); break;
+        case "tool-result": lines.push(`Result of ${part.result.name} (${part.result.status}): ${clip(JSON.stringify(part.result.status === "success" ? part.result.output : part.result.error), 4_000)}`); break;
+      }
+    }
+  }
+  const text = lines.join("\n");
+  // The end of the part being summarized matters most: it is what the dialog continues from.
+  return text.length <= maxChars ? text : `[The beginning of the conversation is omitted.]\n${text.slice(text.length - maxChars)}`;
+}
+
+/**
+ * Where the dialog is cut: messages before the index are summarized, the rest
+ * stay as written. A Tool call is never separated from its results.
+ * `undefined` when there is nothing worth summarizing.
+ */
+function compactionCut(messages: readonly AgentMessage[], tokens: readonly number[], keepTokens: number): number | undefined {
+  let cut = messages.length;
+  let kept = 0;
+  while (cut > 0 && kept + tokens[cut - 1]! <= keepTokens) {
+    kept += tokens[cut - 1]!;
+    cut -= 1;
+  }
+  // The kept part starts with a question or an answer, never with a Tool result.
+  while (cut < messages.length && messages[cut]!.role === "tool") cut += 1;
+  if (cut >= messages.length) {
+    // The newest exchange alone is larger than what may be kept: it stays whole anyway.
+    cut = messages.length - 1;
+    while (cut > 0 && messages[cut]!.role === "tool") cut -= 1;
+  }
+  return cut >= 2 ? cut : undefined;
+}
+
 /** Waits unless the run is cancelled first; resolves `false` when it was. */
 function pause(ms: number, signal: AbortSignal | undefined): Promise<boolean> {
   if (signal?.aborted) return Promise.resolve(false);
@@ -571,7 +672,7 @@ function runtimeResult(options: {
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
 }): AgentRuntimeResult {
-  const usage = totalUsage(options.responses);
+  const usage = totalUsage(options.responses.map((response) => response.usage));
   return Object.freeze({
     invocationId: options.invocationId,
     agentName: options.agentName,
@@ -644,6 +745,20 @@ function attachAbortForwarding(source: AbortSignal | undefined, target: AbortCon
   return () => source.removeEventListener("abort", abort);
 }
 
+/** The size of a whole dialog as the context builder counted it, dropped messages included. */
+function contextTokens(context: AgentContext): number {
+  return context.trace.reduce((sum, entry) => sum + entry.tokens, 0);
+}
+
+const fallbackEstimator = new ApproximateAgentContextTokenEstimator();
+
+/** Tokens of every dialog message: the builder's own count, or an estimate for a builder that keeps no such trace. */
+function messageTokens(messages: readonly AgentMessage[], context: AgentContext, tokenScale: number): readonly number[] {
+  const counted = context.trace.filter((entry) => entry.section.startsWith("conversation["));
+  if (counted.length === messages.length) return counted.map((entry) => entry.tokens);
+  return messages.map((message) => Math.ceil(fallbackEstimator.estimateMessage(message) * tokenScale));
+}
+
 export class AgentExecutionDriver {
   private readonly toolExecutor: AgentToolExecutor;
   private readonly defaultMaxSteps: number;
@@ -655,6 +770,8 @@ export class AgentExecutionDriver {
   private readonly maxOutputContinuations: number;
   private readonly maxOutputRepairs: number;
   private readonly maxParallelToolCalls: number;
+  private readonly compaction: AgentCompactionOptions | undefined;
+  private readonly tokenScales: Map<string, number>;
   private readonly defaultContextLimits?: AgentContextLimits;
   private readonly contextBuilder: AgentContextBuilder;
   private readonly logger?: Logger;
@@ -684,6 +801,8 @@ export class AgentExecutionDriver {
     this.maxOutputContinuations = options.maxOutputContinuations ?? DEFAULT_MAX_OUTPUT_CONTINUATIONS;
     this.maxOutputRepairs = options.maxOutputRepairs ?? DEFAULT_MAX_OUTPUT_REPAIRS;
     this.maxParallelToolCalls = options.maxParallelToolCalls ?? DEFAULT_MAX_PARALLEL_TOOL_CALLS;
+    this.compaction = this.compactionSettings(options.compaction, "AgentRuntime.compaction") ?? (options.compaction === false ? undefined : Object.freeze({}));
+    this.tokenScales = options.tokenScales ?? new Map<string, number>();
     this.defaultMaxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
     this.defaultMaxToolCallsPerStep = options.maxToolCallsPerStep ?? DEFAULT_MAX_TOOL_CALLS_PER_STEP;
     this.defaultModelProfile = optionalText(options.modelProfile, "AgentRuntime.modelProfile");
@@ -830,6 +949,9 @@ export class AgentExecutionDriver {
       maxOutputContinuations: this.maxOutputContinuations,
       maxOutputRepairs: this.maxOutputRepairs,
       maxParallelToolCalls: 1,
+      // A Session keeps its dialog as written: a checkpoint ties it to the recorded responses.
+      compaction: undefined,
+      side: { usage: [], compactions: 0 },
       modelProfile,
       contextLimits,
       messages: [...checkpoint.messages],
@@ -855,6 +977,7 @@ export class AgentExecutionDriver {
     let maxToolCallsPerStep: number;
     let timeoutMs: number | undefined;
     let runTimeoutMs: number | undefined;
+    let compaction: AgentCompactionOptions | undefined;
     let modelProfile: string | undefined;
     let contextLimits: AgentContextLimits | undefined;
     try {
@@ -864,6 +987,10 @@ export class AgentExecutionDriver {
       assertNonNegativeInteger(options.timeoutMs, "agentRuntime.timeoutMs");
       assertNonNegativeInteger(options.runTimeoutMs, "agentRuntime.runTimeoutMs");
       runTimeoutMs = options.runTimeoutMs === 0 ? undefined : options.runTimeoutMs ?? this.defaultRunTimeoutMs;
+      const ownCompaction = this.compactionSettings(options.compaction, "agentRuntime.compaction");
+      compaction = options.compaction === false ? undefined
+        : ownCompaction === undefined ? this.compaction
+        : Object.freeze({ ...(this.compaction ?? {}), ...ownCompaction });
       maxSteps = options.maxSteps ?? this.defaultMaxSteps;
       maxToolCallsPerStep = options.maxToolCallsPerStep ?? this.defaultMaxToolCallsPerStep;
       timeoutMs = options.timeoutMs === 0 ? undefined : options.timeoutMs ?? this.defaultTimeoutMs;
@@ -904,6 +1031,8 @@ export class AgentExecutionDriver {
         maxOutputContinuations: this.maxOutputContinuations,
         maxOutputRepairs: this.maxOutputRepairs,
         maxParallelToolCalls: this.maxParallelToolCalls,
+        compaction,
+        side: { usage: [], compactions: 0 },
         modelProfile,
         contextLimits,
         messages,
@@ -962,6 +1091,14 @@ export class AgentExecutionDriver {
       }
     };
     const terminal = (state: TState, result: AgentRuntimeResult): EngineOutcome<TState> => ({ kind: "terminal", state, result });
+    // A dialog is compacted at most once before a step and once after a refusal of that step.
+    const canCompact = !session && plan.compaction !== undefined;
+    let sizeCheckedAtStep = 0;
+    let overflowHandledAtStep = 0;
+    const withMessages = (messages: readonly AgentMessage[]): TState => bridge.evolve(checkpoint, {
+      phase: checkpoint.phase, steps: checkpoint.steps, messages, responses: checkpoint.responses, toolResults: checkpoint.toolResults,
+      seenToolCallIds: checkpoint.seenToolCallIds, pendingToolBatch: undefined, terminal: undefined,
+    });
 
     for (;;) {
       if (session && signal?.aborted) return suspend("aborted");
@@ -1080,8 +1217,22 @@ export class AgentExecutionDriver {
       const readyControl = await control(checkpoint);
       if (readyControl !== undefined) return readyControl;
       let modelRequest: AgentModelRequest;
+      let context: AgentContext;
+      const tokenScale = this.tokenScales.get(plan.modelProfile ?? "") ?? 1;
+      const build = (): AgentContext => this.contextBuilder.build({ invocationId: plan.invocationId, agent: plan.agent, messages: checkpoint.messages, metadata: plan.metadata, limits: plan.contextLimits, tokenScale });
       try {
-        const context = this.contextBuilder.build({ invocationId: plan.invocationId, agent: plan.agent, messages: checkpoint.messages, metadata: plan.metadata, limits: plan.contextLimits });
+        context = build();
+        if (canCompact && sizeCheckedAtStep !== step) {
+          sizeCheckedAtStep = step;
+          const maxTokens = this.compactionThreshold(plan);
+          if (maxTokens !== undefined && contextTokens(context) > maxTokens) {
+            const compacted = await this.compact(plan, checkpoint.messages, context, tokenScale, plan.compaction!.keepTokens ?? Math.floor(maxTokens / 4), "size", signal);
+            if (compacted !== undefined) {
+              checkpoint = withMessages(compacted);
+              context = build();
+            }
+          }
+        }
         modelRequest = agentModelRequest({
           invocationId: plan.invocationId, messages: context.messages, tools: plan.tools,
           output: this.providerOutputContract(plan.options.output),
@@ -1106,6 +1257,15 @@ export class AgentExecutionDriver {
       const response = await this.completeModel(modelRequest, plan.agent.name, plan.modelProfile, plan.metadata, signal, plan.timeoutMs, plan.modelRetry,
         plan.options.onTextDelta ? text => plan.options.onTextDelta!(Object.freeze({ step, text })) : undefined);
       if (!response.ok) {
+        // The provider says the request is too long: the dialog is compacted and the step is asked again.
+        if (response.cause instanceof AgentModelContextOverflowError && canCompact && overflowHandledAtStep !== step) {
+          overflowHandledAtStep = step;
+          const compacted = await this.compact(plan, checkpoint.messages, context, tokenScale, plan.compaction!.keepTokens ?? Math.floor(contextTokens(context) / 4), "overflow", signal);
+          if (compacted !== undefined) {
+            checkpoint = withMessages(compacted);
+            continue;
+          }
+        }
         const candidate = bridge.evolve(checkpoint, {
           phase: "terminal", steps: step, messages: checkpoint.messages, responses: checkpoint.responses, toolResults: checkpoint.toolResults,
           seenToolCallIds: checkpoint.seenToolCallIds, pendingToolBatch: undefined, terminal: { status: "failed", error: response.error },
@@ -1114,6 +1274,7 @@ export class AgentExecutionDriver {
         const stopped = await committedControl(candidate);
         return stopped ?? terminal(candidate, this.resultFromCheckpoint(plan, candidate));
       }
+      this.learnTokenScale(plan.modelProfile, tokenScale, context, response.value);
       const candidate = await this.modelCandidate(plan, checkpoint, step, response.value, bridge);
       try { await boundary.afterModelSettlement(checkpoint, candidate.state, step, { response: response.value }); } catch { throw bridge.boundaryError(checkpoint); }
       const stopped = await committedControl(candidate.state);
@@ -1225,7 +1386,7 @@ export class AgentExecutionDriver {
     const resolvedPlan = { ...plan, modelProfile: plan.modelProfile ?? plan.agent.modelProfile ?? this.defaultModelProfile };
     if (plan.runTimeoutMs === undefined) {
       const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, plan.options.signal, inMemoryBridge, false);
-      if (outcome.kind === "terminal") return outcome.result;
+      if (outcome.kind === "terminal") return this.withSideWork(outcome.result, plan);
       throw new AgentRuntimeError("in-memory execution cannot suspend.");
     }
     // The run deadline cancels whatever is in flight, like the caller's signal does.
@@ -1236,13 +1397,104 @@ export class AgentExecutionDriver {
     try {
       const outcome = await this.drivePhaseEngine(resolvedPlan, initial, inMemoryBoundary, deadline.signal, inMemoryBridge, false);
       if (outcome.kind !== "terminal") throw new AgentRuntimeError("in-memory execution cannot suspend.");
-      return expired && outcome.result.error?.code === "AGENT_ABORTED"
+      return this.withSideWork(expired && outcome.result.error?.code === "AGENT_ABORTED"
         ? this.failedResult(outcome.result, runtimeError("AGENT_RUN_TIMEOUT", `Agent "${plan.agent.name}" did not finish within runTimeoutMs (${plan.runTimeoutMs}).`, { runTimeoutMs: plan.runTimeoutMs }))
-        : outcome.result;
+        : outcome.result, plan);
     } finally {
       clearTimeout(timer);
       detach?.();
     }
+  }
+
+  /** Adds to a result what the run did besides its steps: summaries and their usage. */
+  private withSideWork(result: AgentRuntimeResult, plan: PreparedAgentPlan): AgentRuntimeResult {
+    if (plan.side.compactions === 0) return result;
+    const usage = totalUsage([result.usage, ...plan.side.usage]);
+    return Object.freeze({ ...result, ...(usage === undefined ? {} : { usage }), compactions: plan.side.compactions });
+  }
+
+  private compactionSettings(value: AgentCompactionOptions | false | undefined, field: string): AgentCompactionOptions | undefined {
+    if (value === undefined || value === false) return undefined;
+    assertPositiveInteger(value.maxTokens, `${field}.maxTokens`);
+    assertPositiveInteger(value.keepTokens, `${field}.keepTokens`);
+    const modelProfile = optionalText(value.modelProfile, `${field}.modelProfile`);
+    const instructions = optionalText(value.instructions, `${field}.instructions`);
+    return Object.freeze({
+      ...(value.maxTokens === undefined ? {} : { maxTokens: value.maxTokens }),
+      ...(value.keepTokens === undefined ? {} : { keepTokens: value.keepTokens }),
+      ...(modelProfile === undefined ? {} : { modelProfile }),
+      ...(instructions === undefined ? {} : { instructions }),
+    });
+  }
+
+  /** The dialog size that starts compaction, when it is set or the model's window is known. */
+  private compactionThreshold(plan: PreparedAgentPlan): number | undefined {
+    if (plan.compaction?.maxTokens !== undefined) return plan.compaction.maxTokens;
+    let window: number | undefined;
+    try { window = this.modelProvider.contextTokens?.(plan.modelProfile); } catch { window = undefined; }
+    return typeof window === "number" && Number.isFinite(window) && window > 0 ? Math.floor(window * COMPACTION_WINDOW_SHARE) : undefined;
+  }
+
+  /**
+   * Replaces the older part of a dialog with a summary the model writes.
+   * `undefined` when there is nothing to summarize or the summary failed: the
+   * dialog then stays as it is.
+   */
+  private async compact(
+    plan: PreparedAgentPlan, messages: readonly AgentMessage[], context: AgentContext, tokenScale: number, keepTokens: number,
+    reason: "size" | "overflow", signal: AbortSignal | undefined,
+  ): Promise<readonly AgentMessage[] | undefined> {
+    const tokens = messageTokens(messages, context, tokenScale);
+    const cut = compactionCut(messages, tokens, keepTokens);
+    if (cut === undefined) return undefined;
+    const settings = plan.compaction!;
+    const modelProfile = settings.modelProfile ?? plan.modelProfile;
+    const before = tokens.reduce((sum, value) => sum + value, 0);
+    const summarized = tokens.slice(0, cut).reduce((sum, value) => sum + value, 0);
+    try {
+      const request = agentModelRequest({
+        invocationId: plan.invocationId,
+        messages: [
+          agentMessage("system", settings.instructions ?? SUMMARY_INSTRUCTIONS),
+          // Plain text, so the request needs neither the Tools nor a valid tool-call order.
+          agentMessage("user", `<conversation>\n${renderDialog(messages.slice(0, cut), Math.max(20_000, summarized * 4))}\n</conversation>\n\nWrite the summary of the conversation above.`),
+        ],
+        modelProfile,
+        metadata: { ...plan.metadata, agentName: plan.agent.name, purpose: "compaction", modelProfile: modelProfile ?? null },
+      });
+      const response = await this.completeModel(request, plan.agent.name, modelProfile, plan.metadata, signal, plan.timeoutMs, plan.modelRetry);
+      if (!response.ok) {
+        if (response.error.code !== "AGENT_ABORTED") this.logger?.warn("Agent context was not compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, code: response.error.code });
+        return undefined;
+      }
+      if (response.value.usage !== undefined) plan.side.usage.push(response.value.usage);
+      const summary = (response.value.message?.content ?? []).map((part) => part.kind === "text" ? part.text : "").join("").trim();
+      if (summary.length === 0 || response.value.toolCalls.length > 0) {
+        this.logger?.warn("Agent context was not compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, code: "AGENT_SUMMARY_EMPTY" });
+        return undefined;
+      }
+      plan.side.compactions += 1;
+      this.logger?.info("Agent context compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, messages: cut, tokensBefore: before, tokensSummarized: summarized });
+      return Object.freeze([
+        agentMessage("user", `${SUMMARY_PREFIX}\n\n${summary}`, { metadata: { runtime: RUNTIME_SUMMARY, messages: cut } }),
+        ...messages.slice(cut),
+      ]);
+    } catch (error) {
+      this.logger?.warn("Agent context was not compacted", { agent: plan.agent.name, invocationId: plan.invocationId, reason, error: redactSensitive(error) });
+      return undefined;
+    }
+  }
+
+  /** Remembers how many real tokens an estimated one is for a model, from the usage it reported. */
+  private learnTokenScale(modelProfile: string | undefined, usedScale: number, context: AgentContext, response: AgentModelResponse): void {
+    const reported = response.usage?.inputTokens;
+    const counted = context.metadata.tokenCount;
+    if (typeof reported !== "number" || reported <= 0 || typeof counted !== "number" || counted <= 0) return;
+    const measured = Math.min(6, Math.max(0.5, reported / (counted / usedScale)));
+    const key = modelProfile ?? "";
+    const known = this.tokenScales.get(key);
+    // Half-way to the new measurement: one unusual request does not swing the estimate.
+    this.tokenScales.set(key, known === undefined ? measured : (known + measured) / 2);
   }
 
   /**
@@ -1378,7 +1630,7 @@ export class AgentExecutionDriver {
     timeoutMs: number | undefined,
     retry: ModelRetrySettings,
     onTextDelta?: (text: string) => void,
-  ): Promise<{ readonly ok: true; readonly value: AgentModelResponse } | { readonly ok: false; readonly error: AgentToolError }> {
+  ): Promise<{ readonly ok: true; readonly value: AgentModelResponse } | { readonly ok: false; readonly error: AgentToolError; readonly cause?: unknown }> {
     for (let attempt = 1; ; attempt += 1) {
       const outcome = await this.completeModelOnce(request, agentName, modelProfile, metadata, sourceSignal, timeoutMs, onTextDelta);
       if (outcome.ok) return outcome;
@@ -1388,7 +1640,7 @@ export class AgentExecutionDriver {
         if (outcome.error.code !== "AGENT_ABORTED" && !outcome.logged) {
           this.logger?.error("Agent model call failed", { agent: agentName, invocationId: request.invocationId, code: outcome.error.code, ...(attempt > 1 ? { attempts: attempt } : {}), error: redactSensitive(outcome.cause) });
         }
-        return { ok: false, error: outcome.error };
+        return { ok: false, error: outcome.error, cause: outcome.cause };
       }
       const asked = (outcome.cause as AgentModelUnavailableError).retryAfterMs ?? 0;
       const delayMs = Math.min(retry.maxDelayMs, Math.max(asked, retry.delayMs * 2 ** (attempt - 1)));
@@ -1449,7 +1701,9 @@ export class AgentExecutionDriver {
         ? "AGENT_PROVIDER_TIMEOUT"
         : error instanceof AgentRuntimeAbortError
           ? "AGENT_ABORTED"
-          : "AGENT_PROVIDER_FAILED";
+          : error instanceof AgentModelContextOverflowError
+            ? "AGENT_CONTEXT_OVERFLOW"
+            : "AGENT_PROVIDER_FAILED";
       return { ok: false, cause: error, textEmitted, logged: false, error: runtimeError(code, errorMessageOf(error)) };
     } finally {
       acceptingText = false;

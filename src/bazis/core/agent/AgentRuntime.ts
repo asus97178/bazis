@@ -14,6 +14,7 @@ import {
 import type { AgentModelProvider } from "./ModelProvider";
 
 export {
+  type AgentCompactionOptions,
   type AgentModelRetryPolicy,
   type AgentRuntimeInvokeOptions,
   type AgentExecutionDriverOptions,
@@ -59,7 +60,13 @@ export class AgentRuntime {
     this.options = {
       ...options,
       toolExecutorOptions: { schemaValidator: modelValidatorAdapter, ...toolExecutorOptions },
+      // What a model's tokens turned out to cost is learned once for every run.
+      tokenScales: new Map<string, number>(),
     };
+    const summaryProfile = options.compaction === undefined || options.compaction === false ? undefined : options.compaction.modelProfile;
+    if (summaryProfile !== undefined && typeof modelProvider.modelProfiles === "function" && !modelProvider.modelProfiles().includes(summaryProfile)) {
+      throw new AgentSetupError(`AgentRuntime.compaction: model profile "${summaryProfile}" is not configured (configured: ${[...modelProvider.modelProfiles()].sort().join(", ")}).`);
+    }
     // Invalid options and hook setup fail here, at the first resolve, not on the first run.
     new AgentExecutionDriver(services, this.catalog, modelProvider, this.options);
   }
