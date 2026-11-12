@@ -4,6 +4,51 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.140.0 — 2026-11-13
+
+Access ([ACCESS-001 v1.4](docs/architecture/ACCESS.md)): permissions that appear while
+the application runs, and comparisons of numbers in grants. Stores stay as they are.
+Behaviour changes: see [Upgrading](docs/guide/reference/upgrading.md#01400).
+
+### Added
+
+- Permission sources: `@Module({ permissionSources: { data: DataPermissionSource } })`.
+  A `PermissionSource` class owns a key prefix and gives permissions in the form of
+  `definePermissions` — the tables of a data manager and their fields. The catalog reads
+  the sources before the HTTP host starts and checks every specification like a declared
+  one; a bad one is logged and does not exist.
+- Keys of sources are types: `` `${prefix}.${string}` `` (`SourcePermissionKey`), accepted
+  by `can`, `access.can`, `access.filter` and `access.fields`. `bazis codegen` takes the
+  prefixes from `permissionSources`. A key the source does not give now is closed for
+  everyone: `can` answers no, `filter` — nothing.
+- Changes: `IAccessCatalog.changed(prefix, keys?)` on the instance that changed the data;
+  other instances compare the source's `version()` every `access.sourcePollSeconds`
+  (5 by default, `0` — no poll). A new key or a new attribute does not wait for the poll:
+  the version is compared before a refusal. The state of the sources is in `/health` and
+  in `IAccessCatalog.sources()`.
+- `IAccessCatalog.grantProblem(permission, grant)`: the checks of a request, for a rights
+  system that saves a rule and answers 422.
+- Conditions: `gt`, `gte`, `lt`, `lte` for an attribute of `type: "number"` with a column.
+  In a list filter a comparison is `{ column, op, value }` of `ColumnCondition`;
+  `grantsToWhere` turns it into an ORM condition.
+- `GET /access/catalog` lists the permissions of sources (`source`) and marks the
+  attributes that may be compared (`compare: true`).
+
+### Changed
+
+- A number attribute is compared as a number, exactly, as a decimal: `"100000.00"` of a
+  `decimal` column equals `100000` in `eq`, `in` and `notIn` too. A check and a list filter
+  agree on such a column. A value of a number attribute that is not a number makes the
+  grant unusable.
+- `grantsToWhere` sends a fraction to the database as decimal text: a `decimal` column of
+  the ORM refuses a `double`.
+
+### Verified
+
+- `access.postgres.live.test.ts`: the filter lists exactly the rows `can` allows, for
+  every kind of condition, on `decimal`, `integer` and `real` columns. The CI pipeline
+  runs it on its PostgreSQL service (`BAZIS_ACCESS_PG_URL`).
+
 ## 0.139.0 — 2026-11-12
 
 The agent runtime after its audit: a run recovers instead of failing, a long dialog is
