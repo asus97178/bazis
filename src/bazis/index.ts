@@ -96,6 +96,7 @@ export {
   agentInvocation,
   agentJsonSchema,
   agentMessage,
+  agentMessageText,
   agentModelCapabilities,
   agentModelRequest,
   agentModelResponse,

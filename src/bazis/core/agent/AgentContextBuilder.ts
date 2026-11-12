@@ -172,6 +172,13 @@ function cutToolResult(message: AgentMessage, maxChars: number): AgentMessage | 
   });
 }
 
+function withoutReasoning(message: AgentMessage): AgentMessage {
+  if (!message.content.some((part) => part.kind === "reasoning")) return message;
+  const content = message.content.filter((part) => part.kind !== "reasoning");
+  if (content.length === 0) return message;
+  return agentMessage(message.role, content, { id: message.id, name: message.name, toolCallId: message.toolCallId, createdAtUnixMs: message.createdAtUnixMs, metadata: message.metadata });
+}
+
 function jsonLength(value: unknown): number {
   return JSON.stringify(value)?.length ?? 0;
 }
@@ -491,12 +498,15 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
 
     const messages: AgentMessage[] = [];
     const trace: AgentContextTraceEntry[] = [];
+    // A provider ties reasoning to the dialog it was written in: once older
+    // messages are dropped, the reasoning in the rest no longer matches it.
+    const trimmed = included.includes(false);
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index] as ContextCandidate;
       const isIncluded = included[index] === true;
       trace.push(traceEntry(candidate, isIncluded, reasons[index]));
       if (isIncluded) {
-        messages.push(candidate.message);
+        messages.push(trimmed ? withoutReasoning(candidate.message) : candidate.message);
       }
     }
 

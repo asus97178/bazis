@@ -24,6 +24,7 @@ OpenSearch, LLM, Codex. Список — по пакету 0.128.0.
 | `openAiCompatibleAdapter`, `OpenAiCompatibleModelProvider` | Адаптер OpenAI-совместимого API | [Свой адаптер](../../ai/llm-connectors.md#свой-адаптер) |
 | `codexAppServerConnect(config)`, `ICodex`, `CODEX_MODEL_ID`, `CODEX_REASONING_EFFORT` | ChatGPT через Codex App Server; клиент внедряется по типу `ICodex` | [Codex](../../infra/connectors.md#codex) |
 | `CodexError`, `RU_CODEX_MESSAGES` | Ошибки Codex с текстом для пользователя | [Ошибки агентов](../errors/agents.md#модели-и-codex) |
+| `anthropicAdapter`, `AnthropicModelProvider`, `AnthropicProviderError` из `bazis/core/infra/anthropic` | Адаптер Claude на официальном SDK; отдельный вход, потому что требует пакет `@anthropic-ai/sdk` | [Claude](../../ai/llm-connectors.md#claude-anthropicadapter) |
 | `LlmModelRouterError`, `OpenAiCompatibleProviderError` | Ошибки LLM-коннекторов | [Ошибки](../../ai/llm-connectors.md#ошибки) |
 | `DEFAULT_LLM_REQUEST_TIMEOUT_MS` | Срок запроса к провайдеру по умолчанию | — |
 

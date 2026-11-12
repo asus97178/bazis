@@ -27,8 +27,8 @@
 провайдера ([Свой адаптер](../../ai/llm-connectors.md#свой-адаптер)):
 
 `AGENT_MODEL_PROVIDER`, `agentModelRequest`, `agentModelResponse`,
-`agentModelCapabilities`, `agentMessage`, `agentText`, `agentData`,
-`agentFile`, `agentImage`, `agentToolCall`, `agentToolCallPart`,
+`agentModelCapabilities`, `agentMessage`, `agentMessageText`, `agentText`, `agentData`,
+`agentFile`, `agentImage`, `agentReasoning`, `agentToolCall`, `agentToolCallPart`,
 `agentToolResult`, `agentToolResultPart`, `agentToolContract`,
 `agentOutputContract`, `agentJsonSchema`, `agentClassSchema`,
 `agentInvocation`, `normalizeJsonValue`.
@@ -72,7 +72,7 @@
   `AgentModelRequest`, `AgentModelResponse`, `AgentModelCapabilities`,
   `AgentMessage`, `AgentMessageOptions`, `AgentMessageRole`,
   `AgentContentInput`, `AgentContentPart`, `AgentTextPart`, `AgentDataPart`,
-  `AgentFilePart`, `AgentImagePart`, `AgentToolCallPart`,
+  `AgentFilePart`, `AgentImagePart`, `AgentReasoningPart`, `AgentToolCallPart`,
   `AgentToolResultPart`, `AgentOutputContract`, `AgentOutputMode`,
   `AgentSchemaContract`, `AgentJsonSchemaContract`,
   `AgentClassSchemaContract`.

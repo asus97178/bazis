@@ -8,6 +8,7 @@ import {
   agentInvocation,
   agentJsonSchema,
   agentMessage,
+  agentMessageText,
   agentReasoning,
   agentModelCapabilities,
   agentModelRequest,
@@ -275,5 +276,12 @@ describe("agent semantic invocation and model exchange", () => {
     expect(message.content.map((item) => item.kind)).toEqual(["reasoning", "text"]);
     expect(() => agentMessage("user", [part])).toThrow(/reasoning content parts require an assistant message/);
     expect(() => agentReasoning("x", { data: ["not", "an", "object"] })).toThrow(/reasoning.data/);
+  });
+
+  test("reads the words of a message past its reasoning and Tool calls", () => {
+    const message = agentMessage("assistant", [agentReasoning("Thinking."), agentText("Order 42 "), agentText("is paid.")]);
+    expect(agentMessageText(message)).toBe("Order 42 is paid.");
+    expect(agentMessageText(agentMessage("assistant", [agentReasoning("Only thoughts.")]))).toBe("");
+    expect(agentMessageText(undefined)).toBe("");
   });
 });

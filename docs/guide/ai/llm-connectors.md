@@ -70,6 +70,78 @@ Completions. `timeoutMs` — срок одного запроса к модел�
 
 С одной моделью `modelProfile` агента ни на что не влияет.
 
+## Claude: `anthropicAdapter`
+
+Для моделей Claude есть свой адаптер. Он работает через официальный SDK,
+поэтому живёт в отдельном входе `bazis/core/infra/anthropic`, а пакет SDK
+приложение ставит само:
+
+```bash
+bun add @anthropic-ai/sdk
+```
+
+```ts
+// infra/llm.config.ts
+export const llmConfig = defineConfig("llm", {
+  default: { provider: "anthropic", model: "claude-opus-5-5", baseUrl: "https://api.anthropic.com", apiKey: secret("") },
+});
+
+// infra/App.infra.ts
+import { Infra, llmConnect } from "bazis/core/infra";
+import { anthropicAdapter } from "bazis/core/infra/anthropic";
+
+@Infra({ llm: llmConnect(llmConfig, anthropicAdapter({ effort: "medium" })) })
+export class AppInfra {}
+```
+
+| Опция адаптера | По умолчанию | Что задаёт |
+| --- | --- | --- |
+| `effort` | умолчание модели | Насколько тщательно модель работает: `low`, `medium`, `high`, `xhigh`, `max` |
+| `thinking` | `true` | Адаптивные рассуждения: модель сама решает, когда и сколько думать. `false` не передаёт настройку — для модели, которая её не принимает |
+| `thinkingDisplay` | умолчание модели | `"summarized"` возвращает краткое изложение рассуждений в тексте частей `reasoning`; иначе на текущих моделях текст пуст |
+| `cache` | `true` | Кэш промпта: `true` — на пять минут, `"1h"` — на час, `false` — выключен |
+| `maxOutputTokens` | 32 000 | `max_tokens` запроса, если запуск не задал `maxOutputTokens` |
+| `healthCheck` | `true` | Проверять ли провайдера в `/health` |
+| `client` | — | Готовый клиент SDK вместо созданного по конфигурации: клиент облачной платформы или подставной в тестах |
+
+Что адаптер делает сам:
+
+- **Кэш промпта.** Инструкции, описания инструментов и уже пройденный диалог
+  на следующем шаге читаются из кэша провайдера — в разы дешевле. В
+  `result.usage` это видно: `cacheReadTokens` и `cacheWriteTokens`.
+  Кэш работает, пока начало запроса не меняется, поэтому не подставляйте
+  в инструкции агента время или номер запроса.
+- **Рассуждения.** Блоки рассуждений модели остаются в диалоге частями
+  `reasoning` и возвращаются провайдеру без изменений вместе с вызовом
+  инструмента, к которому привели. `usage.reasoningTokens` — сколько
+  токенов ответа ушло на них.
+- **Окно модели.** При старте адаптер спрашивает у провайдера модель из
+  конфигурации: неверный ключ или имя модели останавливают запуск, а окно
+  контекста становится известно без `contextTokens`, и
+  [сжатие диалога](agents.md#длинный-диалог-сжатие) начинается заранее.
+- **Изображения и файлы.** `agentImage` уходит как изображение (по адресу
+  или `data:`-строкой: JPEG, PNG, GIF, WebP), `agentFile` — как документ
+  (PDF или текст).
+- **Структурированный ответ** запрашивается по JSON-схеме. Правила, которые
+  API не принимает (`minLength`, `minimum` и другие), SDK превращает в
+  подсказку модели, а проверяет их рантайм.
+
+Чего адаптер не передаёт: `temperature` (текущие модели Claude её
+отвергают) и повторы самого SDK — запрос повторяет
+[рантайм](agents.md#что-рантайм-исправляет-сам). Если модель отказалась
+отвечать по соображениям безопасности, запуск завершается с
+`AGENT_PROVIDER_STOPPED` (`finishReason: "content-filter"`), а категория
+отказа — в `responses[].metadata.refusal`.
+
+Текст ошибки API адаптер не повторяет: в нём может быть часть запроса. В
+журнале остаются код ответа, тип ошибки и номер запроса, по которому его
+можно найти в консоли провайдера:
+
+```text
+error: Agent model call failed {"code":"AGENT_PROVIDER_FAILED","error":{"name":"AnthropicProviderError",
+  "message":"Anthropic request failed with HTTP 401 (authentication_error), request req_011…"}}
+```
+
 ## Что уходит провайдеру
 
 Проверено на запросах, которые получил сервер:
@@ -80,6 +152,7 @@ Completions. `timeoutMs` — срок одного запроса к модел�
 | `onTextDelta` | `stream: true`: текст приходит по частям |
 | `output` с JSON-схемой | `response_format: { type: "json_schema", json_schema: { name, strict, schema } }` |
 | Ключ | `Authorization: Bearer <apiKey>` |
+| `agentImage` в сообщении пользователя | часть `image_url`; файл `data:`-строкой — часть `file` |
 
 Вызовы инструментов разбираются и в потоковом ответе, и в обычном.
 

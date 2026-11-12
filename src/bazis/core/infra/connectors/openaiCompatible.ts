@@ -24,6 +24,7 @@ import {
   type LlmProviderAdapter,
 } from "./llm";
 import { readOpenAiTextStream } from "./openaiTextStream";
+import { providerToolName, toolNameMapping, type ToolNameMapping } from "./toolNames";
 import { InfraError } from "../InfraConnector";
 import { redactSensitiveText } from "../../../library/redaction";
 
@@ -107,11 +108,6 @@ interface OpenAiChatResponse {
   };
 }
 
-interface ToolNameMapping {
-  readonly providerToBazis: ReadonlyMap<string, string>;
-  readonly bazisToProvider: ReadonlyMap<string, string>;
-}
-
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -133,47 +129,6 @@ function cancelBodyBestEffort(body: ReadableStream<Uint8Array> | null | undefine
   // Cleanup is deliberately not part of the provider terminal boundary: a
   // hostile/custom stream may never settle cancel().
   void body.cancel(reason).catch(() => undefined);
-}
-
-function shortHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-function providerToolName(name: string, used: Set<string>): string {
-  const replaced = name.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const prefixed = /^[a-zA-Z_]/.test(replaced) ? replaced : `tool_${replaced}`;
-  const trimmed = prefixed.length <= 64 ? prefixed : `${prefixed.slice(0, 55)}_${shortHash(name)}`;
-  if (!used.has(trimmed)) {
-    used.add(trimmed);
-    return trimmed;
-  }
-
-  const suffix = shortHash(name);
-  const base = trimmed.slice(0, Math.max(1, 63 - suffix.length));
-  const unique = `${base}_${suffix}`;
-  if (used.has(unique)) {
-    throw new OpenAiCompatibleProviderError(`Tool name "${name}" collides after OpenAI-compatible normalization.`);
-  }
-  used.add(unique);
-  return unique;
-}
-
-function toolNameMapping(tools: readonly AgentToolContract[]): ToolNameMapping {
-  const providerToBazis = new Map<string, string>();
-  const bazisToProvider = new Map<string, string>();
-  const used = new Set<string>();
-  for (let index = 0; index < tools.length; index += 1) {
-    const tool = tools[index] as AgentToolContract;
-    const providerName = providerToolName(tool.name, used);
-    providerToBazis.set(providerName, tool.name);
-    bazisToProvider.set(tool.name, providerName);
-  }
-  return Object.freeze({ providerToBazis, bazisToProvider });
 }
 
 function schemaForTool(tool: AgentToolContract): JsonObject {

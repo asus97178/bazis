@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   DefaultAgentContextBuilder,
   agentMessage,
+  agentReasoning,
+  agentText,
   agentToolCall,
   agentToolCallPart,
   agentToolResult,
@@ -282,5 +284,18 @@ describe("agent context builder", () => {
     const wholePart = whole.messages[2]?.content[0];
     expect(wholePart?.kind === "tool-result" ? wholePart.result.output : undefined).toEqual(rows);
     expect(whole.trace[2]?.reason).toBeUndefined();
+  });
+
+  test("drops reasoning from the messages that stay once older ones are trimmed", () => {
+    const reasoned = agentMessage("assistant", [agentReasoning("Thinking about it.", { data: { signature: "sig" } }), agentText("Second answer.")]);
+    const messages = [agentMessage("user", "First question"), agentMessage("assistant", "First answer."), agentMessage("user", "Second question"), reasoned, agentMessage("user", "Third question")];
+    const builder = new DefaultAgentContextBuilder();
+
+    const whole = builder.build({ invocationId: "inv-1", agent: agentNamed("plain-agent"), messages, metadata: {} });
+    expect(whole.messages[3]?.content.map((part) => part.kind)).toEqual(["reasoning", "text"]);
+
+    const trimmed = builder.build({ invocationId: "inv-1", agent: agentNamed("plain-agent"), messages, metadata: {}, limits: { maxMessages: 3 } });
+    expect(trimmed.messages.map((message) => message.content.map((part) => part.kind))).toEqual([["text"], ["text"], ["text"]]);
+    expect(textOf(trimmed.messages[1])).toBe("Second answer.");
   });
 });

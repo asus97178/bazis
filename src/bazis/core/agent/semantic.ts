@@ -498,6 +498,15 @@ export function agentMessage(role: AgentMessageRole, content: AgentContentInput,
   });
 }
 
+/**
+ * The words of a message: its text parts joined, without reasoning, data and
+ * Tool calls. An empty string for a message that has no text or is absent.
+ */
+export function agentMessageText(message: AgentMessage | undefined): string {
+  if (message === undefined) return "";
+  return message.content.map((part) => part.kind === "text" ? part.text : "").join("");
+}
+
 export function agentToolCall(options: AgentToolCallOptions): AgentToolCall {
   return freezeWithoutUndefined({
     id: requiredName(options.id, "toolCall.id"),

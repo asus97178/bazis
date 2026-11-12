@@ -20,6 +20,7 @@ const STABLE_BAZIS_BARRELS = new Set([
   "bazis/core/http",
   "bazis/core/grpc",
   "bazis/core/infra",
+  "bazis/core/infra/anthropic",
   "bazis/core/kernel",
   "bazis/core/orm",
   "bazis/core/testing",
@@ -44,6 +45,15 @@ const ALLOWED_TYPESCRIPT_IMPORTS = new Set([
   posix(path.join(BAZIS, "core/scripts/orm-predicate-codegen.ts")),
   posix(path.join(BAZIS, "core/scripts/request-model-codegen.ts")),
   posix(path.join(BAZIS, "library/openapi/codegen.ts")),
+]);
+
+/**
+ * The only external packages runtime source may import, and the only files
+ * that may do it. Each is an optional peer dependency: an application installs
+ * it when it uses that file's entry, and no public barrel reaches the file.
+ */
+const OPTIONAL_PEER_IMPORTS: ReadonlyMap<string, { readonly peer: string; readonly entry: string }> = new Map([
+  [posix(path.join(BAZIS, "core/infra/connectors/anthropic.ts")), { peer: "@anthropic-ai/sdk", entry: "./core/infra/anthropic" }],
 ]);
 
 const IGNORED_DIRS = new Set(["test", "generated", "node_modules"]);
@@ -85,11 +95,48 @@ describe("runtime import boundary", () => {
       for (const file of sourceFiles(base)) {
         if (shouldSkipBareImportCheck(file)) continue;
         const content = readFileSync(file, "utf8");
+        const peer = OPTIONAL_PEER_IMPORTS.get(posix(file))?.peer;
         for (const specifier of valueImportSpecifiers(content)) {
+          if (peer !== undefined && (specifier === peer || specifier.startsWith(`${peer}/`))) continue;
           if (!isAllowedRuntimeSpecifier(specifier)) {
             offenders.push(`${relative(file)} -> ${specifier}`);
           }
         }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("an optional peer package is declared optional, has its own entry and is out of reach of the public barrels", () => {
+    const framework = JSON.parse(readFileSync(path.join(BAZIS, "package.json"), "utf8")) as {
+      readonly exports: Readonly<Record<string, string>>;
+      readonly peerDependencies?: Readonly<Record<string, string>>;
+      readonly peerDependenciesMeta?: Readonly<Record<string, { readonly optional?: boolean }>>;
+    };
+    for (const [file, { peer, entry }] of OPTIONAL_PEER_IMPORTS) {
+      expect(framework.peerDependencies?.[peer], peer).toBeDefined();
+      expect(framework.peerDependenciesMeta?.[peer]?.optional, peer).toBe(true);
+      const entryFile = resolveFile(path.join(BAZIS, framework.exports[entry] ?? "missing"));
+      expect(entryFile, entry).toBeDefined();
+      expect(valueImportSpecifiers(readFileSync(entryFile!, "utf8")).map((specifier) => resolveLocalDependency(entryFile!, specifier)).map((resolved) => resolved && posix(resolved)), entry).toContain(file);
+    }
+
+    // An application that does not use the entry never loads the package.
+    const visited = new Set<string>();
+    const stack = runtimeEntrypoints().map((file) => ({ file, via: [relative(file)] }));
+    const offenders: string[] = [];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const key = posix(current.file);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      if (OPTIONAL_PEER_IMPORTS.has(key)) {
+        offenders.push(current.via.join(" -> "));
+        continue;
+      }
+      for (const dependency of valueImportSpecifiers(readFileSync(current.file, "utf8"))) {
+        const resolved = resolveLocalDependency(current.file, dependency);
+        if (resolved && !shouldSkipRuntimeGraphFile(resolved)) stack.push({ file: resolved, via: [...current.via, relative(resolved)] });
       }
     }
     expect(offenders).toEqual([]);
