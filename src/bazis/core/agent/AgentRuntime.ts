@@ -6,6 +6,7 @@ import type { AgentDataDefinition } from "./AgentDataDefinition";
 import { AgentRegistry, type ToolDefinition } from "./AgentRegistry";
 import {
   AgentExecutionDriver,
+  type AgentRunEvent,
   type AgentRuntimeInvokeOptions,
   type AgentExecutionDriverOptions,
   type AgentRuntimeOptions,
@@ -14,6 +15,15 @@ import {
 import type { AgentModelProvider } from "./ModelProvider";
 
 export {
+  type AgentRunEvent,
+  type AgentStepStartedEvent,
+  type AgentTextDeltaEvent,
+  type AgentModelRetryEvent,
+  type AgentModelAnsweredEvent,
+  type AgentToolStartedEvent,
+  type AgentToolFinishedEvent,
+  type AgentCompactedEvent,
+  type AgentRunFinishedEvent,
   type AgentCompactionOptions,
   type AgentModelRetryPolicy,
   type AgentRuntimeInvokeOptions,
@@ -105,5 +115,56 @@ export class AgentRuntime {
     this.assertModelProfile(definition.name, options.modelProfile ?? definition.modelProfile);
     const driver = new AgentExecutionDriver(this.services, registry, this.modelProvider, this.options);
     return driver.invoke(definition.name, options);
+  }
+
+  /**
+   * Runs a definition and gives what happens as it happens: for a response
+   * that is written to the client while the agent works. The last event is
+   * `finished` with the result `run` would return. Leaving the loop early
+   * cancels the run.
+   *
+   * ```ts
+   * for await (const event of this.agents.stream(support, { input: question })) {
+   *   if (event.kind === "text-delta") write(event.text);
+   *   if (event.kind === "tool-started") write(`\n[${event.call.name}]\n`);
+   * }
+   * ```
+   */
+  stream(definition: AgentDataDefinition, options: AgentRuntimeInvokeOptions = {}): AsyncIterable<AgentRunEvent> {
+    return {
+      [Symbol.asyncIterator]: () => {
+        const events: AgentRunEvent[] = [];
+        let wake: (() => void) | undefined;
+        let ended = false;
+        let failure: unknown;
+        const cancel = new AbortController();
+        const signal = options.signal === undefined ? cancel.signal : AbortSignal.any([options.signal, cancel.signal]);
+        const notify = (): void => { const waiting = wake; wake = undefined; waiting?.(); };
+        const run = this.run(definition, {
+          ...options,
+          signal,
+          onEvent: (event) => { options.onEvent?.(event); events.push(event); notify(); },
+        }).then(() => undefined, (error: unknown) => { failure = error; }).finally(() => { ended = true; notify(); });
+        return {
+          async next(): Promise<IteratorResult<AgentRunEvent>> {
+            for (;;) {
+              const event = events.shift();
+              if (event !== undefined) return { value: event, done: false };
+              if (ended) {
+                // A definition that cannot be run rejects here, like `run` does.
+                if (failure !== undefined) throw failure;
+                return { value: undefined, done: true };
+              }
+              await new Promise<void>((resolve) => { wake = resolve; });
+            }
+          },
+          async return(): Promise<IteratorResult<AgentRunEvent>> {
+            cancel.abort();
+            await run;
+            return { value: undefined, done: true };
+          },
+        };
+      },
+    };
   }
 }

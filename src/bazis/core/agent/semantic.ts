@@ -322,49 +322,6 @@ export interface AgentModelResponseOptions {
   readonly metadata?: unknown;
 }
 
-export type AgentStreamEvent =
-  | AgentMessageDeltaEvent
-  | AgentToolCallEvent
-  | AgentToolResultEvent
-  | AgentUsageEvent
-  | AgentDoneEvent
-  | AgentErrorEvent;
-
-export interface AgentMessageDeltaEvent {
-  readonly kind: "message-delta";
-  readonly invocationId: string;
-  readonly text: string;
-}
-
-export interface AgentToolCallEvent {
-  readonly kind: "tool-call";
-  readonly invocationId: string;
-  readonly toolCall: AgentToolCall;
-}
-
-export interface AgentToolResultEvent {
-  readonly kind: "tool-result";
-  readonly invocationId: string;
-  readonly toolResult: AgentToolResult;
-}
-
-export interface AgentUsageEvent {
-  readonly kind: "usage";
-  readonly invocationId: string;
-  readonly usage: AgentUsage;
-}
-
-export interface AgentDoneEvent {
-  readonly kind: "done";
-  readonly response: AgentModelResponse;
-}
-
-export interface AgentErrorEvent {
-  readonly kind: "error";
-  readonly invocationId: string;
-  readonly error: AgentToolError;
-}
-
 export function normalizeJsonValue(value: unknown, field = "value"): JsonValue {
   if (value === null || typeof value === "string" || typeof value === "boolean") {
     return value;

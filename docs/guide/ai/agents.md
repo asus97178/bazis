@@ -170,6 +170,7 @@ const answer = agentMessageText(result.finalMessage);   // "" если отве�
 | `modelProfile` | Профиль модели вместо указанного в определении |
 | `signal` | Отмена запуска |
 | `onTextDelta` | Текст ответа по частям, пока модель его пишет: `({ step, text }) => …` |
+| `onEvent` | Всё, что происходит в запуске: шаги, вызовы инструментов, повторы — см. [события](#ход-запуска-события) |
 
 ## Агенты в базе
 
@@ -570,6 +571,122 @@ run(support, { input: "42?", maxSteps: 3 })
 порядке, в каком их написала модель. Результаты в диалоге стоят в порядке
 вызовов, кто бы ни закончил первым. `maxParallelToolCalls: 1` возвращает
 выполнение строго по одному.
+
+## Ход запуска: события
+
+Пока агент работает, пользователь смотрит на пустой экран. Опция `onEvent`
+сообщает, что происходит, в том порядке, в каком это происходит:
+
+```ts
+await this.agents.run(support, {
+  input: question,
+  onEvent: (event) => {
+    if (event.kind === "tool-started") progress(`Ищу: ${event.call.name}`);
+  },
+});
+```
+
+| Событие | Когда | Что в нём |
+| --- | --- | --- |
+| `step-started` | Модель спрошена | `step` |
+| `text-delta` | Модель пишет ответ | `step`, `text` — очередной кусок |
+| `model-retry` | Провайдер занят, запрос будет повторён | `attempt`, `maxAttempts`, `delayMs` |
+| `model-answered` | Модель ответила | `message`, `toolCalls`, `finishReason`, `usage` |
+| `tool-started` | Вызов инструмента начат | `call`: имя и аргументы |
+| `tool-finished` | Вызов инструмента закончен | `result`: то, что получит модель |
+| `compacted` | Старая часть диалога заменена пересказом | `reason`, `messages` |
+| `finished` | Запуск закончен; всегда последнее | `result` — то же, что вернёт `run` |
+
+В каждом событии есть `invocationId`. Обработчик синхронный; если он
+бросит исключение, оно попадёт в журнал (`Agent event observer failed`),
+а запуск продолжится. Текст из `text-delta` — черновой: ответ ещё не
+проверен, а при структурированном ответе текст не приходит вовсе.
+
+Чтобы отдавать события клиенту по мере появления, возьмите `stream`: те же
+события, но итератором. Вместе с [потоковым ответом](../overview/responses.md#потоковые-ответы)
+получается чат, в котором видно, как агент работает:
+
+```ts
+@Post("ask")
+ask(body: AskRequest) {
+  const events = this.agents.stream(support, { input: body.question });
+  const encoder = new TextEncoder();
+  return new Response(new ReadableStream({
+    async start(controller) {
+      for await (const event of events) {
+        if (event.kind === "text-delta") controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.text })}\n\n`));
+        if (event.kind === "tool-started") controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool: event.call.name })}\n\n`));
+      }
+      controller.close();
+    },
+  }), { headers: { "content-type": "text/event-stream" } });
+}
+```
+
+```text
+data: {"tool":"orders.find"}
+data: {"text":"Заказ 42 "}
+data: {"text":"оплачен."}
+```
+
+Выход из цикла раньше события `finished` отменяет запуск. Определение,
+которое нельзя запустить, отклоняет итератор той же ошибкой
+`AgentSetupError`, что и `run`.
+
+## Агент как инструмент
+
+Один агент может поручить часть работы другому. `agentTool` делает из
+определения агента инструмент: вызывающий агент передаёт задачу словами,
+вложенный работает в собственном диалоге со своими инструментами, и назад
+возвращается только его ответ.
+
+```ts
+import { agentTool, type AgentDataDefinition } from "bazis/core/agent";
+
+const researcher: AgentDataDefinition = {
+  name: "researcher",
+  instructions: "Находи факты о заказах. Отвечай коротко и только фактами.",
+  toolNames: ["orders.find", "orders.history"],
+  modelProfile: "fast",
+};
+
+export const researchOrders = agentTool({
+  name: "research.orders",
+  description: "Находит факты о заказах. Передай полный вопрос: агент не видит этот разговор.",
+  agent: researcher,
+});
+
+@Module({ tools: [FindOrderTool, OrderHistoryTool, researchOrders] })
+export class SupportModule {}
+```
+
+```text
+ведущий агент: вызов research.orders {"task":"Оплачен ли заказ 42?"}
+  researcher: вызов orders.find {"id":42} → {"id":42,"status":"paid"}
+  researcher: «Заказ 42 оплачен.»
+ведущий агент получает: {"answer":"Заказ 42 оплачен."}
+```
+
+Зачем это нужно: диалог ведущего агента остаётся коротким — в нём нет
+десятков результатов поиска, — а чтение можно отдать быстрой дешёвой
+модели. Несколько таких инструментов в одном шаге выполняются
+[одновременно](#инструменты-одного-шага).
+
+| Опция | По умолчанию | Что задаёт |
+| --- | --- | --- |
+| `agent` | — | Определение вложенного агента |
+| `output` | — | [Структурированный ответ](#структурированный-ответ): тогда в результате есть `output` |
+| `maxSteps`, `modelProfile` | как у агента | Пределы и модель вложенного запуска |
+| `timeoutMs` | 5 минут | Срок одного вызова вместе со всем вложенным запуском |
+| `maxDepth` | 3 | Насколько глубоко агенты могут вызывать агентов; дальше вызов отклоняется |
+| `sideEffect` | `"none"` | Что меняет сам инструмент. Инструменты вложенного агента подтверждаются и попадают в аудит по отдельности |
+
+Вложенный агент получает только задачу: ни диалога, ни инструкций
+вызывающего. Поэтому описание инструмента должно просить полный вопрос.
+Если вложенный запуск не удался, вызывающая модель получает ошибку
+`Agent "researcher" did not finish: …` и сама решает, что делать дальше.
+В `metadata` вложенного запуска есть `parentInvocationId` и `agentDepth`:
+по ним политика подтверждения и журнал видят, кто кого вызвал.
 
 ## Тестирование
 
