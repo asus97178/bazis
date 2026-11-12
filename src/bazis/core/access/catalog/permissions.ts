@@ -97,7 +97,9 @@ export function permissionProblems(key: string, spec: PermissionSpec): string[] 
   if (!isText(spec.title, 200)) problems.push(`${at}: title must be a non-empty text up to 200 characters`);
   if (spec.description !== undefined && !isText(spec.description, 2000)) problems.push(`${at}: description must be a non-empty text up to 2000 characters`);
   const scope = spec.scope;
-  if (scope !== undefined && scope !== "none" && scope !== "request") {
+  if (typeof scope !== "object" || scope === null) {
+    if (scope !== undefined && scope !== "none" && scope !== "request") problems.push(`${at}: scope must be "none", "request", { column } or { lookup }`);
+  } else {
     const column = (scope as { column?: unknown }).column;
     const lookup = (scope as { lookup?: unknown }).lookup;
     if ((column === undefined) === (lookup === undefined)) problems.push(`${at}: scope must be "none", "request", { column } or { lookup }`);
@@ -126,7 +128,7 @@ export function permissionProblems(key: string, spec: PermissionSpec): string[] 
 /** The lookup classes a permission needs registered. */
 export function lookupsOf(spec: PermissionSpec): Class<AttributeLookup>[] {
   const lookups: Class<AttributeLookup>[] = [];
-  if (typeof spec.scope === "object" && "lookup" in spec.scope) lookups.push(spec.scope.lookup);
+  if (typeof spec.scope === "object" && spec.scope !== null && "lookup" in spec.scope) lookups.push(spec.scope.lookup);
   for (const attribute of Object.values(spec.on ?? {})) if (attribute.lookup !== undefined) lookups.push(attribute.lookup);
   return lookups;
 }
@@ -149,7 +151,7 @@ export function underPrefix(key: string, prefix: string): boolean {
 
 /** A frozen copy of a specification a source gave: the catalog keeps it, the source may change its own. */
 export function frozenSpec(spec: PermissionSpec): PermissionSpec {
-  const scope = typeof spec.scope === "object" ? { ...spec.scope } : spec.scope;
+  const scope = typeof spec.scope === "object" && spec.scope !== null ? { ...spec.scope } : spec.scope;
   const on = spec.on === undefined ? undefined : Object.fromEntries(Object.entries(spec.on).map(([name, attribute]) => [name, { ...attribute }]));
   const title = typeof spec.title === "object" ? { ...spec.title } : spec.title;
   const description = typeof spec.description === "object" ? { ...spec.description } : spec.description;

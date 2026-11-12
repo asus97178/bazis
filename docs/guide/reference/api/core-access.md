@@ -12,9 +12,9 @@
 | `defineRoles({...})` | Роли системы прав по умолчанию для `@Module({ roles })`; `"<право>:own"` — только своё | [Роли по умолчанию](../../security/access.md#роли-по-умолчанию) |
 | `References` | Значения вида ссылки для `@Module({ references })`: `exists`, `describe`, `search` | [Ссылки и каталог](../../security/access.md#ссылки-и-каталог-для-админки) |
 | `AttributeLookup` | Атрибут или раздел, которого нет в колонках строки: `toColumn(values)` → `{ column, in }` | [Объявить права](../../security/access.md#объявить-права) |
-| `PermissionSource` | Права, которые появляются во время работы, для `@Module({ permissionSources })`: `version()`, `load(keys?)` | [Права во время работы](../../security/access.md#права-которые-появляются-во-время-работы) |
+| `PermissionSource`, `PermissionSourceVersion` | Права, которые появляются во время работы, для `@Module({ permissionSources })`: `version()` (число или непустая строка), `load(keys?)` | [Права во время работы](../../security/access.md#права-которые-появляются-во-время-работы) |
 | `IAccessCatalog` | Права, виды ссылок и роли всех модулей приложения; `grantProblem(permission, grant)` — проверка правила при сохранении, `changed(prefix, keys?)` — источник изменился, `sources()` — состояние источников, `find(key)` — право для проверки | [Проверить правило](../../security/access.md#проверить-правило-при-сохранении) |
-| `accessConfig` | Настройки `access.kindClaim`, `access.roleClaim`, `access.maxInList`, `access.sourcePollSeconds` | [Роли по умолчанию](../../security/access.md#роли-по-умолчанию) |
+| `accessConfig` | Настройки `access.kindClaim`, `access.roleClaim`, `access.maxInList`, `access.sourcePollSeconds`, `access.sourceTimeoutSeconds` | [Роли по умолчанию](../../security/access.md#роли-по-умолчанию) |
 | `AccessSetupError` | Ошибка объявлений при сборке приложения | [Объявить права](../../security/access.md#объявить-права) |
 
 ## Проверки

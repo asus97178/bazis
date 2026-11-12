@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Schema, Nullable } from "@/library/orm";
-import { IAccess, AccessModule, AccessPolicy, AttributeLookup, definePermissions, grantsToWhere, type AccessValue, type Condition, type Grants, type PermissionsOf } from "@/core/access";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
+import { Column, DbContext, DbContextOptions, Entity, Key, postgres, Required, Schema, Nullable } from "@/library/orm";
+import { IAccess, IAccessCatalog, AccessModule, AccessPolicy, AttributeLookup, PermissionSource, definePermissions, grantsToWhere, type AccessValue, type Condition, type Grants, type PermissionDeclarations, type PermissionsOf } from "@/core/access";
+import { PermissionSourcesService } from "@/core/access/catalog/PermissionSources.service";
 import { StaticAccessPolicy } from "@/core/access/testing";
 import { Module, singleton, singletonValue } from "@/core/di";
+import { registerGeneratedClassDeps } from "@/core/di/module/autoDeps";
 import { createTestContainer } from "@/core/testing";
 
 // ACCESS-001 §4.3: the list filter and the object check agree on real rows.
@@ -10,6 +12,7 @@ const url = process.env.BAZIS_PG_URL;
 let schema: string | undefined;
 
 afterEach(async () => {
+  setSystemTime();
   if (!url || !schema) return;
   const provider = postgres({ url });
   try { await provider.execute(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`, []); }
@@ -37,7 +40,31 @@ const permissions = definePermissions({
 
 declare module "@/core/access" {
   interface BazisPermissions extends PermissionsOf<typeof permissions> {}
+  interface BazisPermissionSources { tables: true }
 }
+
+/** The tables of a data manager as its source of permissions reads them. */
+abstract class TableStore {
+  abstract version(): Promise<number>;
+  abstract tables(): Promise<readonly { readonly code: string; readonly title: string }[]>;
+}
+
+/** A source the way an application writes it: a class of its module with a dependency of that module. */
+class TablePermissionSource extends PermissionSource {
+  constructor(private readonly store: TableStore) { super(); }
+
+  async version(): Promise<number> {
+    return await this.store.version();
+  }
+
+  async load(keys?: readonly string[]): Promise<PermissionDeclarations> {
+    const tables = await this.store.tables();
+    const all = Object.fromEntries(tables.map((table) => [`tables.${table.code}.read`, { title: `${table.title}: read`, on: { total: { type: "number" as const } } }]));
+    return keys === undefined ? all : Object.fromEntries(keys.filter((key) => key in all).map((key) => [key, all[key]!]));
+  }
+}
+// What `bazis codegen` writes for an application.
+registerGeneratedClassDeps(TablePermissionSource, [TableStore]);
 
 describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
   test("every row passes the filter exactly when can() allows it", async () => {
@@ -164,6 +191,90 @@ describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
       }
       await scope.dispose();
       await container.dispose();
+    } finally {
+      await provider.close();
+    }
+  }, 60_000);
+
+  // ACCESS-001 §3.1: two instances of one application learn of each other's tables from the source's version.
+  test("a source reads the database; a second instance learns of a new table from the version", async () => {
+    schema = `bazis_access_${crypto.randomUUID().replaceAll("-", "")}`.slice(0, 63);
+    @Schema(schema) @Entity({ table: "dm_tables" })
+    class DmTable {
+      @Key() id = 0;
+      @Required() @Column() code = "";
+      @Required() @Column() title = "";
+    }
+    @Schema(schema) @Entity({ table: "dm_meta" })
+    class DmMeta {
+      @Key() id = 0;
+      @Required() @Column({ type: "integer" }) version = 0;
+    }
+    class Db extends DbContext { readonly tables = this.set(DmTable); readonly meta = this.set(DmMeta); }
+    const provider = postgres({ url: url! });
+    const db = () => new Db(new DbContextOptions({ provider, entities: [DmTable, DmMeta] }));
+    class PostgresTableStore extends TableStore {
+      async version() { return (await db().meta.asNoTracking().where((meta) => meta.id.eq(1)).toList())[0]!.version; }
+      async tables() { return await db().tables.asNoTracking().orderBy((table) => table.code).toList(); }
+    }
+    /** A change of the tables and of the version in one transaction, as a data manager makes it. */
+    const change = async (work: (ctx: Db) => void | Promise<void>) => {
+      const ctx = db();
+      await work(ctx);
+      const meta = (await ctx.meta.where((item) => item.id.eq(1)).toList())[0]!;
+      meta.version += 1;
+      await ctx.saveChanges();
+    };
+
+    // The store is a private provider of the module: the catalog reads the source in a scope of its own.
+    @Module({ imports: [AccessModule], permissionSources: { tables: TablePermissionSource }, providers: [singletonValue(TableStore, new PostgresTableStore())], exports: [] })
+    class TablesModule {}
+    @Module({ imports: [TablesModule], providers: [singletonValue(AccessPolicy, new StaticAccessPolicy({ otherwise: [{ scopes: "all", where: { total: { lte: 100000 } } }] }))] })
+    class AppModule {}
+
+    try {
+      await db().database.ensureCreated();
+      const seed = db();
+      seed.meta.add(Object.assign(new DmMeta(), { id: 1, version: 1 }));
+      seed.tables.add(Object.assign(new DmTable(), { id: 1, code: "orders", title: "Orders" }));
+      await seed.saveChanges();
+
+      const instance = async () => {
+        const container = await createTestContainer(AppModule);
+        const scope = container.createScope();
+        const sources = container.resolve(PermissionSourcesService);
+        await sources.load();
+        return { catalog: container.resolve(IAccessCatalog), sources, as: (sub: string) => scope.resolve(IAccess).as({ sub }, scope) };
+      };
+      const first = await instance();
+      const second = await instance();
+      const keys = (of: typeof first) => of.catalog.permissions().filter((item) => item.source === "tables").map((item) => item.key);
+      expect(first.catalog.sources()[0]).toMatchObject({ loaded: true, version: "1", error: undefined });
+      expect(keys(first)).toEqual(["tables.orders.read"]);
+      expect(keys(second)).toEqual(["tables.orders.read"]);
+      expect(await first.as("user:1").can("tables.orders.read", { total: "100000.00" })).toBe(true);
+      expect(await first.as("user:1").can("tables.orders.read", { total: "100000.01" })).toBe(false);
+
+      // The first instance creates a table and tells its catalog; the second one is told nothing.
+      await change((ctx) => { ctx.tables.add(Object.assign(new DmTable(), { id: 2, code: "deals", title: "Deals" })); });
+      await first.catalog.changed("tables", ["tables.deals.read"]);
+      expect(keys(first)).toEqual(["tables.deals.read", "tables.orders.read"]);
+      expect(keys(second)).toEqual(["tables.orders.read"]);
+      // A request for the new table on the second instance compares the version before it refuses.
+      setSystemTime(new Date(Date.now() + 2000));
+      expect(await second.as("user:1").can("tables.deals.read", { total: 5 })).toBe(true);
+      expect(second.catalog.sources()[0]).toMatchObject({ version: "2" });
+
+      // The second instance removes a table; the first one keeps it until it compares the versions.
+      await change(async (ctx) => { ctx.tables.remove((await ctx.tables.where((table) => table.code.eq("orders")).toList())[0]!); });
+      await second.catalog.changed("tables");
+      expect(keys(second)).toEqual(["tables.deals.read"]);
+      expect(await second.as("user:2").can("tables.orders.read", { total: 5 })).toBe(false);
+      expect(keys(first)).toEqual(["tables.deals.read", "tables.orders.read"]);
+      await first.sources.poll();
+      expect(keys(first)).toEqual(["tables.deals.read"]);
+      expect(await first.as("user:2").can("tables.orders.read", { total: 5 })).toBe(false);
+      expect(first.catalog.sources()[0]).toMatchObject({ version: "3", error: undefined });
     } finally {
       await provider.close();
     }

@@ -17,7 +17,8 @@ import {
   type PermissionSpec,
   type ReferenceItem,
 } from "@/core/access";
-import { PermissionSourceLoader } from "@/core/access/catalog/PermissionSourceLoader";
+import { PermissionSourceLoader } from "@/core/access/catalog/PermissionSourceLoader.background";
+import { PermissionSourcesService } from "@/core/access/catalog/PermissionSources.service";
 import { StaticAccessPolicy } from "@/core/access/testing";
 import { Module, singletonValue } from "@/core/di";
 import { Authorize, Controller, Get, PRINCIPAL_STATE_KEY, UnauthorizedError, type AuthorizeCheck } from "@/core/http";
@@ -33,6 +34,10 @@ const data = {
   failure: undefined as string | undefined,
   loads: [] as (readonly string[] | "all")[],
   versions: 0,
+  /** What `version()` returns instead of the version, when a test wants a wrong one. */
+  wrongVersion: undefined as { readonly value: unknown } | undefined,
+  /** A database that hangs: the source waits for it before it answers. */
+  hang: undefined as Promise<void> | undefined,
 };
 
 class TableLookup extends AttributeLookup {
@@ -50,10 +55,11 @@ class RecordReferences extends References {
 }
 
 class DataPermissionSource extends PermissionSource {
-  version(): string {
+  async version(): Promise<string> {
     data.versions += 1;
+    if (data.hang !== undefined) await data.hang;
     if (data.failure !== undefined) throw new Error(data.failure);
-    return String(data.version);
+    return data.wrongVersion === undefined ? String(data.version) : data.wrongVersion.value as string;
   }
 
   load(keys?: readonly string[]): PermissionDeclarations {
@@ -108,6 +114,8 @@ beforeEach(() => {
   data.failure = undefined;
   data.loads = [];
   data.versions = 0;
+  data.wrongVersion = undefined;
+  data.hang = undefined;
   logged.length = 0;
 });
 
@@ -125,6 +133,7 @@ async function application(policy: AccessPolicy = new StaticAccessPolicy({ other
     /** What the start of the application does before it takes requests. */
     start: () => container.resolve(PermissionSourceLoader).start(),
     loader: container.resolve(PermissionSourceLoader),
+    sources: container.resolve(PermissionSourcesService),
     as: (sub: string) => scope.resolve(IAccess).as({ sub }, scope),
   };
 }
@@ -172,14 +181,14 @@ test("a source owns its prefix: declared keys and other sources stay out of it",
 test("the start reads the sources; their permissions stand in the catalog next to the declared ones", async () => {
   const app = await application();
   expect(app.catalog.permissions().map((item) => item.key)).toEqual(["access.catalog.read", "dm.tables.manage"]);
-  expect(app.catalog.sources()).toEqual([{ prefix: "data", module: "DataModule", loaded: false, version: undefined, error: undefined, permissions: 0 }]);
+  expect(app.catalog.sources()).toEqual([{ prefix: "data", module: "DataModule", loaded: false, version: undefined, error: undefined, failures: 0, permissions: 0 }]);
   expect(app.loader.checkHealth().healthy).toBe(false);
 
   await app.start();
   expect(app.catalog.permissions().map((item) => item.key)).toEqual(["access.catalog.read", "data.orders.read", "data.orders.update", "dm.tables.manage"]);
   expect(app.catalog.permission("data.orders.read")).toMatchObject({ key: "data.orders.read", module: "DataModule", source: "data" });
   expect(app.catalog.permission("dm.tables.manage")!.source).toBeUndefined();
-  expect(app.catalog.sources()).toEqual([{ prefix: "data", module: "DataModule", loaded: true, version: "1", error: undefined, permissions: 2 }]);
+  expect(app.catalog.sources()).toEqual([{ prefix: "data", module: "DataModule", loaded: true, version: "1", error: undefined, failures: 0, permissions: 2 }]);
   expect(app.loader.checkHealth()).toEqual({ healthy: true });
   // The catalog keeps its own frozen copy: the source cannot change a permission behind its back.
   expect(Object.isFrozen(app.catalog.permission("data.orders.read")!.spec.on)).toBe(true);
@@ -195,6 +204,10 @@ test("a specification of a source passes the checks of a declared one; a bad one
     "data.noref.read": { title: "x", on: { buyer: { ref: "dm.nothing" } } },
     "data.nolookup.read": { title: "x", scope: { lookup: UnregisteredLookup } },
     "data.empty.read": null as never,
+    "data.nullscope.read": { title: "x", scope: null as never },
+    "data.numberscope.read": { title: "x", scope: 5 as never },
+    // Data of any shape may come from a source: reading this one throws.
+    "data.broken.read": Object.defineProperty({}, "title", { enumerable: true, get() { throw new Error("the row is torn"); } }) as never,
   };
   const app = await application();
   await app.start();
@@ -205,6 +218,11 @@ test("a specification of a source passes the checks of a declared one; a bad one
   expect(problems["data.noref.read"]).toContain('refers to kind "dm.nothing", which no module declares in references');
   expect(problems["data.nolookup.read"]).toContain("UnregisteredLookup is not registered: add it to providers of DataModule");
   expect(problems["data.empty.read"]).toContain("must be an object with a title");
+  // One specification that cannot even be checked is one bad permission: the rest of the source works.
+  expect(problems["data.nullscope.read"]).toBe('permission "data.nullscope.read": scope must be "none", "request", { column } or { lookup }');
+  expect(problems["data.numberscope.read"]).toBe('permission "data.numberscope.read": scope must be "none", "request", { column } or { lookup }');
+  expect(problems["data.broken.read"]).toBe('permission "data.broken.read": cannot be checked: the row is torn');
+  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, error: undefined, permissions: 1 });
 
   // Closed, not open: the superuser of the rights system does not get a permission that does not exist.
   expect(await app.as("user:1").can("data.bad.read")).toBe(false);
@@ -346,7 +364,7 @@ test("a source that fails at the start has no permissions until a reading succee
   data.failure = "the database is away";
   const app = await application();
   await app.start(); // the start goes on
-  expect(app.catalog.sources()).toEqual([{ prefix: "data", module: "DataModule", loaded: false, version: undefined, error: "the database is away", permissions: 0 }]);
+  expect(app.catalog.sources()).toEqual([{ prefix: "data", module: "DataModule", loaded: false, version: undefined, error: "the database is away", failures: 1, permissions: 0 }]);
   expect(app.loader.checkHealth()).toEqual({ healthy: false, details: 'permission source "data": not loaded: the database is away' });
   expect(await app.as("user:1").can("data.orders.read")).toBe(false);
   expect(logged.at(-1)).toMatchObject({ level: "error", message: "access permission source failed", fields: { source: "data", state: "the source has no permissions" } });
@@ -362,14 +380,110 @@ test("a source that fails at the start has no permissions until a reading succee
   data.failure = "the database is away again";
   await app.catalog.changed("data");
   expect(app.catalog.permissions().filter((item) => item.source === "data").map((item) => item.key)).toEqual(["data.orders.read", "data.orders.update"]);
-  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "1", error: "the database is away again" });
-  expect(app.loader.checkHealth()).toEqual({ healthy: false, details: 'permission source "data": the database is away again' });
+  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "1", error: "the database is away again", failures: 1 });
   expect(logged.at(-1)!.fields).toMatchObject({ state: "the permissions read before stay" });
+  // A database that blinked once does not make the application unhealthy; one that keeps failing does.
+  expect(app.loader.checkHealth()).toEqual({ healthy: true });
+  await app.sources.retry();
+  expect(app.loader.checkHealth()).toEqual({ healthy: true });
+  await app.sources.retry();
+  expect(app.catalog.sources()[0]).toMatchObject({ failures: 3 });
+  expect(app.loader.checkHealth()).toEqual({ healthy: false, details: 'permission source "data": the database is away again' });
 
+  // Without a poll nothing compares the versions, but a source that failed is tried again.
   data.failure = undefined;
-  await app.catalog.changed("data");
+  await app.sources.retry();
   expect(app.catalog.permissions().filter((item) => item.source === "data").map((item) => item.key)).toEqual(["data.items.read", "data.orders.read", "data.orders.update"]);
-  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "2", error: undefined });
+  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "2", error: undefined, failures: 0 });
+  expect(app.loader.checkHealth()).toEqual({ healthy: true });
+  data.versions = 0;
+  await app.sources.retry();
+  expect(data.versions).toBe(0);
+});
+
+test("a version that is not a value is a failed reading, not a version that never changes", async () => {
+  for (const [value, got] of [[undefined, "undefined"], [null, "null"], ["", "an empty string"], [Number.NaN, "number"], [{}, "object"]] as const) {
+    data.wrongVersion = { value };
+    logged.length = 0;
+    const app = await application();
+    await app.start();
+    expect(app.catalog.sources()[0]).toMatchObject({ loaded: false, version: undefined, error: `version() must return a non-empty string or a number, got ${got}` });
+    expect(await app.as("user:1").can("data.orders.read")).toBe(false);
+    expect(logged.at(-1)).toMatchObject({ level: "error", message: "access permission source failed" });
+  }
+
+  // A number and a bigint are versions; a source that loses its version later keeps what was read and says so.
+  data.wrongVersion = { value: 7 };
+  const app = await application();
+  await app.start();
+  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "7" });
+  data.wrongVersion = { value: 8n };
+  await app.sources.poll();
+  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "8", error: undefined });
+  data.wrongVersion = { value: undefined };
+  await app.sources.poll();
+  expect(app.catalog.sources()[0]).toMatchObject({ loaded: true, version: "8", error: "version() must return a non-empty string or a number, got undefined" });
+  expect(await app.as("user:1").can("data.orders.read")).toBe(true);
+});
+
+test("a clock set back does not switch the version comparison off", async () => {
+  const app = await application();
+  await app.start();
+  data.tables["data.deals.read"] = { title: "Deals: read" };
+  data.version = 2;
+  setSystemTime(new Date(Date.now() - 60_000));
+  expect(await app.as("user:1").can("data.deals.read")).toBe(true);
+});
+
+test("the list of the catalog follows the sources and is the caller's own copy", async () => {
+  const app = await application();
+  await app.start();
+  const first = app.catalog.permissions();
+  expect(app.catalog.permissions()).toEqual(first);
+  (first as unknown[]).length = 0;
+  expect(app.catalog.permissions().map((item) => item.key)).toEqual(["access.catalog.read", "data.orders.read", "data.orders.update", "dm.tables.manage"]);
+
+  delete data.tables["data.orders.update"];
+  await app.catalog.changed("data", ["data.orders.update"]);
+  expect(app.catalog.permissions().map((item) => item.key)).toEqual(["access.catalog.read", "data.orders.read", "dm.tables.manage"]);
+  data.tables["data.items.read"] = { title: "Items: read" };
+  data.version = 2;
+  await app.catalog.changed("data");
+  expect(app.catalog.permissions().map((item) => item.key)).toEqual(["access.catalog.read", "data.items.read", "data.orders.read", "dm.tables.manage"]);
+});
+
+test("a source that does not answer holds neither the start nor a request, and is asked once", async () => {
+  let release!: () => void;
+  data.hang = new Promise<void>((resolve) => { release = resolve; });
+  @Module({ imports: [DataModule], controllers: [DataController], providers: [singletonValue(AccessPolicy, new StaticAccessPolicy({ otherwise: "all" }))] })
+  class AppModule {}
+  const started = Date.now();
+  const app = await startTestApp(AppModule, { http: { authorize: signedIn }, configure: (builder) => builder.addConfigSource(memorySource({ access: { sourcePollSeconds: 0, sourceTimeoutSeconds: 0.1 } })) });
+  try {
+    // The start waited for the deadline of the source, not for the source.
+    expect(Date.now() - started).toBeLessThan(5000);
+    const catalog = app.container.resolve(IAccessCatalog);
+    expect(catalog.sources()[0]).toMatchObject({ loaded: false, error: "the source did not answer in 0.1 s (access.sourceTimeoutSeconds)" });
+    expect((await app.fetch("/data/orders", { headers: { "x-user": "1" } })).status).toBe(403);
+
+    // The call that hangs is still out: no second one starts beside it.
+    data.versions = 0;
+    await catalog.changed("data");
+    await catalog.changed("data");
+    expect(data.versions).toBe(0);
+    expect(catalog.sources()[0]).toMatchObject({ loaded: false, error: "the previous call of the source has not answered yet", failures: 3 });
+
+    // The database is back: the old call answers and frees the source.
+    data.hang = undefined;
+    release();
+    await Bun.sleep(20);
+    await catalog.changed("data");
+    expect(catalog.sources()[0]).toMatchObject({ loaded: true, error: undefined, failures: 0, permissions: 2 });
+    expect((await app.fetch("/data/orders", { headers: { "x-user": "1" } })).status).toBe(200);
+  } finally {
+    release();
+    await app.stop();
+  }
 });
 
 const signedIn: AuthorizeCheck = (ctx) => {
