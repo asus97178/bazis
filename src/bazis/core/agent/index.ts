@@ -25,6 +25,7 @@ export {
   AgentSetupError,
   AgentToolExecutionError,
   AgentModelTimeoutError,
+  AgentModelUnavailableError,
   AgentToolPreCommitError,
   ToolError,
 } from "./errors";
@@ -33,6 +34,7 @@ export {
   AgentRuntime,
   type AgentRuntimeInvokeOptions,
   type AgentRuntimeOptions,
+  type AgentModelRetryPolicy,
   type AgentRuntimeResult,
   type AgentRuntimeStatus,
   type AgentRuntimeToolCallContext,

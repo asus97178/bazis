@@ -31,12 +31,13 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `AGENT_CONTEXT_INVALID` | текст ошибки | Неверные метаданные или контекст вызова |
 | `AGENT_MAX_STEPS_EXCEEDED` | `Agent "support" exceeded maxSteps (8).` | Модель не закончила за `maxSteps` шагов ([Пределы](../../ai/agents.md#пределы)) |
 | `AGENT_TOOL_CALL_LIMIT_EXCEEDED` | `Model requested 12 tool calls; the per-step limit is 8.` | Модель запросила за шаг больше вызовов, чем разрешено |
-| `AGENT_PROVIDER_FAILED` | — | Провайдер ответил ошибкой; в журнале — `Agent model call failed` |
+| `AGENT_RUN_TIMEOUT` | `Agent "support" did not finish within runTimeoutMs (30000).` | Запуск целиком не уложился в `runTimeoutMs` |
+| `AGENT_PROVIDER_FAILED` | — | Провайдер ответил ошибкой, в том числе после [повторов](../../ai/agents.md#что-рантайм-исправляет-сам); в журнале — `Agent model call failed` |
 | `AGENT_PROVIDER_TIMEOUT` | — | Провайдер не ответил в срок коннектора или рантайма |
-| `AGENT_PROVIDER_STOPPED` | `Model provider stopped with finishReason "length".` | Модель остановилась не по своей воле: лимит токенов, фильтр |
+| `AGENT_PROVIDER_STOPPED` | `Model provider stopped with finishReason "length".` | Модель остановилась не по своей воле: лимит ответа исчерпан и после продолжений, фильтр |
 | `AGENT_PROVIDER_RESPONSE_INVALID` | `Model provider returned a response for another invocation.` | Адаптер провайдера вернул неверный ответ (повтор id вызова, чужой запуск) |
 | `AGENT_ABORTED` | — | Запуск отменён через `signal` |
-| `AGENT_OUTPUT_INVALID` | `Agent output failed JSON Schema validation.` | Структурированный ответ не прошёл схему ([Структурированный ответ](../../ai/agents.md#структурированный-ответ)) |
+| `AGENT_OUTPUT_INVALID` | `Agent output failed JSON Schema validation.` | Структурированный ответ не прошёл схему и после исправлений ([Структурированный ответ](../../ai/agents.md#структурированный-ответ)) |
 | `AGENT_OUTPUT_SCHEMA_UNAVAILABLE` | `Output class "Triage" has no generated JSON schema.` | Для класса ответа нет схемы — запустите `bazis codegen` |
 | `AGENT_TOOL_OUTCOME_UNKNOWN` | `Tool "orders.cancel" finished with an unknown retry-safe side-effect outcome; automatic model continuation is blocked.` | Инструмент с записью завершился с неизвестным исходом; агент останавливается, чтобы модель не повторила запись |
 | `AGENT_EXECUTION_STATE_INVALID` | `Agent execution checkpoint is invalid.` | Внутренняя: повреждено состояние запуска |
@@ -65,6 +66,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | --- | --- | --- |
 | `TOOL_INPUT_VALIDATION_FAILED` | `Tool "orders.find" input failed schema validation.` | Аргументы модели не прошли схему; подробности — в `details` |
 | `TOOL_INPUT_INVALID` | текст ошибки | Аргументы не удалось разобрать |
+| `TOOL_ARGUMENTS_INVALID` | `Tool "orders.find" arguments are not valid JSON: …` | Модель написала аргументы битым или обрезанным JSON; инструмент не вызван, модель может повторить вызов |
 | `TOOL_OUTPUT_VALIDATION_FAILED` | `Tool "orders.find" output failed schema validation.` | Результат инструмента не прошёл схему выхода |
 | `TOOL_OUTPUT_INVALID` | `Tool output processing failed.` | Результат не удалось обработать |
 | `TOOL_RESULT_INVALID` | `Tool result is invalid.` | `execute` вернул то, что нельзя передать модели |

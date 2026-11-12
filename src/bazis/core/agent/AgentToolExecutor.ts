@@ -903,6 +903,13 @@ export class AgentToolExecutor {
       return this.finish(call, result, startedAt, metadata, options, audit, tool, options.agentName, undefined, executionState);
     }
 
+    // The provider could not read the arguments the model wrote: the Tool is
+    // not run, and the model gets the reason so it can write the call again.
+    if (call.inputError !== undefined) {
+      const result = this.errorResult(call, "TOOL_ARGUMENTS_INVALID", `Tool "${tool.metadata.name}" arguments are not valid JSON: ${call.inputError}`, metadata, startedAt, { phase: "pre-execute" });
+      return this.finish(call, result, startedAt, metadata, options, audit, tool, visibility.agentName, undefined, executionState);
+    }
+
     const schema = this.schemaSettings(options);
     const schemaGate = this.ensureSchemaValidator(call, tool, schema, metadata, startedAt);
     if (schemaGate) {

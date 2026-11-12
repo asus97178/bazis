@@ -1,6 +1,6 @@
 # Agent Runtime: partial passport
 
-Version: 10. Check date: 2026-10-12. Status: implemented in the described scope;
+Version: 11. Check date: 2026-11-12. Status: implemented in the described scope;
 checks and limits are in the [fixes report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-20-agent-tool/fixes/REPORT.md).
 Type: an existing atomic core feature. Path: `src/bazis/core/agent`.
 This subsystem has no `*.module.ts` of its own: it is connected by importing the
@@ -202,6 +202,21 @@ main fields.
 | `signal` | An optional AbortSignal | Cancellation that keeps the knowledge of the effect outcome |
 | `onTextDelta` | optional synchronous `(event: {step:number, text:string}) => void` | Partial text of one model step; without it the complete-only path is kept |
 | `contextLimits.maxMessages/maxChars/maxTokens` | Optional positive integers | Applied in this order; the protected minimum cannot be removed |
+| `contextLimits.maxToolResultChars` | Optional positive integer | 100000; a longer Tool output reaches the model as `{ truncated, totalChars, text }`, the dialog keeps it whole |
+| `runTimeoutMs` | Optional non-negative integer, ms | No deadline by default; expiry gives `AGENT_RUN_TIMEOUT`; 0 turns it off for one run |
+| `AgentRuntimeOptions.modelRetry` | `{ maxAttempts, delayMs, maxDelayMs }` | 3 / 500 / 20000; only `AgentModelUnavailableError` is repeated, never after text was emitted |
+| `AgentRuntimeOptions.maxOutputContinuations` | Non-negative integer | 3; a text answer with `finishReason: "length"` is continued, the pieces are joined |
+| `AgentRuntimeOptions.maxOutputRepairs` | Non-negative integer | 2; an invalid JSON answer is sent back with the issues |
+| `AgentRuntimeOptions.maxParallelToolCalls` | Positive integer | 8; adjacent `none`/`read` Tools of one step run together; a Session runs Tools one by one |
+
+Loop recovery (version 11, 0.139.0). Continuations and repairs are ordinary
+steps: the draft and a user message with `metadata.runtime`
+(`continue-output` / `repair-output`) are appended and the phase returns to
+`ready-model`; they never go beyond `maxSteps`. The terminal state drops this
+trailing chain and keeps one answer. A provider reports unreadable Tool
+arguments with `AgentToolCall.inputError`; the executor answers
+`TOOL_ARGUMENTS_INVALID` before input binding and the Tool is not run. Checks:
+[agent.loop-recovery.test.ts](test/agent.loop-recovery.test.ts).
 
 Structured output is requested per run with `output: agentOutputContract({ mode: "json", schema })`.
 The contract is sent to the provider and checked locally. Success holds the parsed

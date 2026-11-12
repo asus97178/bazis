@@ -69,6 +69,25 @@ export class AgentModelTimeoutError extends Error {
   }
 }
 
+/**
+ * A model provider could not serve the request right now: it is overloaded,
+ * limits the rate (HTTP 429), answered 5xx or the connection broke. The runtime
+ * repeats such a call (`AgentRuntimeOptions.modelRetry`); any other provider
+ * error fails the run at once.
+ */
+export class AgentModelUnavailableError extends Error {
+  /** How long the provider asked to wait (`Retry-After`), when it said so. */
+  readonly retryAfterMs?: number;
+
+  constructor(message: string, options: { readonly retryAfterMs?: number } = {}) {
+    super(message);
+    this.name = "AgentModelUnavailableError";
+    if (options.retryAfterMs !== undefined && Number.isFinite(options.retryAfterMs) && options.retryAfterMs >= 0) {
+      this.retryAfterMs = Math.floor(options.retryAfterMs);
+    }
+  }
+}
+
 /** Error thrown when the agent runtime is configured incorrectly. */
 export class AgentRuntimeError extends Error {
   constructor(message: string) {

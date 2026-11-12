@@ -77,6 +77,12 @@ export interface AgentToolCall {
   readonly id: string;
   readonly name: string;
   readonly input: JsonValue;
+  /**
+   * Why the arguments the model wrote could not be read (broken or cut-off
+   * JSON). Such a call is never executed: the model gets this text as the
+   * Tool error `TOOL_ARGUMENTS_INVALID` and can write the call again.
+   */
+  readonly inputError?: string;
   readonly metadata: JsonObject;
 }
 
@@ -84,6 +90,8 @@ export interface AgentToolCallOptions {
   readonly id: string;
   readonly name: string;
   readonly input?: unknown;
+  /** Set by a model provider instead of throwing when the arguments are not valid JSON. */
+  readonly inputError?: string;
   readonly metadata?: unknown;
 }
 
@@ -455,10 +463,11 @@ export function agentMessage(role: AgentMessageRole, content: AgentContentInput,
 }
 
 export function agentToolCall(options: AgentToolCallOptions): AgentToolCall {
-  return Object.freeze({
+  return freezeWithoutUndefined({
     id: requiredName(options.id, "toolCall.id"),
     name: requiredName(options.name, "toolCall.name"),
     input: normalizeJsonValue(options.input ?? {}, "toolCall.input"),
+    inputError: optionalContentText(options.inputError, "toolCall.inputError"),
     metadata: normalizeJsonObject(options.metadata ?? {}, "toolCall.metadata"),
   });
 }

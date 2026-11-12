@@ -14,6 +14,7 @@ import {
 import type { AgentModelProvider } from "./ModelProvider";
 
 export {
+  type AgentModelRetryPolicy,
   type AgentRuntimeInvokeOptions,
   type AgentExecutionDriverOptions,
   type AgentRuntimeOptions,
