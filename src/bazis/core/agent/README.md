@@ -167,6 +167,15 @@ request as too long (`AgentModelContextOverflowError`); `result.compactions`
 says it happened and `compaction: false` turns it off. Token estimates are
 corrected by the usage a provider reports (`metadata.agentContext.tokenScale`).
 
+A model's reasoning is a `reasoning` content part of its assistant message
+(`agentReasoning(text, { data })`): `data` is the provider's own record of the
+block and goes back to it unchanged with the dialog. The runtime drops
+reasoning wherever it rewrites a dialog (compaction, trimming by
+`contextLimits`, dropped drafts). `AgentUsage` also reports `cacheReadTokens`,
+`cacheWriteTokens` and `reasoningTokens`; `inputTokens` is the whole request,
+cached tokens included. Claude is served by `anthropicAdapter` from
+`bazis/core/infra/anthropic`, on the official SDK.
+
 With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
 not serve; a fallback to another profile is logged as `LLM model profile
 failed, using fallback`. A model provider that gives up after its own deadline

@@ -17,6 +17,7 @@
     "build:bin": "bun run scripts/bun-toolchain-check.ts && bun run scripts/build-bin.ts src/bazis/cli/main.ts bin/bazis"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@types/bun": "1.4.0",
     "typescript": "^6"
   },

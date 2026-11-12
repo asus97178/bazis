@@ -8,6 +8,8 @@ import {
   agentInvocation,
   agentJsonSchema,
   agentMessage,
+  agentMessageText,
+  agentReasoning,
   agentModelCapabilities,
   agentModelRequest,
   agentModelResponse,
@@ -264,5 +266,22 @@ describe("agent semantic invocation and model exchange", () => {
     expect((request.output.schema.schema as { properties: { x: { type: string } } }).properties.x.type).toBe("string");
     expect(request.capabilities?.toolCalling).toBe(true);
     expect(Object.isFrozen(request.output?.schema)).toBe(true);
+  });
+
+  test("keeps a model's reasoning in its assistant message, with the provider's record of it", () => {
+    const part = agentReasoning("First find the order.", { data: { signature: "sig-1" } });
+    expect(part).toEqual({ kind: "reasoning", text: "First find the order.", data: { signature: "sig-1" } });
+    expect(agentReasoning("")).toEqual({ kind: "reasoning", text: "" });
+    const message = agentMessage("assistant", [part, agentText("Order 42 is paid.")]);
+    expect(message.content.map((item) => item.kind)).toEqual(["reasoning", "text"]);
+    expect(() => agentMessage("user", [part])).toThrow(/reasoning content parts require an assistant message/);
+    expect(() => agentReasoning("x", { data: ["not", "an", "object"] })).toThrow(/reasoning.data/);
+  });
+
+  test("reads the words of a message past its reasoning and Tool calls", () => {
+    const message = agentMessage("assistant", [agentReasoning("Thinking."), agentText("Order 42 "), agentText("is paid.")]);
+    expect(agentMessageText(message)).toBe("Order 42 is paid.");
+    expect(agentMessageText(agentMessage("assistant", [agentReasoning("Only thoughts.")]))).toBe("");
+    expect(agentMessageText(undefined)).toBe("");
   });
 });

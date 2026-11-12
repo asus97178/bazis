@@ -146,15 +146,16 @@ POST /agents/support/ask {"question":"Где заказ 42?"}
 | `toolResults` | Вызовы инструментов: `name`, `status`, `output`, `error` |
 | `messages` | Весь диалог этого запуска: вопрос, вызовы, ответы инструментов |
 | `steps` | Сколько раз модель ответила |
-| `usage` | Сумма токенов по всем вызовам модели, если провайдер их сообщает |
+| `usage` | Сумма токенов по всем вызовам модели, если провайдер их сообщает: `inputTokens`, `outputTokens`, а также `cacheReadTokens`, `cacheWriteTokens` и `reasoningTokens` |
 | `compactions` | Сколько раз за запуск старая часть диалога была заменена пересказом; `messages` тогда начинаются с него |
 | `error` | Почему запуск не удался: `code` и `message` |
 
 Текст ответа:
 
 ```ts
-const part = result.finalMessage?.content[0];
-const answer = part?.kind === "text" ? part.text : null;
+import { agentMessageText } from "bazis/core/agent";
+
+const answer = agentMessageText(result.finalMessage);   // "" если ответа нет
 ```
 
 | Опция `run` | Что задаёт |
@@ -425,6 +426,42 @@ const reply = await this.agents.run(support, { messages: [...history, agentMessa
 100 000 символов JSON) модель получает урезанным:
 `{ "truncated": true, "totalChars": 250000, "text": "…начало…" }`.
 В `result.toolResults` и `result.messages` результат остаётся целым.
+
+## Изображения и файлы
+
+Сообщение пользователя может состоять из нескольких частей: текста,
+изображения, файла.
+
+```ts
+import { agentFile, agentImage, agentMessage, agentText } from "bazis/core/agent";
+
+const question = agentMessage("user", [
+  agentText("Что на фотографии и что сказано в договоре о сроках?"),
+  agentImage("https://files.example/box.png"),
+  agentFile(`data:application/pdf;base64,${pdf.toString("base64")}`, { name: "contract.pdf" }),
+]);
+const result = await this.agents.run(support, { messages: [question] });
+```
+
+Изображение и файл можно передать адресом или `data:`-строкой. Что именно
+примет модель, зависит от [адаптера](llm-connectors.md): Claude принимает
+изображения и PDF обоими способами, OpenAI-совместимый API — изображения
+обоими, а файлы только `data:`-строкой. Файл, заданный адресом, такой API
+получит как упоминание в тексте.
+
+## Рассуждения модели
+
+Модель, которая умеет рассуждать перед ответом, возвращает рассуждения
+отдельными частями сообщения — `kind: "reasoning"`. Поэтому текст ответа
+берите через `agentMessageText(result.finalMessage)`, а не из первой части
+сообщения: первой может оказаться часть с рассуждениями.
+
+Сохраняйте `result.messages` целиком и передавайте в следующий запуск как
+есть: рассуждения возвращаются тому же провайдеру вместе с диалогом. Менять
+их или переносить в другой диалог нельзя — провайдер проверяет, что диалог
+тот же. Там, где рантайм сам переписывает диалог (сжатие, обрезка по
+`contextLimits`), он убирает рассуждения из оставшихся сообщений; слова и
+вызовы инструментов остаются.
 
 ## Длинный диалог: сжатие
 

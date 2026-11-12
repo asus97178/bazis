@@ -7,6 +7,8 @@ import {
   Tool,
   agentMessage,
   agentModelResponse,
+  agentReasoning,
+  agentText,
   agentToolCall,
   agentToolCallPart,
   agentToolResult,
@@ -245,6 +247,21 @@ describe("agent dialog compaction", () => {
         expect(pending.size).toBe(0);
       }
     } finally { await container.dispose(); }
+  });
+
+  test("drops reasoning from the kept messages: it was written with the whole dialog in view", async () => {
+    const model = new Model();
+    const { runtime, dispose } = runtimeOf(model, { compaction: { maxTokens: 600, keepTokens: 150 } });
+    try {
+      const dialog = longDialog();
+      // The last answer before the new question carries the model's reasoning.
+      dialog[dialog.length - 2] = agentMessage("assistant", [agentReasoning("Order 20 was delivered, so…", { data: { signature: "sig-20" } }), agentText("Answer 20: delivered.")]);
+      const result = await runtime.run(support, { messages: dialog });
+      expect(result.compactions).toBe(1);
+      const kept = model.requests[0]!.messages.find((message) => textOf(message) === "Answer 20: delivered.");
+      expect(kept?.content).toEqual([{ kind: "text", text: "Answer 20: delivered." }]);
+      expect(model.requests[0]!.messages.some((message) => message.content.some((part) => part.kind === "reasoning"))).toBe(false);
+    } finally { await dispose(); }
   });
 
   test("learns from the provider's usage how many real tokens an estimated one is", async () => {

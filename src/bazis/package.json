@@ -42,6 +42,7 @@
     "./core/http-client": "./core/http-client/index.ts",
     "./core/http/OpenApi/generatedOpenApiRegistry": "./core/http/OpenApi/generatedOpenApiRegistry.ts",
     "./core/infra": "./core/infra/index.ts",
+    "./core/infra/anthropic": "./core/infra/anthropic.ts",
     "./core/kernel": "./core/kernel/index.ts",
     "./core/orm": "./core/orm/index.ts",
     "./core/testing": "./core/testing/index.ts",
@@ -81,7 +82,8 @@
   },
   "peerDependencies": {
     "typescript": "^5.9.3 || ^6.0.0 || ^7.0.0",
-    "@typescript/typescript6": "^6.0.0"
+    "@typescript/typescript6": "^6.0.0",
+    "@anthropic-ai/sdk": "^1.8.0"
   },
   "publishConfig": {
     "access": "public",
@@ -89,6 +91,9 @@
   },
   "peerDependenciesMeta": {
     "@typescript/typescript6": {
+      "optional": true
+    },
+    "@anthropic-ai/sdk": {
       "optional": true
     }
   }
