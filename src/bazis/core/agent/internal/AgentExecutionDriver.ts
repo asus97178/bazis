@@ -152,7 +152,27 @@ interface ModelRetrySettings {
   readonly maxDelayMs: number;
 }
 
-export type AgentRuntimeStatus = "completed" | "failed";
+/**
+ * How a run ended. `"waiting"`: a Tool call waits for a person's approval
+ * (`result.pendingApprovals`); the run goes on when `run` is called again
+ * with `result.messages` and `approvals`.
+ */
+export type AgentRuntimeStatus = "completed" | "failed" | "waiting";
+
+/** A person's answer about a Tool call a run waits for. */
+export interface AgentToolApproval {
+  /** `call.id` from `result.pendingApprovals`. */
+  readonly callId: string;
+  readonly approved: boolean;
+  /** Why not: the model gets it with the refusal. */
+  readonly message?: string;
+}
+
+/** A Tool call that waits for a person's approval. */
+export interface AgentPendingApproval {
+  readonly call: AgentModelResponse["toolCalls"][number];
+  readonly tool: { readonly name: string; readonly description: string; readonly sideEffect: string };
+}
 
 export interface AgentRuntimeToolCallContext {
   readonly invocationId: string;
@@ -240,6 +260,11 @@ export interface AgentRuntimeInvokeOptions {
   readonly runTimeoutMs?: number;
   /** Compaction settings of this run over the runtime's; `false` keeps the dialog as written. */
   readonly compaction?: AgentCompactionOptions | false;
+  /**
+   * A person's answers for a run that stopped with `status: "waiting"`: pass
+   * them with that run's `result.messages` (and no `input`) to go on.
+   */
+  readonly approvals?: readonly AgentToolApproval[];
   readonly contextLimits?: AgentContextLimits;
   readonly signal?: AbortSignal;
   readonly toolExecution?: AgentRuntimeToolExecutionOptions;
@@ -273,8 +298,17 @@ export interface AgentRuntimeResult {
    * with `metadata.runtime: "summary"`, not with the original dialog.
    */
   readonly compactions?: number;
+  /** The Tool calls a person must decide on, when `status` is `"waiting"`. */
+  readonly pendingApprovals?: readonly AgentPendingApproval[];
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
+}
+
+/** Where a run that waited for approval goes on from: the unanswered calls of its last assistant message. */
+interface ResumePoint {
+  readonly assistantMessageIndex: number;
+  readonly nextToolIndex: number;
+  readonly calls: AgentModelResponse["toolCalls"];
 }
 
 type PreparedAgentPlan = {
@@ -293,6 +327,9 @@ type PreparedAgentPlan = {
   readonly compaction: AgentCompactionOptions | undefined;
   /** What the run did besides its steps; filled while it runs. */
   readonly side: { readonly usage: AgentUsage[]; compactions: number };
+  /** A person's answers by call id. */
+  readonly approvals: ReadonlyMap<string, AgentToolApproval>;
+  readonly resume?: ResumePoint;
   readonly modelProfile: string | undefined;
   readonly contextLimits: AgentContextLimits | undefined;
   readonly messages: AgentMessage[];
@@ -730,6 +767,7 @@ function runtimeResult(options: {
   readonly toolResults: readonly AgentToolResult[];
   readonly finalMessage?: AgentMessage;
   readonly output?: JsonValue;
+  readonly pendingApprovals?: readonly AgentPendingApproval[];
   readonly error?: AgentToolError;
   readonly metadata: JsonObject;
 }): AgentRuntimeResult {
@@ -745,6 +783,7 @@ function runtimeResult(options: {
     ...(options.finalMessage !== undefined ? { finalMessage: options.finalMessage } : {}),
     ...(options.output !== undefined ? { output: options.output } : {}),
     ...(usage !== undefined ? { usage } : {}),
+    ...(options.pendingApprovals !== undefined ? { pendingApprovals: Object.freeze([...options.pendingApprovals]) } : {}),
     ...(options.error !== undefined ? { error: options.error } : {}),
     metadata: options.metadata,
   });
@@ -804,6 +843,25 @@ function attachAbortForwarding(source: AbortSignal | undefined, target: AbortCon
   const abort = () => target.abort(source.reason);
   source.addEventListener("abort", abort, { once: true });
   return () => source.removeEventListener("abort", abort);
+}
+
+/**
+ * The Tool calls at the end of a dialog that have no result yet: a run that
+ * stopped to wait for approval ends this way. `undefined` for a dialog that
+ * is ready for the model.
+ */
+function unansweredCalls(messages: readonly AgentMessage[]): ResumePoint | undefined {
+  let index = messages.length - 1;
+  while (index >= 0 && messages[index]!.role === "tool") index -= 1;
+  const assistant = messages[index];
+  if (assistant === undefined || assistant.role !== "assistant") return undefined;
+  const calls = assistant.content.flatMap((part) => part.kind === "tool-call" ? [part.call] : []);
+  const answered = messages.length - 1 - index;
+  if (calls.length === 0 || answered >= calls.length) return undefined;
+  for (let offset = 0; offset < answered; offset += 1) {
+    if (messages[index + 1 + offset]!.toolCallId !== calls[offset]!.id) throw new AgentRuntimeError("the Tool results at the end of the dialog do not follow the order of the calls.");
+  }
+  return { assistantMessageIndex: index, nextToolIndex: answered, calls: Object.freeze(calls) };
 }
 
 /** The size of a whole dialog as the context builder counted it, dropped messages included. */
@@ -1025,6 +1083,7 @@ export class AgentExecutionDriver {
       // A Session keeps its dialog as written: a checkpoint ties it to the recorded responses.
       compaction: undefined,
       side: { usage: [], compactions: 0 },
+      approvals: new Map(),
       modelProfile,
       contextLimits,
       messages: [...checkpoint.messages],
@@ -1083,9 +1142,24 @@ export class AgentExecutionDriver {
 
     let messages: AgentMessage[];
     let seenToolCallIds: Set<string>;
+    let resume: ResumePoint | undefined;
+    const approvals = new Map<string, AgentToolApproval>();
     try {
       messages = this.initialMessages(options);
       seenToolCallIds = this.initialToolCallIds(messages);
+      // Looked for in the dialog as it was given: an `input` would stand after the unanswered calls.
+      resume = unansweredCalls(options.messages ?? []);
+      if (resume !== undefined && options.input !== undefined) {
+        throw new AgentRuntimeError("the dialog ends with Tool calls that wait for approval: continue it with approvals, not with input.");
+      }
+      const waiting = new Set((resume?.calls ?? []).slice(resume?.nextToolIndex ?? 0).map((call) => call.id));
+      for (const approval of options.approvals ?? []) {
+        if (approval === null || typeof approval !== "object" || typeof approval.callId !== "string" || typeof approval.approved !== "boolean") {
+          throw new AgentRuntimeError("approvals must be { callId, approved } answers.");
+        }
+        if (!waiting.has(approval.callId)) throw new AgentRuntimeError(`approvals name Tool call "${approval.callId}", which does not wait for approval in this dialog.`);
+        approvals.set(approval.callId, approval);
+      }
     } catch (error) {
       return { ok: false, result: runtimeResult({ invocationId, agentName: agent.name, status: "failed", steps: 0, messages: [], responses: [], toolResults: [], error: runtimeError("AGENT_INPUT_INVALID", errorMessageOf(error)), metadata }) };
     }
@@ -1106,6 +1180,8 @@ export class AgentExecutionDriver {
         maxParallelToolCalls: this.maxParallelToolCalls,
         compaction,
         side: { usage: [], compactions: 0 },
+        approvals,
+        ...(resume === undefined ? {} : { resume }),
         modelProfile,
         contextLimits,
         messages,
@@ -1164,6 +1240,16 @@ export class AgentExecutionDriver {
       }
     };
     const terminal = (state: TState, result: AgentRuntimeResult): EngineOutcome<TState> => ({ kind: "terminal", state, result });
+    /** The call a person must decide on: the run stops with what it has done so far. */
+    const waiting = (pendingCall: AgentModelResponse["toolCalls"][number], messages: readonly AgentMessage[], toolResults: readonly AgentToolResult[]): EngineOutcome<TState> => {
+      const definition = plan.agent.tools.find((tool) => tool.metadata.name === pendingCall.name)?.metadata;
+      return terminal(checkpoint, runtimeResult({
+        invocationId: plan.invocationId, agentName: plan.agent.name, status: "waiting", steps: checkpoint.steps,
+        messages, responses: checkpoint.responses, toolResults, metadata: plan.metadata,
+        pendingApprovals: [{ call: pendingCall, tool: { name: pendingCall.name, description: definition?.description ?? "", sideEffect: definition?.sideEffect ?? "none" } }],
+      }));
+    };
+    const isPending = (result: AgentToolResult): boolean => !session && result.error?.code === "TOOL_APPROVAL_PENDING";
     // A dialog is compacted at most once before a step and once after a refusal of that step.
     const canCompact = !session && plan.compaction !== undefined;
     let sizeCheckedAtStep = 0;
@@ -1192,10 +1278,19 @@ export class AgentExecutionDriver {
               metadata: plan.metadata,
               signal,
               idempotencyKey: item.idempotencyKey,
+              ...this.answered(plan, item.call.id),
             });
-            this.emit(plan.options, { kind: "tool-finished", invocationId: plan.invocationId, step: pending.step, result });
+            if (!isPending(result)) this.emit(plan.options, { kind: "tool-finished", invocationId: plan.invocationId, step: pending.step, result });
             return result;
           }));
+          const asked = results.findIndex(isPending);
+          if (asked >= 0) {
+            // The calls before it are done and stay; the ones after it change nothing and are simply run again later.
+            const done = results.slice(0, asked);
+            return waiting(together[asked]!.call, [...checkpoint.messages, ...done.map((result, index) => agentMessage("tool", agentToolResultPart(result), {
+              toolCallId: together[index]!.call.id, metadata: { toolName: together[index]!.call.name },
+            }))], [...checkpoint.toolResults, ...done]);
+          }
           const unknown = results.findIndex((result) => result.error?.code?.endsWith("_OUTCOME_UNKNOWN") === true);
           const nextToolIndex = pending.nextToolIndex + together.length;
           const finished = nextToolIndex === response.toolCalls.length;
@@ -1247,7 +1342,9 @@ export class AgentExecutionDriver {
           metadata: plan.metadata,
           signal,
           idempotencyKey,
+          ...this.answered(plan, call.id),
         });
+        if (isPending(result)) return waiting(call, checkpoint.messages, checkpoint.toolResults);
         this.emit(plan.options, { kind: "tool-finished", invocationId: plan.invocationId, step: pending.step, result });
         const messages = [...checkpoint.messages, agentMessage("tool", agentToolResultPart(result), {
           toolCallId: call.id, metadata: { toolName: call.name },
@@ -1464,9 +1561,17 @@ export class AgentExecutionDriver {
   }
 
   private async drive(plan: PreparedAgentPlan): Promise<AgentRuntimeResult> {
-    const initial: InMemoryExecutionState = Object.freeze({
-      phase: "ready-model", steps: 0, messages: Object.freeze([...plan.messages]), responses: Object.freeze([]), toolResults: Object.freeze([]), seenToolCallIds: Object.freeze([...plan.seenToolCallIds]),
-    });
+    const initial: InMemoryExecutionState = plan.resume === undefined
+      ? Object.freeze({
+        phase: "ready-model", steps: 0, messages: Object.freeze([...plan.messages]), responses: Object.freeze([]), toolResults: Object.freeze([]), seenToolCallIds: Object.freeze([...plan.seenToolCallIds]),
+      })
+      // A run that waited for approval goes on with the calls its last assistant message left unanswered.
+      : Object.freeze({
+        phase: "pending-tools", steps: 0, messages: Object.freeze([...plan.messages]),
+        responses: Object.freeze([agentModelResponse({ invocationId: plan.invocationId, finishReason: "tool-calls", toolCalls: plan.resume.calls, metadata: { runtime: "resumed" } })]),
+        toolResults: Object.freeze([]), seenToolCallIds: Object.freeze([...plan.seenToolCallIds]),
+        pendingToolBatch: Object.freeze({ step: 0, responseIndex: 0, assistantMessageIndex: plan.resume.assistantMessageIndex, nextToolIndex: plan.resume.nextToolIndex }),
+      });
     const inMemoryBoundary: EngineBoundary<InMemoryExecutionState> = {
       async checkControl() { return { kind: "continue" }; }, async beforeModelDispatch() {}, async afterModelSettlement() {}, async beforeToolDispatch() {}, async afterToolSettlement() {},
     };
@@ -1495,6 +1600,14 @@ export class AgentExecutionDriver {
       clearTimeout(timer);
       detach?.();
     }
+  }
+
+  /** A person's answer as the approval policy of one call; nothing for a call nobody answered about. */
+  private answered(plan: PreparedAgentPlan, callId: string): Pick<AgentToolExecutionOptions, "approvalPolicy"> {
+    const approval = plan.approvals.get(callId);
+    if (approval === undefined) return {};
+    const message = typeof approval.message === "string" && approval.message.trim().length > 0 ? approval.message : "a person declined it.";
+    return { approvalPolicy: () => approval.approved ? true : { approved: false, message } };
   }
 
   /** Adds to a result what the run did besides its steps: summaries and their usage. */

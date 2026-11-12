@@ -81,7 +81,8 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `TOOL_AUDIT_REQUIRED` | `Tool "orders.cancel" has side effects and requires an audit sink.` | Инструмент с записью без `auditSink` в `TOOL_EXECUTION_OPTIONS` ([Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение)) |
 | `TOOL_APPROVAL_REQUIRED` | `Tool "orders.cancel" requires explicit approval.` | Инструмент объявлен с `approval: "required"`, а политики подтверждения нет |
 | `TOOL_APPROVAL_POLICY_MISSING` | `Tool "orders.cancel" requires an approval policy.` | `approval: "policy"` у инструмента с записью, а политики нет. Инструменты только для чтения без политики выполняются |
-| `TOOL_APPROVAL_DENIED` | `Tool execution was denied by approval policy.` | Политика отказала; `status: "denied"` |
+| `TOOL_APPROVAL_DENIED` | `Tool execution was denied by approval policy.` или `Tool "orders.cancel" was declined: …` | Политика или человек отказали; `status: "denied"`. Текст после двоеточия — объяснение для модели |
+| `TOOL_APPROVAL_PENDING` | `Tool "orders.cancel" waits for a person's approval.` | Политика ответила `"ask"`. Запуск агента останавливается со `status: "waiting"`; при вызове без модели (`ToolRunner`) это отказ |
 | `TOOL_APPROVAL_FAILED` | `Tool approval policy failed: …` | Политика подтверждения упала |
 | `TOOL_AUDIT_FAILED` | `Tool audit failed.` | Журнал аудита не принял запись; инструмент не выполняется ([Если журнал недоступен](../../ai/hooks.md#если-журнал-недоступен)) |
 

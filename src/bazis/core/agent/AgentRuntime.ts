@@ -25,6 +25,8 @@ export {
   type AgentCompactedEvent,
   type AgentRunFinishedEvent,
   type AgentCompactionOptions,
+  type AgentToolApproval,
+  type AgentPendingApproval,
   type AgentModelRetryPolicy,
   type AgentRuntimeInvokeOptions,
   type AgentExecutionDriverOptions,

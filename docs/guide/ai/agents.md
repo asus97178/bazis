@@ -140,7 +140,8 @@ POST /agents/support/ask {"question":"Где заказ 42?"}
 
 | Поле результата | Что в нём |
 | --- | --- |
-| `status` | `completed` или `failed` |
+| `status` | `completed`, `failed` или `waiting` — [ждёт решения человека](#подтверждение-человеком) |
+| `pendingApprovals` | При `waiting`: вызов инструмента, о котором надо спросить человека |
 | `finalMessage` | Последний ответ модели |
 | `output` | Проверенный JSON, если запрошен структурированный ответ |
 | `toolResults` | Вызовы инструментов: `name`, `status`, `output`, `error` |
@@ -167,6 +168,7 @@ const answer = agentMessageText(result.finalMessage);   // "" если отве�
 | `maxSteps` | Предел ответов модели (по умолчанию 30) |
 | `runTimeoutMs` | Срок всего запуска; по умолчанию срока нет |
 | `compaction` | Настройки [сжатия диалога](#длинный-диалог-сжатие) для этого запуска; `false` оставляет диалог как есть |
+| `approvals` | Решения человека для запуска, который [ждал подтверждения](#подтверждение-человеком) |
 | `modelProfile` | Профиль модели вместо указанного в определении |
 | `signal` | Отмена запуска |
 | `onTextDelta` | Текст ответа по частям, пока модель его пишет: `({ step, text }) => …` |
@@ -383,7 +385,7 @@ POST /agents/support/ask              {"question":"Где заказ 42?"}
 | `maxSteps` | Предел ответов модели за запуск (по умолчанию 30) |
 | `timeoutMs` | Срок одного вызова модели (по умолчанию 60 с, `0` — без срока) |
 | `TOOL_EXECUTION_OPTIONS.auditSink` | Куда писать журнал вызовов инструментов |
-| `TOOL_EXECUTION_OPTIONS.approvalPolicy` | Разрешить ли вызов: `(request) => boolean`; в `request` есть `caller` (`"agent"`) и `actor` |
+| `TOOL_EXECUTION_OPTIONS.approvalPolicy` | Разрешить ли вызов: `(request) => true`, `false`, `{ approved: false, message }` или `"ask"` — [спросить человека](#подтверждение-человеком); в `request` есть `caller` (`"agent"`) и `actor` |
 | `TOOL_EXECUTION_OPTIONS.defaultTimeoutMs` | Срок вызова инструмента (по умолчанию 30 с) |
 | `contextLimits` | Сколько истории отправлять модели |
 
@@ -396,6 +398,62 @@ POST /agents/support/ask              {"question":"Где заказ 42?"}
 | `"never"` (только для `read` и `none`) | Выполняется | Не спрашивается |
 | `"policy"` — по умолчанию для `read` и `none` | Чтение выполняется, запись — отказ | Спрашивается |
 | `"required"` — по умолчанию для `write` и `external` | Отказ `TOOL_APPROVAL_REQUIRED` | Спрашивается |
+
+### Подтверждение человеком
+
+Правило не всегда может решить само: отменить заказ или вернуть деньги
+должен разрешить человек. Тогда политика отвечает `"ask"`:
+
+```ts
+this.approvalPolicy = (request) => request.tool.metadata.sideEffect === "read" ? true : "ask";
+```
+
+Запуск останавливается, ничего не изменив, и возвращает `status: "waiting"`:
+
+```ts
+const first = await this.agents.run(operator, { id: runId, input: "Отмени заказ 7" });
+first.status;            // "waiting"
+first.pendingApprovals;  // [{ call: { id: "c1", name: "orders.cancel", input: { id: 7 } },
+                         //    tool: { name: "orders.cancel", description: "…", sideEffect: "write" } }]
+await this.runs.save(runId, first.messages);   // диалог хранит приложение
+```
+
+Покажите человеку, что именно агент хочет сделать (`call.name`, `call.input`),
+и, получив ответ, продолжите запуск: тот же диалог и решение.
+
+```ts
+const second = await this.agents.run(operator, {
+  id: runId,
+  messages: await this.runs.load(runId),
+  approvals: [{ callId: "c1", approved: true }],
+});
+second.status;   // "completed": инструмент выполнен, модель ответила
+```
+
+```text
+approved: true                                   → orders.cancel выполнен, в контексте инструмента approval: "approved"
+approved: false, message: "Заказ уже отгружен."  → модель получает: Tool "orders.cancel" was declined: Заказ уже отгружен.
+```
+
+Что важно знать:
+
+- Между остановкой и продолжением может пройти сколько угодно времени и
+  смениться процесс: всё состояние — в `result.messages`. Храните их на
+  сервере: решение человека относится к вызову с этими аргументами.
+- Продолжайте с тем же `id` запуска: по нему строится ключ идемпотентности
+  инструмента.
+- Продолжение без `approvals` снова вернёт `"waiting"`. Вместе с `input`
+  такой диалог продолжить нельзя: сначала ответ на вызов.
+- Если модель запросила несколько инструментов, запуск останавливается на
+  первом, который требует решения. Сделанное до него остаётся в диалоге,
+  остальное выполняется после ответа. Следующий такой вызов остановит
+  запуск ещё раз.
+- Агент, вызванный [как инструмент](#агент-как-инструмент), спросить
+  человека не может: вызывающая модель получит ошибку
+  `agent_needs_approval`.
+
+Политика может и отказать с объяснением для модели:
+`{ approved: false, message: "Отмена закрыта до понедельника." }`.
 
 Журнал по умолчанию маскирует пароли, токены и ключи во входе и результате.
 

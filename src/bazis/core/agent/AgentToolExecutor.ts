@@ -86,7 +86,14 @@ export interface AgentToolApprovalRequest {
   readonly signal?: AbortSignal;
 }
 
-export type AgentToolApprovalDecision = boolean | Promise<boolean>;
+/**
+ * What an approval policy answers: `true` runs the Tool, `false` refuses it,
+ * `{ approved: false, message }` refuses it and tells the model why, and
+ * `"ask"` leaves the decision to a person — an agent run then stops with
+ * `status: "waiting"` and goes on when it is given the answer.
+ */
+export type AgentToolApprovalAnswer = boolean | "ask" | { readonly approved: false; readonly message: string };
+export type AgentToolApprovalDecision = AgentToolApprovalAnswer | Promise<AgentToolApprovalAnswer>;
 export type AgentToolApprovalFunction = (request: AgentToolApprovalRequest) => AgentToolApprovalDecision;
 
 export interface AgentToolApprovalPolicyObject {
@@ -1355,6 +1362,24 @@ export class AgentToolExecutor {
       });
       if (approved === true) {
         return { allowed: true, executionApproval: "approved" };
+      }
+      if (approved === "ask") {
+        return {
+          allowed: false,
+          executionApproval: "not-required",
+          code: "TOOL_APPROVAL_PENDING",
+          message: `Tool "${tool.metadata.name}" waits for a person's approval.`,
+          reason,
+        };
+      }
+      if (typeof approved === "object" && approved !== null && approved.approved === false && typeof approved.message === "string" && approved.message.trim().length > 0) {
+        return {
+          allowed: false,
+          executionApproval: "not-required",
+          code: "TOOL_APPROVAL_DENIED",
+          message: `Tool "${tool.metadata.name}" was declined: ${approved.message}`,
+          reason,
+        };
       }
       return {
         allowed: false,
