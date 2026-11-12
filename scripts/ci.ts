@@ -53,6 +53,14 @@ try {
 
 run("package", [bun, "run", "scripts/package-check.ts"]);
 
+// Access on real rows (ACCESS-001 §4.3): a list filter must list exactly the rows
+// can() allows. The suite is skipped without a database; CI gives the one of the
+// examples through BAZIS_ACCESS_PG_URL, and the test keeps to a schema of its own.
+const accessDb = process.env.BAZIS_ACCESS_PG_URL;
+if (accessDb !== undefined) {
+  run("access on PostgreSQL", [bun, "test", "--isolate", "src/bazis/core/access/test/access.postgres.live.test.ts"], root, { ...process.env, BAZIS_PG_URL: accessDb });
+}
+
 // The examples as a user would build them. Their tests need PostgreSQL, else they
 // are skipped: CI gives one through BAZIS_EXAMPLES_DB_HOST (database bazis_examples).
 const examplesDb = process.env.BAZIS_EXAMPLES_DB_HOST;
