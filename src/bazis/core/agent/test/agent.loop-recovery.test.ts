@@ -348,6 +348,18 @@ describe("agent loop recovery", () => {
     });
   });
 
+  test("thirty steps are allowed by default, and the thirty-first is not asked", async () => {
+    const model = new ScriptedModel(Array.from({ length: 30 }, (_unused, index) => text(`piece ${index}`, "length")));
+    // Continuations are steps: with no other limit in the way the default one stops the run.
+    const { runtime, dispose } = runtimeOf(model, { maxOutputContinuations: 100 });
+    try {
+      const result = await runtime.run(plainAgent, { input: "Write" });
+      expect(result.steps).toBe(30);
+      expect(model.requests).toHaveLength(30);
+      expect(result.error?.code).toBe("AGENT_PROVIDER_STOPPED");
+    } finally { await dispose(); }
+  });
+
   describe("the run deadline", () => {
     test("stops a run that takes longer than runTimeoutMs", async () => {
       const model = new ScriptedModel([

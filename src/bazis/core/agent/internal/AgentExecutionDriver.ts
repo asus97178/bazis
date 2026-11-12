@@ -53,7 +53,7 @@ import {
   type JsonValue,
 } from "../semantic";
 
-const DEFAULT_MAX_STEPS = 8;
+const DEFAULT_MAX_STEPS = 30;
 const DEFAULT_MAX_TOOL_CALLS_PER_STEP = 16;
 const DEFAULT_MODEL_TIMEOUT_MS = 60_000;
 const DEFAULT_MODEL_ATTEMPTS = 3;
