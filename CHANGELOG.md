@@ -4,6 +4,61 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.139.0 — 2026-11-12
+
+The agent runtime after its audit: a run recovers instead of failing, a long dialog is
+compacted, and Claude is served by its own adapter. Stores stay as they are.
+Behaviour changes: see [Upgrading](docs/guide/reference/upgrading.md#01390).
+
+### Added
+
+- A model request the provider cannot serve right now (HTTP 408, 409, 425, 429, 5xx, a
+  broken connection) is repeated: three attempts, backoff from 0.5 s, `Retry-After`
+  honoured. `AgentModelUnavailableError`, `AgentRuntimeOptions.modelRetry`.
+- A text answer cut by the output limit is continued (`maxOutputContinuations`, 3); a
+  structured answer that is not valid goes back to the model with the issues
+  (`maxOutputRepairs`, 2). The finished dialog keeps one answer.
+- Tool arguments the provider could not read give the model `TOOL_ARGUMENTS_INVALID`
+  instead of failing the run: `AgentToolCall.inputError`.
+- Tools of one step that change nothing (`sideEffect: "none"` or `"read"`) and stand
+  next to each other run together, up to eight (`maxParallelToolCalls`). `write` and
+  `external` run one by one, as before.
+- `runTimeoutMs`: the deadline of a whole run, `AGENT_RUN_TIMEOUT`. `result.usage`:
+  the sum over every model call, with `cacheReadTokens`, `cacheWriteTokens` and
+  `reasoningTokens`.
+- Compaction: the older part of a dialog that reaches the model's window is replaced
+  by a summary the model writes; the newest messages stay as written.
+  `AgentRuntimeOptions.compaction`, `result.compactions`, `contextTokens` of
+  `llmConnect` / `llmProfile`, `AgentModelContextOverflowError`,
+  `AGENT_CONTEXT_OVERFLOW`.
+- `contextLimits.maxToolResultChars` (100 000): a longer Tool output reaches the model
+  cut; the dialog keeps it whole.
+- `anthropicAdapter()` from `bazis/core/infra/anthropic`: Claude through the official
+  SDK. Tools, structured answers, images and PDF, streaming, prompt caching, adaptive
+  thinking; the model's context window is read from the provider at start.
+  `@anthropic-ai/sdk` is an optional peer dependency: an application that uses the
+  adapter installs it.
+- `agentReasoning` / `AgentReasoningPart`: a model's reasoning is a part of its
+  assistant message and goes back to the provider unchanged.
+  `agentMessageText(message)`: the words of a message.
+
+### Changed
+
+- The default `maxSteps` is 30 (was 8).
+- The token estimate behind `contextLimits.maxTokens` counts characters by script
+  instead of words and is corrected by the usage a provider reports
+  (`metadata.agentContext.tokenScale`). For Cyrillic and JSON it is two to three times
+  higher than before.
+- The OpenAI-compatible adapter sends `agentImage` as an image and an inline
+  `agentFile` as a file; they used to be JSON text with an address. It reports cached
+  and reasoning tokens, and throws `AgentModelUnavailableError` for the statuses above
+  (was `OpenAiCompatibleProviderError`).
+
+### Fixed
+
+- A streamed Tool call cut by the output limit no longer fails the run as an invalid
+  provider response.
+
 ## 0.138.0 — 2026-11-11
 
 The second part of the framework audit: the application is declared once, Tools made
