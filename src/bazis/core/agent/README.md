@@ -183,6 +183,13 @@ gives the same as an async iterator; leaving it early cancels the run.
 agent: the nested agent gets only the task, works in its own dialog, and its
 answer comes back; `maxDepth` (3) stops agents that call each other.
 
+An approval policy may answer `"ask"`: the run stops with `status:
+"waiting"` and `pendingApprovals`, nothing is changed, and `run` called again
+with that run's `messages` and `approvals: [{ callId, approved, message? }]`
+goes on from the unanswered call. The whole state is the dialog, so the pause
+survives a restart. A policy may also refuse with words for the model:
+`{ approved: false, message }`.
+
 With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
 not serve; a fallback to another profile is logged as `LLM model profile
 failed, using fallback`. A model provider that gives up after its own deadline

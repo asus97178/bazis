@@ -40,7 +40,7 @@
 
 ## Типы
 
-- **Агент и запуск:** `AgentDataDefinition`, `AgentToolOptions`, `AgentToolInput`, `AgentToolOutput`, `AgentRuntimeOptions`, `AgentModelRetryPolicy`, `AgentCompactionOptions`,
+- **Агент и запуск:** `AgentDataDefinition`, `AgentToolApproval`, `AgentPendingApproval`, `AgentToolApprovalAnswer`, `AgentToolOptions`, `AgentToolInput`, `AgentToolOutput`, `AgentRuntimeOptions`, `AgentModelRetryPolicy`, `AgentCompactionOptions`,
   `AgentRuntimeInvokeOptions`, `AgentRuntimeResult`, `AgentRuntimeStatus`,
   `AgentRuntimeToolCallContext`, `AgentRuntimeToolExecutionOptions`,
   `AgentInvocation`, `AgentInvocationOptions`, `AgentUsage`,

@@ -104,6 +104,11 @@ export function agentTool(options: AgentToolOptions): DefinedTool<AgentToolInput
         ...(options.maxSteps === undefined ? {} : { maxSteps: options.maxSteps }),
         ...(options.modelProfile === undefined ? {} : { modelProfile: options.modelProfile }),
       });
+      if (result.status === "waiting") {
+        // A nested run cannot ask a person: its dialog is not kept anywhere to go on from.
+        const asked = result.pendingApprovals?.[0]?.call.name ?? "a Tool";
+        throw new ToolError(`Agent "${agent.name}" stopped: its Tool "${asked}" needs a person's approval, which an agent called as a Tool cannot ask for.`, { reason: "agent_needs_approval" });
+      }
       if (result.status !== "completed") {
         // The caller's model decides what to do next: try again, ask differently, do without.
         throw new ToolError(`Agent "${agent.name}" did not finish: ${result.error?.message ?? "unknown error"}`, { reason: "agent_failed" });
