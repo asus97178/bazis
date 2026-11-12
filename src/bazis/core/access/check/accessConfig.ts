@@ -15,12 +15,15 @@ export interface AccessConfig {
    * `IAccessCatalog.changed` on every instance itself.
    */
   sourcePollSeconds: number;
+  /** Seconds a permission source has for one answer; after them the reading has failed. */
+  sourceTimeoutSeconds: number;
 }
 
 export const accessConfig = defineConfig<AccessConfig>("access", {
-  default: { kindClaim: "", roleClaim: "role", maxInList: 1000, sourcePollSeconds: 5 },
+  default: { kindClaim: "", roleClaim: "role", maxInList: 1000, sourcePollSeconds: 5, sourceTimeoutSeconds: 10 },
   validate: {
     maxInList: (value) => Number.isSafeInteger(value) && value >= 1 && value <= 100_000 ? undefined : "must be an integer 1–100000",
     sourcePollSeconds: (value) => Number.isFinite(value) && value >= 0 && value <= 3600 ? undefined : "must be a number 0–3600",
+    sourceTimeoutSeconds: (value) => Number.isFinite(value) && value > 0 && value <= 600 ? undefined : "must be a number above 0, up to 600",
   },
 });

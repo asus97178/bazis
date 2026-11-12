@@ -23,6 +23,8 @@ export interface PermissionSourceState {
   readonly version: string | undefined;
   /** Why the last reading failed; the permissions read before it stay. */
   readonly error: string | undefined;
+  /** Readings and version questions that failed in a row; `0` after a success. */
+  readonly failures: number;
   readonly permissions: number;
 }
 
@@ -31,10 +33,13 @@ interface Source extends OwnedPermissionSource {
   loaded: boolean;
   version: string | undefined;
   error: string | undefined;
-  /** When the version was last compared, for the limit of {@link PermissionSources.verify}. */
+  failures: number;
+  /** When the version was last compared, for the limit of {@link PermissionSourcesService.verify}. */
   verifiedAt: number;
   /** Readings of one source go one after another. */
   queue: Promise<unknown>;
+  /** A call that ran out of time and has not answered yet: no new call starts beside it. */
+  unanswered: Promise<void> | undefined;
 }
 
 /** How often a missing key or attribute may ask a source for its version. */
@@ -45,18 +50,21 @@ const VERIFY_EVERY_MS = 1000;
  * the application takes requests, read again when a source's version changes.
  * A specification passes the checks of a declared one; a bad one is logged and
  * the permission does not exist — closed, never open. A reading that fails
- * leaves the permissions read before it.
+ * leaves the permissions read before it. A source that does not answer in
+ * `access.sourceTimeoutSeconds` has failed: it holds neither the start nor a
+ * request.
  */
-export class PermissionSources {
+export class PermissionSourcesService {
   private readonly sources: readonly Source[];
   private readonly kinds: ReadonlySet<string>;
+  private changes = 0;
 
   constructor(private readonly services: ServiceProvider, private readonly config: ConfigView<AccessConfig>) {
     const { sources, kinds } = declarationsOf(services);
     this.kinds = new Set(kinds.map((kind) => kind.kind));
     this.sources = [...sources]
       .sort((left, right) => left.prefix.localeCompare(right.prefix))
-      .map((source) => ({ ...source, permissions: new Map(), loaded: false, version: undefined, error: undefined, verifiedAt: 0, queue: Promise.resolve() }));
+      .map((source) => ({ ...source, permissions: new Map(), loaded: false, version: undefined, error: undefined, failures: 0, verifiedAt: 0, queue: Promise.resolve(), unanswered: undefined }));
   }
 
   /** The prefix of the source that owns the key, or `undefined` — the key is not of a source. */
@@ -74,7 +82,16 @@ export class PermissionSources {
   }
 
   state(): readonly PermissionSourceState[] {
-    return this.sources.map(({ prefix, module, loaded, version, error, permissions }) => ({ prefix, module, loaded, version, error, permissions: permissions.size }));
+    return this.sources.map(({ prefix, module, loaded, version, error, failures, permissions }) => ({ prefix, module, loaded, version, error, failures, permissions: permissions.size }));
+  }
+
+  /** Grows with every reading that changed the permissions: a list built from them is good until it does. */
+  get revision(): number {
+    return this.changes;
+  }
+
+  get count(): number {
+    return this.sources.length;
   }
 
   /** The seconds between two questions about the versions; `0` — never ask. */
@@ -90,6 +107,13 @@ export class PermissionSources {
   /** Asks every source for its version and reads again the ones that changed or have not been read. */
   async poll(): Promise<void> {
     await Promise.all(this.sources.map((source) => this.enqueue(source, () => this.compare(source))));
+  }
+
+  /** Tries again the sources whose last reading failed: without a poll nothing else would. */
+  async retry(): Promise<void> {
+    await Promise.all(this.sources
+      .filter((source) => !source.loaded || source.error !== undefined)
+      .map((source) => this.enqueue(source, () => this.compare(source))));
   }
 
   /**
@@ -113,7 +137,9 @@ export class PermissionSources {
     const source = this.sources.find((item) => underPrefix(key, item.prefix));
     if (source === undefined) return false;
     return await this.enqueue(source, async () => {
-      if (!force && Date.now() - source.verifiedAt < VERIFY_EVERY_MS) return false;
+      // A clock set back gives a negative time: compare then, do not wait for the clock to catch up.
+      const since = Date.now() - source.verifiedAt;
+      if (!force && since >= 0 && since < VERIFY_EVERY_MS) return false;
       return await this.compare(source);
     });
   }
@@ -129,9 +155,10 @@ export class PermissionSources {
     source.verifiedAt = Date.now();
     if (source.loaded) {
       try {
-        const version = await this.use(source, async (instance) => String(await instance.version()));
+        const version = await this.use(source, async (instance) => versionOf(await instance.version()));
         if (version === source.version) {
           source.error = undefined;
+          source.failures = 0;
           return false;
         }
       } catch (error) {
@@ -146,7 +173,7 @@ export class PermissionSources {
     source.verifiedAt = Date.now();
     try {
       // The version first: data changed during the reading gives a newer version to the next comparison.
-      const { version, declarations } = await this.use(source, async (instance) => ({ version: String(await instance.version()), declarations: await instance.load() }));
+      const { version, declarations } = await this.use(source, async (instance) => ({ version: versionOf(await instance.version()), declarations: await instance.load() }));
       if (typeof declarations !== "object" || declarations === null || Array.isArray(declarations)) throw new TypeError("load() must return an object: key → permission");
       const permissions = new Map<string, OwnedPermission>();
       for (const key of Object.keys(declarations).sort()) {
@@ -157,6 +184,8 @@ export class PermissionSources {
       source.version = version;
       source.loaded = true;
       source.error = undefined;
+      source.failures = 0;
+      this.changes += 1;
       return true;
     } catch (error) {
       this.failed(source, error);
@@ -176,6 +205,9 @@ export class PermissionSources {
         else permissions.set(key, permission);
       }
       source.permissions = new Map([...permissions].sort(([left], [right]) => left.localeCompare(right)));
+      source.error = undefined;
+      source.failures = 0;
+      this.changes += 1;
       return true;
     } catch (error) {
       this.failed(source, error);
@@ -185,33 +217,61 @@ export class PermissionSources {
 
   /** The permission, or `undefined` with the problems logged: it does not exist then. */
   private accept(source: Source, key: string, spec: PermissionSpec): OwnedPermission | undefined {
-    const problems = underPrefix(key, source.prefix) ? permissionProblems(key, spec) : [`permission "${key}": the key must start with "${source.prefix}."`];
-    if (problems.length === 0) {
-      for (const [name, attribute] of Object.entries(spec.on ?? {})) {
-        if (attribute.ref !== undefined && !this.kinds.has(attribute.ref)) problems.push(`permission "${key}": attribute "${name}" refers to kind "${attribute.ref}", which no module declares in references`);
+    let problems: string[];
+    let accepted: OwnedPermission | undefined;
+    try {
+      problems = underPrefix(key, source.prefix) ? permissionProblems(key, spec) : [`permission "${key}": the key must start with "${source.prefix}."`];
+      if (problems.length === 0) {
+        for (const [name, attribute] of Object.entries(spec.on ?? {})) {
+          if (attribute.ref !== undefined && !this.kinds.has(attribute.ref)) problems.push(`permission "${key}": attribute "${name}" refers to kind "${attribute.ref}", which no module declares in references`);
+        }
+        for (const lookup of lookupsOf(spec)) {
+          if (!this.services.has(lookup)) problems.push(`permission "${key}": ${lookup.name} is not registered: add it to providers of ${source.module}`);
+        }
       }
-      for (const lookup of lookupsOf(spec)) {
-        if (!this.services.has(lookup)) problems.push(`permission "${key}": ${lookup.name} is not registered: add it to providers of ${source.module}`);
-      }
+      if (problems.length === 0) accepted = { key, spec: frozenSpec(spec), module: source.module, source: source.prefix };
+    } catch (error) {
+      // Data of any shape may come from a source: what cannot even be checked is one bad permission, not a failed reading.
+      problems = [`permission "${key}": cannot be checked: ${error instanceof Error ? error.message : String(error)}`];
     }
-    if (problems.length > 0) {
-      this.services.tryResolve(LOGGER)?.error("access permission of a source rejected", { source: source.prefix, module: source.module, permission: key, problems });
-      return undefined;
-    }
-    return { key, spec: frozenSpec(spec), module: source.module, source: source.prefix };
+    if (accepted === undefined) this.services.tryResolve(LOGGER)?.error("access permission of a source rejected", { source: source.prefix, module: source.module, permission: key, problems });
+    return accepted;
   }
 
+  /**
+   * One call of the source in a scope of its own, with a deadline. A call that
+   * ran out of time cannot be stopped: its scope is closed when it answers, and
+   * until then no new call starts, so a database that hangs is asked once.
+   */
   private async use<T>(source: Source, work: (instance: PermissionSource) => Promise<T>): Promise<T> {
+    if (source.unanswered !== undefined) throw new Error("the previous call of the source has not answered yet");
+    const seconds = this.config.get("sourceTimeoutSeconds");
     const scope = this.services.createScope();
+    const working = (async () => await work(scope.resolve(source.type)))();
+    const answered = working.then(() => undefined, () => undefined).then(async () => {
+      source.unanswered = undefined;
+      await scope.dispose().catch(() => undefined);
+    });
+    let late = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        late = true;
+        source.unanswered = answered;
+        reject(new Error(`the source did not answer in ${seconds} s (access.sourceTimeoutSeconds)`));
+      }, seconds * 1000);
+    });
     try {
-      return await work(scope.resolve(source.type));
+      return await Promise.race([working, deadline]);
     } finally {
-      await scope.dispose();
+      clearTimeout(timer);
+      if (!late) await answered;
     }
   }
 
   private failed(source: Source, error: unknown): void {
     source.error = error instanceof Error ? error.message : String(error);
+    source.failures += 1;
     this.services.tryResolve(LOGGER)?.error("access permission source failed", {
       source: source.prefix,
       module: source.module,
@@ -219,4 +279,14 @@ export class PermissionSources {
       state: source.loaded ? "the permissions read before stay" : "the source has no permissions",
     });
   }
+}
+
+/**
+ * A version is what the catalog compares to learn of a change: `undefined`,
+ * `null` or an empty string would look like a version that never changes.
+ */
+function versionOf(value: unknown): string {
+  if (typeof value === "string" && value !== "") return value;
+  if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") return String(value);
+  throw new TypeError(`version() must return a non-empty string or a number, got ${value === null ? "null" : typeof value === "string" ? "an empty string" : typeof value}`);
 }

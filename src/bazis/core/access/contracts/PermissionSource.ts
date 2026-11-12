@@ -20,9 +20,10 @@ export abstract class PermissionSource {
    * The version of the source's data: a counter or a timestamp that changes in
    * one transaction with the data. Every instance of the application asks it
    * every `access.sourcePollSeconds` and reads the permissions again when it
-   * differs.
+   * differs. Nothing — `undefined`, `null`, an empty string — is a failed
+   * reading: it would look like a version that never changes.
    */
-  abstract version(): string | Promise<string>;
+  abstract version(): PermissionSourceVersion | Promise<PermissionSourceVersion>;
 
   /**
    * The permissions of the prefix, in the form of `definePermissions`. With
@@ -30,3 +31,6 @@ export abstract class PermissionSource {
    */
   abstract load(keys?: readonly string[]): PermissionDeclarations | Promise<PermissionDeclarations>;
 }
+
+/** A counter (a number, a bigint) or any non-empty string: the catalog only tells whether it differs. */
+export type PermissionSourceVersion = string | number | bigint;

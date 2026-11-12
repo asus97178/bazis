@@ -4,15 +4,15 @@ import { registerFrameworkClassDeps } from "../../di/module/autoDeps";
 import { ServiceProvider } from "../../di/ServiceProvider";
 import { AccessCatalog } from "../catalog/AccessCatalog";
 import { IAccessCatalog } from "../catalog/IAccessCatalog.service";
-import { PermissionSourceLoader } from "../catalog/PermissionSourceLoader";
-import { PermissionSources } from "../catalog/PermissionSources";
+import { PermissionSourceLoader } from "../catalog/PermissionSourceLoader.background";
+import { PermissionSourcesService } from "../catalog/PermissionSources.service";
 import { Access } from "../check/Access";
 import { RolesAccessPolicy } from "../roles/RolesAccessPolicy";
 
 registerFrameworkClassDeps([
   [Access, [IAccessCatalog, "Config:access"]],
-  [AccessCatalog, [ServiceProvider, PermissionSources, "Config:access"]],
-  [PermissionSourceLoader, [PermissionSources]],
-  [PermissionSources, [ServiceProvider, "Config:access"]],
+  [AccessCatalog, [ServiceProvider, PermissionSourcesService, "Config:access"]],
+  [PermissionSourceLoader, [PermissionSourcesService]],
+  [PermissionSourcesService, [ServiceProvider, "Config:access"]],
   [RolesAccessPolicy, [IAccessCatalog, "Config:access"]],
 ]);

@@ -26,7 +26,7 @@ export interface BazisPermissionSources {}
 
 export { AccessModule } from "./Access.module";
 export { definePermissions, type AnyPermissionKey, type AttributeSpec, type OwnPermissionKey, type PermissionDeclarations, type PermissionKey, type PermissionsOf, type PermissionSpec, type ScopeSource, type SourcePermissionKey } from "./catalog/permissions";
-export type { PermissionSourceState } from "./catalog/PermissionSources";
+export type { PermissionSourceState } from "./catalog/PermissionSources.service";
 export { IAccessCatalog } from "./catalog/IAccessCatalog.service";
 export type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./catalog/AccessCatalog";
 export { IAccess } from "./check/IAccess.service";
@@ -36,7 +36,7 @@ export { can } from "./check/can";
 export { grantsToWhere, type AccessFilter, type ColumnCondition } from "./check/filter";
 export { AccessPolicy, type ScopePrincipals } from "./contracts/AccessPolicy";
 export { AttributeLookup, type LookupColumn } from "./contracts/AttributeLookup";
-export { PermissionSource } from "./contracts/PermissionSource";
+export { PermissionSource, type PermissionSourceVersion } from "./contracts/PermissionSource";
 export { References, type ReferenceContext, type ReferenceItem, type ReferencePage } from "./contracts/References";
 export { AccessFilterTooLargeError, AccessSetupError } from "./contracts/errors";
 export type {

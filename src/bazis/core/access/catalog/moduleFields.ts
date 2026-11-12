@@ -17,7 +17,7 @@ import { isDeclaredRoles, rolePermission, type RoleDeclarations, type RolePermis
 import { IAccess } from "../check/IAccess.service";
 import type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./AccessCatalog";
 import { isDeclaredPermissions, isReferenceKind, isSourcePrefix, lookupsOf, permissionProblems, underPrefix, type PermissionDeclarations, type PermissionSpec } from "./permissions";
-import type { OwnedPermissionSource } from "./PermissionSources";
+import type { OwnedPermissionSource } from "./PermissionSources.service";
 
 interface PermissionPayload { readonly key: string; readonly spec: PermissionSpec }
 interface ReferencePayload { readonly kind: string; readonly type: Class<References> }

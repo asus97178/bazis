@@ -1,6 +1,6 @@
 import type { Grant } from "../contracts/types";
 import type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./AccessCatalog";
-import type { PermissionSourceState } from "./PermissionSources";
+import type { PermissionSourceState } from "./PermissionSources.service";
 
 /**
  * What the application's modules declared about access: permissions, reference

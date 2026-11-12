@@ -2,8 +2,8 @@ import { Module, singleton } from "../di";
 import { AccessCatalog } from "./catalog/AccessCatalog";
 import { IAccessCatalog } from "./catalog/IAccessCatalog.service";
 import { definePermissions } from "./catalog/permissions";
-import { PermissionSourceLoader } from "./catalog/PermissionSourceLoader";
-import { PermissionSources } from "./catalog/PermissionSources";
+import { PermissionSourceLoader } from "./catalog/PermissionSourceLoader.background";
+import { PermissionSourcesService } from "./catalog/PermissionSources.service";
 import { Access } from "./check/Access";
 import { accessConfig } from "./check/accessConfig";
 import { IAccess } from "./check/IAccess.service";
@@ -29,7 +29,7 @@ export const accessPermissions = definePermissions({
   config: [accessConfig],
   permissions: accessPermissions,
   providers: [
-    singleton(PermissionSources),
+    singleton(PermissionSourcesService),
     singleton(IAccessCatalog, AccessCatalog),
     singleton(AccessPolicy, RolesAccessPolicy),
     singleton(IAccess, Access),

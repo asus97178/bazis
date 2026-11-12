@@ -1,6 +1,6 @@
 # AccessModule
 
-Passport version: 1.1. Check date: 2026-11-13.
+Passport version: 1.2. Check date: 2026-11-13.
 Status: implemented for stages 1 and 5 (v1.4: permission sources, number comparisons) of [ACCESS-001](../../../../docs/architecture/ACCESS.md); checks below.
 Type: atomic.
 Path: `src/bazis/core/access`.
@@ -42,8 +42,8 @@ never open.
 | Module field `permissionSources` | [catalog/moduleFields.ts](catalog/moduleFields.ts) | channel `access.permission-source/v1`; the field registers the class as scoped | prefix → `PermissionSource` class; build-time checks: a prefix is owned once, no declared key and no other source under it |
 | `IAccessCatalog` → `AccessCatalog` (singleton) | [catalog](catalog) | `SERVICE_PROVIDER`: the container's contributions; `PermissionSources`; `accessConfig` | permissions (declared and of sources), reference kinds, roles; `find`, `grantProblem`, `changed`, `sources` |
 | `PermissionSource` (port of declaring modules) | [contracts/PermissionSource.ts](contracts/PermissionSource.ts) | — | `version()`, `load(keys?)` |
-| `PermissionSources` (singleton) | [catalog/PermissionSources.ts](catalog/PermissionSources.ts) | `SERVICE_PROVIDER` (a scope of its own for every reading), `accessConfig`, `LOGGER` | the permissions of every source, checked like declared ones; `load`, `poll`, `changed`, `verify` |
-| `PermissionSourceLoader` (`background`, phase 5) | [catalog/PermissionSourceLoader.ts](catalog/PermissionSourceLoader.ts) | `PermissionSources` | reads the sources before the HTTP host starts, then polls their versions; `/health` check `background:PermissionSourceLoader` |
+| `PermissionSourcesService` (singleton) | [catalog/PermissionSources.service.ts](catalog/PermissionSources.service.ts) | `SERVICE_PROVIDER` (a scope of its own for every call), `accessConfig`, `LOGGER` | the permissions of every source, checked like declared ones; `load`, `poll`, `retry`, `changed`, `verify`; a deadline for every call |
+| `PermissionSourceLoader` (`background`, phase 5) | [catalog/PermissionSourceLoader.background.ts](catalog/PermissionSourceLoader.background.ts) | `PermissionSourcesService` | reads the sources before the HTTP host starts, then polls their versions (without a poll — tries the failed ones again); `/health` check `background:PermissionSourceLoader` |
 | `AccessPolicy` (port) | [contracts/AccessPolicy.ts](contracts/AccessPolicy.ts) | — | `subject`, `grants`, `ownerIds`, `principals` |
 | `AttributeLookup`, `References` (ports of declaring modules) | [contracts](contracts) | — | column conditions for lookups; values of reference kinds |
 | Conditions | [check/conditions.ts](check/conditions.ts), [check/decimal.ts](check/decimal.ts) | — | `grantProblem` (limits: depth 8, 200 nodes, `maxInList`; `gt`/`gte`/`lt`/`lte` only for a `type: "number"` attribute with a column), `evaluate`; exact decimal comparison of number attributes |
@@ -83,6 +83,7 @@ No data of its own. Config `access`:
 | `roleClaim` | `role` | claim with the roles, separated by spaces or commas |
 | `maxInList` | `1000` | values of one `in`/`notIn` and of a lookup result; more → the grant is dropped / `AccessFilterTooLargeError` |
 | `sourcePollSeconds` | `5` | seconds between two questions to the permission sources about their version; `0` — no poll |
+| `sourceTimeoutSeconds` | `10` | seconds a permission source has for one answer; after them the reading has failed |
 
 The subject of a request is asked once and kept in `ctx.state`; grants are
 kept in its `SubjectAccess` for the request, together with the specification
@@ -93,7 +94,16 @@ Permission sources (ACCESS-001 §3.1):
 - Start: `PermissionSourceLoader` reads every source before the HTTP host
   starts. A source that fails does not stop the start: its prefix has no
   permissions, the error is logged, `/health` is unhealthy, and every poll
-  tries again.
+  tries again; without a poll a failed source is tried again every 5 seconds.
+- A call of a source (`version()`, `load()`) has `sourceTimeoutSeconds`. A
+  call that ran out of time cannot be stopped: its scope is closed when it
+  answers, and until then no new call of that source starts.
+- A version is a number, a bigint or a non-empty string; anything else is a
+  failed reading.
+- `/health` is unhealthy for a source that has never been read and for one
+  whose readings failed three times in a row; one failure keeps it healthy.
+- A specification that cannot be checked (any shape may come from a
+  database) is one rejected permission, not a failed reading.
 - Change on this instance: the module calls `IAccessCatalog.changed(prefix, keys?)`
   after its transaction is committed. With `keys` only they are read, and the
   catalog keeps the old version, so the next comparison reads the whole prefix.
@@ -156,6 +166,15 @@ line: a broken rule never widens access.
   the prefixes of `permissionSources` as key types, the source's dependencies.
 - Known limit: a lookup cannot return a subquery yet; a result over
   `maxInList` fails the request (ACCESS-001 §11).
+- [test/access.postgres.live.test.ts](test/access.postgres.live.test.ts) also
+  runs a source that reads the database through a private provider of its
+  module, in two containers on one database: a new table reaches the second
+  instance through the version, a removed one — with the poll.
 - Known limits of v1.4: no comparisons of dates; a permission or an attribute
   removed on another instance lives here up to `sourcePollSeconds`; a fraction
-  goes to the database as decimal text (ACCESS-001 §4.2, §11).
+  goes to the database as decimal text; the comparison is exact for `decimal`
+  columns, while `integer` and `real` are read and compared by the ORM as
+  doubles (integers are exact up to 2^53) (ACCESS-001 §4.2, §11).
+- Known cost: after `changed(prefix, keys)` the next comparison of versions
+  reads the whole prefix again; `keys` makes the change visible at once, it
+  does not save the reading.

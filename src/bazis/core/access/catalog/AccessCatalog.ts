@@ -9,7 +9,7 @@ import type { RolePermission } from "../roles/roles";
 import { IAccessCatalog } from "./IAccessCatalog.service";
 import { declarationsOf } from "./moduleFields";
 import type { PermissionSpec } from "./permissions";
-import type { PermissionSources, PermissionSourceState } from "./PermissionSources";
+import type { PermissionSourcesService, PermissionSourceState } from "./PermissionSources.service";
 
 /** A permission with the module that declares it: in `@Module({ permissions })` or through a source. */
 export interface OwnedPermission {
@@ -40,7 +40,10 @@ export class AccessCatalog extends IAccessCatalog {
   private readonly byKind: ReadonlyMap<string, OwnedReferenceKind>;
   private readonly byName: ReadonlyMap<string, DeclaredRole>;
 
-  constructor(services: ServiceProvider, private readonly sourced: PermissionSources, private readonly config: ConfigView<AccessConfig>) {
+  /** The declared permissions and the ones of the sources as one sorted list, good for one revision of the sources. */
+  private merged: { readonly revision: number; readonly list: readonly OwnedPermission[] } | undefined;
+
+  constructor(services: ServiceProvider, private readonly sourced: PermissionSourcesService, private readonly config: ConfigView<AccessConfig>) {
     super();
     const { permissions, kinds, roles } = declarationsOf(services);
     this.byKey = new Map([...permissions].sort((a, b) => a.key.localeCompare(b.key)).map((item) => [item.key, item]));
@@ -49,8 +52,11 @@ export class AccessCatalog extends IAccessCatalog {
   }
 
   permissions(): readonly OwnedPermission[] {
-    const sourced = this.sourced.permissions();
-    return sourced.length === 0 ? [...this.byKey.values()] : [...this.byKey.values(), ...sourced].sort((a, b) => a.key.localeCompare(b.key));
+    const revision = this.sourced.revision;
+    if (this.merged?.revision !== revision) {
+      this.merged = { revision, list: [...this.byKey.values(), ...this.sourced.permissions()].sort((a, b) => a.key.localeCompare(b.key)) };
+    }
+    return [...this.merged.list];
   }
 
   permission(key: string): OwnedPermission | undefined {
