@@ -4,6 +4,27 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.140.2 — 2026-11-13
+
+A fix of the ORM: integers beyond 2^53 in conditions. Nothing to change in an
+application.
+
+### Fixed
+
+- A condition on an `integer` column (`bigint` in PostgreSQL) compares an integer beyond
+  2^53 exactly. The parameter used to become a double, PostgreSQL then compared doubles,
+  and `where((row) => row.id.eq("1234567890123456789"))` found the neighbouring row as
+  well; `gt(9007199254740992)` lost the row with `9007199254740993`. Now an integer
+  written as a string, and a whole number of that size, go to the database as a `bigint`.
+  The same holds for `in`, `ne`, `gte`, `lt`, `lte` and for immediate updates.
+- Access: a list filter by such an integer lists exactly the rows the check allows.
+
+### Known limits
+
+- Reading is not changed: a `DbSet` gives an integer beyond 2^53 as a rounded number.
+  Pass such a value to `can` as a string or a `bigint`; to keep it exact in the entity,
+  store it in a `text` or `decimal` column.
+
 ## 0.140.1 — 2026-11-13
 
 Fixes for the permission sources of 0.140.0, found by a review of the code. Nothing to
