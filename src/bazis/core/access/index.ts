@@ -30,7 +30,7 @@ export type { PermissionSourceState } from "./catalog/PermissionSources.service"
 export { IAccessCatalog } from "./catalog/IAccessCatalog.service";
 export type { DeclaredRole, OwnedPermission, OwnedReferenceKind } from "./catalog/AccessCatalog";
 export { IAccess } from "./check/IAccess.service";
-export { SubjectAccess, maskFields, type FieldAccess } from "./check/Access";
+export { SubjectAccess, maskFields, type AccessExplanation, type FieldAccess, type GrantExplanation } from "./check/Access";
 export { accessConfig } from "./check/accessConfig";
 export { can } from "./check/can";
 export { grantsToWhere, type AccessFilter, type ColumnCondition } from "./check/filter";

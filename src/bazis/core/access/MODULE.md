@@ -1,7 +1,7 @@
 # AccessModule
 
-Passport version: 1.2. Check date: 2026-11-13.
-Status: implemented for stages 1 and 5 (v1.4: permission sources, number comparisons) of [ACCESS-001](../../../../docs/architecture/ACCESS.md); checks below.
+Passport version: 1.3. Check date: 2026-11-13.
+Status: implemented for stages 1, 5 (v1.4: permission sources, number comparisons) and 6 (v1.5: `Grant.id`, `explain`, `filterableFields`) of [ACCESS-001](../../../../docs/architecture/ACCESS.md); checks below.
 Type: atomic.
 Path: `src/bazis/core/access`.
 Connection point: [Access.module.ts](Access.module.ts), class `AccessModule`; public entry `bazis/core/access`, test helpers `bazis/core/access/testing`.
@@ -48,7 +48,7 @@ never open.
 | `AttributeLookup`, `References` (ports of declaring modules) | [contracts](contracts) | — | column conditions for lookups; values of reference kinds |
 | Conditions | [check/conditions.ts](check/conditions.ts), [check/decimal.ts](check/decimal.ts) | — | `grantProblem` (limits: depth 8, 200 nodes, `maxInList`; `gt`/`gte`/`lt`/`lte` only for a `type: "number"` attribute with a column), `evaluate`; exact decimal comparison of number attributes |
 | List filter | [check/filter.ts](check/filter.ts) | ORM `Operand` | `AccessFilter`, `ColumnCondition` (`{ column, op, value }` for a comparison), `grantsToWhere` |
-| `IAccess` → `Access` (singleton), `SubjectAccess` | [check](check) | `IAccessCatalog`, `accessConfig`; `AccessPolicy` and lookups from the request scope | `for(ctx)`, `as(subject, scope)`, `can`, `filter`, `fields`, `principals`, `ownerIds`; `maskFields` |
+| `IAccess` → `Access` (singleton), `SubjectAccess` | [check](check) | `IAccessCatalog`, `accessConfig`; `AccessPolicy` and lookups from the request scope | `for(ctx)`, `as(subject, scope)`, `can`, `explain`, `filter`, `fields`, `filterableFields`, `principals`, `ownerIds`; `maskFields` |
 | `can(permission, objectOf?)` | [check/can.ts](check/can.ts) | `IAccess` | an `AuthorizeCheck` |
 | `defineRoles`; `AccessPolicy` → `RolesAccessPolicy` (singleton) | [roles](roles) | `IAccessCatalog`, `accessConfig` | the default rights system; the application's own `AccessPolicy` registration replaces it |
 | `AccessCatalogController` (context only) | [http/AccessCatalog.controller.ts](http/AccessCatalog.controller.ts) | `IAccessCatalog`, `IAccess` from the request scope | `GET /access/catalog`, `GET /access/references/:kind` |
@@ -138,6 +138,24 @@ Permission sources (ACCESS-001 §3.1):
   (`SourcePermissionKey`). A source's key that does not exist now gives `false`,
   `"none"` and empty field lists, and the rights system is not asked.
 - `grantsToWhere(filter)` → ORM `Predicate`, `"all"` or `"none"`.
+- `explain(permission, object)` → `AccessExplanation`: `"all"` (a superuser),
+  `"absent"` (a source's key that does not exist now) or every grant of the
+  rights system in its order with `id`, `scope`, `where` (`true`, `false`,
+  `"unknown"`), `applies`, `problem` of a dropped grant and `fields` of a grant
+  that applies. `allowed` is the answer of `can`: both use one function. There
+  is no route: the answer shows the rules of another person.
+- `filterableFields(permission, { scope? })` → `"all"` or the fields the
+  subject reads by every grant: a list is filtered and sorted only by them.
+  `restrictListOptions(options, fields)` of `bazis/library/jsonapi` applies it
+  to the options of a list.
+- `Grant.id` — a label of the rights system; it comes back in `explain` and in
+  the `warn` line of a dropped grant (field `grant`). `RolesAccessPolicy` sets
+  `role:<role>`.
+- An object of `can` and `explain` has values under the names of attributes
+  (not columns), the owner under the name of the `owner` column, the partition
+  under `scope`. An attribute may be on the column of the partition
+  (`scope: { column: "spaceId" }` and `on: { spaceId: … }`): a grant applies
+  when both its partition and its condition fit.
 
 A grant the permission cannot use (unknown attribute, `own` without `owner`,
 a comparison of an attribute that is not a number in a column, a value of a
@@ -155,6 +173,11 @@ line: a broken rule never widens access.
   system and the catalog over HTTP.
 - [test/access.compare.test.ts](test/access.compare.test.ts): exact decimals;
   comparisons in `can` and in the filter; which attributes may be compared.
+- [test/access.explain.test.ts](test/access.explain.test.ts): `explain`
+  answers like `can` for every kind of condition; the order, the ids, the
+  problems and the fields of grants; the id in the warning; the role in the id
+  of the default rights system; `filterableFields`; an attribute on the column
+  of the partition.
 - [test/access.sources.test.ts](test/access.sources.test.ts): prefixes at
   build time; the start, bad specifications, a closed missing key; `changed`,
   the version comparison for a new key and a new attribute, `grantProblem`,
@@ -177,6 +200,9 @@ line: a broken rule never widens access.
   integer beyond 2^53 as a bigint), but the ORM still reads such an integer
   as a rounded number, so `can` needs it as a string or a bigint; `real` is a
   double on both sides (ACCESS-001 §4.2, §11).
+- Known limits of v1.5: `explain` gives one result per grant, not per leaf
+  of its condition; `filterableFields` counts every grant, also one that opens
+  no row of the list.
 - Known cost: after `changed(prefix, keys)` the next comparison of versions
   reads the whole prefix again; `keys` makes the change visible at once, it
   does not save the reading.

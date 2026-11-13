@@ -3,6 +3,7 @@ import {
   buildListDocument,
   ListQueryError,
   parseListQuery,
+  restrictListOptions,
   serializeListQuery,
   type ListQueryOptions,
 } from "@/library/jsonapi";
@@ -196,5 +197,40 @@ describe("serializeListQuery", () => {
     const reparsed = parseListQuery(new URLSearchParams(serializeListQuery(query)), OPTIONS);
     expect(reparsed.filters).toEqual(query.filters);
     expect(reparsed.or).toEqual(query.or);
+  });
+});
+
+describe("restrictListOptions", () => {
+  const options: ListQueryOptions = { ...OPTIONS, defaultSort: "-createdAt,name" };
+
+  test("leaves sorting and filtering only for the open fields", () => {
+    const restricted = restrictListOptions(options, ["name", "createdAt", "secret"]);
+    expect(restricted).toEqual({ sort: ["name", "createdAt"], filter: { name: ["eq", "contains"] }, include: ["posts"], page: { defaultSize: 20, maxSize: 100 }, defaultSort: "-createdAt,name" });
+    expect(parseListQuery(new URLSearchParams("filter[name]=Bob"), restricted).sort).toEqual([{ field: "createdAt", dir: "desc" }, { field: "name", dir: "asc" }]);
+    let error: unknown;
+    try {
+      parseListQuery(new URLSearchParams("filter[age][gte]=18&sort=-age"), restricted);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(ListQueryError);
+    expect((error as ListQueryError).problems).toEqual([
+      { parameter: "sort", message: 'sorting by "age" is not allowed' },
+      { parameter: "filter[age][gte]", message: 'filtering by "age" is not allowed' },
+    ]);
+  });
+
+  test("takes off a default sort that names a closed field", () => {
+    const restricted = restrictListOptions(options, ["name"]);
+    expect(restricted.defaultSort).toBeUndefined();
+    expect(restricted.sort).toEqual(["name"]);
+    // Without the default the request is parsed, not refused for a sort nobody asked for.
+    expect(parseListQuery(new URLSearchParams(""), restricted).sort).toEqual([]);
+  });
+
+  test('"all" changes nothing; an empty list closes everything; absent lists stay absent', () => {
+    expect(restrictListOptions(options, "all")).toBe(options);
+    expect(restrictListOptions(options, [])).toEqual({ sort: [], filter: {}, include: ["posts"], page: { defaultSize: 20, maxSize: 100 } });
+    expect(restrictListOptions({ page: { maxSize: 10 } }, ["name"])).toEqual({ page: { maxSize: 10 } });
   });
 });

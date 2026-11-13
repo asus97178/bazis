@@ -39,7 +39,8 @@ export class RolesAccessPolicy extends AccessPolicy {
       const role = this.catalog.role(name);
       if (role === undefined) continue;
       if (role.permissions === "all") return "all";
-      for (const item of role.permissions) if (item.permission === permission) grants.push(item.grant);
+      // The id tells `explain` and the log which role gave the grant (ACCESS-001 §4.1).
+      for (const item of role.permissions) if (item.permission === permission) grants.push({ id: `role:${name}`, ...item.grant });
     }
     return grants;
   }

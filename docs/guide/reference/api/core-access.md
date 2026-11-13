@@ -25,10 +25,11 @@
 | `IAccess` | Сервис проверок: `for(ctx)` — человек запроса, `as(subject, scope)` — без HTTP, `policy(scope)` | [Проверить маршрут](../../security/access.md#проверить-маршрут) |
 | `BazisPermissions`, `PermissionKey`, `OwnPermissionKey`, `PermissionsOf` | Объявленные права как тип: интерфейс заполняет codegen, `PermissionKey` принимают `can` и `defineRoles` | [Ключи проверяет компилятор](../../security/access.md#ключи-проверяет-компилятор) |
 | `BazisPermissionSources`, `SourcePermissionKey`, `AnyPermissionKey` | Ключи источников как тип: `` `${префикс}.${string}` ``; `AnyPermissionKey` принимают `can`, `access.can`, `access.filter`, `access.fields` | [Права во время работы](../../security/access.md#права-которые-появляются-во-время-работы) |
-| `SubjectAccess` | Права одного человека: `can`, `filter`, `fields`, `grants`, `principals`, `ownerIds` | там же |
+| `SubjectAccess` | Права одного человека: `can`, `explain`, `filter`, `fields`, `filterableFields`, `grants`, `principals`, `ownerIds` | там же |
+| `AccessExplanation`, `GrantExplanation` | Ответ `explain`: итог `can` и каждый грант с `id`, `scope`, `where`, `applies`, `problem`, `fields` | [Объяснить решение](../../security/access.md#объяснить-решение) |
 | `grantsToWhere(filter)` | Фильтр как условие ORM, `"all"` или `"none"` | [Отфильтровать список](../../security/access.md#отфильтровать-список) |
 | `AccessFilter`, `ColumnCondition` | Фильтр как данные, для модуля без ORM: `all`, `any`, `not`, `{ column, in }`, `{ column, isNull }`, `{ column, op, value }` | — |
-| `maskFields(record, read)` | Запись только с разрешёнными полями | — |
+| `maskFields(record, read)` | Запись только с разрешёнными полями | [Поля в списке](../../security/access.md#поля-в-списке) |
 | `AccessFilterTooLargeError` | `lookup` дал больше `access.maxInList` значений | — |
 
 ## Система прав
@@ -37,4 +38,4 @@
 | --- | --- | --- |
 | `AccessPolicy` | Порт системы прав приложения: `subject`, `grants`, `ownerIds`, `principals` | [Своя система прав](../../security/access.md#своя-система-прав) |
 | `RolesAccessPolicy`, `RoleSubject` | `AccessPolicy` по умолчанию: роли из токена, права из `@Module({ roles })`; приложение заменяет её своей регистрацией `AccessPolicy` | [Роли по умолчанию](../../security/access.md#роли-по-умолчанию) |
-| Типы `Grant`, `Grants`, `Condition`, `ValueTest`, `CompareTest`, `AccessSubject`, `AccessObject`, `Scope`, `LocalizedText` | Форма грантов и условий; `CompareTest` — `gt`, `gte`, `lt`, `lte` | [Сравнения чисел](../../security/access.md#сравнения-чисел) |
+| Типы `Grant`, `Grants`, `Condition`, `ValueTest`, `CompareTest`, `AccessSubject`, `AccessObject`, `Scope`, `LocalizedText` | Форма грантов и условий; `Grant.id` — метка правила системы прав; `CompareTest` — `gt`, `gte`, `lt`, `lte` | [Сравнения чисел](../../security/access.md#сравнения-чисел) |

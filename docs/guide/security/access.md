@@ -233,6 +233,94 @@ if (problem !== undefined) throw new HttpError(422, problem);
 неизвестный атрибут, `own` без `owner`, сравнение строки, слишком длинный
 список. Ответ — текст причины или `undefined`.
 
+### Объяснить решение
+
+С версии 0.141.0. Экрану «почему человеку можно или нельзя» нужно знать,
+какое правило сработало. Не повторяйте расчёт у себя: спросите `explain`.
+
+```ts
+// система прав отдаёт грант с меткой своего правила
+{ id: "rule:42", scopes: ["shop-1"], where: { total: { lte: 100000 } } }
+
+const why = await access.as(subject, scope).explain("orders.update", { ...order, scope: order.shopId });
+// {
+//   allowed: false,
+//   kind: "grants",
+//   grants: [
+//     { id: "rule:42", scope: true, where: false, applies: false },
+//     { id: "rule:57", scope: false, where: true, applies: false },
+//   ],
+// }
+```
+
+- `allowed` — тот же ответ, что у `can` на этом объекте.
+- `kind: "all"` — система прав ответила `"all"`, это суперпользователь.
+  `kind: "absent"` — права источника сейчас нет.
+- `grants` — все гранты в том порядке, в каком их отдала система прав.
+  `scope` — подошёл ли раздел. `where` — итог условия: `true`, `false` или
+  `"unknown"`, когда у объекта нет значения атрибута. `applies` — грант
+  подошёл целиком.
+- У отброшенного гранта вместо `scope` и `where` — `problem` с причиной.
+  Та же причина и `id` гранта пишутся в предупреждение в журнале.
+- У подошедшего гранта права с `fields: true` есть `fields`: что дал
+  именно он.
+- `id` в гранте необязателен. Роли по умолчанию ставят `role:<роль>`.
+
+Маршрута у `explain` нет. Ответ раскрывает правила другого человека, поэтому
+экран и право на него делает ваша система прав.
+
+### Поля в списке
+
+`fields(permission, object)` считает поля для одной записи. В списке у разных
+строк поля разные: считайте их в цикле, гранты уже лежат в кэше запроса.
+
+```ts
+const my = await access.for(ctx);
+const rows = await Promise.all(orders.map(async (order) =>
+  maskFields(order, (await my.fields("orders.read", { ...order, scope: order.shopId })).read)));
+```
+
+Фильтр и сортировка по закрытому полю выдают его значения, даже если само
+поле из ответа убрано. Разрешайте их только по полям, которые человек читает
+по каждому своему гранту:
+
+```ts
+import { optionsFromSchema, parseListQuery, restrictListOptions } from "bazis/library/jsonapi";
+
+const fields = await my.filterableFields("orders.read");   // "all" или список полей
+const query = parseListQuery(params, restrictListOptions(optionsFromSchema(OrderList), fields));
+```
+
+- Запрос с закрытым полем получает обычный ответ `400`:
+  `filtering by "total" is not allowed`.
+- Сортировка по умолчанию с закрытым полем снимается: список идёт по
+  первичному ключу.
+- У права со `scope: "request"` передайте раздел запроса:
+  `filterableFields("dm.records.read", { scope: space })`.
+- Правило с запасом: поле, закрытое хотя бы в одном гранте, закрыто для
+  всего списка.
+
+### Объект проверки
+
+`can` и `explain` читают значения объекта по именам атрибутов, а фильтр
+списка — по колонкам. Владелец читается по имени колонки `owner`, раздел —
+из `scope`.
+
+```ts
+// атрибут назван как колонка: строка из базы подходит как есть
+"orders.read": { scope: { column: "shopId" }, on: { status: { type: "string" } }, owner: "customerId" }
+await my.can("orders.read", { ...order, scope: order.shopId });
+
+// атрибут с другим именем: значение нужно положить под имя атрибута
+on: { buyer: { ref: "crm.client", column: "buyerId" } }
+await my.can("orders.read", { ...order, buyer: order.buyerId, scope: order.shopId });
+```
+
+Значения под именем атрибута нет — условие «неизвестно», и проверка
+откажет, хотя фильтр списка эту строку покажет. Атрибут может лежать и на
+колонке раздела: раздел гранта говорит, где он действует, условие по
+атрибуту сужает дальше.
+
 ## Права, которые появляются во время работы
 
 Таблицы дата-менеджера создаёт администратор, а не программист. Право на
