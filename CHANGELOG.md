@@ -4,6 +4,35 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.141.0 — 2026-11-13
+
+Access ([ACCESS-001 v1.5](docs/architecture/ACCESS.md)): why a check answers what it
+answers, and which fields a list may be filtered by. Nothing to change in an application.
+
+### Added
+
+- `SubjectAccess.explain(permission, object)`: the answer of `can` and every grant of the
+  rights system in its order — whether its partition fits, the result of its condition
+  (`true`, `false`, `"unknown"`), the reason a grant was dropped, the fields a grant that
+  applies gives. `kind: "all"` — the rights system answered `"all"`; `kind: "absent"` — a
+  permission of a source that does not exist now. `can` and `explain` use one function.
+- `Grant.id`: an optional label of the rights system, for example the id of a role's rule.
+  The checks do not read it; it comes back in `explain` and in the warning about a dropped
+  grant (field `grant`). The default rights system sets `role:<role>`.
+- `SubjectAccess.filterableFields(permission, { scope? })`: `"all"` or the fields the
+  subject reads by every grant. A filter or a sort by a closed field tells its values, so
+  a list is filtered and sorted only by these.
+- `restrictListOptions(options, fields)` in `bazis/library/jsonapi`: the options of a list
+  with `sort` and `filter` left only for the open fields. A request with a closed field
+  gets the usual `400` (`filtering by "total" is not allowed`); a `defaultSort` that names
+  a closed field is taken off.
+
+### Changed
+
+- The specification allows an attribute on the column of the partition
+  (`scope: { column: "spaceId" }` and `on: { spaceId: … }`): the code allowed it already.
+  A grant applies when both its partition and its condition fit.
+
 ## 0.140.2 — 2026-11-13
 
 A fix of the ORM: integers beyond 2^53 in conditions. Nothing to change in an
