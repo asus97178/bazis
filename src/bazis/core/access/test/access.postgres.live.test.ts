@@ -196,6 +196,56 @@ describe.skipIf(!url)("access filters on PostgreSQL (live)", () => {
     }
   }, 60_000);
 
+  // ACCESS-001 §4.2: an integer beyond 2^53 is compared exactly too, when the object carries it exactly.
+  test("big integers: the filter lists exactly the rows can() allows", async () => {
+    schema = `bazis_access_${crypto.randomUUID().replaceAll("-", "")}`.slice(0, 63);
+    @Schema(schema) @Entity({ table: "deals" })
+    class Deal {
+      @Key() id = 0;
+      @Nullable() @Column({ type: "integer" }) qty: number | null = null;
+    }
+    class Db extends DbContext { readonly deals = this.set(Deal); }
+    const provider = postgres({ url: url! });
+    const db = () => new Db(new DbContextOptions({ provider, entities: [Deal] }));
+
+    const conditions: Condition[] = [
+      { qty: { eq: "1234567890123456789" } },
+      { qty: { in: ["1234567890123456790", 42] } },
+      { qty: { notIn: ["1234567890123456789", 42] } },
+      { qty: { gt: 9007199254740992 } },
+      { qty: { lte: 9007199254740992 } },
+      { not: { qty: { gte: 9007199254740992 } } },
+    ];
+    const grants = Object.fromEntries(conditions.map((where, index) => [`user:${index}`, { "shop.deals.read": [{ scopes: "all", where }] satisfies Grants }]));
+    @Module({ imports: [AccessModule], permissions, providers: [singleton(GroupLookup), singletonValue(AccessPolicy, new StaticAccessPolicy({ grants }))] })
+    class AppModule {}
+
+    try {
+      await db().database.ensureCreated();
+      await provider.execute(`INSERT INTO "${schema}"."deals" (id, qty) VALUES (1, 1234567890123456789), (2, 1234567890123456790), (3, 9007199254740993), (4, 9007199254740992), (5, 42), (6, NULL)`, []);
+      // The ORM reads an integer column as a number and rounds these; the exact values come as text.
+      const exact = (await provider.query(`SELECT id, qty::text AS qty FROM "${schema}"."deals" ORDER BY id`, []) as { id: unknown; qty: string | null }[]).map((row) => ({ id: Number(row.id), qty: row.qty }));
+      expect((await db().deals.asNoTracking().orderBy((deal) => deal.id).toList()).slice(0, 2).map((deal) => deal.qty)).toEqual([1234567890123456800, 1234567890123456800]);
+
+      const container = await createTestContainer(AppModule);
+      const scope = container.createScope();
+      for (const [index, condition] of conditions.entries()) {
+        const access = scope.resolve(IAccess).as({ sub: `user:${index}` }, scope);
+        const where = grantsToWhere(await access.filter("shop.deals.read"));
+        const listed = (await db().deals.asNoTracking().where(() => where as Exclude<typeof where, string>).orderBy((deal) => deal.id).toList()).map((deal) => deal.id);
+        const allowed: number[] = [];
+        for (const deal of exact) if (await access.can("shop.deals.read", { qty: deal.qty })) allowed.push(deal.id);
+        expect(allowed.length, JSON.stringify(condition)).toBeGreaterThan(0);
+        expect(allowed.length, JSON.stringify(condition)).toBeLessThan(exact.length);
+        expect(listed, JSON.stringify(condition)).toEqual(allowed);
+      }
+      await scope.dispose();
+      await container.dispose();
+    } finally {
+      await provider.close();
+    }
+  }, 60_000);
+
   // ACCESS-001 §3.1: two instances of one application learn of each other's tables from the source's version.
   test("a source reads the database; a second instance learns of a new table from the version", async () => {
     schema = `bazis_access_${crypto.randomUUID().replaceAll("-", "")}`.slice(0, 63);
