@@ -173,8 +173,10 @@ line: a broken rule never widens access.
 - Known limits of v1.4: no comparisons of dates; a permission or an attribute
   removed on another instance lives here up to `sourcePollSeconds`; a fraction
   goes to the database as decimal text; the comparison is exact for `decimal`
-  columns, while `integer` and `real` are read and compared by the ORM as
-  doubles (integers are exact up to 2^53) (ACCESS-001 §4.2, §11).
+  columns and, in a list filter, for integers of any size (the ORM sends an
+  integer beyond 2^53 as a bigint), but the ORM still reads such an integer
+  as a rounded number, so `can` needs it as a string or a bigint; `real` is a
+  double on both sides (ACCESS-001 §4.2, §11).
 - Known cost: after `changed(prefix, keys)` the next comparison of versions
   reads the whole prefix again; `keys` makes the change visible at once, it
   does not save the reading.

@@ -54,11 +54,16 @@ try {
 run("package", [bun, "run", "scripts/package-check.ts"]);
 
 // Access on real rows (ACCESS-001 §4.3): a list filter must list exactly the rows
-// can() allows. The suite is skipped without a database; CI gives the one of the
-// examples through BAZIS_ACCESS_PG_URL, and the test keeps to a schema of its own.
+// can() allows; and the integers beyond 2^53 it depends on in the ORM. The suites are
+// skipped without a database; CI gives the one of the examples through
+// BAZIS_ACCESS_PG_URL, and each test keeps to a schema of its own.
 const accessDb = process.env.BAZIS_ACCESS_PG_URL;
 if (accessDb !== undefined) {
-  run("access on PostgreSQL", [bun, "test", "--isolate", "src/bazis/core/access/test/access.postgres.live.test.ts"], root, { ...process.env, BAZIS_PG_URL: accessDb });
+  run("access on PostgreSQL", [
+    bun, "test", "--isolate",
+    "src/bazis/core/access/test/access.postgres.live.test.ts",
+    "src/bazis/library/orm/test/orm.integer-exact.postgres.live.test.ts",
+  ], root, { ...process.env, BAZIS_PG_URL: accessDb });
 }
 
 // The examples as a user would build them. Their tests need PostgreSQL, else they
