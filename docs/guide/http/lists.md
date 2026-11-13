@@ -164,6 +164,10 @@ GET /tasks?filter[createdAt][gt]=2020&filter[name][gte]=A&page[number]=0
 То же для сортировки (`sorting by "secret" is not allowed`) и связей
 (`include "owner" is not allowed`).
 
+Если поля записи закрыты правами, фильтр и сортировку по ним тоже нужно
+закрыть: `restrictListOptions` — в главе
+[Права модулей](../security/access.md#поля-в-списке).
+
 ## Дальше
 
 - [Маршрутизация и привязка параметров](routing.md)

@@ -13,6 +13,7 @@
  * in `@/core/http`.
  */
 export { parseListQuery } from "./parseListQuery";
+export { restrictListOptions } from "./restrictListOptions";
 export { buildListDocument, serializeListQuery } from "./document";
 export type { BuildListDocumentOptions, ListDocument, ListLinks, ListMeta } from "./document";
 export { ListQueryError, type ListQueryProblem } from "./ListQueryError";

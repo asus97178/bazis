@@ -45,6 +45,12 @@ export interface GrantFields {
 
 /** What a subject is given by one permission: in these partitions, on these conditions. */
 export interface Grant {
+  /**
+   * A label of the rights system, for example the id of a role's rule. The
+   * framework does not read it: `explain` and the warning about a dropped
+   * grant hand it back (ACCESS-001 §4.1).
+   */
+  readonly id?: string;
   readonly scopes: "all" | readonly Scope[];
   readonly where?: Condition;
   readonly fields?: GrantFields;
