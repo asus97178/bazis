@@ -108,11 +108,15 @@ ORM и отдельно считает `total`. Значения из запро
 | `?filter[name]=Bob` | `name = 'Bob'` — без оператора это `eq` |
 | `?filter[email][contains]=test` | Содержит |
 | `?filter[name][startsWith]=Ca` | Начинается с |
+| `?filter[name][icontains]=кат` | Содержит без учёта регистра: найдёт «Катя» |
 | `?filter[name]=Bob&filter[email][contains]=example` | Оба условия (И) |
 | `?filter[or][0][name]=Alice&filter[or][1][name]=Eve` | Хотя бы одна группа (ИЛИ) |
 
 Операторы: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `contains`,
-`startsWith`, `endsWith`, `like`, `in`, `nin`, `isNull`, `isNotNull`.
+`startsWith`, `endsWith`, `icontains`, `istartsWith`, `iendsWith`, `like`,
+`in`, `nin`, `isNull`, `isNotNull`. `contains`, `startsWith` и `endsWith`
+различают регистр; варианты с `i` — нет (в PostgreSQL это `ILIKE`). `%` и `_`
+в значении у всех шести — обычные символы.
 Условия внутри одной группы `or[N]` соединяются через И, разные группы —
 через ИЛИ.
 
