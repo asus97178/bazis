@@ -1,7 +1,7 @@
 # Orders — a bazis workflow example
 
-An application on [business processes](../../docs/guide/workflow/processes.md)
-and [permissions](../../docs/guide/security/access.md), without a CMS: an order
+An application on [business processes](../../docs/guide/module/processes.md)
+and [permissions](../../docs/guide/module/access.md), without a CMS: an order
 is approved by a process, its steps are Tools of the `order` module, and who may
 do what is the data of `defineRoles`.
 
