@@ -23,9 +23,6 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Жизненный цикл](application/lifecycle.md) — фоновые службы, перезапуск, хуки, порядок запуска и остановки
 - ✅ [Плавная остановка и health](application/graceful-shutdown.md) — `SIGTERM`, срок остановки и коды выхода, `/health`, проверки Kubernetes
 - ✅ [Кодогенерация](application/codegen.md) — как связываются зависимости и HTTP, `src/generated`, цели
-- ✅ [Обзор `@Infra`](application/infra/overview.md) — манифест, клиенты по типу, порядок старта и остановки, сбой подключения, срок старта, здоровье, два экземпляра одного типа
-- ✅ [Коннекторы](application/infra/connectors.md) — PostgreSQL (`postgres`), Redis, OpenSearch, Codex; LLM — в [отдельной главе](agents/llm-connectors.md)
-- ✅ [Свой коннектор](application/infra/custom-connector.md) — клиент, тип для внедрения, `InfraConnector`, конфигурация и секреты, сервис поверх клиента
 - ✅ [Кэширование](application/caching.md) — кэш в памяти и в Redis, `@Cacheable` и ключи, время жизни сервиса, только простые данные в Redis, недоступный Redis
 - ✅ [CORS, заголовки безопасности, журнал запросов](application/cors-headers-log.md) — источники и preflight, CORS для части маршрутов, HSTS и CSP, `accessLog`
 - ✅ [Ограничение частоты запросов](application/rate-limit.md) — `rateLimit`, ключи, работа за прокси, заголовки `RateLimit-*`
@@ -33,6 +30,12 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Health checks](application/health-checks.md) — `/health`, свои проверки, подробности, тайм-ауты
 - ✅ [Аутентификация через JWT](application/jwt.md) — пара токенов, обновление и отзыв refresh, HS256 и RS256, ротация ключей, виды токенов
 - ✅ [Шаблоны авторизации](application/authorization-patterns.md) — текущий пользователь, роли и права, `anyOf`, владелец записи, арендаторы, ключи API
+
+### Инфраструктура
+
+- ✅ [Обзор `@Infra`](application/infra/overview.md) — манифест, клиенты по типу, порядок старта и остановки, сбой подключения, срок старта, здоровье, два экземпляра одного типа
+- ✅ [Коннекторы](application/infra/connectors.md) — PostgreSQL (`postgres`), Redis, OpenSearch, Codex; LLM-коннекторы — в разделе «AI-агенты»
+- ✅ [Свой коннектор](application/infra/custom-connector.md) — клиент, тип для внедрения, `InfraConnector`, конфигурация и секреты, сервис поверх клиента
 
 ## 3. Модуль
 
