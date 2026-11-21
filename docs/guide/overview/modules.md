@@ -192,7 +192,7 @@ CLI создаст пустой модуль с паспортом `MODULE.md` �
 |---|---|
 | `bunx bazis g module User --empty` | Пустой модуль с паспортом |
 | `bunx bazis g module User` или `--minimal` | Готовая основа CRUD-модуля: модель, контекст БД, контракт и сервис, контроллер, модели запросов |
-| `bunx bazis g module User --full` | CRUD-модуль плюс кэш, авторизация, фоновая служба и AI-инструмент |
+| `bunx bazis g module User --full` | CRUD-модуль плюс список с фильтрами, кэш, авторизация, фоновая служба и AI-инструмент |
 | `bunx bazis g pack Catalog --parts items,categories` | Составной модуль из нескольких независимых частей |
 | `bunx bazis g module Prices --pack Catalog` | Ещё одна часть в готовом составном модуле |
 
