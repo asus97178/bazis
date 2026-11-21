@@ -45,18 +45,18 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Инкапсуляция модулей](module/encapsulation.md) — видимость, реэкспорт, одна реализация на токен, модули с параметрами
 - ✅ [Архитектура модулей](module/module-architecture.md) — атомарные и составные модули, создание через CLI, паспорт `MODULE.md`
 
-### Сервисы (`providers`)
+### Сервисы (providers)
 
 - ✅ [Провайдеры и DI](module/services/providers.md) — `scoped`, `singleton`, `transient`, внедрение через конструктор
 - ✅ [DI подробно](module/services/dependency-injection.md) — значения, фабрики, асинхронные фабрики, ключи, `Lazy`, освобождение ресурсов
 - ✅ [События](module/services/events.md) — `EventBus`, `onEvent`, `@OnEvent`, порядок, ошибки
 
-### Настройки (`config`)
+### Настройки (config)
 
 - ✅ [Конфигурация](module/config/configuration.md) — `defineConfig`, источники, переменные `BAZIS_*`, секреты, `inspect()`
 - ✅ [Секреты и конфигурация](module/config/secrets.md) — секрет в коде и production, файлы секретов, `.env` и бинарник, `Secret`, маскировка в логах, ротация
 
-### Контроллеры (`controllers`)
+### Контроллеры (controllers)
 
 - ✅ [Контроллеры](module/controllers/controllers.md) — `@Controller`, `@Get` / `@Post`, параметры маршрута
 - ✅ [Маршрутизация и привязка параметров](module/controllers/routing.md) — выбор маршрута, параметры пути и строки запроса, массивы
@@ -71,23 +71,23 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [OpenAPI](module/controllers/openapi.md) — документ из кода, коды ответов и ошибки, JSDoc
 - ✅ [Кэширование ответов](module/controllers/output-cache.md) — `@OutputCache`, ключи, сброс по тегам, защищённые маршруты, политики
 
-### WebSocket (`gateways`)
+### WebSocket (gateways)
 
 - ✅ [WebSocket](module/websocket.md) — шлюзы в модуле, протокол и клиент, комнаты, отправка из сервиса через `WebSocketService`, вход по JWT, проверка данных и лимиты, переподключение
 
-### gRPC (`grpcControllers`, `grpcClients`)
+### gRPC (grpcControllers, grpcClients)
 
 - ✅ [gRPC](module/grpc.md) — контракт `.proto`, контроллеры и четыре вида вызовов, проверка DTO, ошибки, `@Authorize`, срок вызова, клиент как класс с `@GrpcClient` и поле `grpcClients`, 502/504 в HTTP
 
-### HTTP-клиенты (`httpClients`)
+### HTTP-клиенты (httpClients)
 
 - ✅ [HTTP-клиент](module/http-client.md) — клиент как класс с `@HttpClient` и поле `httpClients`, повторы и тайм-ауты, ошибки и 502/504, несколько сервисов, браузер
 
-### Фоновые службы (`background`)
+### Фоновые службы (background)
 
 - ✅ [Фоновые службы](module/background-services.md) — очередь задач в базе, несколько экземпляров: один раз за период и не одновременно, здоровье служб в `/health`
 
-### База данных (`ormBazis`)
+### База данных (ormBazis)
 
 - ✅ [Подключение PostgreSQL](module/database/postgresql.md) — настройки, `@Infra`, ошибки подключения, TLS, пул и тайм-ауты
 - ✅ [Сущности и ключи](module/database/entities.md) — таблицы, типы столбцов и NULL, ключи и UUID v7, индексы, `@Check`
@@ -103,22 +103,22 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Динамические модели](module/database/dynamic-models.md) — таблицы, описанные данными: `buildDynamicModel`, `setByName`, связи, изменение на лету, реестр в DI
 - ✅ [Ошибки базы данных](module/database/errors.md) — классы ошибок, обработка в коде, HTTP-статусы, тайм-ауты и недоступная база
 
-### Права и роли (`permissions`, `roles`, `references`)
+### Права и роли (permissions, roles, references)
 
 - ✅ [Права модулей](module/access.md) — `definePermissions`, `can`, фильтр списков по правам, роли по умолчанию, своя система прав (`AccessPolicy`), каталог для админки
 
-### Инструменты (`tools`, `agentToolHooks`)
+### Инструменты (tools, agentToolHooks)
 
 Операции модуля с контрактом. Их вызывают и бизнес-процессы, и агенты.
 
 - ✅ [Инструменты](module/tools/tools.md) — `@Tool` и `@Module.tools`, схема для модели, проверка аргументов, контекст вызова, `ToolError` и журнал, срок и отмена, запись с неизвестным исходом, `AgentToolPreCommitError`, повторы
 - ✅ [Хуки инструментов и аудит](module/tools/hooks.md) — `enforcement`, `settlement`, `observer`, причина отказа для модели, журнал вызовов и маскировка, отказ журнала, обязательные хуки
 
-### Бизнес-процессы (`processes`)
+### Бизнес-процессы (processes)
 
 - ✅ [Бизнес-процессы](module/processes.md) — `WorkflowModule`, документ процесса, публикация версий, запуск, ошибка шага и повтор, задача сотруднику и входящие задачи, повторы, ошибки с причиной и таймеры, события, расписание, отмена, права `workflow.*`, несколько экземпляров
 
-### Генерируемый UI (`uiProfiles`)
+### Генерируемый UI (uiProfiles)
 
 - ⏳ Описание интерфейса (UI-профили) — отложено до выхода рендерера
 
