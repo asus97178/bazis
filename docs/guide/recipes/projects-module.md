@@ -62,7 +62,7 @@ export class ProjectsDbContext extends DbContext {
 ## 2. Контракт
 
 Другие модули видят не сам сервис, а его контракт — абстрактный класс. Он
-же токен DI ([Провайдеры](../overview/providers.md#интерфейс-и-токен)):
+же токен DI ([Провайдеры](../module/services/providers.md#интерфейс-и-токен)):
 
 ```ts
 // src/app/modules/projects/services/IProjects.service.ts
@@ -147,7 +147,7 @@ export class ProjectsService implements IProjectsService {
 
 `ServiceProvider` scoped-сервиса — область текущего запроса, поэтому
 `publishScoped` передаёт её подписчикам: они получат сервисы того же
-запроса ([Контейнер вручную](../fundamentals/dependency-injection.md#контейнер-вручную)).
+запроса ([Контейнер вручную](../module/services/dependency-injection.md#контейнер-вручную)).
 Сервис проектов не знает, кто подписан, и не зависит от HTTP.
 
 ## 3. Контроллер и модуль
@@ -215,7 +215,7 @@ export class ProjectsModule {}
 
 `exports: [IProjectsService]` — то, чем модуль делится. Контекст базы и
 сам `ProjectsService` наружу не выходят: таблицу `projects` меняет только
-этот модуль ([Инкапсуляция](../fundamentals/encapsulation.md)).
+этот модуль ([Инкапсуляция](../module/encapsulation.md)).
 
 ## 4. Задача в проекте
 
@@ -324,7 +324,7 @@ export class ProjectCleanup {
 
 - `scoped(ProjectCleanup)` и `withEventSubscribers(ProjectCleanup)` —
   подписчик живёт в запросе и получает контекст базы этого запроса
-  ([События](../fundamentals/events.md#методом-класса)).
+  ([События](../module/services/events.md#методом-класса)).
 
 > [!NOTE]
 > До 0.106.0 `ServiceProvider` в scoped-сервисе был корневым контейнером, и
@@ -334,13 +334,13 @@ export class ProjectCleanup {
 - `executeUpdate` меняет строки одним `UPDATE`, без загрузки задач. Перед
   ним нужен `asNoTracking()`, иначе
   `OrmUnsafeImmediateMutationError: … call .asNoTracking() before executeUpdate()`
-  ([Немедленные изменения](../database/immediate.md)).
+  ([Немедленные изменения](../module/database/immediate.md)).
 
 > [!WARNING]
 > Удаление проекта и очистка задач — две разные транзакции. Если
 > подписчик упал, проект уже удалён, клиент получил `500`, а у задач
 > осталась ссылка на несуществующий проект. Шина событий не надёжна, как
-> очередь ([Чего шина не делает](../fundamentals/events.md#чего-шина-не-делает)).
+> очередь ([Чего шина не делает](../module/services/events.md#чего-шина-не-делает)).
 > Здесь это безопасно: чужой или удалённый проект `isOwn` не найдёт, а
 > ссылку можно убрать повторно.
 
@@ -435,5 +435,5 @@ $ bunx bazis test
 ## Дальше
 
 - [Один исполняемый файл](../deployment/single-executable.md) — собрать планировщик и запустить в production с секретами
-- [Модули](../overview/modules.md) и [инкапсуляция](../fundamentals/encapsulation.md)
-- [События](../fundamentals/events.md)
+- [Модули](../module/modules.md) и [инкапсуляция](../module/encapsulation.md)
+- [События](../module/services/events.md)

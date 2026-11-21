@@ -159,13 +159,13 @@ bunx bazis g module Orders --full     # CRUD, список, кэш, доступ
 
 `+` — новый файл, `~` — изменённый. Строка `◆` говорит, что нужно
 модулю для запуска: примерам `--minimal` и `--full` нужна база данных
-([подключение](../database/postgresql.md)), примеру `--full` — ещё и кэш
+([подключение](../module/database/postgresql.md)), примеру `--full` — ещё и кэш
 (`@App({ cache: memory() })`).
 
 Таблицу модуля шаблон не создаёт: как появится схема, решает
 приложение. Без этого первый запрос ответит
 `500 relation "orders" does not exist`. Проще всего — `ensureCreated: true`
-в `ormBazis` модуля ([Управление схемой](../database/schema.md)):
+в `ormBazis` модуля ([Управление схемой](../module/database/schema.md)):
 
 ```ts
 ormBazis: { context: OrdersDbContext, ensureCreated: true },
@@ -229,7 +229,7 @@ bunx bazis g module Discounts --empty --pack Catalog   # ещё одна час�
 
 Частей — не меньше двух, части создаются пустыми. Когда нужен атомарный
 модуль, а когда составной, — в главе
-[Архитектура модулей](../fundamentals/module-architecture.md).
+[Архитектура модулей](../module/module-architecture.md).
 
 ## `bazis g process`
 
@@ -268,7 +268,7 @@ bunx bazis workflow diagram delivery > delivery.mmd
 `diagram` печатает процесс как Mermaid `flowchart` и больше ничего — вывод
 можно перенаправить в файл. Обе берут `src/app/modules/App.module.ts`, другой
 файл — `--app-module <путь>`. Подробно — в главе
-[Бизнес-процессы](../workflow/processes.md#проверка-и-схема-bazis-workflow).
+[Бизнес-процессы](../module/processes.md#проверка-и-схема-bazis-workflow).
 
 ## `bazis upgrade`
 
@@ -329,7 +329,7 @@ bunx bazis codegen --target all      # все цели bazis.config.json
   ╰──────────────────────────────────────────────────────────────────────────╯
 ```
 
-Коды ошибок и цели — в главе [Кодогенерация](../fundamentals/codegen.md).
+Коды ошибок и цели — в главе [Кодогенерация](../application/codegen.md).
 
 ## `bazis dev`
 
@@ -540,7 +540,7 @@ Ran 1 test across 1 file. [217.00ms]
 ```
 
 Код выхода — код `bun test`. Как писать тесты — в главе
-[Тестирование](../fundamentals/testing.md).
+[Тестирование](../testing/testing.md).
 
 ## `bazis build`
 
@@ -618,7 +618,7 @@ bunx bazis build --bin --platform linux-x64  # для другой платфо�
 ## Дальше
 
 - [Установка](../introduction/installation.md)
-- [Архитектура модулей](../fundamentals/module-architecture.md)
-- [Кодогенерация](../fundamentals/codegen.md)
-- [Тестирование](../fundamentals/testing.md)
-- [Конфигурация](../fundamentals/configuration.md)
+- [Архитектура модулей](../module/module-architecture.md)
+- [Кодогенерация](../application/codegen.md)
+- [Тестирование](../testing/testing.md)
+- [Конфигурация](../module/config/configuration.md)

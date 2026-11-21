@@ -88,7 +88,7 @@ POST /auth/register {"email":"bad","password":"x"}
   `Vary: Accept-Language`: кэши не отдадут английский ответ русскому
   клиенту.
 - Успешные ответы контроллеров эти заголовки не получают и по-прежнему
-  попадают в [кэш ответов](../http/output-cache.md). Если ответ зависит от
+  попадают в [кэш ответов](../module/controllers/output-cache.md). Если ответ зависит от
   языка, используйте `ctx.language` — выбранный язык — и сами добавьте
   `Vary: Accept-Language`.
 - Тексты `CodexError` — на языке `default`: они общие на процесс.
@@ -269,6 +269,6 @@ expect((await (await app.fetch("/books")).json()).details).toEqual([{ property: 
 
 ## Дальше
 
-- [Проверка данных](../overview/validation.md)
-- [Ошибки](../overview/errors.md)
+- [Проверка данных](../module/controllers/validation.md)
+- [Ошибки](../module/controllers/errors.md)
 - [Команды CLI](../cli/commands.md)

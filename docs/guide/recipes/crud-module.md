@@ -70,7 +70,7 @@ export class Application {}
 
 Секция `test` направляет тесты в отдельную базу `planner_test`.
 Ошибки базы отвечают понятными кодами сами: нарушение
-уникальности — `409`, а не `500` ([Ошибки базы данных](../database/errors.md#http-статусы)).
+уникальности — `409`, а не `500` ([Ошибки базы данных](../module/database/errors.md#http-статусы)).
 
 ## 2. Модель
 
@@ -141,8 +141,8 @@ export class TasksModule {}
 [orm:schema] applied 2 operation(s): create table tasks, create index ix_tasks_priority on tasks (priority)
 ```
 
-Подробнее о столбцах и ключах — [Сущности](../database/entities.md), о
-создании схемы — [Управление схемой](../database/schema.md).
+Подробнее о столбцах и ключах — [Сущности](../module/database/entities.md), о
+создании схемы — [Управление схемой](../module/database/schema.md).
 
 ## 3. Что принимает и отдаёт API
 
@@ -199,7 +199,7 @@ export function toTaskResponse(task: Task): TaskResponse {
 Ответ — отдельный тип, а не сама сущность: в API не уйдут поля, которые
 вы потом добавите в таблицу. Поле `done` в создании не принимается —
 новая задача всегда невыполненная; лишние поля тела отбрасываются
-([Проверка данных](../overview/validation.md)).
+([Проверка данных](../module/controllers/validation.md)).
 
 ### Список
 
@@ -232,7 +232,7 @@ export class TasksListQuery extends ListRequest<Task> {
 
 Сортировать и фильтровать можно только по объявленным полям и
 операторам — остальное отклоняется с `400`
-([Списки](../http/lists.md)).
+([Списки](../module/controllers/lists.md)).
 
 ## 4. Сервис
 
@@ -370,7 +370,7 @@ export class TasksController {
 
 `FromQuery`, `FromRoute` и `FromBody` показывают, откуда берётся каждый
 аргумент; без них кодогенерация выведет то же самое из типов
-([Явный источник](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute)).
+([Явный источник](../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute)).
 `g module` с версии 0.119.0 генерирует контроллер именно так.
 
 `:id(uuid)` пропускает к методу только UUID: `/tasks/not-a-uuid` получит
@@ -502,6 +502,6 @@ $ bunx bazis test
 ## Дальше
 
 - [JWT и защита маршрутов](jwt-auth.md) — закрыть этот API
-- [Запросы](../database/queries.md) и [Сохранение](../database/saving.md)
-- [Списки](../http/lists.md)
-- [Тестирование](../fundamentals/testing.md)
+- [Запросы](../module/database/queries.md) и [Сохранение](../module/database/saving.md)
+- [Списки](../module/controllers/lists.md)
+- [Тестирование](../testing/testing.md)

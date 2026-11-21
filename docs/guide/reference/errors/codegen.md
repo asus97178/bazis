@@ -18,7 +18,7 @@
 ```
 
 С `BAZIS_CODEGEN_REPORT=<файл>` те же ошибки записываются в JSON-отчёт
-([Кодогенерация](../../fundamentals/codegen.md)).
+([Кодогенерация](../../application/codegen.md)).
 
 Тексты получены на bazis 0.100.8, кроме отмеченных «текст из исходников».
 
@@ -43,7 +43,7 @@ constructor parameter 1 "prefix" of "Greeter" has type "string", which cannot be
 - **Что сделать.** Сделайте контракт абстрактным классом — он и будет
   токеном. Для значения (строки, числа, объекта настроек) объявите токен
   с тем же именем, что у типа, и зарегистрируйте значение
-  ([Провайдеры](../../overview/providers.md#интерфейс-и-токен)).
+  ([Провайдеры](../../module/services/providers.md#интерфейс-и-токен)).
 
 ### `BAZIS_DI_CONFIG_UNKNOWN`
 
@@ -55,7 +55,7 @@ constructor parameter 1 of "Mailer" has type "ConfigView<MailConfig>", but no de
   `defineConfig<MailConfig>(...)` по типу. Его нет, или тип не указан явно
   (`defineConfig("mail", …)` без `<MailConfig>`).
 - **Что сделать.** Объявите настройки с явным типом
-  ([Конфигурация](../../fundamentals/configuration.md#объявление)).
+  ([Конфигурация](../../module/config/configuration.md#объявление)).
 
 ### `BAZIS_DI_CONFIG_AMBIGUOUS`
 
@@ -78,7 +78,7 @@ providers of NotesModule: "scoped(NotesService, NotesService, [INotesRepository]
   не класс, а `DI.bindDeps(...)`.
 - **Что сделать.** Зарегистрируйте сервис одной из форм из сообщения.
   Вычисляемое значение — класс с конструктором
-  ([DI подробно](../../fundamentals/dependency-injection.md#вычисляемый-сервис--класс)).
+  ([DI подробно](../../module/services/dependency-injection.md#вычисляемый-сервис--класс)).
 
 ### `BAZIS_DI_CONSTRUCTOR_UNRESOLVED`
 
@@ -116,7 +116,7 @@ controller "TagsController.list" (/…/src/app/tags/Tags.controller.ts): cannot 
 - **Что сделать.** Простые типы — из пути и строки запроса, класс из
   исходников приложения — тело, `HttpContext` — всё остальное. Сервисы —
   в конструктор
-  ([Контроллеры](../../overview/controllers.md#аргументы-методов)).
+  ([Контроллеры](../../module/controllers/controllers.md#аргументы-методов)).
 
 Явные источники дают свои причины:
 
@@ -148,7 +148,7 @@ src/app/modules/tasks/services/Tasks.service.ts:31:21: ORM conditions cannot use
   бы не те строки.
 - **Что сделать.** `.and()`, `.or()`, `.not()`:
   `where((t) => t.ownerId.eq(me.id).and(t.done.eq(false)))`
-  ([Запросы](../../database/queries.md)).
+  ([Запросы](../../module/database/queries.md)).
 
 ## Агенты
 
@@ -160,7 +160,7 @@ Tool schema CreateTaskInput must be a named exported top-level class (src/app/as
 
 Текст из исходников. Схема входа инструмента агента должна быть
 экспортированным классом верхнего уровня, а не классом внутри функции или
-выражением ([Инструменты](../../ai/tools.md)).
+выражением ([Инструменты](../../module/tools/tools.md)).
 
 ## Проект и цели
 
@@ -184,7 +184,7 @@ Tool schema CreateTaskInput must be a named exported top-level class (src/app/as
 ```
 
 `bazis.config.json` не читается или в нём нет обязательных полей.
-Правильная форма — в главе [Кодогенерация](../../fundamentals/codegen.md).
+Правильная форма — в главе [Кодогенерация](../../application/codegen.md).
 
 ### `BAZIS_CODEGEN_ENTRY_NOT_IN_PROGRAM`
 
@@ -226,5 +226,5 @@ BAZIS_TYPESCRIPT_API_MISSING: TypeScript 7 has no compiler API, and bazis codege
 ## Дальше
 
 - [Ошибки DI](di.md)
-- [Кодогенерация](../../fundamentals/codegen.md)
+- [Кодогенерация](../../application/codegen.md)
 - [Команды CLI](../../cli/commands.md#bazis-codegen)

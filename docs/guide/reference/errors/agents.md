@@ -17,8 +17,8 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
   [Классы исключений](#классы-исключений).
 
 Коды и тексты — из исходников 0.100.8; примеры, проверенные запуском, — в
-главах [Агенты](../../ai/agents.md), [Инструменты](../../ai/tools.md) и
-[Хуки](../../ai/hooks.md).
+главах [Агенты](../../agents/agents.md), [Инструменты](../../module/tools/tools.md) и
+[Хуки](../../module/tools/hooks.md).
 
 ## Коды запуска
 
@@ -29,22 +29,22 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `AGENT_RUNTIME_OPTIONS_INVALID` | текст ошибки | Неверные параметры запуска или `AGENT_RUNTIME_OPTIONS` |
 | `AGENT_TOOL_OPTIONS_INVALID` | текст ошибки | Неверные настройки инструментов агента |
 | `AGENT_CONTEXT_INVALID` | текст ошибки | Неверные метаданные или контекст вызова |
-| `AGENT_MAX_STEPS_EXCEEDED` | `Agent "support" exceeded maxSteps (30).` | Модель не закончила за `maxSteps` шагов ([Пределы](../../ai/agents.md#пределы)) |
+| `AGENT_MAX_STEPS_EXCEEDED` | `Agent "support" exceeded maxSteps (30).` | Модель не закончила за `maxSteps` шагов ([Пределы](../../agents/agents.md#пределы)) |
 | `AGENT_TOOL_CALL_LIMIT_EXCEEDED` | `Model requested 12 tool calls; the per-step limit is 8.` | Модель запросила за шаг больше вызовов, чем разрешено |
 | `AGENT_RUN_TIMEOUT` | `Agent "support" did not finish within runTimeoutMs (30000).` | Запуск целиком не уложился в `runTimeoutMs` |
-| `AGENT_PROVIDER_FAILED` | — | Провайдер ответил ошибкой, в том числе после [повторов](../../ai/agents.md#что-рантайм-исправляет-сам); в журнале — `Agent model call failed` |
-| `AGENT_CONTEXT_OVERFLOW` | `… The request does not fit the model's context window.` | Запрос длиннее окна модели и после [сжатия диалога](../../ai/agents.md#длинный-диалог-сжатие), или сжатие выключено |
+| `AGENT_PROVIDER_FAILED` | — | Провайдер ответил ошибкой, в том числе после [повторов](../../agents/agents.md#что-рантайм-исправляет-сам); в журнале — `Agent model call failed` |
+| `AGENT_CONTEXT_OVERFLOW` | `… The request does not fit the model's context window.` | Запрос длиннее окна модели и после [сжатия диалога](../../agents/agents.md#длинный-диалог-сжатие), или сжатие выключено |
 | `AGENT_PROVIDER_TIMEOUT` | — | Провайдер не ответил в срок коннектора или рантайма |
 | `AGENT_PROVIDER_STOPPED` | `Model provider stopped with finishReason "length".` | Модель остановилась не по своей воле: лимит ответа исчерпан и после продолжений, фильтр |
 | `AGENT_PROVIDER_RESPONSE_INVALID` | `Model provider returned a response for another invocation.` | Адаптер провайдера вернул неверный ответ (повтор id вызова, чужой запуск) |
 | `AGENT_ABORTED` | — | Запуск отменён через `signal` |
-| `AGENT_OUTPUT_INVALID` | `Agent output failed JSON Schema validation.` | Структурированный ответ не прошёл схему и после исправлений ([Структурированный ответ](../../ai/agents.md#структурированный-ответ)) |
+| `AGENT_OUTPUT_INVALID` | `Agent output failed JSON Schema validation.` | Структурированный ответ не прошёл схему и после исправлений ([Структурированный ответ](../../agents/agents.md#структурированный-ответ)) |
 | `AGENT_OUTPUT_SCHEMA_UNAVAILABLE` | `Output class "Triage" has no generated JSON schema.` | Для класса ответа нет схемы — запустите `bazis codegen` |
 | `AGENT_TOOL_OUTCOME_UNKNOWN` | `Tool "orders.cancel" finished with an unknown retry-safe side-effect outcome; automatic model continuation is blocked.` | Инструмент с записью завершился с неизвестным исходом; агент останавливается, чтобы модель не повторила запись |
 | `AGENT_EXECUTION_STATE_INVALID` | `Agent execution checkpoint is invalid.` | Внутренняя: повреждено состояние запуска |
 
 Ошибки провайдера подробно — в главе
-[LLM-коннекторы](../../ai/llm-connectors.md#ошибки).
+[LLM-коннекторы](../../agents/llm-connectors.md#ошибки).
 
 ## Коды инструментов
 
@@ -55,9 +55,9 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 | `TOOL_NOT_REGISTERED` | `Tool "orders.find" is not registered.` | Модель назвала инструмент, которого нет |
 | `TOOL_NOT_VISIBLE_TO_AGENT` | `Tool "orders.cancel" is not visible to agent "support".` | Инструмент есть, но не в списке агента |
 | `TOOL_CALL_INVALID` | `Tool call is invalid.` | Неверная форма вызова от модели |
-| `TOOL_CALLER_NOT_ALLOWED` | `Tool "orders.cancel" may not be called by "workflow" (callers: agent).` | Вызывающего нет в `callers` инструмента; `status: "denied"` ([Инструменты](../../ai/tools.md#инструмент)) |
+| `TOOL_CALLER_NOT_ALLOWED` | `Tool "orders.cancel" may not be called by "workflow" (callers: agent).` | Вызывающего нет в `callers` инструмента; `status: "denied"` ([Инструменты](../../module/tools/tools.md#инструмент)) |
 | `TOOL_CALLER_REQUIRED` | `Tool "orders.find" execution requires an agent or a caller.` | Исполнитель вызван без агента и без `caller` (с 0.123.0; раньше `TOOL_AGENT_REQUIRED`) |
-| `TOOL_ACTOR_REQUIRED` | `Tool "orders.cancel" changes data: pass actor, the user or system the call runs for.` | `ToolRunner` вызывает `write` или `external` без `actor` ([Вызов без модели](../../ai/tools.md#вызов-без-модели)) |
+| `TOOL_ACTOR_REQUIRED` | `Tool "orders.cancel" changes data: pass actor, the user or system the call runs for.` | `ToolRunner` вызывает `write` или `external` без `actor` ([Вызов без модели](../../module/tools/tools.md#вызов-без-модели)) |
 | `TOOL_METHOD_MISSING` | `Tool "orders.find" must expose execute(input, context).` | В классе инструмента нет `execute` |
 | `TOOL_RESOLVE_FAILED` | `Tool could not be created.` | Не удалось создать инструмент из DI |
 
@@ -78,22 +78,22 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 | Код | Текст | Когда |
 | --- | --- | --- |
-| `TOOL_AUDIT_REQUIRED` | `Tool "orders.cancel" has side effects and requires an audit sink.` | Инструмент с записью без `auditSink` в `TOOL_EXECUTION_OPTIONS` ([Настройки](../../ai/agents.md#настройки-аудит-и-подтверждение)) |
+| `TOOL_AUDIT_REQUIRED` | `Tool "orders.cancel" has side effects and requires an audit sink.` | Инструмент с записью без `auditSink` в `TOOL_EXECUTION_OPTIONS` ([Настройки](../../agents/agents.md#настройки-аудит-и-подтверждение)) |
 | `TOOL_APPROVAL_REQUIRED` | `Tool "orders.cancel" requires explicit approval.` | Инструмент объявлен с `approval: "required"`, а политики подтверждения нет |
 | `TOOL_APPROVAL_POLICY_MISSING` | `Tool "orders.cancel" requires an approval policy.` | `approval: "policy"` у инструмента с записью, а политики нет. Инструменты только для чтения без политики выполняются |
 | `TOOL_APPROVAL_DENIED` | `Tool execution was denied by approval policy.` | Политика отказала; `status: "denied"` |
 | `TOOL_APPROVAL_FAILED` | `Tool approval policy failed: …` | Политика подтверждения упала |
-| `TOOL_AUDIT_FAILED` | `Tool audit failed.` | Журнал аудита не принял запись; инструмент не выполняется ([Если журнал недоступен](../../ai/hooks.md#если-журнал-недоступен)) |
+| `TOOL_AUDIT_FAILED` | `Tool audit failed.` | Журнал аудита не принял запись; инструмент не выполняется ([Если журнал недоступен](../../module/tools/hooks.md#если-журнал-недоступен)) |
 
 ### Выполнение
 
 | Код | Текст | Когда |
 | --- | --- | --- |
-| `TOOL_EXECUTION_FAILED` | `Tool execution failed.` | `execute` бросил исключение. Модель видит только этот текст; `ToolError` передаёт модели свой текст ([Ошибки инструмента](../../ai/tools.md#ошибки)) |
+| `TOOL_EXECUTION_FAILED` | `Tool execution failed.` | `execute` бросил исключение. Модель видит только этот текст; `ToolError` передаёт модели свой текст ([Ошибки инструмента](../../module/tools/tools.md#ошибки)) |
 | `TOOL_TIMEOUT` | `Tool execution timed out during approval.` | Не уложился в срок, а записи не было: инструмент только читает или срок вышел до неё |
 | `TOOL_ABORTED` | `Tool execution was aborted during approval.` | Отменён через `signal`, записи не было |
 | `TOOL_EXECUTION_OPTIONS_INVALID` | текст ошибки | Неверные параметры выполнения |
-| `TOOL_RETRY_IDEMPOTENCY_REQUIRED` | `Tool "orders.cancel" has "write" side effects and requires idempotencyKey when retryPolicy.maxAttempts is greater than 1.` | Повторы записи без ключа идемпотентности ([Повторы](../../ai/tools.md#повторы)) |
+| `TOOL_RETRY_IDEMPOTENCY_REQUIRED` | `Tool "orders.cancel" has "write" side effects and requires idempotencyKey when retryPolicy.maxAttempts is greater than 1.` | Повторы записи без ключа идемпотентности ([Повторы](../../module/tools/tools.md#повторы)) |
 | `TOOL_RETRY_POLICY_INVALID` | `Tool retry policy produced no execution attempts.` | Политика повторов не дала ни одной попытки |
 | `TOOL_SCOPE_DISPOSE_FAILED` | — | Не закрылась DI-область инструмента |
 
@@ -107,7 +107,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 | Код | Когда |
 | --- | --- |
-| `TOOL_TIMEOUT_OUTCOME_UNKNOWN` | Срок вышел во время записи ([Срок и отмена](../../ai/tools.md#срок-и-отмена)) |
+| `TOOL_TIMEOUT_OUTCOME_UNKNOWN` | Срок вышел во время записи ([Срок и отмена](../../module/tools/tools.md#срок-и-отмена)) |
 | `TOOL_ABORTED_OUTCOME_UNKNOWN` | Отмена во время записи |
 | `TOOL_EXECUTION_FAILED_OUTCOME_UNKNOWN` | `Tool "orders.cancel" threw after side-effect execution started; retry safety is unknown.` |
 | `TOOL_POST_EXECUTION_FAILED_OUTCOME_UNKNOWN` | Запись прошла, упала обработка после неё |
@@ -116,7 +116,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 ### Хуки
 
-Коды [хуков](../../ai/hooks.md) `enforcement` и `settlement`:
+Коды [хуков](../../module/tools/hooks.md) `enforcement` и `settlement`:
 
 | Код | Текст |
 | --- | --- |
@@ -153,7 +153,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 | Класс | Когда |
 | --- | --- |
-| `AgentSetupError` | Неверное объявление агента или инструмента — при запуске или в `agents.check()` для определения из базы ([Агенты в базе](../../ai/agents.md#агенты-в-базе)) |
+| `AgentSetupError` | Неверное объявление агента или инструмента — при запуске или в `agents.check()` для определения из базы ([Агенты в базе](../../agents/agents.md#агенты-в-базе)) |
 | `AgentRuntimeError` | Неверная настройка рантайма агентов |
 | `AgentToolExecutionError` | Неверная настройка исполнителя инструментов |
 | `AgentSemanticError` | Неверные данные сообщения, вызова или ответа модели, например `temperature must be a number between 0 and 2.` |
@@ -171,7 +171,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 - Ошибки LLM-коннекторов (`OpenAiCompatibleProviderError`,
   `LlmModelRouterError`) — в главе
-  [LLM-коннекторы](../../ai/llm-connectors.md#ошибки).
+  [LLM-коннекторы](../../agents/llm-connectors.md#ошибки).
 - `CodexError` — ошибки подключения ChatGPT через Codex App Server. Поле
   `code`, текст рассчитан на показ пользователю:
 
@@ -191,10 +191,10 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 Язык текстов задаёт `@App({ language })` (с 0.105.3), свои тексты —
 `CodexError.useMessages({ … })` поверх него
-([Codex](../../infra/connectors.md#codex)).
+([Codex](../../application/infra/connectors.md#codex)).
 
 ## Дальше
 
-- [Агенты](../../ai/agents.md)
-- [Инструменты](../../ai/tools.md)
-- [Хуки](../../ai/hooks.md)
+- [Агенты](../../agents/agents.md)
+- [Инструменты](../../module/tools/tools.md)
+- [Хуки](../../module/tools/hooks.md)

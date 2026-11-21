@@ -6,13 +6,13 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `ListRequest`, `ListOptions`, `Sortable`, `Filterable` | Модель списка: что можно сортировать и фильтровать, пределы страниц | [Модель списка](../../http/lists.md#модель-списка) |
-| `parseListQuery(params, options)` | Разбор `sort`, `filter[…]`, `page[…]`, `include`, `fields` по разрешённому | [Параметры запроса](../../http/lists.md#параметры-запроса) |
+| `ListRequest`, `ListOptions`, `Sortable`, `Filterable` | Модель списка: что можно сортировать и фильтровать, пределы страниц | [Модель списка](../../module/controllers/lists.md#модель-списка) |
+| `parseListQuery(params, options)` | Разбор `sort`, `filter[…]`, `page[…]`, `include`, `fields` по разрешённому | [Параметры запроса](../../module/controllers/lists.md#параметры-запроса) |
 | `optionsFromSchema(Class)`, `listSchemaOf(Class)` | Разрешённое модели списка | — |
-| `restrictListOptions(options, fields)` | Разрешённое только для открытых полей: фильтр и сортировка по закрытому полю дают `400` | [Поля в списке](../../security/access.md#поля-в-списке) |
-| `buildListDocument(items, query, total, options)` | Документ ответа: `data`, `meta`, `links` | [Ответ](../../http/lists.md#ответ) |
+| `restrictListOptions(options, fields)` | Разрешённое только для открытых полей: фильтр и сортировка по закрытому полю дают `400` | [Поля в списке](../../module/access.md#поля-в-списке) |
+| `buildListDocument(items, query, total, options)` | Документ ответа: `data`, `meta`, `links` | [Ответ](../../module/controllers/lists.md#ответ) |
 | `serializeListQuery(query)` | Строка запроса из `ListQuery` | — |
-| `ListQueryError` | Ошибка разбора; в HTTP — `400` со списком проблем | [Ошибки](../../http/lists.md#ошибки) |
+| `ListQueryError` | Ошибка разбора; в HTTP — `400` со списком проблем | [Ошибки](../../module/controllers/lists.md#ошибки) |
 
 Типы: `ListQuery`, `ListQueryOptions`, `ListQueryProblem`, `ListSchema`,
 `FieldSchema`, `ListOptionsConfig`, `PageOptions`, `PageParams`,

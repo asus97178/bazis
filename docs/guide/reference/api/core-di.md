@@ -7,20 +7,20 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Module(metadata)` | Декоратор модуля: `imports`, `providers`, `exports`, `controllers`, `config`, `background`, `gateways`… | [Модули](../../overview/modules.md) |
-| `Global()` | Модуль, чьи `exports` видны всем без `imports` | [Глобальные модули](../../overview/modules.md#глобальные-модули) |
+| `Module(metadata)` | Декоратор модуля: `imports`, `providers`, `exports`, `controllers`, `config`, `background`, `gateways`… | [Модули](../../module/modules.md) |
+| `Global()` | Модуль, чьи `exports` видны всем без `imports` | [Глобальные модули](../../module/modules.md#глобальные-модули) |
 | `markGlobal(module)` | То же для модуля, созданного кодом | — |
 
 ## Регистрация
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `singleton(X)`, `scoped(X)`, `transient(X)` | Класс с временем жизни; `singleton(Contract, Impl)` — реализация по контракту | [Провайдеры](../../overview/providers.md) |
-| `singletonValue(TOKEN, value)` | Готовое значение | [Значения](../../overview/providers.md#значения) |
-| `singletonAsyncFactory(TOKEN, [deps], async factory)` | Результат асинхронной функции; создаётся при запуске | [Асинхронные фабрики](../../fundamentals/dependency-injection.md#асинхронные-фабрики) |
-| `createToken<T>(name)` | Токен для значения или интерфейса | [Интерфейс и токен](../../overview/providers.md#интерфейс-и-токен) |
-| `keyedDependency`, `namedDependency`, `lazyDependency`, `optionalDependency` | Зависимости в списке асинхронной фабрики; ленивая и необязательная в конструкторе — `Lazy<T>` и `?` | [Внедрение зависимостей](../../fundamentals/dependency-injection.md) |
-| `DI` из `bazis/core/di/lowLevel` | Низкоуровневые регистрации для пакетов, расширяющих фреймворк: провайдер вручную, фабрика, явный список зависимостей. В `providers` модуля приложения не пишутся; из `bazis/core/di` убраны в 0.138.0 | [Способы регистрации](../../fundamentals/dependency-injection.md#способы-регистрации) |
+| `singleton(X)`, `scoped(X)`, `transient(X)` | Класс с временем жизни; `singleton(Contract, Impl)` — реализация по контракту | [Провайдеры](../../module/services/providers.md) |
+| `singletonValue(TOKEN, value)` | Готовое значение | [Значения](../../module/services/providers.md#значения) |
+| `singletonAsyncFactory(TOKEN, [deps], async factory)` | Результат асинхронной функции; создаётся при запуске | [Асинхронные фабрики](../../module/services/dependency-injection.md#асинхронные-фабрики) |
+| `createToken<T>(name)` | Токен для значения или интерфейса | [Интерфейс и токен](../../module/services/providers.md#интерфейс-и-токен) |
+| `keyedDependency`, `namedDependency`, `lazyDependency`, `optionalDependency` | Зависимости в списке асинхронной фабрики; ленивая и необязательная в конструкторе — `Lazy<T>` и `?` | [Внедрение зависимостей](../../module/services/dependency-injection.md) |
+| `DI` из `bazis/core/di/lowLevel` | Низкоуровневые регистрации для пакетов, расширяющих фреймворк: провайдер вручную, фабрика, явный список зависимостей. В `providers` модуля приложения не пишутся; из `bazis/core/di` убраны в 0.138.0 | [Способы регистрации](../../module/services/dependency-injection.md#способы-регистрации) |
 | `ProviderDefinition` | Регистрация, которую возвращают функции выше | — |
 | `SERVICE_PROVIDER` | Токен самого контейнера (как `IServiceProvider` в .NET) | — |
 
@@ -28,7 +28,7 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `createContainer(root, options)` | Контейнер из дерева модулей; `overrides` — замены для тестов | [Контейнер вручную](../../fundamentals/dependency-injection.md#контейнер-вручную) |
+| `createContainer(root, options)` | Контейнер из дерева модулей; `overrides` — замены для тестов | [Контейнер вручную](../../module/services/dependency-injection.md#контейнер-вручную) |
 | `DiContainer`, `ServiceProvider`, `ServiceScope`, `ServiceCollection` | Контейнер, провайдер сервисов (в scoped-сервисе — область запроса), область, набор регистраций | там же |
 | `createInstance(resolver, Class, deps?)` | Создать класс с зависимостями из контейнера, без регистрации (как `ActivatorUtilities` в .NET) | — |
 
@@ -44,7 +44,7 @@
 ## Опции
 
 Механизм в духе `IOptions` .NET. Настройки приложения объявляются через
-`defineConfig` ([Конфигурация](../../fundamentals/configuration.md)); эти
+`defineConfig` ([Конфигурация](../../module/config/configuration.md)); эти
 функции — для пакетов.
 
 | Экспорт | Что это |

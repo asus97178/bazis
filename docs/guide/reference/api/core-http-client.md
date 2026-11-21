@@ -6,16 +6,16 @@ HTTP-клиент для вызовов внешних сервисов, в ст
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `@HttpClient({ config, ...defaults })` | Объявляет клиента внешнего сервиса; модуль перечисляет его в `httpClients`, сервисы получают по классу | [Подключение](../../http/http-client.md#подключение) |
+| `@HttpClient({ config, ...defaults })` | Объявляет клиента внешнего сервиса; модуль перечисляет его в `httpClients`, сервисы получают по классу | [Подключение](../../module/http-client.md#подключение) |
 | `HttpClientConfig`, `HttpClientDeclaration` | Настройки клиента (`baseUrl`, `timeoutMs`, `maxResponseBytes`) и опции декоратора | там же |
-| `HttpClientBase` | Клиент: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `request`, `create` | [Запросы](../../http/http-client.md#запросы) |
+| `HttpClientBase` | Клиент: `get`, `post`, `put`, `patch`, `delete`, `head`, `options`, `request`, `create` | [Запросы](../../module/http-client.md#запросы) |
 | `HttpClientFactory`, `HttpClientFactoryBuilder` | Именованные клиенты без DI | — |
-| `HttpClientError`, `HttpErrorCode` | Ошибка с кодом `ETIMEDOUT`, `ERR_BAD_STATUS`…, статусом и ответом | [Ошибки](../../http/http-client.md#ошибки) |
+| `HttpClientError`, `HttpErrorCode` | Ошибка с кодом `ETIMEDOUT`, `ERR_BAD_STATUS`…, статусом и ответом | [Ошибки](../../module/http-client.md#ошибки) |
 | `HttpClientConfigError` | Запрошен незарегистрированный именованный клиент | [Ошибки HTTP-клиента](../errors/http.md#httpclientconfigerror) |
 | `InterceptorManager` | Перехватчики запросов и ответов | — |
 | `basicAuthHeader(username, password)` | Значение заголовка `Authorization: Basic …` | — |
 | `appendQuery`, `defaultParamsSerializer`, `resolveUrl`, `isBodyInit` | Сборка адреса и тела | — |
-| `shouldPropagateCorrelation` | Можно ли отправлять `x-request-id` на этот адрес | [Correlation id и секреты](../../http/http-client.md#correlation-id-и-секреты) |
+| `shouldPropagateCorrelation` | Можно ли отправлять `x-request-id` на этот адрес | [Correlation id и секреты](../../module/http-client.md#correlation-id-и-секреты) |
 | `InspectableRedirectProtocol` | Протокол проверяемых перенаправлений между сервисами bazis | — |
 
 Типы: `RequestConfig`, `ResolvedRequestConfig`, `HttpResponse`,

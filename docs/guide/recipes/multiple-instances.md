@@ -16,7 +16,7 @@ Planner из предыдущих рецептов запускается в д�
 | `@Cacheable`, `@OutputCache`, `memory()` | Свой кэш у каждого экземпляра |
 | `@CacheableRedis`, `@OutputRedisCache` | Общий кэш в Redis |
 | Комнаты и сессии WebSocket | В памяти процесса; общие — с адаптером Redis |
-| `rateLimit` | Свои счётчики у каждого экземпляра ([Ограничение частоты](../http/rate-limit.md#как-считается)) |
+| `rateLimit` | Свои счётчики у каждого экземпляра ([Ограничение частоты](../application/rate-limit.md#как-считается)) |
 
 ## 1. Redis
 
@@ -47,7 +47,7 @@ export class AppInfra {}
 `cache: "distributed"` публикует общий кэш поверх этого подключения.
 `@OutputRedisCache` и `IDistributedCache` в этом рецепте работают без
 `memory()`. Для `@Cacheable` и `@CacheableRedis` на методах сервисов он
-нужен ([Кэширование](../realtime/caching.md#два-уровня)).
+нужен ([Кэширование](../application/caching.md#два-уровня)).
 
 ## 2. Общий кэш списка задач
 
@@ -62,7 +62,7 @@ import { OutputRedisCache } from "bazis/core/cache";
 
 Маршрут защищён, поэтому у каждого пользователя своя запись
 (`varyByUser`) — иначе приложение не стартует
-([Защищённые маршруты](../http/output-cache.md#защищённые-маршруты)).
+([Защищённые маршруты](../module/controllers/output-cache.md#защищённые-маршруты)).
 
 После каждой записи сервис сбрасывает тег — на всех экземплярах:
 
@@ -249,7 +249,7 @@ $ bunx bazis test
 
 ## Дальше
 
-- [Кэширование](../realtime/caching.md) — `@CacheableRedis`, недоступный Redis
-- [Кэш ответов](../http/output-cache.md)
-- [WebSocket](../realtime/websocket.md)
-- [Плавная остановка и health](../deployment/graceful-shutdown.md)
+- [Кэширование](../application/caching.md) — `@CacheableRedis`, недоступный Redis
+- [Кэш ответов](../module/controllers/output-cache.md)
+- [WebSocket](../module/websocket.md)
+- [Плавная остановка и health](../application/graceful-shutdown.md)

@@ -53,7 +53,7 @@ const template = await Bun.file(templatePath).text();
 ```
 
 Импорт файла возвращает путь к нему внутри бинарника, а TypeScript нужно
-объявление расширения — как для `.proto` в главе [gRPC](../realtime/grpc.md#контракт):
+объявление расширения — как для `.proto` в главе [gRPC](../module/grpc.md#контракт):
 
 ```ts
 // src/assets.d.ts
@@ -85,7 +85,7 @@ BAZIS_DB__PASSWORD=… BAZIS_HTTP__PORT=8080 ./shop
 Файл можно запускать из любого каталога. Он ничего не читает рядом с
 собой: ни `bunfig.toml`, ни `.env` (если не собран с `--dotenv`). Настройки
 приходят из переменных окружения `BAZIS_…` и
-[файлов секретов](../security/secrets.md#файлы-секретов).
+[файлов секретов](../module/config/secrets.md#файлы-секретов).
 
 **Среда по умолчанию — production.** Без `BAZIS_ENV` приложение требует
 секреты production, не показывает подробности ошибок и страницу
@@ -133,13 +133,13 @@ info: schema only: infrastructure and schema are ready, stopping (BAZIS_SCHEMA_O
 
 Приложение подключается к инфраструктуре, приводит схему в порядок и
 выходит с кодом 0 — HTTP-сервер не запускается. Зачем запускать схему под
-отдельным пользователем — в [чек-листе](../security/production-checklist.md#пользователь-без-прав-на-схему).
+отдельным пользователем — в [чек-листе](production-checklist.md#пользователь-без-прав-на-схему).
 
 ## Остановка и обновление
 
 По `SIGTERM` или `SIGINT` приложение доделывает начатые запросы,
 останавливает фоновые задачи, закрывает подключения и выходит с кодом 0.
-Подробнее — в главе [Плавная остановка и health](graceful-shutdown.md).
+Подробнее — в главе [Плавная остановка и health](../application/graceful-shutdown.md).
 
 Обновление — замена файла и перезапуск. Файл не зависит от того, что
 лежит рядом, поэтому старую версию можно сохранить под другим именем и
@@ -149,5 +149,5 @@ info: schema only: infrastructure and schema are ready, stopping (BAZIS_SCHEMA_O
 
 - [Настройка продакшена](production.md)
 - [Docker](docker.md)
-- [Плавная остановка и health](graceful-shutdown.md)
-- [Чек-лист перед продакшеном](../security/production-checklist.md)
+- [Плавная остановка и health](../application/graceful-shutdown.md)
+- [Чек-лист перед продакшеном](production-checklist.md)

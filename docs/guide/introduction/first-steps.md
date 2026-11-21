@@ -363,7 +363,7 @@ export class UsersModule {}
 
 Ошибки в этих списках не доживут до первого запроса. Забыли сервис в
 `providers` или `singleton` зависит от `scoped`? Приложение не запустится и
-скажет, что не так. Подробнее — в [«Провайдерах и DI»](../overview/providers.md).
+скажет, что не так. Подробнее — в [«Провайдерах и DI»](../module/services/providers.md).
 
 ## 8. Проверяем
 
@@ -413,7 +413,7 @@ curl http://127.0.0.1:3000/users/abc
 А теперь откройте в браузере <http://127.0.0.1:3000/docs>. Там уже описаны
 все три адреса `/users`: что принимают и что отвечают. bazis строит эту
 страницу из вашего кода, поэтому она всегда совпадает с API. В `production`
-страница выключена. Подробнее — в [«OpenAPI»](../http/openapi.md).
+страница выключена. Подробнее — в [«OpenAPI»](../module/controllers/openapi.md).
 
 ## 9. Запускаем тесты
 
@@ -484,7 +484,7 @@ export const mailConfig = defineConfig("mail", {
 BAZIS_ENV=development ./bin/my-app
 ```
 
-Подробнее — в [«Настройках»](../fundamentals/configuration.md) и
+Подробнее — в [«Настройках»](../module/config/configuration.md) и
 [«Одном исполняемом файле»](../deployment/single-executable.md).
 
 ## Что получилось
@@ -495,11 +495,11 @@ BAZIS_ENV=development ./bin/my-app
 
 ## Что дальше
 
-- Каждое понятие подробно: [модули](../overview/modules.md),
-  [провайдеры и DI](../overview/providers.md),
-  [контроллеры](../overview/controllers.md), [ответы](../overview/responses.md),
-  [настройки](../fundamentals/configuration.md),
-  [кодогенерация](../fundamentals/codegen.md) и
-  [путь запроса через middleware](../overview/middleware.md#порядок-выполнения).
+- Каждое понятие подробно: [модули](../module/modules.md),
+  [провайдеры и DI](../module/services/providers.md),
+  [контроллеры](../module/controllers/controllers.md), [ответы](../module/controllers/responses.md),
+  [настройки](../module/config/configuration.md),
+  [кодогенерация](../application/codegen.md) и
+  [путь запроса через middleware](../module/controllers/middleware.md#порядок-выполнения).
 - Настоящий проект с базой данных и входом: планировщик задач в трёх
   рецептах. Начните с [«CRUD-модуля целиком»](../recipes/crud-module.md).

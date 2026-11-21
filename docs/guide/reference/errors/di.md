@@ -49,9 +49,9 @@ Missing dependency "IClock" for "Scheduler".
 
 | Имя | Что сделать |
 | --- | --- |
-| `Config:report` | Подключить конфиг: `config: reportConfig` в модуле или `@App({ config })` ([Конфигурация](../../fundamentals/configuration.md)) |
-| `IRepository<Lead>` | Добавить `Lead` в `entities` модуля с `ormBazis` ([Репозитории](../../database/repositories.md)) |
-| `IClock` | Зарегистрировать токен: `scoped(IClock, SystemClock)` ([Провайдеры](../../overview/providers.md#интерфейс-и-токен)) |
+| `Config:report` | Подключить конфиг: `config: reportConfig` в модуле или `@App({ config })` ([Конфигурация](../../module/config/configuration.md)) |
+| `IRepository<Lead>` | Добавить `Lead` в `entities` модуля с `ormBazis` ([Репозитории](../../module/database/repositories.md)) |
+| `IClock` | Зарегистрировать токен: `scoped(IClock, SystemClock)` ([Провайдеры](../../module/services/providers.md#интерфейс-и-токен)) |
 
 > [!NOTE]
 > С версии 0.105.1. Раньше запуск останавливался на первой такой
@@ -68,7 +68,7 @@ Singleton "PriceCache" depends on scoped "OrdersRepository". A scoped service li
   `DbContext` на всё приложение, данные одного запроса в другом.
 - **Что сделать.** Сделайте `PriceCache` `scoped`. Если это фоновая служба или
   хук — внедрите `ServiceProvider` и создавайте область на каждую единицу
-  работы ([Жизненный цикл](../../fundamentals/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
+  работы ([Жизненный цикл](../../application/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
 - Если класс зарегистрирован под токеном, в сообщении и класс, и токен:
   `singleton(LIFECYCLE_HOOK, WarmUp)` даст
 
@@ -89,7 +89,7 @@ Cycle detected: InvoiceService -> OrderService -> InvoiceService
   с каждого участника).
 - **Что сделать.** Вынесите общую часть в третий сервис или разорвите цикл
   ленивой зависимостью
-  ([Ленивые зависимости](../../fundamentals/dependency-injection.md#ленивые-зависимости)).
+  ([Ленивые зависимости](../../module/services/dependency-injection.md#ленивые-зависимости)).
 
 #### Class provider requires constructor deps
 
@@ -132,7 +132,7 @@ Module "BillingModule": "BillingService" depends on "TariffsRepository", which m
 
 - **Что сделать.** Добавьте `TariffsModule` в `imports` модуля
   `BillingModule`. Импорт в корневом модуле не делает сервис видимым
-  соседям ([Инкапсуляция](../../fundamentals/encapsulation.md)).
+  соседям ([Инкапсуляция](../../module/encapsulation.md)).
 
 #### Module imports cycle
 
@@ -241,7 +241,7 @@ No provider token found for named dependency "IClock".
 класс — когда граф не проверялся: `createContainer(…)` без
 `validateOnBuild` и сразу `resolve`. Что сделать — то же: зарегистрировать
 токен или сделать контракт абстрактным классом
-([Провайдеры](../../overview/providers.md#интерфейс-и-токен)).
+([Провайдеры](../../module/services/providers.md#интерфейс-и-токен)).
 
 ### `AmbiguousNamedDependencyError`
 
@@ -277,5 +277,5 @@ Options validation failed:
 ## Дальше
 
 - [Ошибки кодогенерации](codegen.md)
-- [Провайдеры](../../overview/providers.md)
-- [Внедрение зависимостей](../../fundamentals/dependency-injection.md)
+- [Провайдеры](../../module/services/providers.md)
+- [Внедрение зависимостей](../../module/services/dependency-injection.md)

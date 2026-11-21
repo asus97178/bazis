@@ -4,6 +4,6 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `StaticAccessPolicy` | Система прав из таблицы «человек → право → гранты»; человек — `subject` принципала | [Тесты](../../security/access.md#тесты) |
+| `StaticAccessPolicy` | Система прав из таблицы «человек → право → гранты»; человек — `subject` принципала | [Тесты](../../module/access.md#тесты) |
 | `StaticAccessOptions` | Опции: `grants`, `otherwise` (что даёт право, которого нет в таблице; `"all"` — всё), `anonymous` (кто запрос без входа), `owners`, `principals` | там же |
-| `allowAll(options?)` | Замена для `overrides`: система прав, где у всех есть все права. `anonymous`, `grants` — как выше. С версии 0.138.0 | [Права в тестах](../../fundamentals/testing.md#права-в-тестах) |
+| `allowAll(options?)` | Замена для `overrides`: система прав, где у всех есть все права. `anonymous`, `grants` — как выше. С версии 0.138.0 | [Права в тестах](../../testing/testing.md#права-в-тестах) |

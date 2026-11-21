@@ -1,0 +1,500 @@
+# Сущности и ключи
+
+Сущность — класс, который ORM хранит в таблице. Декораторы описывают
+таблицу, столбцы и ключ. Схему по ним создаёт `ensureCreated` (см.
+[Подключение PostgreSQL](postgresql.md)).
+
+Все примеры проверены на bazis 0.109.0 и PostgreSQL 17, преобразование значений и шифрование — на 0.104.1.
+
+```ts
+import { Column, CreatedAt, Entity, Index, Nullable, Required, UpdatedAt, UUID } from "bazis/core/orm";
+
+@Entity({ table: "tasks" })
+export class Task {
+  @UUID({ version: "v7" })
+  id = "";
+
+  @Required()
+  @Column({ type: "text" })
+  title = "";
+
+  @Nullable()
+  @Column({ type: "integer" })
+  priority = 0;
+
+  @Index({ unique: true })
+  @Nullable()
+  @Column({ type: "text" })
+  email = "";
+
+  @CreatedAt() createdAt = new Date(0);
+  @UpdatedAt() updatedAt = new Date(0);
+}
+```
+
+```text
+ Column    | Type                     | Nullable
+-----------+--------------------------+----------
+ id        | uuid                     | not null
+ title     | text                     | not null
+ priority  | bigint                   |
+ email     | text                     |
+ createdAt | timestamp with time zone | not null
+ updatedAt | timestamp with time zone | not null
+Indexes:
+    "pk_tasks" PRIMARY KEY, btree (id)
+    "ix_tasks_email" UNIQUE, btree (email)
+```
+
+Значения по умолчанию в полях (`= ""`, `= 0`) нужны TypeScript и для
+нового объекта; у столбца в базе значения по умолчанию от них не
+появляется.
+
+## Таблица
+
+| Декоратор | Что задаёт |
+| --- | --- |
+| `@Entity({ table: "tasks" })` | Имя таблицы |
+| `@Entity()` | Имя по умолчанию — множественное число имени класса с **сохранением регистра**: `Book` → `"Books"` |
+| `@Schema("billing")` | Схема PostgreSQL; без декоратора — `public` |
+
+Задавайте `table` явно в нижнем регистре: таблицу `"Books"` в своём SQL
+придётся писать в кавычках, иначе PostgreSQL будет искать `books`.
+
+## Столбцы
+
+Тип столбца **не берётся** из типа TypeScript — его задаёт `type`:
+
+| `type` | Столбец PostgreSQL | Значение в JS |
+| --- | --- | --- |
+| `"text"` | `text` | `string` |
+| `"integer"` | `bigint` | `number` |
+| `"real"` | `double precision` | `number` — **не точное** |
+| `"decimal"` | `numeric(p, s)` | `string` — точное число, [для денег](#деньги-и-точные-числа) |
+| `"boolean"` | `boolean` | `boolean` |
+| `"datetime"` | `timestamp with time zone` | `Date` |
+| `"json"` | `jsonb` | объект или массив |
+| `"uuid"` | `text` | `string`, **заполняется сам** — UUID v4 при вставке, если пусто |
+
+Целое больше 2⁵³ (9 007 199 254 740 992) в `number` не помещается точно.
+В условии передавайте его строкой или `bigint` — сравнение будет точным:
+
+```ts
+await db.rows.where((row) => row.externalId.eq("1234567890123456789")).toList();
+```
+
+До версии 0.140.2 такое условие находило и соседнюю строку: значение
+превращалось в `double`. При чтении целое больше 2⁵³ по-прежнему приходит
+округлённым числом; если такие значения нужны точно, храните их в `text`
+или `decimal`.
+
+Ссылку на строку с UUID-ключом объявляйте как `type: "text"`: с внешним
+ключом (`@ForeignKey`) столбец станет `uuid`, как у ключа. `type: "uuid"` у
+не-ключевого поля — это генерируемое значение: `null` в нём не сохранится,
+вместо него запишется новый UUID.
+
+Без `type` столбец — `text`. Если начальное значение поля говорит о
+другом типе, модель не соберётся:
+
+```text
+Entity "Book": property "pages" has no column type and maps to text, but its initial value is a number.
+Set the type: @Column({ type: "integer" }) or @Column({ type: "real" }).
+```
+
+> [!NOTE]
+> Проверка — с версии 0.98.14. Раньше `@Column() pages = 0` молча
+> становился столбцом `text`, и после загрузки из базы `pages` был
+> строкой `"412"`.
+
+### Деньги и точные числа
+
+`real` — число с плавающей точкой: `0.1 + 0.2` в нём —
+`0.30000000000000004`. Для денег берите `decimal`:
+
+```ts
+@Entity({ table: "products" })
+export class Product {
+  @Key() id = 0;
+  @Required() @Column({ type: "decimal", precision: 12, scale: 2 }) price = "0";
+}
+```
+
+```text
+"price" numeric(12, 2) NOT NULL
+```
+
+- `precision` — сколько цифр всего, `scale` — сколько после точки. Без
+  них столбец — `numeric` любой длины.
+- Значение — **строка**: `product.price = "19.90"`. Можно передать
+  `bigint` или целое число; дробное `number` (`0.1`) ORM не примет — оно
+  уже неточное.
+- Лишние цифры ORM не округляет молча, а останавливает сохранение:
+  `Product.price: "1.005" has 3 digits after the point; numeric(12, 2) keeps 2. Round it in the code.`
+- Считайте в базе (`sum(price)`) или в коде целыми копейками через
+  `BigInt`; арифметика строк в JavaScript не работает.
+- Ключ не может быть `decimal`. В [owned stores](owned-stores.md)
+  `decimal` пока нет.
+
+> [!NOTE]
+> `decimal` — с версии 0.117.0.
+
+### Пустые значения
+
+Каждый столбец сам говорит, может ли он быть пустым: `@Required()` или `@Nullable()`.
+Умолчания нет, поэтому тот, кто читает модель, видит это у самого поля:
+
+| Запись | Столбец |
+| --- | --- |
+| `@Required() @Column({ type: "text" }) title = ""` | `text NOT NULL` |
+| `@Nullable() @Column({ type: "datetime" }) shippedAt: Date \| null = null` | `timestamp with time zone`, NULL можно |
+| `@Column({ type: "text" }) title = ""` | Ошибка при старте |
+
+```text
+ModelBuildError: Entity "Task": property "title" does not say whether it may be empty.
+Mark it @Required() (NOT NULL) or @Nullable().
+```
+
+Ключ, `@CreatedAt`, `@UpdatedAt` и `@SoftDelete` помечать не нужно: первые три всегда `NOT NULL`, последний
+всегда допускает NULL. `@Nullable()` на ключе — ошибка.
+
+> [!NOTE]
+> Обязательная метка — с версии 0.137.0. До неё столбец без `@Required()` молча допускал NULL, а
+> разрешение записывалось опцией `nullable: true`; опции больше нет. Существующий код переводит команда
+> `bunx bazis upgrade columns` ([Обновление](../../reference/upgrading.md#01370)).
+
+### Остальные настройки
+
+| Настройка | Что задаёт |
+| --- | --- |
+| `name: "created_by"` | Имя столбца; по умолчанию — имя свойства как есть (`createdAt`) |
+| `default: "new"` | Значение по умолчанию **в базе**: `status text DEFAULT 'new'` — для строк, вставленных мимо ORM |
+
+## Ключи
+
+| Ключ | Запись | Значение |
+| --- | --- | --- |
+| Целый, автоинкремент | `@Key() id = 0` | Выдаёт база: `bigint GENERATED BY DEFAULT AS IDENTITY` |
+| UUID v4 | `@UUID() id = ""` | Выдаёт база: `DEFAULT gen_random_uuid()` |
+| UUID v7 | `@UUID({ version: "v7" }) id = ""` | Выдаёт ORM перед вставкой |
+| Естественный | `@Key() @Column({ type: "text" }) code = ""` | Задаёт приложение |
+| Составной | `@Key(["orderId", "lineNo"])` | Задаёт приложение |
+
+После `saveChanges()` ключ, выданный базой или ORM, уже записан в объект:
+
+```ts
+const book = Object.assign(new Book(), { title: "Dune" });
+db.books.add(book);
+await db.saveChanges();
+book.id;   // 1
+```
+
+Свойство `id` (или `<ИмяКласса>Id`) без `@Key()` тоже становится
+ключом — по соглашению.
+
+### UUID v7
+
+UUID v7 начинается с времени создания, поэтому новые ключи идут по
+возрастанию:
+
+```text
+01a122b7-6e9f-741b-8b56-a272446ffeeb
+01a122b7-6e9f-741c-8c77-7d46dd27b24e
+```
+
+Новые строки ложатся в конец индекса, а не в случайное место, как с v4.
+Это быстрее на больших таблицах и даёт сортировку «по времени создания»
+бесплатно. Ключ создаёт ORM (`Bun.randomUUIDv7()`), поэтому подходит любая
+версия PostgreSQL; столбец — обычный `uuid` без значения по умолчанию.
+Если приложение задало ключ само, ORM его не меняет.
+
+Для новых таблиц v7 — хороший выбор по умолчанию. v4 стоит оставить, если
+время создания по ключу видно наружу и это нежелательно.
+
+### Естественный ключ
+
+Код страны, артикул, email — ключ, который знает само приложение. Тип
+`text` нужно указать:
+
+```ts
+@Entity({ table: "countries" })
+export class Country {
+  @Key() @Column({ type: "text" }) code = "";
+  @Nullable() @Column({ type: "text" }) name = "";
+}
+```
+
+`@Key()` без типа — целый автоинкремент. Для строкового поля это ошибка:
+
+```text
+Entity "Country": key "code" has no column type and maps to an integer identity, but its initial value is a string.
+For a text key add @Column({ type: "text" }) next to @Key(); for a UUID key use @UUID().
+```
+
+> [!NOTE]
+> Проверка — с версии 0.98.14. Раньше `@Key() code = ""` становился
+> `bigint` с автоинкрементом: присвоенное `"RU"` пропадало, и
+> `find("RU")` ничего не находил.
+
+### Составной ключ
+
+```ts
+@Entity({ table: "order_lines" })
+export class OrderLine {
+  @Key(["orderId", "lineNo"])
+  @Column({ type: "integer" }) orderId = 0;
+  @Nullable() @Column({ type: "integer" }) lineNo = 0;
+  @Nullable() @Column({ type: "integer" }) quantity = 1;
+}
+```
+
+`@Key([...])` ставится на одно из свойств ключа и перечисляет все. Поиск —
+объектом со всеми частями:
+
+```ts
+await db.lines.find({ orderId: 1, lineNo: 1 });
+```
+
+## Время создания и изменения
+
+| Декоратор | Когда заполняется |
+| --- | --- |
+| `@CreatedAt()` | При вставке |
+| `@UpdatedAt()` | При вставке и при каждом изменении |
+
+Значения ставит ORM при `saveChanges()`; задавать их самому не нужно.
+
+## Индексы и проверки
+
+```ts
+@Entity({ table: "order_lines" })
+@Index(["orderId", "productId"], { unique: true })
+@Check<OrderLine>("ck_order_lines_qty", (line) => line.quantity.gt(0))
+export class OrderLine { ... }
+```
+
+```text
+"ix_order_lines_orderId_productId" UNIQUE, btree ("orderId", "productId")
+"ck_order_lines_qty" CHECK (quantity > 0)
+```
+
+| Запись | Что создаёт |
+| --- | --- |
+| `@Index()` на свойстве | Индекс по столбцу: `ix_<таблица>_<столбец>` |
+| `@Index({ unique: true })` | Уникальный индекс |
+| `@Index({ unique: true, conflict: "…" })` | Текст ответа `409`, когда значение занято ([Ошибки](errors.md#занятое-значение)) |
+| `@Index(["a", "b"])` на классе | Индекс по нескольким столбцам |
+| `@Index<T>(["a"], { where: (row) => ... })` | Частичный индекс: только строки, подходящие под условие ([пример с мягким удалением](filters.md#уникальные-индексы)) |
+| `@Check<T>("имя", (row) => ...)` на классе | Ограничение `CHECK` |
+
+В `@Check` доступны `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in([...])`,
+`isNull()`, `isNotNull()`; условия объединяются через `.and()`, `.or()`,
+`.not()`. Сравнивать можно и два столбца:
+`(row) => row.endsAt.gt(row.startsAt)`.
+
+> [!NOTE]
+> До версии 0.115.0 `@Check` с `in([...])` или с цепочкой из трёх
+> условий и больше (`a.and(b).and(c)`) создавался, но второй запуск
+> останавливался: `ensureCreated` не узнавал его в базе.
+
+## Преобразование значения
+
+`@HasConversion` задаёт, как значение поля хранится в столбце: функция
+`toProvider` — перед записью, `fromProvider` — после чтения.
+
+```ts
+import { Column, Entity, HasConversion, Key, ValueConverters, type ValueConverter, Nullable } from "bazis/core/orm";
+
+/** В коде — копейки, в базе — рубли строкой. */
+const rubles: ValueConverter<number, string> = {
+  toProvider: (kopecks) => (kopecks / 100).toFixed(2),
+  fromProvider: (stored) => Math.round(Number(stored) * 100),
+};
+
+@Entity({ table: "profiles" })
+export class Profile {
+  @Key({ generated: false }) id = 0;
+
+  @HasConversion(rubles) @Nullable() @Column({ type: "text" }) balance = 0;
+
+  @HasConversion(ValueConverters.json<{ tags: string[] }>())
+  @Nullable()
+  @Column({ type: "text" })
+  settings: { tags: string[] } | null = null;
+}
+```
+
+```text
+в коде    {"id":1,"balance":12345,"settings":{"tags":["vip"]}}
+в базе    balance = '123.45', settings = '{"tags":["vip"]}'
+```
+
+| Конвертер | Что делает |
+| --- | --- |
+| `ValueConverters.json<T>()` | Объект ↔ JSON-строка в столбце `text`. Для `jsonb` конвертер не нужен: `type: "json"` |
+| `encryptedWith(config, field)` | Шифрование ключом из настроек — [ниже](#шифрование-столбца) |
+| `ValueConverters.encrypted(key)` | То же с ключом в коде — для ORM без приложения |
+
+Тип столбца по-прежнему задаёт `type`: конвертер возвращает значение
+этого типа.
+
+### `null` и конвертеры
+
+`null` в поле с конвертером остаётся NULL в столбце: конвертер для него не
+вызывается ни при записи, ни при чтении. Так `json()` и шифрование
+работают в столбцах с `@Nullable()`:
+
+```text
+в коде    {"id":2,"settings":null}
+в базе    settings IS NULL
+```
+
+Если `null` нужно хранить иначе — например, пустой строкой в столбце
+`NOT NULL`, — объявите `convertsNulls: true`, и конвертер будет получать
+`null` в обе стороны:
+
+```ts
+const emptyAsNull: ValueConverter<string | null, string | null> = {
+  convertsNulls: true,
+  toProvider: (value) => value ?? "",
+  fromProvider: (stored) => (stored === "" || stored === null ? null : stored),
+};
+
+@Nullable() @HasConversion(emptyAsNull) @Column({ type: "text" }) nickname: string | null = null;
+```
+
+```text
+в коде    {"id":2,"nickname":null}
+в базе    nickname = ''
+```
+
+> [!NOTE]
+> Правило — с версии 0.104.1, как в EF Core. Раньше конвертер получал
+> `null`: зашифрованный столбец не сохранялся (`TypeError`), а `json()`
+> записывал строку `"null"`. Такие строки и сейчас читаются как `null`.
+
+## Шифрование столбца
+
+`encryptedWith` шифрует строковый столбец (AES-256-GCM). Ключ берётся из
+[настроек](../config/configuration.md) модуля:
+
+```ts
+// config/crypto.config.ts
+import { defineConfig, secret } from "bazis/core/kernel";
+
+export const cryptoConfig = defineConfig("crypto", {
+  default: { phoneKey: secret("dev-phone-key-not-for-production"), phoneHashKey: secret("dev-phone-hash-key") },
+  production: { phoneKey: secret(), phoneHashKey: secret() },
+});
+```
+
+```ts
+// customers/model/Customer.model.ts
+import { Column, encryptedWith, Entity, HasConversion, Required, UUID } from "bazis/core/orm";
+
+@Entity({ table: "customers" })
+export class Customer {
+  @UUID() id = "";
+
+  @Required() @Column({ type: "text" }) name = "";
+
+  @Required()
+  @HasConversion(encryptedWith(cryptoConfig, "phoneKey"))
+  @Column({ type: "text" })
+  phone = "";
+}
+
+// customers/Customers.module.ts
+@Module({ config: cryptoConfig, ormBazis: { context: Customers }, exports: [] })
+export class CustomersModule {}
+```
+
+В коде поле обычное, в базе лежит шифротекст:
+
+```text
+GET /customers/b40c…               → {"name":"Анна","phone":"+7 900 123-45-67"}
+SELECT phone FROM customers        → rJfNG/P39GOy4F+RVyPQ/9fv6+5K6vnF6DTLqPU0GR+ncdE+70tstZwMMQ8=
+```
+
+Ключ читается при запуске, когда загружены все источники настроек, в том
+числе [файлы секретов](../config/secrets.md#файлы-секретов). Если конфиг
+не подключён к модулю, приложение не стартует:
+
+```text
+OrmError: Customer.phone: encryptedWith(crypto.phoneKey): the config "crypto" is not declared in the application;
+add it to `config` of the module that owns Customer or to @App({ config }).
+```
+
+- **Ключ — случайные 32 байта**, а не пароль: `openssl rand -base64 32`.
+  Строка ключа превращается в ключ AES через SHA-256, без растяжения, как у
+  паролей.
+- **Ключ нельзя сменить.** Строки, записанные другим ключом, не читаются:
+
+  ```text
+  OrmError: Cannot read Customer.phone: cannot decrypt the value: it was encrypted with another key,
+  or the stored value was changed
+  ```
+
+  Смены ключа с перешифровкой старых строк в bazis нет.
+- **Одинаковые значения в базе разные**: каждое шифруется со случайным
+  числом (nonce). Поэтому по столбцу нельзя искать и сортировать — запрос
+  падает, а не возвращает пустой список:
+
+  ```text
+  OrmError: Customer.phone is encrypted with a random nonce: it cannot be compared or sorted in SQL.
+  To find rows by it, store a separate column with a keyed hash of the value (HMAC) and compare that.
+  ```
+
+  По той же причине зашифрованный ключ и уникальный индекс не дают собрать
+  модель (`ModelBuildError`). `isNull()` работает.
+- **Пустая строка тоже шифруется**, а `null` остаётся NULL — см.
+  [`null` и конвертеры](#null-и-конвертеры).
+
+> [!NOTE]
+> `encryptedWith` — с версии 0.104.0. Раньше ключ передавали строкой в
+> `ValueConverters.encrypted(…)` при объявлении класса, и ключ из файла
+> секретов к этому моменту ещё не был загружен. `ValueConverters.encrypted`
+> остался для ORM без приложения, когда ключ уже есть в коде.
+
+### Поиск по зашифрованному столбцу
+
+Чтобы находить клиента по телефону, храните рядом HMAC телефона — хеш с
+отдельным ключом. Одинаковые телефоны дают одинаковый хеш, по нему работают
+`eq` и индекс:
+
+```ts
+// customers/PhoneHash.service.ts
+import { createHmac } from "node:crypto";
+import type { ConfigView } from "bazis/core/kernel";
+
+export class PhoneHash {
+  constructor(private readonly config: ConfigView<typeof cryptoConfig>) {}
+
+  of(phone: string): string {
+    const normalized = phone.replace(/[^\d+]/g, "");
+    return createHmac("sha256", this.config.get("phoneHashKey").reveal()).update(normalized).digest("base64url");
+  }
+}
+
+// Customer.model.ts
+@Required() @Index() @Column({ type: "text" }) phoneHash = "";
+
+// контроллер
+customer.phoneHash = this.hash.of(body.phone);                         // при записи
+this.db.customers.where((c) => c.phoneHash.eq(this.hash.of(phone)));    // при поиске
+```
+
+```text
+GET /customers/by-phone/+7%20(900)%20123-45-67 → [{"name":"Анна","phone":"+7 900 123-45-67",…}]
+```
+
+- Номер приводится к одному виду до хеширования: `+7 (900) 123-45-67` и
+  `+7 900 123-45-67` должны давать один хеш.
+- Ключ HMAC — отдельный от ключа шифрования.
+- Хеш показывает, у каких строк значения совпадают. Самих значений по нему
+  не узнать, если не знать ключ.
+
+## Дальше
+
+- [Подключение PostgreSQL](postgresql.md)
+- [`DbContext` и `DbSet`](dbcontext.md)
+- [Управление схемой](schema.md)

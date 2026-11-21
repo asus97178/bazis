@@ -1,7 +1,7 @@
 # Ошибки WebSocket и gRPC
 
 Тексты — из исходников 0.100.8; проверенные примеры — в главах
-[WebSocket](../../realtime/websocket.md) и [gRPC](../../realtime/grpc.md).
+[WebSocket](../../module/websocket.md) и [gRPC](../../module/grpc.md).
 
 ## WebSocket
 
@@ -23,7 +23,7 @@
 | Пакет — не JSON или не объект | `Invalid JSON packet`, `Packet must be a JSON object` |
 | Неизвестная версия или тип пакета | `Unsupported packet version`, `Unknown packet type: …` |
 
-Подробно — в главе [WebSocket](../../realtime/websocket.md#проверка-данных-и-лимиты).
+Подробно — в главе [WebSocket](../../module/websocket.md#проверка-данных-и-лимиты).
 
 ### При подключении
 
@@ -89,5 +89,5 @@ WebSocket session capacity exceeded (10000).
 
 ## Дальше
 
-- [WebSocket](../../realtime/websocket.md)
-- [gRPC](../../realtime/grpc.md)
+- [WebSocket](../../module/websocket.md)
+- [gRPC](../../module/grpc.md)

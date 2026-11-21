@@ -32,26 +32,26 @@ NestJS — переносится большая часть привычек. Н
 
 | NestJS | bazis | Где читать |
 | --- | --- | --- |
-| `NestFactory.create(AppModule)` + `listen` | `@App({ http })` | [Приложение](../overview/application.md) |
-| `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../overview/modules.md) |
-| `@Global()` | `@Global()` — так же | [Модули](../overview/modules.md#глобальные-модули) |
+| `NestFactory.create(AppModule)` + `listen` | `@App({ http })` | [Приложение](../application/application.md) |
+| `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../module/modules.md) |
+| `@Global()` | `@Global()` — так же | [Модули](../module/modules.md#глобальные-модули) |
 | `@Injectable()` | Не нужен | |
-| `@Param()`, `@Query()`, `@Body()` | Имя и тип параметра метода или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>` | [Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
-| `@Headers("x-id")` | `FromHeader<string, "x-id">` | [Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
-| `@Query() query: SearchDto` + `ValidationPipe` | `query: FromQuery<SearchQuery>` — модель строки запроса с `@Validator` | [Модели строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
-| `ParseIntPipe`, `ParseUUIDPipe` | Ограничение в маршруте: `:id(int)`, `:id(uuid)` | [Контроллеры](../overview/controllers.md#маршруты) |
-| `class-validator` + `ValidationPipe` | `@Validator` на полях класса; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
-| `Scope.DEFAULT` / `REQUEST` / `TRANSIENT` | `singleton` / `scoped` / `transient` | [Провайдеры](../overview/providers.md#время-жизни) |
-| `@Inject(TOKEN)` + `{ provide, useClass }` | Абстрактный класс как токен: `singleton(IBookStore, MemoryBookStore)` | [Провайдеры](../overview/providers.md#регистрация-по-контракту) |
-| `@nestjs/config` + `ConfigService` | `defineConfig` + `ConfigView<T>` | [Конфигурация](../fundamentals/configuration.md) |
-| Guard (`CanActivate`) | `@Authorize(check)` | [Авторизация](../overview/authorization.md) |
-| Interceptor | `@ActionFilter` или middleware | [Middleware](../overview/middleware.md) |
-| Exception filter | Middleware, переводящий ошибку в `HttpError` | [Ошибки](../overview/errors.md#доменные-ошибки) |
-| `HttpException`, `NotFoundException` | `HttpError`, `NotFoundError` | [Ошибки](../overview/errors.md) |
-| `OnModuleInit`, `OnApplicationShutdown` | `LifecycleHook`: `onInit`, `onShutdown` | [Жизненный цикл](../fundamentals/lifecycle.md#хуки-жизненного-цикла) |
-| `@nestjs/schedule`, `@Cron` | `PeriodicBackgroundService` в поле `background` модуля | [Фоновые службы](../realtime/background-services.md) |
-| `@nestjs/swagger` | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../http/openapi.md) |
-| `Test.createTestingModule(...).overrideProvider(...)` | `startTestApp(AppModule, { overrides })` | [Тестирование](../fundamentals/testing.md#приложение-целиком-starttestapp) |
+| `@Param()`, `@Query()`, `@Body()` | Имя и тип параметра метода или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>` | [Контроллеры](../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `@Headers("x-id")` | `FromHeader<string, "x-id">` | [Контроллеры](../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `@Query() query: SearchDto` + `ValidationPipe` | `query: FromQuery<SearchQuery>` — модель строки запроса с `@Validator` | [Модели строки запроса](../module/controllers/controllers.md#модели-строки-запроса-и-заголовков) |
+| `ParseIntPipe`, `ParseUUIDPipe` | Ограничение в маршруте: `:id(int)`, `:id(uuid)` | [Контроллеры](../module/controllers/controllers.md#маршруты) |
+| `class-validator` + `ValidationPipe` | `@Validator` на полях класса; `@RequestModel()` — по желанию | [Проверка данных](../module/controllers/validation.md) |
+| `Scope.DEFAULT` / `REQUEST` / `TRANSIENT` | `singleton` / `scoped` / `transient` | [Провайдеры](../module/services/providers.md#время-жизни) |
+| `@Inject(TOKEN)` + `{ provide, useClass }` | Абстрактный класс как токен: `singleton(IBookStore, MemoryBookStore)` | [Провайдеры](../module/services/providers.md#регистрация-по-контракту) |
+| `@nestjs/config` + `ConfigService` | `defineConfig` + `ConfigView<T>` | [Конфигурация](../module/config/configuration.md) |
+| Guard (`CanActivate`) | `@Authorize(check)` | [Авторизация](../module/controllers/authorization.md) |
+| Interceptor | `@ActionFilter` или middleware | [Middleware](../module/controllers/middleware.md) |
+| Exception filter | Middleware, переводящий ошибку в `HttpError` | [Ошибки](../module/controllers/errors.md#доменные-ошибки) |
+| `HttpException`, `NotFoundException` | `HttpError`, `NotFoundError` | [Ошибки](../module/controllers/errors.md) |
+| `OnModuleInit`, `OnApplicationShutdown` | `LifecycleHook`: `onInit`, `onShutdown` | [Жизненный цикл](../application/lifecycle.md#хуки-жизненного-цикла) |
+| `@nestjs/schedule`, `@Cron` | `PeriodicBackgroundService` в поле `background` модуля | [Фоновые службы](../module/background-services.md) |
+| `@nestjs/swagger` | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../module/controllers/openapi.md) |
+| `Test.createTestingModule(...).overrideProvider(...)` | `startTestApp(AppModule, { overrides })` | [Тестирование](../testing/testing.md#приложение-целиком-starttestapp) |
 | `nest g resource` | `bazis g module` | [Команды CLI](../cli/commands.md) |
 | TypeORM / Prisma | Встроенная ORM: `DbContext`, `DbSet`, `saveChanges` | [Рецепт CRUD](crud-module.md) |
 
@@ -152,7 +152,7 @@ export const booksConfig = defineConfig("books", {
 Значения типизированы, переменные окружения называются сами —
 `BAZIS_BOOKS__PAGESIZE`, `BAZIS_BOOKS__ADMINKEY`. Ошибка в значении или
 пропущенный секрет production останавливает запуск
-([Конфигурация](../fundamentals/configuration.md)).
+([Конфигурация](../module/config/configuration.md)).
 
 ### Контроллер
 
@@ -368,12 +368,12 @@ HTTP — без `supertest`.
 
 - **Декораторов на параметрах** и пользовательских param-декораторов
   (`createParamDecorator`): контекст запроса доступен через `HttpContext`,
-  пользователь — через scoped-сервис ([Текущий пользователь](../security/authorization-patterns.md#текущий-пользователь-в-сервисах)).
+  пользователь — через scoped-сервис ([Текущий пользователь](../application/authorization-patterns.md#текущий-пользователь-в-сервисах)).
 - **Динамических модулей `forRoot()` / `forRootAsync()`**: модуль
   объявляет настройки полем `config`, инфраструктура подключается
-  манифестом `@Infra` ([Инфраструктура](../infra/overview.md)).
+  манифестом `@Infra` ([Инфраструктура](../application/infra/overview.md)).
 - **Микросервисных транспортов `@nestjs/microservices`**: есть gRPC и
-  WebSocket ([gRPC](../realtime/grpc.md), [WebSocket](../realtime/websocket.md)).
+  WebSocket ([gRPC](../module/grpc.md), [WebSocket](../module/websocket.md)).
 
 ## Дальше
 
