@@ -256,7 +256,9 @@ duplicate the DI algorithm with its own factory. The core does not import cache/
 
 ## 6. Checks and the readiness boundary
 
-Checked on macOS arm64, Bun 1.4.0 / `34cbb9a40`, through the pinned launcher.
+Checked on macOS arm64, Bun 1.4.0 / `34cbb9a40`, through the pinned launcher. Since
+bazis 0.142.0 the pin is Bun 1.4.5 / `a7733435c`: the module's tests pass on it
+(2026-11-21); the measurements of the report were not repeated.
 Detailed results, the source snapshot and the commands are in the
 [refactoring report](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/di-structure-2026-09-19.md).
 

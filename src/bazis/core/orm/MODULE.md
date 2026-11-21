@@ -1,6 +1,6 @@
 # ORM: connection and operational policy
 
-Version: 5. Check date: 2026-10-02.
+Version: 6. Check date: 2026-11-21 (Bun 1.4.5: the cancellation facts; the rest as of 2026-10-02).
 Type: the existing atomic integration of the library ORM with DI and Infra.
 Scope of this passport: the extra `ormBazisConnect` inputs and passing the
 lifecycle/health signal. The other `ormModule` contracts are kept.
@@ -112,9 +112,13 @@ Types and final results always come from the report's latest receipt.
 
 Server cancellation through a separate Bun.SQL connection is on by default;
 [its qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/orm-server-cancel-integration-2026-09-14.md)
-is separate from the old close mode. Direct fast cancellation by closing TLS on the
-qualified Bun 1.4.0 still fails:
-closing a native Promise does not guarantee that SQL stops on the server at once.
+is separate from the old close mode. Direct fast cancellation by closing TLS on
+Bun 1.4.0 failed: closing a native Promise does not guarantee that SQL stops on the
+server at once. On Bun 1.4.5, the pinned version since bazis 0.142.0, this was not
+checked again (it needs the TLS target), so the default stays. What did change in
+1.4.5 is the native `Query.cancel()`: over plain TCP it stops a running query (see
+the [library ORM README](../../library/orm/README.md)); moving the ORM to it is
+separate work.
 The contract of the final unknown outcome, the timeouts and the retry ban are defined
 in the [library ORM passport](../../library/orm/MODULE.md). `statement_timeout`
 bounds SQL execution from its start, not the time after an arbitrary abort.
