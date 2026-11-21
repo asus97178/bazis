@@ -1,6 +1,6 @@
 # bazis module architecture and directory structure
 
-Identifier: **MOD-ARCH-001**. Version: **1.12**. Date: **2026-11-11**.
+Identifier: **MOD-ARCH-001**. Version: **1.13**. Date: **2026-11-21**.
 Status: **mandatory repository rule**.
 
 The specification fixes the choice between an atomic and a composite module, the
@@ -131,6 +131,20 @@ The current build targets of this repository are defined in [package.json](../..
 
 Use the qualified Bun through `scripts/bazis-bun`. When checking a single target,
 first refresh the required codegen results.
+
+The qualified Bun is the one [toolchain/bun.json](../../toolchain/bun.json) names:
+1.4.5 since bazis 0.142.0. Three rules follow from the pin (v1.13):
+
+- **The pin is also the lowest supported Bun.** Tests run only on the pinned version, so
+  `engines.bun` of the package, the check before every `bazis` command and the project
+  template name the same version. Moving the pin moves all of them
+  ([how](../../toolchain/README.md#moving-to-a-newer-bun)).
+- **A statement about how Bun behaves names the version it was checked on.** A passport
+  that works around the runtime (a binding, a cancellation, a build artifact) says on
+  which Bun the behaviour was seen. When the pin moves, each such statement is checked
+  again, or marked as not checked again with the reason.
+- **Types are checked twice.** `ci` runs `tsc --noEmit` and `bun check`; `tsc` is the
+  authority, and a difference between the two is a finding to resolve, not to silence.
 A change that affects the binary build or execution is checked by building the
 affected target and a control run of the matching scenario in a controlled
 environment. Typecheck, unit tests and running from TypeScript do not replace this check.

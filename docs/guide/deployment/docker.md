@@ -4,8 +4,10 @@
 на втором файл кладётся в небольшой Debian. В итоговом образе нет ни Bun,
 ни `node_modules`, ни исходников.
 
-Все примеры проверены на bazis 0.111.2, образах `oven/bun:1.4.0` и
-`debian:bookworm-slim`, Docker Compose 5.1 и PostgreSQL 17.
+`Dockerfile` проверен на bazis 0.142.0 и образах `oven/bun:1.4.5` и
+`debian:bookworm-slim`: сборка, запуск не от root, `/health`, остановка.
+Остальные примеры главы (Compose, PostgreSQL) проверялись на bazis 0.111.2
+с `oven/bun:1.4.0`, Docker Compose 5.1 и PostgreSQL 17.
 
 ## Dockerfile
 
@@ -70,8 +72,8 @@ src/generated
 docker build -t shop .
 ```
 
-Сборка заняла 13 секунд, образ — 259 МБ: 138 МБ Debian и 84 МБ
-исполняемый файл. Образ собирается под архитектуру машины сборки: на Mac с
+Образ нового проекта — 300 МБ, из них 110 МБ — исполняемый файл. В
+проверке на Bun 1.4.0 было 259 и 84 МБ: с тех пор вырос сам Bun. Образ собирается под архитектуру машины сборки: на Mac с
 Apple Silicon — `aarch64`.
 
 ## Запуск
