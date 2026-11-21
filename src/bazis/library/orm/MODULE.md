@@ -559,3 +559,23 @@ limited. The expected and catalog type labels are `decimal(p,s)` / `decimal`
 refuse decimal columns; the dynamic logical `decimal` maps to `decimal`.
 Checks: [orm.decimal.test.ts](test/orm.decimal.test.ts),
 [orm.decimal.postgres.live.test.ts](test/orm.decimal.postgres.live.test.ts).
+
+## 18. Exact integer parameters (2026-11-13)
+
+An `integer` column is `bigint` in PostgreSQL, a JavaScript number is a double.
+`Providers/integerValue.ts` (`integerParameter`, used by the dialect for
+conditions and writes) sends an integer written as a string, and a whole
+number beyond 2^53, as a `bigint`: the database compares it with the column
+exactly. Before, `Number(value)` made such a parameter a double, PostgreSQL
+turned the column into doubles too, and `id = "1234567890123456789"` found the
+neighbouring row as well. A number within ±2^53, a fraction and a value
+outside `bigint` go as numbers, as before; a `real` column is not changed.
+
+Not changed: reading. An integer beyond 2^53 still comes from a `DbSet` as a
+rounded number (two neighbours read as one value). Reading it exactly needs
+another value in the entity (a `bigint`), which changes what applications
+get; it is an open decision.
+
+Checks: [test/orm.integer-exact.test.ts](test/orm.integer-exact.test.ts);
+[test/orm.integer-exact.postgres.live.test.ts](test/orm.integer-exact.postgres.live.test.ts)
+(`BAZIS_PG_URL`, runs in the CI pipeline).

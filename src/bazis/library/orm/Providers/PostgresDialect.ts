@@ -4,6 +4,7 @@ import { projectCheckAstIdentifiers, renderCheck } from "../Schema/CheckExpressi
 import { resolvedForeignKey } from "./resolvedForeignKey";
 import { physicalTableIdentity, primaryKeyName } from "../Schema/tableKey";
 import { decimalParameter } from "./decimalValue";
+import { integerParameter } from "./integerValue";
 
 const jsonScalarParameters = new WeakSet<object>();
 
@@ -54,6 +55,7 @@ export class PostgresDialect implements SqlDialect {
         // Pre-serializing them would store JSON text as another JSON string.
         return value as SqlParam;
       case "integer":
+        return integerParameter(value);
       case "real":
         return typeof value === "bigint" ? value : Number(value);
       case "decimal":

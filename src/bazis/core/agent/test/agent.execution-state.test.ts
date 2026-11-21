@@ -173,6 +173,34 @@ describe("agent execution checkpoint state", () => {
     expect(done.terminal?.finalMessage?.content[0]).toMatchObject({ kind: "data", value: { answer: "done" } });
   });
 
+  test("keeps a model's reasoning, cache counts and unreadable arguments through a round trip", () => {
+    const value = base("ready-model");
+    (value.messages as unknown[]).push(
+      message("assistant", [{ kind: "reasoning", text: "Find the order first.", data: { signature: "sig-1" } }, { kind: "text", text: "Order 42 is paid." }]),
+      message("user", [{ kind: "text", text: "Thanks" }]),
+    );
+    value.steps = 1;
+    value.responses = [{
+      invocationId: "inv-1", finishReason: "stop",
+      message: message("assistant", [{ kind: "reasoning", text: "Find the order first.", data: { signature: "sig-1" } }, { kind: "text", text: "Order 42 is paid." }]),
+      toolCalls: [], metadata: {},
+      usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120, cacheReadTokens: 80, cacheWriteTokens: null, reasoningTokens: 12, latencyMs: null, cost: null, cacheHit: null },
+    }];
+    const text = canonicalAgentExecutionCheckpointV1(value);
+    const parsed = parseAgentExecutionCheckpointV1(text);
+    expect(parsed.messages[1]?.content[0]).toEqual({ kind: "reasoning", text: "Find the order first.", data: { signature: "sig-1" } });
+    expect(parsed.responses[0]?.usage).toEqual({ inputTokens: 100, outputTokens: 20, totalTokens: 120, cacheReadTokens: 80, reasoningTokens: 12 });
+    expect(canonicalAgentExecutionCheckpointV1(JSON.parse(text))).toBe(text);
+
+    // A checkpoint written before these fields existed still opens.
+    const older = base("ready-model");
+    older.steps = 1;
+    (older.messages as unknown[]).push(message("assistant", [{ kind: "text", text: "Hi" }]), message("user", [{ kind: "text", text: "Thanks" }]));
+    older.responses = [{ invocationId: "inv-1", finishReason: "stop", message: message("assistant", [{ kind: "text", text: "Hi" }]), toolCalls: [], metadata: {},
+      usage: { inputTokens: 5, outputTokens: 1, totalTokens: 6, latencyMs: null, cost: null, cacheHit: null } }];
+    expect(parseAgentExecutionCheckpointV1(JSON.stringify(older)).responses[0]?.usage).toEqual({ inputTokens: 5, outputTokens: 1, totalTokens: 6 });
+  });
+
   test("admits only State-issued semantic checkpoints without traversing spoofed roots", () => {
     const issued = parseAgentExecutionCheckpointV1(canonical(base("ready-model")));
     expect(requireIssuedAgentExecutionCheckpointV1(issued)).toBe(issued);

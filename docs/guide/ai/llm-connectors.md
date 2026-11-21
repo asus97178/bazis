@@ -55,6 +55,9 @@ export class AppInfra {}
 `openAiCompatibleAdapter` работает с любым API в формате OpenAI Chat
 Completions. `timeoutMs` — срок одного запроса к модели, по умолчанию
 60 секунд, `0` — без срока.
+`contextTokens` — окно контекста модели в токенах (`128_000` для модели на
+128 тысяч): зная его, рантайм заранее
+[сжимает длинный диалог](agents.md#длинный-диалог-сжатие).
 
 | Опция адаптера | По умолчанию | Что задаёт |
 | --- | --- | --- |
@@ -67,6 +70,78 @@ Completions. `timeoutMs` — срок одного запроса к модел�
 
 С одной моделью `modelProfile` агента ни на что не влияет.
 
+## Claude: `anthropicAdapter`
+
+Для моделей Claude есть свой адаптер. Он работает через официальный SDK,
+поэтому живёт в отдельном входе `bazis/core/infra/anthropic`, а пакет SDK
+приложение ставит само:
+
+```bash
+bun add @anthropic-ai/sdk
+```
+
+```ts
+// infra/llm.config.ts
+export const llmConfig = defineConfig("llm", {
+  default: { provider: "anthropic", model: "claude-opus-5-5", baseUrl: "https://api.anthropic.com", apiKey: secret("") },
+});
+
+// infra/App.infra.ts
+import { Infra, llmConnect } from "bazis/core/infra";
+import { anthropicAdapter } from "bazis/core/infra/anthropic";
+
+@Infra({ llm: llmConnect(llmConfig, anthropicAdapter({ effort: "medium" })) })
+export class AppInfra {}
+```
+
+| Опция адаптера | По умолчанию | Что задаёт |
+| --- | --- | --- |
+| `effort` | умолчание модели | Насколько тщательно модель работает: `low`, `medium`, `high`, `xhigh`, `max` |
+| `thinking` | `true` | Адаптивные рассуждения: модель сама решает, когда и сколько думать. `false` не передаёт настройку — для модели, которая её не принимает |
+| `thinkingDisplay` | умолчание модели | `"summarized"` возвращает краткое изложение рассуждений в тексте частей `reasoning`; иначе на текущих моделях текст пуст |
+| `cache` | `true` | Кэш промпта: `true` — на пять минут, `"1h"` — на час, `false` — выключен |
+| `maxOutputTokens` | 32 000 | `max_tokens` запроса, если запуск не задал `maxOutputTokens` |
+| `healthCheck` | `true` | Проверять ли провайдера в `/health` |
+| `client` | — | Готовый клиент SDK вместо созданного по конфигурации: клиент облачной платформы или подставной в тестах |
+
+Что адаптер делает сам:
+
+- **Кэш промпта.** Инструкции, описания инструментов и уже пройденный диалог
+  на следующем шаге читаются из кэша провайдера — в разы дешевле. В
+  `result.usage` это видно: `cacheReadTokens` и `cacheWriteTokens`.
+  Кэш работает, пока начало запроса не меняется, поэтому не подставляйте
+  в инструкции агента время или номер запроса.
+- **Рассуждения.** Блоки рассуждений модели остаются в диалоге частями
+  `reasoning` и возвращаются провайдеру без изменений вместе с вызовом
+  инструмента, к которому привели. `usage.reasoningTokens` — сколько
+  токенов ответа ушло на них.
+- **Окно модели.** При старте адаптер спрашивает у провайдера модель из
+  конфигурации: неверный ключ или имя модели останавливают запуск, а окно
+  контекста становится известно без `contextTokens`, и
+  [сжатие диалога](agents.md#длинный-диалог-сжатие) начинается заранее.
+- **Изображения и файлы.** `agentImage` уходит как изображение (по адресу
+  или `data:`-строкой: JPEG, PNG, GIF, WebP), `agentFile` — как документ
+  (PDF или текст).
+- **Структурированный ответ** запрашивается по JSON-схеме. Правила, которые
+  API не принимает (`minLength`, `minimum` и другие), SDK превращает в
+  подсказку модели, а проверяет их рантайм.
+
+Чего адаптер не передаёт: `temperature` (текущие модели Claude её
+отвергают) и повторы самого SDK — запрос повторяет
+[рантайм](agents.md#что-рантайм-исправляет-сам). Если модель отказалась
+отвечать по соображениям безопасности, запуск завершается с
+`AGENT_PROVIDER_STOPPED` (`finishReason: "content-filter"`), а категория
+отказа — в `responses[].metadata.refusal`.
+
+Текст ошибки API адаптер не повторяет: в нём может быть часть запроса. В
+журнале остаются код ответа, тип ошибки и номер запроса, по которому его
+можно найти в консоли провайдера:
+
+```text
+error: Agent model call failed {"code":"AGENT_PROVIDER_FAILED","error":{"name":"AnthropicProviderError",
+  "message":"Anthropic request failed with HTTP 401 (authentication_error), request req_011…"}}
+```
+
 ## Что уходит провайдеру
 
 Проверено на запросах, которые получил сервер:
@@ -77,6 +152,7 @@ Completions. `timeoutMs` — срок одного запроса к модел�
 | `onTextDelta` | `stream: true`: текст приходит по частям |
 | `output` с JSON-схемой | `response_format: { type: "json_schema", json_schema: { name, strict, schema } }` |
 | Ключ | `Authorization: Bearer <apiKey>` |
+| `agentImage` в сообщении пользователя | часть `image_url`; файл `data:`-строкой — часть `file` |
 
 Вызовы инструментов разбираются и в потоковом ответе, и в обычном.
 
@@ -153,6 +229,7 @@ export class AppInfra {}
 | `model` | Модель профиля вместо `model` из конфигурации |
 | `temperature`, `maxOutputTokens` | Параметры запроса |
 | `timeoutMs` | Срок запроса этого профиля |
+| `contextTokens` | Окно контекста модели в токенах: по нему рантайм заранее [сжимает длинный диалог](agents.md#длинный-диалог-сжатие) |
 | `fallback` | Профиль, который ответит, если этот не смог |
 
 У каждого профиля может быть своя конфигурация — другой провайдер, адрес и
@@ -189,7 +266,7 @@ check({ name: "support", modelProfile: "creative" })
 reasoning отвечает HTTP 503:
 → ответ от fast
 → warn: LLM model profile failed, using fallback {"profile":"reasoning","fallback":"fast",
-    "agent":"support","error":{"name":"OpenAiCompatibleProviderError",
+    "agent":"support","error":{"name":"AgentModelUnavailableError",
     "message":"OpenAI-compatible POST /chat/completions failed with HTTP 503."}}
 
 reasoning не ответил за 1 с (timeoutMs: 1000):
@@ -215,14 +292,17 @@ reasoning прислал «Начинаю отв» и оборвался
 
 | Что случилось | Код запуска | В журнале |
 | --- | --- | --- |
-| Провайдер ответил HTTP-ошибкой | `AGENT_PROVIDER_FAILED` | `OpenAI-compatible POST /chat/completions failed with HTTP 503.` |
+| Провайдер занят (HTTP 408, 409, 425, 429, 5xx) или оборвалось соединение — и после [повторов](agents.md#что-рантайм-исправляет-сам) тоже | `AGENT_PROVIDER_FAILED` | `OpenAI-compatible POST /chat/completions failed with HTTP 503.` |
+| Провайдер отказал: другой HTTP-код (400, 401, 404) — без повторов | `AGENT_PROVIDER_FAILED` | `OpenAI-compatible POST /chat/completions failed with HTTP 401.` |
+| Запрос длиннее окна модели (HTTP 400, 413 или 422 с текстом о длине контекста) — и после [сжатия](agents.md#длинный-диалог-сжатие) тоже | `AGENT_CONTEXT_OVERFLOW` | `… failed with HTTP 400. The request does not fit the model's context window.` |
 | Не уложились в `timeoutMs` коннектора | `AGENT_PROVIDER_TIMEOUT` | `OpenAI-compatible request timed out.` |
 | Не уложились в срок рантайма (`timeoutMs` в [настройках](agents.md#настройки-аудит-и-подтверждение), 60 с) | `AGENT_PROVIDER_TIMEOUT` | |
 | Запуск отменён через `signal` | `AGENT_ABORTED` | — |
 
 Каждый сбой, кроме отмены, пишется в журнал как `Agent model call failed`.
-Тело ответа с ошибкой не читается и не попадает в журнал: провайдер может
-повторить в нём запрос пользователя или ключ.
+Тело ответа с ошибкой не попадает ни в журнал, ни в текст ошибки: провайдер
+может повторить в нём запрос пользователя или ключ. Адаптер только
+определяет по нему, не отказ ли это из-за длины запроса.
 
 ## Свой адаптер
 
@@ -271,6 +351,30 @@ export class AppInfra {}
 Передавайте `context.signal` в запросы — тогда отмена запуска и срок
 рантайма прерывают запрос. Свой срок сообщайте ошибкой
 `AgentModelTimeoutError`: запуск получит код `AGENT_PROVIDER_TIMEOUT`.
+
+Если провайдер не может ответить сейчас — перегружен, ограничивает частоту,
+оборвалось соединение, — бросайте `AgentModelUnavailableError`: такой запрос
+рантайм [повторит](agents.md#что-рантайм-исправляет-сам). Пауза, которую
+просит провайдер, передаётся в `retryAfterMs`. Любую другую ошибку рантайм
+не повторяет.
+
+```ts
+if (response.status === 429 || response.status >= 500) {
+  throw new AgentModelUnavailableError(`echo model: HTTP ${response.status}`, { retryAfterMs: 2_000 });
+}
+```
+
+Если запрос не помещается в окно модели, бросайте
+`AgentModelContextOverflowError` — рантайм сожмёт диалог и повторит шаг.
+Окно модели сообщает необязательный метод `contextTokens(modelProfile?)`.
+Сообщайте в `usage.inputTokens` весь размер запроса, вместе с токенами из
+кэша: по нему рантайм уточняет свою оценку токенов.
+
+Аргументы инструмента, которые модель написала битым JSON, — не сбой
+провайдера. Вместо исключения верните вызов с причиной:
+`agentToolCall({ id, name, inputError: "Unexpected end of JSON input" })`.
+Инструмент не будет вызван, а модель получит ошибку
+`TOOL_ARGUMENTS_INVALID` и напишет вызов заново.
 
 ```text
 модель не ответила за timeoutMs: 200

@@ -144,6 +144,38 @@ await this.agents.run(support, {
 conversation message when trimming old history. Provider requests include
 `metadata.agentContext.trace` so context assembly is inspectable.
 
+The runtime recovers before it fails a run. A model request the provider
+cannot serve right now (`AgentModelUnavailableError`: HTTP 429, 5xx, a broken
+connection) is repeated, three attempts by default (`modelRetry`). A text
+answer cut by the output limit is continued (`maxOutputContinuations`, 3), a
+structured answer that is not valid is sent back to the model with the issues
+(`maxOutputRepairs`, 2); the finished dialog keeps one answer. Tool arguments
+the provider could not read (`AgentToolCall.inputError`) give the model
+`TOOL_ARGUMENTS_INVALID` instead of failing the run. Tools of one step that
+change nothing (`none`, `read`) and stand next to each other run together
+(`maxParallelToolCalls`, 8); `write` and `external` run one by one.
+`runTimeoutMs` bounds a whole run (`AGENT_RUN_TIMEOUT`), `result.usage` sums
+the tokens of every model call, and a Tool output longer than
+`contextLimits.maxToolResultChars` (100 000) reaches the model cut.
+
+A long dialog is compacted: its older part is replaced by a summary the
+model writes (a user message with `metadata.runtime: "summary"`), the newest
+messages stay as written and a Tool call is never separated from its results.
+It starts at 80% of the model's window when the LLM connector states
+`contextTokens`, at `compaction.maxTokens`, or after the provider refuses a
+request as too long (`AgentModelContextOverflowError`); `result.compactions`
+says it happened and `compaction: false` turns it off. Token estimates are
+corrected by the usage a provider reports (`metadata.agentContext.tokenScale`).
+
+A model's reasoning is a `reasoning` content part of its assistant message
+(`agentReasoning(text, { data })`): `data` is the provider's own record of the
+block and goes back to it unchanged with the dialog. The runtime drops
+reasoning wherever it rewrites a dialog (compaction, trimming by
+`contextLimits`, dropped drafts). `AgentUsage` also reports `cacheReadTokens`,
+`cacheWriteTokens` and `reasoningTokens`; `inputTokens` is the whole request,
+cached tokens included. Claude is served by `anthropicAdapter` from
+`bazis/core/infra/anthropic`, on the official SDK.
+
 With `llmRouter`, `check` and `run` reject a `modelProfile` the router does
 not serve; a fallback to another profile is logged as `LLM model profile
 failed, using fallback`. A model provider that gives up after its own deadline

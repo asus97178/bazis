@@ -4,6 +4,196 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.141.0 — 2026-11-13
+
+Access ([ACCESS-001 v1.5](docs/architecture/ACCESS.md)): why a check answers what it
+answers, and which fields a list may be filtered by. Nothing to change in an application.
+
+### Added
+
+- `SubjectAccess.explain(permission, object)`: the answer of `can` and every grant of the
+  rights system in its order — whether its partition fits, the result of its condition
+  (`true`, `false`, `"unknown"`), the reason a grant was dropped, the fields a grant that
+  applies gives. `kind: "all"` — the rights system answered `"all"`; `kind: "absent"` — a
+  permission of a source that does not exist now. `can` and `explain` use one function.
+- `Grant.id`: an optional label of the rights system, for example the id of a role's rule.
+  The checks do not read it; it comes back in `explain` and in the warning about a dropped
+  grant (field `grant`). The default rights system sets `role:<role>`.
+- `SubjectAccess.filterableFields(permission, { scope? })`: `"all"` or the fields the
+  subject reads by every grant. A filter or a sort by a closed field tells its values, so
+  a list is filtered and sorted only by these.
+- `restrictListOptions(options, fields)` in `bazis/library/jsonapi`: the options of a list
+  with `sort` and `filter` left only for the open fields. A request with a closed field
+  gets the usual `400` (`filtering by "total" is not allowed`); a `defaultSort` that names
+  a closed field is taken off.
+
+### Changed
+
+- The specification allows an attribute on the column of the partition
+  (`scope: { column: "spaceId" }` and `on: { spaceId: … }`): the code allowed it already.
+  A grant applies when both its partition and its condition fit.
+
+## 0.140.2 — 2026-11-13
+
+A fix of the ORM: integers beyond 2^53 in conditions. Nothing to change in an
+application.
+
+### Fixed
+
+- A condition on an `integer` column (`bigint` in PostgreSQL) compares an integer beyond
+  2^53 exactly. The parameter used to become a double, PostgreSQL then compared doubles,
+  and `where((row) => row.id.eq("1234567890123456789"))` found the neighbouring row as
+  well; `gt(9007199254740992)` lost the row with `9007199254740993`. Now an integer
+  written as a string, and a whole number of that size, go to the database as a `bigint`.
+  The same holds for `in`, `ne`, `gte`, `lt`, `lte` and for immediate updates.
+- Access: a list filter by such an integer lists exactly the rows the check allows.
+
+### Known limits
+
+- Reading is not changed: a `DbSet` gives an integer beyond 2^53 as a rounded number.
+  Pass such a value to `can` as a string or a `bigint`; to keep it exact in the entity,
+  store it in a `text` or `decimal` column.
+
+## 0.140.1 — 2026-11-13
+
+Fixes for the permission sources of 0.140.0, found by a review of the code. Nothing to
+change in an application.
+
+### Fixed
+
+- A specification of a source that cannot be checked — `scope: null`, an object whose
+  reading throws — is one rejected permission. It used to fail the reading of the whole
+  prefix: at start no permission of the source existed.
+- `PermissionSource.version()` must return a number, a bigint or a non-empty string.
+  `undefined`, `null` and an empty string are a failed reading; they used to become the
+  version `"undefined"`, which never changes, so other instances never read again. A
+  counter may now be returned as a number (`PermissionSourceVersion`).
+- A call of a source has `access.sourceTimeoutSeconds` (10). A source that hangs holds
+  neither the start of the application nor a request, and no second call starts beside
+  the one that has not answered.
+- `/health` is unhealthy for a source that has never been read or failed three times in a
+  row, not for one failure. Without a poll (`sourcePollSeconds: 0`) a failed source is
+  tried again every 5 seconds; its error used to stay for good.
+- A system clock set back no longer switches off the version comparison for a missing
+  key.
+- The catalog builds its merged list of permissions once per reading of a source, not on
+  every call.
+
+### Changed
+
+- Inside the pack: `PermissionSources` is `PermissionSourcesService` in
+  `PermissionSources.service.ts`; the loader's file is
+  `PermissionSourceLoader.background.ts`. The public entry and the `/health` check name
+  are the same.
+- `PermissionSourceState` has `failures`: the readings that failed in a row.
+
+### Known limits
+
+- The comparison of number attributes is exact for `decimal` columns. The ORM reads and
+  compares `integer` and `real` columns as doubles: integers are exact up to 2^53.
+- After `changed(prefix, keys)` the next comparison of versions reads the whole prefix
+  again: `keys` makes a change visible at once, it does not save the reading.
+
+## 0.140.0 — 2026-11-13
+
+Access ([ACCESS-001 v1.4](docs/architecture/ACCESS.md)): permissions that appear while
+the application runs, and comparisons of numbers in grants. Stores stay as they are.
+Behaviour changes: see [Upgrading](docs/guide/reference/upgrading.md#01400).
+
+### Added
+
+- Permission sources: `@Module({ permissionSources: { data: DataPermissionSource } })`.
+  A `PermissionSource` class owns a key prefix and gives permissions in the form of
+  `definePermissions` — the tables of a data manager and their fields. The catalog reads
+  the sources before the HTTP host starts and checks every specification like a declared
+  one; a bad one is logged and does not exist.
+- Keys of sources are types: `` `${prefix}.${string}` `` (`SourcePermissionKey`), accepted
+  by `can`, `access.can`, `access.filter` and `access.fields`. `bazis codegen` takes the
+  prefixes from `permissionSources`. A key the source does not give now is closed for
+  everyone: `can` answers no, `filter` — nothing.
+- Changes: `IAccessCatalog.changed(prefix, keys?)` on the instance that changed the data;
+  other instances compare the source's `version()` every `access.sourcePollSeconds`
+  (5 by default, `0` — no poll). A new key or a new attribute does not wait for the poll:
+  the version is compared before a refusal. The state of the sources is in `/health` and
+  in `IAccessCatalog.sources()`.
+- `IAccessCatalog.grantProblem(permission, grant)`: the checks of a request, for a rights
+  system that saves a rule and answers 422.
+- Conditions: `gt`, `gte`, `lt`, `lte` for an attribute of `type: "number"` with a column.
+  In a list filter a comparison is `{ column, op, value }` of `ColumnCondition`;
+  `grantsToWhere` turns it into an ORM condition.
+- `GET /access/catalog` lists the permissions of sources (`source`) and marks the
+  attributes that may be compared (`compare: true`).
+
+### Changed
+
+- A number attribute is compared as a number, exactly, as a decimal: `"100000.00"` of a
+  `decimal` column equals `100000` in `eq`, `in` and `notIn` too. A check and a list filter
+  agree on such a column. A value of a number attribute that is not a number makes the
+  grant unusable.
+- `grantsToWhere` sends a fraction to the database as decimal text: a `decimal` column of
+  the ORM refuses a `double`.
+
+### Verified
+
+- `access.postgres.live.test.ts`: the filter lists exactly the rows `can` allows, for
+  every kind of condition, on `decimal`, `integer` and `real` columns. The CI pipeline
+  runs it on its PostgreSQL service (`BAZIS_ACCESS_PG_URL`).
+
+## 0.139.0 — 2026-11-12
+
+The agent runtime after its audit: a run recovers instead of failing, a long dialog is
+compacted, and Claude is served by its own adapter. Stores stay as they are.
+Behaviour changes: see [Upgrading](docs/guide/reference/upgrading.md#01390).
+
+### Added
+
+- A model request the provider cannot serve right now (HTTP 408, 409, 425, 429, 5xx, a
+  broken connection) is repeated: three attempts, backoff from 0.5 s, `Retry-After`
+  honoured. `AgentModelUnavailableError`, `AgentRuntimeOptions.modelRetry`.
+- A text answer cut by the output limit is continued (`maxOutputContinuations`, 3); a
+  structured answer that is not valid goes back to the model with the issues
+  (`maxOutputRepairs`, 2). The finished dialog keeps one answer.
+- Tool arguments the provider could not read give the model `TOOL_ARGUMENTS_INVALID`
+  instead of failing the run: `AgentToolCall.inputError`.
+- Tools of one step that change nothing (`sideEffect: "none"` or `"read"`) and stand
+  next to each other run together, up to eight (`maxParallelToolCalls`). `write` and
+  `external` run one by one, as before.
+- `runTimeoutMs`: the deadline of a whole run, `AGENT_RUN_TIMEOUT`. `result.usage`:
+  the sum over every model call, with `cacheReadTokens`, `cacheWriteTokens` and
+  `reasoningTokens`.
+- Compaction: the older part of a dialog that reaches the model's window is replaced
+  by a summary the model writes; the newest messages stay as written.
+  `AgentRuntimeOptions.compaction`, `result.compactions`, `contextTokens` of
+  `llmConnect` / `llmProfile`, `AgentModelContextOverflowError`,
+  `AGENT_CONTEXT_OVERFLOW`.
+- `contextLimits.maxToolResultChars` (100 000): a longer Tool output reaches the model
+  cut; the dialog keeps it whole.
+- `anthropicAdapter()` from `bazis/core/infra/anthropic`: Claude through the official
+  SDK. Tools, structured answers, images and PDF, streaming, prompt caching, adaptive
+  thinking; the model's context window is read from the provider at start.
+  `@anthropic-ai/sdk` is an optional peer dependency: an application that uses the
+  adapter installs it.
+- `agentReasoning` / `AgentReasoningPart`: a model's reasoning is a part of its
+  assistant message and goes back to the provider unchanged.
+  `agentMessageText(message)`: the words of a message.
+
+### Changed
+
+- The default `maxSteps` is 30 (was 8).
+- The token estimate behind `contextLimits.maxTokens` counts characters by script
+  instead of words and is corrected by the usage a provider reports
+  (`metadata.agentContext.tokenScale`). For Cyrillic and JSON it is two to three times
+  higher than before.
+- The OpenAI-compatible adapter sends `agentImage` as an image and an inline
+  `agentFile` as a file; they used to be JSON text with an address. It reports cached
+  and reasoning tokens, and throws `AgentModelUnavailableError` for the statuses above
+  (was `OpenAiCompatibleProviderError`).
+
+### Fixed
+
+- A streamed Tool call cut by the output limit no longer fails the run as an invalid
+  provider response.
+
 ## 0.138.0 — 2026-11-11
 
 The second part of the framework audit: the application is declared once, Tools made

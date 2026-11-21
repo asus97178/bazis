@@ -121,10 +121,13 @@ export async function readOpenAiTextStream(
     // EOF alone is not success: both a terminal choice and [DONE] are required.
     if (!done) fail("was interrupted before completion");
     const toolCalls = [...calls.entries()].sort(([a], [b]) => a - b).map(([index, call], position) => {
-      if (index !== position || !call.id || !call.function.name || !call.function.arguments) fail("contains an incomplete tool call");
+      if (index !== position || !call.id || !call.function.name) fail("contains an incomplete tool call");
       return call;
     });
-    if ((toolCalls.length > 0) !== (finish === "tool_calls") || new Set(toolCalls.map(call => call.id)).size !== toolCalls.length) fail("contains inconsistent tool calls");
+    // "length" with tool calls: the output limit cut the arguments. The calls are
+    // kept, so the model hears that the arguments are broken and writes them again.
+    const cut = finish === "length" && toolCalls.length > 0;
+    if ((!cut && (toolCalls.length > 0) !== (finish === "tool_calls")) || new Set(toolCalls.map(call => call.id)).size !== toolCalls.length) fail("contains inconsistent tool calls");
     return { choices: [{ finish_reason: finish, message: { content: text.join(""), ...(toolCalls.length ? { tool_calls: toolCalls } : {}) } }], usage };
   } finally {
     signal.removeEventListener("abort", cancel);

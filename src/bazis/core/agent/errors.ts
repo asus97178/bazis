@@ -69,6 +69,38 @@ export class AgentModelTimeoutError extends Error {
   }
 }
 
+/**
+ * A model provider could not serve the request right now: it is overloaded,
+ * limits the rate (HTTP 429), answered 5xx or the connection broke. The runtime
+ * repeats such a call (`AgentRuntimeOptions.modelRetry`); any other provider
+ * error fails the run at once.
+ */
+export class AgentModelUnavailableError extends Error {
+  /** How long the provider asked to wait (`Retry-After`), when it said so. */
+  readonly retryAfterMs?: number;
+
+  constructor(message: string, options: { readonly retryAfterMs?: number } = {}) {
+    super(message);
+    this.name = "AgentModelUnavailableError";
+    if (options.retryAfterMs !== undefined && Number.isFinite(options.retryAfterMs) && options.retryAfterMs >= 0) {
+      this.retryAfterMs = Math.floor(options.retryAfterMs);
+    }
+  }
+}
+
+/**
+ * The request does not fit the model's context window. The runtime replaces
+ * the older part of the dialog with a summary and sends the request again
+ * (`AgentRuntimeOptions.compaction`); a run that still does not fit fails
+ * with AGENT_CONTEXT_OVERFLOW.
+ */
+export class AgentModelContextOverflowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentModelContextOverflowError";
+  }
+}
+
 /** Error thrown when the agent runtime is configured incorrectly. */
 export class AgentRuntimeError extends Error {
   constructor(message: string) {

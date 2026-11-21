@@ -1,5 +1,7 @@
 import {
+  AgentModelContextOverflowError,
   AgentModelTimeoutError,
+  AgentModelUnavailableError,
   agentMessage,
   agentModelResponse,
   agentToolCall,
@@ -22,6 +24,7 @@ import {
   type LlmProviderAdapter,
 } from "./llm";
 import { readOpenAiTextStream } from "./openaiTextStream";
+import { providerToolName, toolNameMapping, type ToolNameMapping } from "./toolNames";
 import { InfraError } from "../InfraConnector";
 import { redactSensitiveText } from "../../../library/redaction";
 
@@ -52,9 +55,14 @@ export class OpenAiCompatibleProviderError extends Error {
 
 type OpenAiChatRole = "system" | "user" | "assistant" | "tool";
 
+type OpenAiContentPart =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "image_url"; readonly image_url: { readonly url: string; readonly detail: "auto" | "low" | "high" } }
+  | { readonly type: "file"; readonly file: { readonly file_data: string; readonly filename: string } };
+
 interface OpenAiChatMessage {
   readonly role: OpenAiChatRole;
-  readonly content?: string | null;
+  readonly content?: string | readonly OpenAiContentPart[] | null;
   readonly tool_call_id?: string;
   readonly tool_calls?: readonly OpenAiToolCall[];
 }
@@ -92,15 +100,12 @@ interface OpenAiChatResponse {
     readonly prompt_tokens?: number;
     readonly completion_tokens?: number;
     readonly total_tokens?: number;
+    readonly prompt_tokens_details?: { readonly cached_tokens?: number } | null;
+    readonly completion_tokens_details?: { readonly reasoning_tokens?: number } | null;
   };
   readonly error?: {
     readonly message?: string;
   };
-}
-
-interface ToolNameMapping {
-  readonly providerToBazis: ReadonlyMap<string, string>;
-  readonly bazisToProvider: ReadonlyMap<string, string>;
 }
 
 function stripTrailingSlash(value: string): string {
@@ -124,47 +129,6 @@ function cancelBodyBestEffort(body: ReadableStream<Uint8Array> | null | undefine
   // Cleanup is deliberately not part of the provider terminal boundary: a
   // hostile/custom stream may never settle cancel().
   void body.cancel(reason).catch(() => undefined);
-}
-
-function shortHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
-}
-
-function providerToolName(name: string, used: Set<string>): string {
-  const replaced = name.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const prefixed = /^[a-zA-Z_]/.test(replaced) ? replaced : `tool_${replaced}`;
-  const trimmed = prefixed.length <= 64 ? prefixed : `${prefixed.slice(0, 55)}_${shortHash(name)}`;
-  if (!used.has(trimmed)) {
-    used.add(trimmed);
-    return trimmed;
-  }
-
-  const suffix = shortHash(name);
-  const base = trimmed.slice(0, Math.max(1, 63 - suffix.length));
-  const unique = `${base}_${suffix}`;
-  if (used.has(unique)) {
-    throw new OpenAiCompatibleProviderError(`Tool name "${name}" collides after OpenAI-compatible normalization.`);
-  }
-  used.add(unique);
-  return unique;
-}
-
-function toolNameMapping(tools: readonly AgentToolContract[]): ToolNameMapping {
-  const providerToBazis = new Map<string, string>();
-  const bazisToProvider = new Map<string, string>();
-  const used = new Set<string>();
-  for (let index = 0; index < tools.length; index += 1) {
-    const tool = tools[index] as AgentToolContract;
-    const providerName = providerToolName(tool.name, used);
-    providerToBazis.set(providerName, tool.name);
-    bazisToProvider.set(tool.name, providerName);
-  }
-  return Object.freeze({ providerToBazis, bazisToProvider });
 }
 
 function schemaForTool(tool: AgentToolContract): JsonObject {
@@ -227,6 +191,28 @@ function contentText(parts: readonly AgentContentPart[]): string {
   return lines.join("\n");
 }
 
+/**
+ * What a user sends as the provider expects it: one string for words, parts
+ * when there is an image or a file whose bytes are in the dialog. A file given
+ * by address is named in the text: Chat Completions takes file content only.
+ */
+function userContent(parts: readonly AgentContentPart[]): string | readonly OpenAiContentPart[] {
+  const inline = (part: AgentContentPart): boolean => part.kind === "image" || (part.kind === "file" && part.uri.startsWith("data:"));
+  if (!parts.some(inline)) return contentText(parts);
+  const out: OpenAiContentPart[] = [];
+  for (const part of parts) {
+    if (part.kind === "image") {
+      out.push({ type: "image_url", image_url: { url: part.uri, detail: part.detail } });
+    } else if (part.kind === "file" && part.uri.startsWith("data:")) {
+      out.push({ type: "file", file: { file_data: part.uri, filename: part.name ?? "file" } });
+    } else {
+      const text = contentText([part]);
+      if (text.length > 0) out.push({ type: "text", text });
+    }
+  }
+  return Object.freeze(out);
+}
+
 function toOpenAiRole(role: AgentMessage["role"]): OpenAiChatRole {
   if (role === "developer") {
     return "system";
@@ -266,15 +252,73 @@ function finishReasonOf(reason: string | undefined, hasToolCalls: boolean): Agen
   return "error";
 }
 
-function parseToolArguments(raw: string, callId: string): JsonValue {
+/** Arguments the model wrote: the value, or why they could not be read. */
+function parseToolArguments(raw: string, callId: string): { readonly input: JsonValue } | { readonly inputError: string } {
   if (raw.trim().length === 0) {
-    return Object.freeze({});
+    return { input: Object.freeze({}) };
   }
   try {
-    return normalizeJsonValue(JSON.parse(raw), `toolCall.${callId}.arguments`);
+    return { input: normalizeJsonValue(JSON.parse(raw), `toolCall.${callId}.arguments`) };
   } catch (error) {
-    throw new OpenAiCompatibleProviderError(`OpenAI-compatible tool arguments for "${callId}" are invalid JSON: ${errorMessageOf(error)}`);
+    // Not a provider failure: the model gets the reason as a Tool error and writes the call again.
+    return { inputError: errorMessageOf(error) };
   }
+}
+
+/** HTTP statuses that mean "not now": the runtime repeats the request. */
+function isUnavailableStatus(status: number): boolean {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+const MAX_ERROR_BODY_BYTES = 64 * 1024;
+
+/**
+ * Whether an error body says the request is longer than the model's window.
+ * The body is only classified: its text may repeat the prompt and never
+ * leaves this function.
+ */
+async function saysContextOverflow(response: Response, signal: AbortSignal): Promise<boolean> {
+  if (response.body === null) return false;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const cancel = (): void => { void reader.cancel().catch(() => undefined); };
+  signal.addEventListener("abort", cancel, { once: true });
+  try {
+    while (total < MAX_ERROR_BODY_BYTES) {
+      const item = await reader.read();
+      if (item.done) break;
+      chunks.push(item.value);
+      total += item.value.byteLength;
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    const text = new TextDecoder().decode(bytes.subarray(0, MAX_ERROR_BODY_BYTES));
+    let code: unknown;
+    let message: unknown = text;
+    try {
+      const error = (JSON.parse(text) as { error?: { code?: unknown; message?: unknown } }).error;
+      code = error?.code;
+      if (typeof error?.message === "string") message = error.message;
+    } catch { /* Not JSON: the plain text is looked at. */ }
+    return code === "context_length_exceeded"
+      || (typeof message === "string" && /context[ _-]?length|context window|maximum context|prompt is too long|too many (input )?tokens|input is too long/i.test(message));
+  } catch {
+    return false;
+  } finally {
+    signal.removeEventListener("abort", cancel);
+    cancel();
+  }
+}
+
+/** `Retry-After`: seconds or an HTTP date. */
+function retryAfterMsOf(header: string | null): number | undefined {
+  if (header === null) return undefined;
+  const text = header.trim();
+  if (/^\d+(\.\d+)?$/.test(text)) return Math.round(Number(text) * 1000);
+  const date = Date.parse(text);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
 }
 
 function normalizeToolCalls(
@@ -298,7 +342,7 @@ function normalizeToolCalls(
     out.push(agentToolCall({
       id: call.id,
       name,
-      input: parseToolArguments(call.function?.arguments ?? "", call.id),
+      ...parseToolArguments(call.function?.arguments ?? "", call.id),
     }));
   }
   return Object.freeze(out);
@@ -312,6 +356,8 @@ function buildUsage(usage: OpenAiChatResponse["usage"]): AgentModelResponse["usa
     ...(usage.prompt_tokens !== undefined ? { inputTokens: usage.prompt_tokens } : {}),
     ...(usage.completion_tokens !== undefined ? { outputTokens: usage.completion_tokens } : {}),
     ...(usage.total_tokens !== undefined ? { totalTokens: usage.total_tokens } : {}),
+    ...(typeof usage.prompt_tokens_details?.cached_tokens === "number" ? { cacheReadTokens: usage.prompt_tokens_details.cached_tokens } : {}),
+    ...(typeof usage.completion_tokens_details?.reasoning_tokens === "number" ? { reasoningTokens: usage.completion_tokens_details.reasoning_tokens } : {}),
   });
 }
 
@@ -399,6 +445,11 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
     } catch {
       return false;
     }
+  }
+
+  /** The context window the application stated for this model (`contextTokens`). */
+  public contextTokens(): number | undefined {
+    return this.connection.contextTokens;
   }
 
   /** Base URL of the provider, for diagnostics. */
@@ -490,9 +541,10 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
         continue;
       }
 
+      const role = toOpenAiRole(message.role);
       out.push(Object.freeze({
-        role: toOpenAiRole(message.role),
-        content: contentText(message.content),
+        role,
+        content: role === "user" ? userContent(message.content) : contentText(message.content),
       }));
     }
     return Object.freeze(out);
@@ -507,19 +559,32 @@ export class OpenAiCompatibleModelProvider implements AgentModelProvider {
       : setTimeout(() => abort.abort(new AgentModelTimeoutError("OpenAI-compatible request timed out.")), this.requestTimeoutMs);
     try {
       abort.signal.throwIfAborted();
-      const response = await this.fetcher(`${this.baseUrl}${path}`, {
-        method,
-        headers: this.headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: abort.signal,
-      });
+      let response: Response;
+      try {
+        response = await this.fetcher(`${this.baseUrl}${path}`, {
+          method,
+          headers: this.headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: abort.signal,
+        });
+      } catch (error) {
+        // A cancelled or timed-out request keeps its own reason; a broken connection can be repeated.
+        if (abort.signal.aborted) throw error;
+        throw new AgentModelUnavailableError(`OpenAI-compatible ${method} ${path} could not reach the provider: ${errorMessageOf(error)}`);
+      }
       if (!response.ok) {
+        const message = `OpenAI-compatible ${method} ${path} failed with HTTP ${response.status}.`;
+        // A refusal of a chat request may mean "too long": the runtime answers that by compacting the dialog.
+        if (method === "POST" && (response.status === 400 || response.status === 413 || response.status === 422) && await saysContextOverflow(response, abort.signal)) {
+          throw new AgentModelContextOverflowError(`${message} The request does not fit the model's context window.`);
+        }
         // Cancel the provider-controlled body without exposing it: error bodies
         // may echo prompts, credentials or tenant data.
         cancelBodyBestEffort(response.body);
-        throw new OpenAiCompatibleProviderError(
-          `OpenAI-compatible ${method} ${path} failed with HTTP ${response.status}.`,
-        );
+        if (isUnavailableStatus(response.status)) {
+          throw new AgentModelUnavailableError(message, { retryAfterMs: retryAfterMsOf(response.headers.get("retry-after")) });
+        }
+        throw new OpenAiCompatibleProviderError(message);
       }
       if (response.status === 204) {
         return {};

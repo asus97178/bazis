@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   DefaultAgentContextBuilder,
   agentMessage,
+  agentReasoning,
+  agentText,
   agentToolCall,
   agentToolCallPart,
   agentToolResult,
@@ -254,5 +256,46 @@ describe("agent context builder", () => {
       expect(context.messages.map(textOf)).toEqual(["current"]);
       expect(context.metadata.tokenCount).toBe(1);
     }
+  });
+
+  test("sends a Tool result that is too long cut, and says so in the trace", () => {
+    const rows = Array.from({ length: 200 }, (_, index) => ({ id: index, title: `Product ${index}` }));
+    const full = JSON.stringify(rows);
+    const messages = [
+      agentMessage("user", "List the products"),
+      agentMessage("assistant", [agentToolCallPart(agentToolCall({ id: "call-1", name: "products.list" }))]),
+      agentMessage("tool", agentToolResultPart(agentToolResult({ callId: "call-1", name: "products.list", output: rows })), { toolCallId: "call-1" }),
+    ];
+    const context = new DefaultAgentContextBuilder().build({
+      invocationId: "inv-1", agent: agentNamed("plain-agent"), messages, metadata: {}, limits: { maxToolResultChars: 500 },
+    });
+    const part = context.messages[2]?.content[0];
+    expect(part?.kind === "tool-result" ? part.result : undefined).toMatchObject({
+      callId: "call-1", name: "products.list", status: "success",
+      output: { truncated: true, totalChars: full.length, text: full.slice(0, 500) },
+    });
+    expect(context.trace[2]).toMatchObject({ included: true, reason: "maxToolResultChars" });
+    // The dialog itself is not changed.
+    const original = messages[2]?.content[0];
+    expect(original?.kind === "tool-result" ? original.result.output : undefined).toEqual(rows);
+
+    // A result that fits, and by default one under 100 000 characters, is sent whole.
+    const whole = new DefaultAgentContextBuilder().build({ invocationId: "inv-1", agent: agentNamed("plain-agent"), messages, metadata: {} });
+    const wholePart = whole.messages[2]?.content[0];
+    expect(wholePart?.kind === "tool-result" ? wholePart.result.output : undefined).toEqual(rows);
+    expect(whole.trace[2]?.reason).toBeUndefined();
+  });
+
+  test("drops reasoning from the messages that stay once older ones are trimmed", () => {
+    const reasoned = agentMessage("assistant", [agentReasoning("Thinking about it.", { data: { signature: "sig" } }), agentText("Second answer.")]);
+    const messages = [agentMessage("user", "First question"), agentMessage("assistant", "First answer."), agentMessage("user", "Second question"), reasoned, agentMessage("user", "Third question")];
+    const builder = new DefaultAgentContextBuilder();
+
+    const whole = builder.build({ invocationId: "inv-1", agent: agentNamed("plain-agent"), messages, metadata: {} });
+    expect(whole.messages[3]?.content.map((part) => part.kind)).toEqual(["reasoning", "text"]);
+
+    const trimmed = builder.build({ invocationId: "inv-1", agent: agentNamed("plain-agent"), messages, metadata: {}, limits: { maxMessages: 3 } });
+    expect(trimmed.messages.map((message) => message.content.map((part) => part.kind))).toEqual([["text"], ["text"], ["text"]]);
+    expect(textOf(trimmed.messages[1])).toBe("Second answer.");
   });
 });

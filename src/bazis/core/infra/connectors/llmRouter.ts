@@ -3,7 +3,9 @@ import type { HostedServiceDiagnostics } from "../../di";
 import { redactSensitive } from "../../../library/redaction";
 import {
   AGENT_MODEL_PROVIDER,
+  AgentModelContextOverflowError,
   AgentModelTimeoutError,
+  AgentModelUnavailableError,
   AgentRuntime,
   agentModelRequest,
   type AgentModelProvider,
@@ -175,6 +177,7 @@ function normalizeProfileOptions(options: LlmModelProfileOptions, field: string)
   const model = nonEmptyText(options.model, `${field}.model`);
   const fallback = nonEmptyText(options.fallback, `${field}.fallback`);
   nonNegativeInteger(options.timeoutMs, `${field}.timeoutMs`);
+  positiveInteger(options.contextTokens, `${field}.contextTokens`);
   positiveInteger(options.maxOutputTokens, `${field}.maxOutputTokens`);
   finiteNumber(options.temperature, `${field}.temperature`);
   return Object.freeze({
@@ -222,6 +225,11 @@ export class LlmModelRouter implements AgentModelProvider {
   /** Profile names an agent may use in `modelProfile`. */
   public modelProfiles(): readonly string[] {
     return this.profileNames;
+  }
+
+  /** The context window of a profile's model, when its `llmProfile` states `contextTokens`. */
+  public contextTokens(modelProfile?: string): number | undefined {
+    return this.profiles.get(modelProfile ?? this.defaultProfile)?.connection.contextTokens;
   }
 
   /** The application logger: a fallback is reported, not silent. */
@@ -387,6 +395,10 @@ export class LlmModelRouter implements AgentModelProvider {
       const message = `LLM model profile "${profileName}" failed: ${errorMessageOf(error)}`;
       // Keep a timeout a timeout: the run reports it as AGENT_PROVIDER_TIMEOUT.
       if (error instanceof AgentModelTimeoutError) throw new AgentModelTimeoutError(message);
+      // Keep "too long" what it is: the runtime compacts the dialog.
+      if (error instanceof AgentModelContextOverflowError) throw new AgentModelContextOverflowError(message);
+      // Keep "not now" what it is: the runtime repeats the request.
+      if (error instanceof AgentModelUnavailableError) throw new AgentModelUnavailableError(message, { retryAfterMs: error.retryAfterMs });
       throw new LlmModelRouterError(message);
     } finally {
       acceptingText = false;

@@ -48,7 +48,7 @@ class ListQueryContext extends DbContext {
 
 const typedOptions: ListQueryOptions = {
   filter: {
-    text: ["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin"],
+    text: ["eq", "ne", "gt", "gte", "lt", "lte", "in", "nin", "contains", "icontains", "istartsWith", "iendsWith"],
     amount: ["eq", "gte", "in"],
     ratio: ["eq", "lte", "in"],
     active: ["eq", "in"],
@@ -99,6 +99,18 @@ describe("ListQuery filters use column metadata", () => {
       expect(compiled.sql).toContain(operation === "nin" ? 'NOT ("value_text" IN (' : '"value_text" IN (');
     });
   }
+
+  test("contains is case-sensitive; icontains, istartsWith and iendsWith use ILIKE with escaped wildcards", async () => {
+    const exact = await compiledFilter(new URLSearchParams({ "filter[text][contains]": "кат" }));
+    expect(exact.sql).toContain('"value_text" LIKE');
+    expect(exact.params).toEqual(["%кат%"]);
+    for (const [operation, pattern] of [["icontains", "%50\\%%"], ["istartsWith", "50\\%%"], ["iendsWith", "%50\\%"]] as const) {
+      const compiled = await compiledFilter(new URLSearchParams({ [`filter[text][${operation}]`]: "50%" }));
+      expect(compiled.sql).toContain('"value_text" ILIKE');
+      expect(compiled.sql).toContain("ESCAPE");
+      expect(compiled.params).toEqual([pattern]);
+    }
+  });
 
   test("OR groups use each selected column's type", async () => {
     const compiled = await compiledFilter(new URLSearchParams({

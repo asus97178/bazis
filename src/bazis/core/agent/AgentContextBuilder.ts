@@ -2,6 +2,8 @@ import type { AgentDefinition } from "./AgentRegistry";
 import { AgentRuntimeError } from "./errors";
 import {
   agentMessage,
+  agentToolResult,
+  agentToolResultPart,
   type AgentContentPart,
   type AgentMessage,
   type AgentMessageRole,
@@ -9,10 +11,20 @@ import {
   type JsonValue,
 } from "./semantic";
 
+/** A Tool result longer than this reaches the model cut, unless `maxToolResultChars` says otherwise. */
+export const DEFAULT_MAX_TOOL_RESULT_CHARS = 100_000;
+
 export interface AgentContextLimits {
   readonly maxMessages?: number;
   readonly maxChars?: number;
   readonly maxTokens?: number;
+  /**
+   * The longest Tool output, as JSON text, the model gets in full. A longer
+   * one is sent as `{ truncated: true, totalChars, text }` with its beginning,
+   * so one large result does not fill the model's window; `result.toolResults`
+   * and `result.messages` keep the whole output. 100 000 by default.
+   */
+  readonly maxToolResultChars?: number;
 }
 
 export interface AgentContextBuildInput {
@@ -21,6 +33,12 @@ export interface AgentContextBuildInput {
   readonly messages: readonly AgentMessage[];
   readonly metadata: JsonObject;
   readonly limits?: AgentContextLimits;
+  /**
+   * How many real tokens one estimated token turned out to be for this model:
+   * the runtime measures it from the usage the provider reports. Estimates are
+   * multiplied by it before `maxTokens` is applied. 1 when nothing is known yet.
+   */
+  readonly tokenScale?: number;
 }
 
 export interface AgentContextTraceEntry {
@@ -55,6 +73,8 @@ interface ContextCandidate {
   readonly message: AgentMessage;
   readonly chars: number;
   readonly tokens: number;
+  /** The Tool result was too long and is sent cut. */
+  readonly cut?: true;
 }
 
 function errorMessageOf(error: unknown): string {
@@ -83,7 +103,11 @@ export function normalizeAgentContextLimits(
     return undefined;
   }
 
-  const normalized: { maxMessages?: number; maxChars?: number; maxTokens?: number } = {};
+  const normalized: { maxMessages?: number; maxChars?: number; maxTokens?: number; maxToolResultChars?: number } = {};
+  const maxToolResultChars = optionalPositiveInteger(limits.maxToolResultChars, `${field}.maxToolResultChars`);
+  if (maxToolResultChars !== undefined) {
+    normalized.maxToolResultChars = maxToolResultChars;
+  }
   const maxMessages = optionalPositiveInteger(limits.maxMessages, `${field}.maxMessages`);
   const maxChars = optionalPositiveInteger(limits.maxChars, `${field}.maxChars`);
   const maxTokens = optionalPositiveInteger(limits.maxTokens, `${field}.maxTokens`);
@@ -129,8 +153,46 @@ function cloneMessage(message: AgentMessage, field: string): AgentMessage {
   }
 }
 
+/** The message the model gets instead of a Tool result that is too long; `undefined` when it fits. */
+function cutToolResult(message: AgentMessage, maxChars: number): AgentMessage | undefined {
+  const part = message.content[0];
+  if (message.role !== "tool" || part?.kind !== "tool-result" || part.result.status !== "success") return undefined;
+  const json = JSON.stringify(part.result.output) ?? "";
+  if (json.length <= maxChars) return undefined;
+  const result = agentToolResult({
+    callId: part.result.callId,
+    name: part.result.name,
+    status: "success",
+    output: { truncated: true, totalChars: json.length, text: json.slice(0, maxChars) },
+    durationMs: part.result.durationMs,
+    metadata: part.result.metadata,
+  });
+  return agentMessage("tool", agentToolResultPart(result), {
+    id: message.id, name: message.name, toolCallId: message.toolCallId, createdAtUnixMs: message.createdAtUnixMs, metadata: message.metadata,
+  });
+}
+
+function withoutReasoning(message: AgentMessage): AgentMessage {
+  if (!message.content.some((part) => part.kind === "reasoning")) return message;
+  const content = message.content.filter((part) => part.kind !== "reasoning");
+  if (content.length === 0) return message;
+  return agentMessage(message.role, content, { id: message.id, name: message.name, toolCallId: message.toolCallId, createdAtUnixMs: message.createdAtUnixMs, metadata: message.metadata });
+}
+
 function jsonLength(value: unknown): number {
   return JSON.stringify(value)?.length ?? 0;
+}
+
+/** Tokens of an image whatever its size: providers scale images down to about this much. */
+const IMAGE_TOKENS = 1_200;
+
+function isDataUri(uri: string): boolean {
+  return uri.startsWith("data:");
+}
+
+/** A file in the request costs what its content does; an address alone says nothing about it. */
+function fileTokens(uri: string): number {
+  return isDataUri(uri) ? Math.min(200_000, Math.max(500, Math.ceil(uri.length / 12))) : 2_000;
 }
 
 function contentPartChars(part: AgentContentPart): number {
@@ -140,9 +202,12 @@ function contentPartChars(part: AgentContentPart): number {
     case "data":
       return jsonLength(part.value) + (part.name?.length ?? 0);
     case "image":
-      return part.uri.length + (part.mediaType?.length ?? 0) + part.detail.length;
+      // Bytes written into the dialog are not characters of a prompt.
+      return (isDataUri(part.uri) ? IMAGE_TOKENS * 4 : part.uri.length) + (part.mediaType?.length ?? 0) + part.detail.length;
     case "file":
-      return part.uri.length + (part.mediaType?.length ?? 0) + (part.name?.length ?? 0);
+      return (isDataUri(part.uri) ? fileTokens(part.uri) * 4 : part.uri.length) + (part.mediaType?.length ?? 0) + (part.name?.length ?? 0);
+    case "reasoning":
+      return part.text.length + (part.data === undefined ? 0 : jsonLength(part.data));
     case "tool-result":
       return jsonLength(part.result);
     case "tool-call":
@@ -150,9 +215,35 @@ function contentPartChars(part: AgentContentPart): number {
   }
 }
 
+/**
+ * An estimate close to what tokenizers produce, without a tokenizer: Latin
+ * letters and digits are about four characters a token, letters of other
+ * alphabets about two, a CJK character is a token, punctuation is about two
+ * marks a token. The runtime corrects the rest by the usage a provider reports.
+ */
 function textTokenCount(text: string): number {
-  const matches = text.match(/[\p{L}\p{N}_]+|[^\s]/gu);
-  return matches?.length ?? 0;
+  let latin = 0;
+  let letters = 0;
+  let marks = 0;
+  let whole = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code <= 0x20) continue;
+    if (code < 0x80) {
+      if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a) || code === 0x5f) latin += 1;
+      else marks += 1;
+    } else if (code === 0xa0 || (code >= 0x2000 && code <= 0x200b) || code === 0x3000) {
+      continue;
+    } else if ((code >= 0x2e80 && code <= 0x9fff) || (code >= 0xac00 && code <= 0xd7af) || (code >= 0xf900 && code <= 0xfaff)) {
+      whole += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      // The second half of a surrogate pair: its first half was counted.
+      continue;
+    } else {
+      letters += 1;
+    }
+  }
+  return Math.ceil(latin / 4 + letters / 2 + marks / 2 + whole);
 }
 
 function contentPartTokens(part: AgentContentPart): number {
@@ -162,9 +253,12 @@ function contentPartTokens(part: AgentContentPart): number {
     case "data":
       return textTokenCount(JSON.stringify(part.value) ?? "") + (part.name === undefined ? 0 : textTokenCount(part.name));
     case "image":
-      return textTokenCount(JSON.stringify({ uri: part.uri, mediaType: part.mediaType ?? null, detail: part.detail }));
+      return IMAGE_TOKENS;
     case "file":
-      return textTokenCount(JSON.stringify({ uri: part.uri, mediaType: part.mediaType ?? null, name: part.name ?? null }));
+      return fileTokens(part.uri);
+    case "reasoning":
+      // The provider's record of a block is about as long as the reasoning it holds.
+      return Math.max(textTokenCount(part.text), part.data === undefined ? 0 : Math.ceil(jsonLength(part.data) / 4));
     case "tool-result":
       return textTokenCount(JSON.stringify(part.result) ?? "");
     case "tool-call":
@@ -387,13 +481,15 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
 
   build(input: AgentContextBuildInput): AgentContext {
     const limits = normalizeAgentContextLimits(input.limits);
-    const candidates = this.candidates(input.agent, input.messages);
+    const tokenScale = input.tokenScale !== undefined && Number.isFinite(input.tokenScale) && input.tokenScale > 0 ? input.tokenScale : 1;
+    const candidates = this.candidates(input.agent, input.messages, limits?.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS, tokenScale);
     if (candidates.length === 0) {
       throw new AgentRuntimeError("agent context requires at least one message.");
     }
 
     const included = candidates.map(() => true);
-    const reasons = candidates.map(() => undefined as string | undefined);
+    // A result sent cut stays in the context; the trace says why it is shorter.
+    const reasons = candidates.map((candidate) => candidate.cut ? "maxToolResultChars" : undefined as string | undefined);
     const protectedItems = protectedIndexes(candidates);
     const selection = new ContextSelection(candidates, included, reasons, protectedItems);
     selection.apply("maxMessages", limits?.maxMessages);
@@ -402,12 +498,15 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
 
     const messages: AgentMessage[] = [];
     const trace: AgentContextTraceEntry[] = [];
+    // A provider ties reasoning to the dialog it was written in: once older
+    // messages are dropped, the reasoning in the rest no longer matches it.
+    const trimmed = included.includes(false);
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index] as ContextCandidate;
       const isIncluded = included[index] === true;
       trace.push(traceEntry(candidate, isIncluded, reasons[index]));
       if (isIncluded) {
-        messages.push(candidate.message);
+        messages.push(trimmed ? withoutReasoning(candidate.message) : candidate.message);
       }
     }
 
@@ -421,16 +520,17 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
         messageCount: messages.length,
         charCount,
         tokenCount,
+        ...(tokenScale === 1 ? {} : { tokenScale }),
         trace: traceToJson(trace),
       }),
     });
   }
 
-  private candidates(agent: AgentDefinition, messages: readonly AgentMessage[]): readonly ContextCandidate[] {
+  private candidates(agent: AgentDefinition, messages: readonly AgentMessage[], maxToolResultChars: number, tokenScale: number): readonly ContextCandidate[] {
     const candidates: ContextCandidate[] = [];
     const prompt = this.promptMessage(agent);
     if (prompt !== undefined) {
-      const tokens = this.estimatedTokens(prompt, "prompt");
+      const tokens = this.estimatedTokens(prompt, "prompt", tokenScale);
       candidates.push(Object.freeze({
         section: "prompt",
         message: prompt,
@@ -440,19 +540,22 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     }
 
     for (let index = 0; index < messages.length; index += 1) {
-      const message = cloneMessage(messages[index] as AgentMessage, `agentContext.messages[${index}]`);
-      const tokens = this.estimatedTokens(message, `conversation[${index}]`);
+      const whole = cloneMessage(messages[index] as AgentMessage, `agentContext.messages[${index}]`);
+      const cut = cutToolResult(whole, maxToolResultChars);
+      const message = cut ?? whole;
+      const tokens = this.estimatedTokens(message, `conversation[${index}]`, tokenScale);
       candidates.push(Object.freeze({
         section: `conversation[${index}]`,
         message,
         chars: messageChars(message),
         tokens,
+        ...(cut === undefined ? {} : { cut: true as const }),
       }));
     }
     return Object.freeze(candidates);
   }
 
-  private estimatedTokens(message: AgentMessage, field: string): number {
+  private estimatedTokens(message: AgentMessage, field: string, tokenScale: number): number {
     let estimate: unknown;
     try { estimate = this.tokenEstimator.estimateMessage(message); } catch (error) {
       throw new AgentRuntimeError(`agentContext token estimator failed for ${field}: ${errorMessageOf(error)}`);
@@ -460,7 +563,7 @@ export class DefaultAgentContextBuilder implements AgentContextBuilder {
     if (!Number.isFinite(estimate) || typeof estimate !== "number" || estimate < 0) {
       throw new AgentRuntimeError(`agentContext token estimator returned an invalid estimate for ${field}.`);
     }
-    return estimate;
+    return tokenScale === 1 ? estimate : Math.ceil(estimate * tokenScale);
   }
 
   /** The definition's instructions are the system prompt, sent as written. */

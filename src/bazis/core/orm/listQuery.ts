@@ -125,6 +125,8 @@ function combineAnd<T extends object>(
   return combined;
 }
 
+const IGNORE_CASE = { ignoreCase: true } as const;
+
 function applyRule(operand: Operand, rule: FilterRule, type: ColumnType | undefined): Predicate {
   switch (rule.op) {
     case "eq":
@@ -147,6 +149,12 @@ function applyRule(operand: Operand, rule: FilterRule, type: ColumnType | undefi
       return operand.startsWith(asScalar(rule.value));
     case "endsWith":
       return operand.endsWith(asScalar(rule.value));
+    case "icontains":
+      return operand.contains(asScalar(rule.value), IGNORE_CASE);
+    case "istartsWith":
+      return operand.startsWith(asScalar(rule.value), IGNORE_CASE);
+    case "iendsWith":
+      return operand.endsWith(asScalar(rule.value), IGNORE_CASE);
     case "in":
       return operand.in(asArray(rule.value).map((value) => coerce(value, type)));
     case "nin":

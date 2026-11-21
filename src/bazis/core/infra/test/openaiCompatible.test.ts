@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AgentModelContextOverflowError,
+  AgentModelUnavailableError,
+  agentFile,
+  agentImage,
   agentMessage,
   agentModelRequest,
+  agentReasoning,
+  agentText,
   agentOutputContract,
   agentJsonSchema,
   agentClassSchema,
@@ -12,7 +18,7 @@ import {
   agentToolResultPart,
   type AgentModelProviderContext,
 } from "@/core/agent";
-import { openAiCompatibleAdapter, type OpenAiCompatibleFetch, type OpenAiCompatibleModelProvider } from "../index";
+import { openAiCompatibleAdapter, OpenAiCompatibleProviderError, type OpenAiCompatibleFetch, type OpenAiCompatibleModelProvider } from "../index";
 
 interface CapturedRequest {
   readonly url: string;
@@ -307,16 +313,104 @@ describe("OpenAI-compatible LLM adapter", () => {
       apiKey: "secret-key",
     }) as OpenAiCompatibleModelProvider;
 
-    await expect(
-      invalidToolProvider.complete(
-        agentModelRequest({
-          invocationId: "inv-1",
-          messages: [agentMessage("user", "Hello")],
-          tools: [agentToolContract({ name: "catalog.search", description: "Searches the catalog." })],
-        }),
-        context(),
-      ),
-    ).rejects.toThrow(/tool arguments/);
+    // Broken arguments are the model's mistake, not a provider failure: the call
+    // comes back marked, so the runtime answers the model with a Tool error.
+    const marked = await invalidToolProvider.complete(
+      agentModelRequest({
+        invocationId: "inv-1",
+        messages: [agentMessage("user", "Hello")],
+        tools: [agentToolContract({ name: "catalog.search", description: "Searches the catalog." })],
+      }),
+      context(),
+    );
+    expect(marked.finishReason).toBe("tool-calls");
+    expect(marked.toolCalls[0]).toMatchObject({ id: "call-1", name: "catalog.search", input: {} });
+    expect(marked.toolCalls[0]?.inputError).toMatch(/JSON/);
+  });
+
+  test("reports 429, 5xx and a broken connection as unavailable, with Retry-After", async () => {
+    const create = (fetch: () => Promise<Response>) => openAiCompatibleAdapter({ fetch }).create({
+      provider: "openai-compatible", model: "gpt-test", baseUrl: "https://llm.example/v1", apiKey: "secret-key",
+    }) as OpenAiCompatibleModelProvider;
+    const ask = (provider: OpenAiCompatibleModelProvider) => provider.complete(
+      agentModelRequest({ invocationId: "inv-1", messages: [agentMessage("user", "Hello")] }), context(),
+    ).then(() => undefined, (error: unknown) => error);
+
+    const limited = await ask(create(async () => new Response("{}", { status: 429, headers: { "retry-after": "2" } })));
+    expect(limited).toBeInstanceOf(AgentModelUnavailableError);
+    expect((limited as AgentModelUnavailableError).retryAfterMs).toBe(2000);
+
+    expect(await ask(create(async () => new Response("{}", { status: 503 })))).toBeInstanceOf(AgentModelUnavailableError);
+    const broken = await ask(create(async () => { throw new TypeError("socket closed"); }));
+    expect(broken).toBeInstanceOf(AgentModelUnavailableError);
+    expect((broken as Error).message).toContain("could not reach the provider");
+
+    // A wrong request or key is not repeated.
+    const refused = await ask(create(async () => new Response("{}", { status: 401 })));
+    expect(refused).toBeInstanceOf(OpenAiCompatibleProviderError);
+  });
+
+  test("reports a request longer than the model's window as a context overflow, without the body", async () => {
+    const create = (fetch: () => Promise<Response>, contextTokens?: number) => openAiCompatibleAdapter({ fetch }).create({
+      provider: "openai-compatible", model: "gpt-test", baseUrl: "https://llm.example/v1", apiKey: "secret-key", contextTokens,
+    }) as OpenAiCompatibleModelProvider;
+    const ask = (provider: OpenAiCompatibleModelProvider) => provider.complete(
+      agentModelRequest({ invocationId: "inv-1", messages: [agentMessage("user", "Hello")] }), context(),
+    ).then(() => undefined, (error: unknown) => error as Error);
+
+    const byCode = await ask(create(async () => new Response(JSON.stringify({ error: { code: "context_length_exceeded", message: "The prompt 'tell me the secret' is too large." } }), { status: 400 })));
+    expect(byCode).toBeInstanceOf(AgentModelContextOverflowError);
+    // The body may repeat the prompt: it is classified, never quoted.
+    expect(byCode?.message).not.toContain("secret");
+
+    const byText = await ask(create(async () => new Response(JSON.stringify({ error: { message: "This model's maximum context length is 8192 tokens." } }), { status: 400 })));
+    expect(byText).toBeInstanceOf(AgentModelContextOverflowError);
+    expect(await ask(create(async () => new Response("prompt is too long: 250000 tokens", { status: 413 })))).toBeInstanceOf(AgentModelContextOverflowError);
+
+    const other = await ask(create(async () => new Response(JSON.stringify({ error: { code: "invalid_api_key", message: "Wrong key." } }), { status: 400 })));
+    expect(other).toBeInstanceOf(OpenAiCompatibleProviderError);
+
+    expect(create(async () => new Response("{}"), 128_000).contextTokens()).toBe(128_000);
+    expect(create(async () => new Response("{}")).contextTokens()).toBeUndefined();
+  });
+
+  test("sends an image and an inline file as content parts, and reads cache and reasoning counts", async () => {
+    let sent: { messages: { role: string; content: unknown }[] } | undefined;
+    const provider = openAiCompatibleAdapter({
+      fetch: async (_url, init) => {
+        sent = JSON.parse(String(init?.body));
+        return response({
+          choices: [{ finish_reason: "stop", message: { content: "A cat." } }],
+          usage: { prompt_tokens: 1200, completion_tokens: 40, total_tokens: 1240, prompt_tokens_details: { cached_tokens: 1000 }, completion_tokens_details: { reasoning_tokens: 32 } },
+        });
+      },
+    }).create({ provider: "openai-compatible", model: "gpt-test", baseUrl: "https://llm.example/v1", apiKey: "secret-key" }) as OpenAiCompatibleModelProvider;
+
+    const answer = await provider.complete(agentModelRequest({
+      invocationId: "inv-1",
+      messages: [
+        agentMessage("user", [
+          agentText("What is in the picture and in the contract?"),
+          agentImage("https://files.example/cat.png", { detail: "low" }),
+          agentFile("data:application/pdf;base64,JVBERi0=", { name: "contract.pdf" }),
+          agentFile("https://files.example/terms.pdf", { name: "terms.pdf" }),
+        ]),
+        // Reasoning of another provider is not sent to this one.
+        agentMessage("assistant", [agentReasoning("Looking at the picture…", { data: { signature: "abc" } }), agentText("A cat.")]),
+        agentMessage("user", "Thanks"),
+      ],
+    }), context());
+
+    expect(sent?.messages[0]).toEqual({ role: "user", content: [
+      { type: "text", text: "What is in the picture and in the contract?" },
+      { type: "image_url", image_url: { url: "https://files.example/cat.png", detail: "low" } },
+      { type: "file", file: { file_data: "data:application/pdf;base64,JVBERi0=", filename: "contract.pdf" } },
+      { type: "text", text: JSON.stringify({ kind: "file", uri: "https://files.example/terms.pdf", mediaType: null, name: "terms.pdf" }) },
+    ] });
+    expect(sent?.messages[1]).toEqual({ role: "assistant", content: "A cat." });
+    // Words alone stay one string.
+    expect(sent?.messages[2]).toEqual({ role: "user", content: "Thanks" });
+    expect(answer.usage).toEqual({ inputTokens: 1200, outputTokens: 40, totalTokens: 1240, cacheReadTokens: 1000, reasoningTokens: 32 });
   });
 
   test("bounds successful provider response bodies", async () => {

@@ -9,6 +9,7 @@ import {
   agentData,
   agentMessage,
   agentModelResponse,
+  agentReasoning,
   agentText,
   agentToolCall,
   agentToolCallPart,
@@ -340,13 +341,21 @@ function parseResponse(value: BoundaryJsonValue): AgentExecutionResponse {
 }
 
 function parseUsage(value: BoundaryJsonValue): NonNullable<AgentModelResponse["usage"]> {
-  const record = closed(value, ["inputTokens", "outputTokens", "totalTokens", "latencyMs", "cost", "cacheHit"]);
+  // Checkpoints written before the cache and reasoning counts have six fields.
+  const extended = Object.prototype.hasOwnProperty.call(object(value), "cacheReadTokens");
+  const record: { readonly [Key in "inputTokens" | "outputTokens" | "totalTokens" | "latencyMs" | "cost" | "cacheHit"]: BoundaryJsonValue } & { readonly [Key in "cacheReadTokens" | "cacheWriteTokens" | "reasoningTokens"]?: BoundaryJsonValue } = extended
+    ? closed(value, ["inputTokens", "outputTokens", "totalTokens", "cacheReadTokens", "cacheWriteTokens", "reasoningTokens", "latencyMs", "cost", "cacheHit"])
+    : closed(value, ["inputTokens", "outputTokens", "totalTokens", "latencyMs", "cost", "cacheHit"]);
   if (record.cacheHit !== null && typeof record.cacheHit !== "boolean") throw invalid();
+  const optionalCount = (count: BoundaryJsonValue | undefined): number | undefined => count === undefined || count === null ? undefined : nonNegativeInteger(count);
   const cost = record.cost === null ? undefined : parseCost(record.cost);
   return freezeWithoutUndefined({
     inputTokens: record.inputTokens === null ? undefined : nonNegativeInteger(record.inputTokens),
     outputTokens: record.outputTokens === null ? undefined : nonNegativeInteger(record.outputTokens),
     totalTokens: record.totalTokens === null ? undefined : nonNegativeInteger(record.totalTokens),
+    cacheReadTokens: optionalCount(record.cacheReadTokens),
+    cacheWriteTokens: optionalCount(record.cacheWriteTokens),
+    reasoningTokens: optionalCount(record.reasoningTokens),
     latencyMs: record.latencyMs === null ? undefined : nonNegativeInteger(record.latencyMs),
     cost,
     cacheHit: record.cacheHit === null ? undefined : record.cacheHit,
@@ -385,6 +394,11 @@ function parseContentPart(value: BoundaryJsonValue): AgentContentPart {
     const call = closed(record, ["kind", "call"]);
     return agentToolCallPart(parseToolCall(call.call));
   }
+  if (record.kind === "reasoning") {
+    const reasoning = closed(record, ["kind", "text", "data"]);
+    if (typeof reasoning.text !== "string") throw invalid();
+    return agentReasoning(reasoning.text, { data: reasoning.data === null ? undefined : asJsonObject(reasoning.data) });
+  }
   if (record.kind === "tool-result") {
     const result = closed(record, ["kind", "result"]);
     return agentToolResultPart(parseToolResult(result.result));
@@ -393,11 +407,16 @@ function parseContentPart(value: BoundaryJsonValue): AgentContentPart {
 }
 
 function parseToolCall(value: BoundaryJsonValue): AgentToolCall {
-  const record = closed(value, ["id", "name", "input", "metadata"]);
+  // `inputError` is written only for a call whose arguments could not be read.
+  const withError = Object.prototype.hasOwnProperty.call(object(value), "inputError");
+  const record: { readonly id: BoundaryJsonValue; readonly name: BoundaryJsonValue; readonly input: BoundaryJsonValue; readonly metadata: BoundaryJsonValue; readonly inputError?: BoundaryJsonValue } = withError
+    ? closed(value, ["id", "name", "input", "inputError", "metadata"])
+    : closed(value, ["id", "name", "input", "metadata"]);
   return agentToolCall({
     id: requiredString(record.id),
     name: requiredString(record.name),
     input: asJsonValue(record.input),
+    ...(record.inputError === undefined ? {} : { inputError: requiredString(record.inputError) }),
     metadata: asJsonObject(record.metadata),
   });
 }
@@ -631,6 +650,9 @@ function responseRecord(response: AgentExecutionResponse): Record<string, unknow
       inputTokens: response.usage.inputTokens ?? null,
       outputTokens: response.usage.outputTokens ?? null,
       totalTokens: response.usage.totalTokens ?? null,
+      cacheReadTokens: response.usage.cacheReadTokens ?? null,
+      cacheWriteTokens: response.usage.cacheWriteTokens ?? null,
+      reasoningTokens: response.usage.reasoningTokens ?? null,
       latencyMs: response.usage.latencyMs ?? null,
       cost: response.usage.cost ?? null,
       cacheHit: response.usage.cacheHit ?? null,
@@ -655,12 +677,13 @@ function contentPartRecord(part: AgentContentPart): Record<string, unknown> {
   if (part.kind === "text") return { kind: "text", text: part.text };
   if (part.kind === "data") return { kind: "data", value: part.value, name: part.name ?? null };
   if (part.kind === "tool-call") return { kind: "tool-call", call: toolCallRecord(part.call) };
+  if (part.kind === "reasoning") return { kind: "reasoning", text: part.text, data: part.data ?? null };
   if (part.kind === "tool-result") return { kind: "tool-result", result: toolResultRecord(part.result) };
   throw invalid();
 }
 
 function toolCallRecord(call: AgentToolCall): Record<string, unknown> {
-  return { id: call.id, name: call.name, input: call.input, metadata: call.metadata };
+  return { id: call.id, name: call.name, input: call.input, ...(call.inputError === undefined ? {} : { inputError: call.inputError }), metadata: call.metadata };
 }
 
 function toolResultRecord(result: AgentToolResult): Record<string, unknown> {

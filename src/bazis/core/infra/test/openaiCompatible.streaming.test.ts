@@ -21,6 +21,13 @@ test("partial or inconsistent streamed calls never produce a tool request", asyn
   const invalid = delta + 'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
   await expect(readOpenAiTextStream(new Response(invalid), signal, 10000, () => {}, true)).rejects.toThrow();
 });
+test("a streamed call cut by the output limit is kept, so the model can be told its arguments are broken", async () => {
+  const packet = (delta: unknown, finish_reason: string | null = null) => "data: " + JSON.stringify({ choices: [{ index: 0, delta, finish_reason }] }) + "\n\n";
+  const body = packet({ tool_calls: [{ index: 0, id: "call-1", type: "function", function: { name: "report_write", arguments: '{"text":"A long rep' } }] })
+    + packet({}, "length") + "data: [DONE]\n\n";
+  const result = await readOpenAiTextStream(new Response(body), new AbortController().signal, 10000, () => {}, true);
+  expect(result).toMatchObject({ choices: [{ finish_reason: "length", message: { tool_calls: [{ id: "call-1", function: { name: "report_write", arguments: '{"text":"A long rep' } }] } }] });
+});
 import { agentMessage, agentModelRequest, agentOutputContract, agentToolContract, type AgentModelProviderContext } from "../../agent";
 import { OpenAiCompatibleModelProvider } from "../connectors/openaiCompatible";
 

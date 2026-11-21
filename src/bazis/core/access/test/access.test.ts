@@ -97,7 +97,7 @@ test("declarations are checked when the application is built", async () => {
 
 test("the graph must import AccessModule and own every reference kind; the lookups of permissions register themselves", async () => {
   @Module({ permissions: definePermissions({ "a.read": { title: "x" } }) }) class LonelyModule {}
-  expect((await buildError(LonelyModule)).message).toBe("LonelyModule declares access (permissions, references or roles), but the application does not import AccessModule (bazis/core/access).");
+  expect((await buildError(LonelyModule)).message).toBe("LonelyModule declares access (permissions, references, roles or permission sources), but the application does not import AccessModule (bazis/core/access).");
 
   @Module({ imports: [AccessModule], permissions: definePermissions({ "a.read": { title: "x", on: { table: { ref: "dm.table" } } } }) }) class NoKindModule {}
   expect((await buildError(NoKindModule)).message).toContain('attribute "table" refers to kind "dm.table", which no module declares in references');

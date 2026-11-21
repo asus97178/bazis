@@ -22,6 +22,12 @@ export interface AgentModelProvider {
    * the model is called. Without it any profile is passed through.
    */
   modelProfiles?(): readonly string[];
+  /**
+   * The context window of the model behind a profile, in tokens, when infra
+   * knows it (`contextTokens` of the LLM connector). The runtime starts
+   * compacting a long dialog before it reaches the window.
+   */
+  contextTokens?(modelProfile?: string): number | undefined;
 }
 
 export const AGENT_MODEL_PROVIDER = createToken<AgentModelProvider>("AgentModelProvider");

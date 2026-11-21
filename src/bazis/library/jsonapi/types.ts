@@ -29,7 +29,8 @@ export interface SortField {
  * - `eq`/`ne`: equal/not equal (a `null` value means IS [NOT] NULL);
  * - `gt`/`gte`/`lt`/`lte`: comparisons;
  * - `like`: LIKE with a user pattern; `contains`/`startsWith`/`endsWith`:
- *   LIKE with escaped wildcards;
+ *   LIKE with escaped wildcards; `icontains`/`istartsWith`/`iendsWith`: the
+ *   same, case-insensitive (ILIKE in PostgreSQL);
  * - `in`/`nin`: in/not in a list (comma-separated value);
  * - `isNull`/`isNotNull`: NULL check (no value needed).
  */
@@ -44,6 +45,9 @@ export type FilterOperator =
   | "contains"
   | "startsWith"
   | "endsWith"
+  | "icontains"
+  | "istartsWith"
+  | "iendsWith"
   | "in"
   | "nin"
   | "isNull"

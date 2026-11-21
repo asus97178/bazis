@@ -229,7 +229,7 @@ export const assistant: AgentDataDefinition = {
 
 ```ts
 // tasks/http/Assistant.controller.ts
-import { AgentRuntime } from "bazis/core/agent";
+import { AgentRuntime, agentMessageText } from "bazis/core/agent";
 import { Authorize, Controller, Post, RequestModel } from "bazis/core/http";
 import { Validator } from "bazis/library/validation";
 import { CurrentUser } from "../../auth/CurrentUser";
@@ -253,10 +253,9 @@ export class AssistantController {
     const me = this.current.get();
     // Who asks goes in metadata: tools act on behalf of this user only.
     const result = await this.agents.run(assistant, { input: body.question, metadata: { userId: me.id, kind: me.kind } });
-    const part = result.finalMessage?.content[0];
     return {
       status: result.status,
-      answer: part?.kind === "text" ? part.text : null,
+      answer: agentMessageText(result.finalMessage) || null,
       tools: result.toolResults.map((call) => ({ name: call.name, status: call.status })),
     };
   }

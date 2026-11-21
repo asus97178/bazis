@@ -305,7 +305,8 @@ describe("agent runtime", () => {
       },
     };
     const container = createContainer({});
-    const runtime = new AgentRuntime(container, provider);
+    // No repair requests here: every reply is judged as it came (repairs: agent.loop-recovery.test.ts).
+    const runtime = new AgentRuntime(container, provider, { maxOutputRepairs: 0 });
     const output = agentOutputContract({
       mode: "json",
       schema: agentJsonSchema("Requirements", { type: "object", properties: { goal: { type: "string" } }, required: ["goal"], additionalProperties: false }),
