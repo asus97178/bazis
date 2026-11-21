@@ -7,14 +7,14 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `defineConfig(prefix, schema)` | Объявление настроек: значения по умолчанию, окружения, переменные, проверки | [Конфигурация](../../fundamentals/configuration.md) |
-| `secret(value?)`, `Secret` | Секрет: не попадает в журнал, `reveal()` даёт значение | [Секреты](../../security/secrets.md) |
-| `configEnum(values, default)` | Перечисление в настройках | [Объявление](../../fundamentals/configuration.md#объявление) |
-| `ConfigView<typeof config>`, `ResolvedConfigView<T>` | Настройки в конструкторе сервиса по самому объявлению; интерфейс представления | [Объявление](../../fundamentals/configuration.md#объявление) |
-| `configList(default?)` | Список строк в настройках: массив в коде, через запятую в окружении | [Объявление](../../fundamentals/configuration.md#объявление) |
-| `envSource`, `argsSource`, `jsonFileSource`, `memorySource`, `secretFilesSource` | Источники значений: переменные `BAZIS_*`, `--db.host=…`, JSON-файл, объект, файлы `/run/secrets` | [Откуда берутся значения](../../fundamentals/configuration.md#откуда-берутся-значения) |
+| `defineConfig(prefix, schema)` | Объявление настроек: значения по умолчанию, окружения, переменные, проверки | [Конфигурация](../../module/config/configuration.md) |
+| `secret(value?)`, `Secret` | Секрет: не попадает в журнал, `reveal()` даёт значение | [Секреты](../../module/config/secrets.md) |
+| `configEnum(values, default)` | Перечисление в настройках | [Объявление](../../module/config/configuration.md#объявление) |
+| `ConfigView<typeof config>`, `ResolvedConfigView<T>` | Настройки в конструкторе сервиса по самому объявлению; интерфейс представления | [Объявление](../../module/config/configuration.md#объявление) |
+| `configList(default?)` | Список строк в настройках: массив в коде, через запятую в окружении | [Объявление](../../module/config/configuration.md#объявление) |
+| `envSource`, `argsSource`, `jsonFileSource`, `memorySource`, `secretFilesSource` | Источники значений: переменные `BAZIS_*`, `--db.host=…`, JSON-файл, объект, файлы `/run/secrets` | [Откуда берутся значения](../../module/config/configuration.md#откуда-берутся-значения) |
 | `loadConfiguration(sources)` | Слить источники; поздние важнее | — |
-| `Configuration` | Неизменяемый набор ключей `db.host` → строка | [Настройки вне DI](../../fundamentals/configuration.md#настройки-вне-di) |
+| `Configuration` | Неизменяемый набор ключей `db.host` → строка | [Настройки вне DI](../../module/config/configuration.md#настройки-вне-di) |
 | `ConfigRegistry` | Готовые настройки модулей одного ядра | — |
 | `configOptions`, `addConfigOptions` | Опции, привязанные к настройкам, для пакетов | — |
 | `ConfigValidationError`, `ConfigKeyMissingError` | Ошибки настроек | [Ошибки запуска](../errors/startup.md#configvalidationerror) |
@@ -23,13 +23,13 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Bazis` | Точка входа ядра: `Bazis.run(root, options)`; `runApp` вызывает его сам | [Приложение](../../overview/application.md) |
+| `Bazis` | Точка входа ядра: `Bazis.run(root, options)`; `runApp` вызывает его сам | [Приложение](../../application/application.md) |
 | `KernelBuilder`, `Kernel` | Сборка и работа ядра (как `HostApplicationBuilder` в .NET) | там же |
-| `Environment` | Окружение: `name`, `debug`, `isDevelopment`, `isTest`, `isProduction` | [Окружения](../../fundamentals/configuration.md#окружения) |
-| `ApplicationLifetime` | Моменты жизни приложения и `stop(exitCode)` из любого сервиса | [Жизненный цикл](../../fundamentals/lifecycle.md) |
-| `LIFECYCLE_HOOK`, `addLifecycleHook` | Хуки `onInit`, `onBootstrap`, `onShutdown`, `onDestroy` | [Хуки](../../fundamentals/lifecycle.md#хуки-жизненного-цикла) |
-| `LifecycleCoordinator` | Порядок запуска и остановки служб и хуков | [Порядок](../../fundamentals/lifecycle.md#порядок-запуска-и-остановки) |
-| `SupervisedHostedService`, `supervised` | Перезапуск службы с паузой, если её запуск упал | [Падения и перезапуск](../../fundamentals/lifecycle.md#падения-и-перезапуск) |
+| `Environment` | Окружение: `name`, `debug`, `isDevelopment`, `isTest`, `isProduction` | [Окружения](../../module/config/configuration.md#окружения) |
+| `ApplicationLifetime` | Моменты жизни приложения и `stop(exitCode)` из любого сервиса | [Жизненный цикл](../../application/lifecycle.md) |
+| `LIFECYCLE_HOOK`, `addLifecycleHook` | Хуки `onInit`, `onBootstrap`, `onShutdown`, `onDestroy` | [Хуки](../../application/lifecycle.md#хуки-жизненного-цикла) |
+| `LifecycleCoordinator` | Порядок запуска и остановки служб и хуков | [Порядок](../../application/lifecycle.md#порядок-запуска-и-остановки) |
+| `SupervisedHostedService`, `supervised` | Перезапуск службы с паузой, если её запуск упал | [Падения и перезапуск](../../application/lifecycle.md#падения-и-перезапуск) |
 | `StartupReport` | Что нашёл и сделал запуск: подключения, схема, маршруты; для экрана запуска | [Экран запуска](../../cli/commands.md#экран-запуска) |
 | `KernelError`, `StartupFailuresError`, `StartupTimeoutError`, `StartupAbortedError`, `ShutdownTimeoutError` | Ошибки запуска и остановки | [Ошибки запуска](../errors/startup.md) |
 
@@ -37,9 +37,9 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `LOGGER` | Токен журнала; сервисы получают `Logger` по типу | [Журнал](../../fundamentals/logging.md) |
-| `ConsoleLogger` | Журнал по умолчанию: строка на запись, фильтр уровней | [Уровни](../../fundamentals/logging.md#уровни) |
-| `getRequestId()`, `REQUEST_ID_HEADER`, `REQUEST_ID_STATE_KEY` | Идентификатор текущего запроса | [Correlation id](../../fundamentals/logging.md#correlation-id) |
+| `LOGGER` | Токен журнала; сервисы получают `Logger` по типу | [Журнал](../../application/logging.md) |
+| `ConsoleLogger` | Журнал по умолчанию: строка на запись, фильтр уровней | [Уровни](../../application/logging.md#уровни) |
+| `getRequestId()`, `REQUEST_ID_HEADER`, `REQUEST_ID_STATE_KEY` | Идентификатор текущего запроса | [Correlation id](../../application/logging.md#correlation-id) |
 | `getTraceparent()`, `TRACEPARENT_HEADER`, `TRACEPARENT_STATE_KEY` | W3C `traceparent` текущего запроса | там же |
 | `getOutboundCorrelationHeaders()` | Заголовки для исходящих вызовов | там же |
 | `runWithRequestContext`, `runWithRequestContextAsync` | Выполнить код с контекстом запроса — например, в фоновой задаче | — |
@@ -48,20 +48,20 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `createEventToken<T>(name)` | Событие с типом данных | [Событие](../../fundamentals/events.md#событие) |
-| `EventBus` | Публикация: `publish`, `publishScoped` | [Публикация](../../fundamentals/events.md#публикация) |
-| `onEvent(EVENT, handler)`, `addEventHandler` | Подписка функцией | [Функцией](../../fundamentals/events.md#функцией) |
-| `OnEvent(EVENT)`, `withEventSubscribers`, `eventSubscriptionsOf`, `eventsModule` | Подписка методом класса | [Методом класса](../../fundamentals/events.md#методом-класса) |
+| `createEventToken<T>(name)` | Событие с типом данных | [Событие](../../module/services/events.md#событие) |
+| `EventBus` | Публикация: `publish`, `publishScoped` | [Публикация](../../module/services/events.md#публикация) |
+| `onEvent(EVENT, handler)`, `addEventHandler` | Подписка функцией | [Функцией](../../module/services/events.md#функцией) |
+| `OnEvent(EVENT)`, `withEventSubscribers`, `eventSubscriptionsOf`, `eventsModule` | Подписка методом класса | [Методом класса](../../module/services/events.md#методом-класса) |
 | `EVENT_HANDLER` | Токен подписок | — |
-| `APPLICATION_STARTED`, `APPLICATION_STOPPING` | События приложения | [События приложения](../../fundamentals/events.md#события-приложения) |
-| `EventHandlerTimeoutError` | Обработчик дольше `handlerTimeoutMs` | [Ошибки](../../fundamentals/events.md#ошибки) |
+| `APPLICATION_STARTED`, `APPLICATION_STOPPING` | События приложения | [События приложения](../../module/services/events.md#события-приложения) |
+| `EventHandlerTimeoutError` | Обработчик дольше `handlerTimeoutMs` | [Ошибки](../../module/services/events.md#ошибки) |
 
 ## Здоровье
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `HEALTH_CHECK`, `addHealthCheck` | Своя проверка для `/health` | [Своя проверка](../../fundamentals/health-checks.md#своя-проверка) |
-| `HealthService` | Выполняет проверки с пределом времени, собирает отчёт | [Health](../../fundamentals/health-checks.md) |
+| `HEALTH_CHECK`, `addHealthCheck` | Своя проверка для `/health` | [Своя проверка](../../application/health-checks.md#своя-проверка) |
+| `HealthService` | Выполняет проверки с пределом времени, собирает отчёт | [Health](../../application/health-checks.md) |
 
 ## Типы
 

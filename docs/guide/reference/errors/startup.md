@@ -34,7 +34,7 @@
 | `boolean` | `expected a boolean (true, false, 1, 0), got "yes" (BAZIS_MAIL__USETLS)` | Одно из четырёх значений |
 | `enum` | `"sendgrid" is not allowed, use one of: smtp, ses (BAZIS_MAIL__PROVIDER)` | Значение из списка `configEnum` |
 | `validator` | `must be a TCP port (1-65535)` — текст вашей проверки из `validate` | Поправить значение |
-| `missing-secret` | `required non-empty secret is not set (BAZIS_MAIL__APIKEY)` | Задать секрет переменной или [файлом секрета](../../security/secrets.md#файлы-секретов) |
+| `missing-secret` | `required non-empty secret is not set (BAZIS_MAIL__APIKEY)` | Задать секрет переменной или [файлом секрета](../../module/config/secrets.md#файлы-секретов) |
 | `development-secret` | `production would use the development default secret from the code; set BAZIS_MAIL__WEBHOOKTOKEN, or declare webhookToken in the production section` | Задать секрет для production; значение из кода в production не годится |
 | `conflict` | `conflicting environment aliases: BAZIS_MAIL__HOST and BAZIS_SMTP_HOST are set to different values; set only one` | Основная переменная и имя из `env` заданы по-разному — оставить одну. Значения в тексте не показываются |
 | `string` | `expected a string` | Текст из исходников: значение из своего источника настроек — не строка |
@@ -44,7 +44,7 @@
 - `missing-secret` — секрет без значения (`secret()`) в выбранном
   окружении; `development-secret` — только в `production`: так
   приложение не уедет на сервер с ключом из кода
-  ([Секреты](../../security/secrets.md)).
+  ([Секреты](../../module/config/secrets.md)).
 
 ### `KernelError` — имя переменной
 
@@ -87,9 +87,9 @@ InfraError: Infra connector "llm": https://api.openai.com/v1 is not available �
 
 - **Что сделать.** Проверьте, что сервис запущен и доступен по адресу из
   текста; адрес и пароль — в настройках коннектора
-  ([Инфраструктура](../../infra/overview.md)).
+  ([Инфраструктура](../../application/infra/overview.md)).
 - Ключ LLM-провайдера проверяется при запуске вне среды `test`
-  ([LLM-коннекторы](../../ai/llm-connectors.md#проверка-при-старте)).
+  ([LLM-коннекторы](../../agents/llm-connectors.md#проверка-при-старте)).
 
 ### `StartupFailuresError`
 
@@ -139,7 +139,7 @@ InfraError: Infra connector "llm": https://api.openai.com/v1 is not available �
 - **Что сделать.** Хуки и службы должны слушать сигнал отмены и
   заканчиваться в срок. Если работа долгая по природе — увеличьте срок и
   `stop_grace_period` у Docker
-  ([Плавная остановка](../../deployment/graceful-shutdown.md#срок-остановки)).
+  ([Плавная остановка](../../application/graceful-shutdown.md#срок-остановки)).
 
 ### `StartupAbortedError`
 
@@ -159,7 +159,7 @@ Event "order.paid" handler exceeded 5000ms.
 
 Текст из исходников. Обработчик события работал дольше
 `handlerTimeoutMs` из параметров `publish`
-([События](../../fundamentals/events.md)).
+([События](../../module/services/events.md)).
 
 ## Прочие ошибки ядра
 
@@ -175,5 +175,5 @@ Event "order.paid" handler exceeded 5000ms.
 ## Дальше
 
 - [Ошибки DI](di.md)
-- [Конфигурация](../../fundamentals/configuration.md)
-- [Жизненный цикл](../../fundamentals/lifecycle.md)
+- [Конфигурация](../../module/config/configuration.md)
+- [Жизненный цикл](../../application/lifecycle.md)

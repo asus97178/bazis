@@ -7,7 +7,7 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `memory(options)` | Кэш в памяти одной строкой: `@App({ cache: memory({ maxEntries }) })` | [Кэширование](../../realtime/caching.md) |
+| `memory(options)` | Кэш в памяти одной строкой: `@App({ cache: memory({ maxEntries }) })` | [Кэширование](../../application/caching.md) |
 | `buildCacheModule(config)` | Модуль кэша с расширенными настройками: политики, распределённый кэш | — |
 
 Распределённый кэш включает коннектор Redis:
@@ -18,8 +18,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Cacheable(options)` | Результат метода в памяти процесса | [`@Cacheable`](../../realtime/caching.md#кэш-в-памяти-cacheable) |
-| `CacheableRedis(options)` | Результат метода в Redis — общий для всех экземпляров | [`@CacheableRedis`](../../realtime/caching.md#общий-кэш-в-redis-cacheableredis) |
+| `Cacheable(options)` | Результат метода в памяти процесса | [`@Cacheable`](../../application/caching.md#кэш-в-памяти-cacheable) |
+| `CacheableRedis(options)` | Результат метода в Redis — общий для всех экземпляров | [`@CacheableRedis`](../../application/caching.md#общий-кэш-в-redis-cacheableredis) |
 | `ICache` | Кэш в памяти по типу: `get`, `list`, `set`, `getOrCreate`, `getOrCreateAsync`, `remove`, `evictByTag`, `clear` | там же |
 | `IDistributedCache`, `connectionCache(name)` | Распределённый кэш по типу; кэш именованного подключения | [Несколько экземпляров](../../recipes/multiple-instances.md) |
 | `cacheToken<T>(name)` | Типизированный токен для значений одного типа | — |
@@ -28,9 +28,9 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `OutputCache(options)` | Ответ маршрута в памяти: `seconds`, `tags`, `clientCache` | [Кэш ответов](../../http/output-cache.md) |
+| `OutputCache(options)` | Ответ маршрута в памяти: `seconds`, `tags`, `clientCache` | [Кэш ответов](../../module/controllers/output-cache.md) |
 | `OutputRedisCache(options)` | Ответ маршрута в Redis | [Несколько экземпляров](../../recipes/multiple-instances.md) |
-| `buildOutputCacheKey(ctx, routeName, options)` | Ключ кэша ответа | [Что отличает один ответ от другого](../../http/output-cache.md#что-отличает-один-ответ-от-другого) |
+| `buildOutputCacheKey(ctx, routeName, options)` | Ключ кэша ответа | [Что отличает один ответ от другого](../../module/controllers/output-cache.md#что-отличает-один-ответ-от-другого) |
 | `guardInsecureOutputCacheRoute` | Предупреждение: кэш ответа на защищённом маршруте без разделения по пользователю | — |
 
 ## Ошибки

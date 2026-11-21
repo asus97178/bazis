@@ -59,7 +59,7 @@ export class TasksDbContext extends DbContext {
 
 Таблица `tasks` уже есть, но удалять её не нужно: новый столбец допускает
 `NULL`, и `ensureCreated` добавит его сам вместе с новой таблицей
-([Что добавляется само](../database/schema.md#что-добавляется-само)):
+([Что добавляется само](../module/database/schema.md#что-добавляется-само)):
 
 ```text
 [orm:schema] applied 3 operation(s): create table notifications, add column tasks.remindedAt,
@@ -118,7 +118,7 @@ export class RemindersService {
   неотмеченными до следующего раза.
 - **`forUpdate({ skipLocked: true })`** блокирует выбранные задачи до конца
   транзакции, а другой экземпляр их пропускает
-  ([Транзакции](../database/transactions.md#очередь-задач-skiplocked)).
+  ([Транзакции](../module/database/transactions.md#очередь-задач-skiplocked)).
 - **`remindedAt.isNull()`** — уже отмеченная задача больше не попадёт в
   выборку.
 - **`take(100)`** — одна транзакция не держит тысячи строк; остальные
@@ -165,7 +165,7 @@ export class TaskReminders extends PeriodicBackgroundService {
   закрывается в `finally`.
 - Упавший тик пишется в журнал, расписание продолжается. Перезапуски с
   запасом — чтобы временный сбой базы не вывел экземпляр из балансировки
-  ([Здоровье](../realtime/background-services.md#здоровье)).
+  ([Здоровье](../module/background-services.md#здоровье)).
 
 ## 4. Уведомления в API
 
@@ -317,7 +317,7 @@ $ bunx bazis test
 
 ## Дальше
 
-- [Фоновые службы](../realtime/background-services.md) — очередь задач,
+- [Фоновые службы](../module/background-services.md) — очередь задач,
   «ровно один раз за период», блокировки
-- [Жизненный цикл](../fundamentals/lifecycle.md#фоновые-службы)
+- [Жизненный цикл](../application/lifecycle.md#фоновые-службы)
 - [Несколько экземпляров с Redis](multiple-instances.md)

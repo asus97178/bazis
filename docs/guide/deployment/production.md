@@ -2,7 +2,7 @@
 
 Что задать приложению для production: точка входа, переменные
 окружения сервера, журнал, сроки, проверка перед выкладкой. Что именно
-проверить по безопасности — в [чек-листе](../security/production-checklist.md);
+проверить по безопасности — в [чек-листе](production-checklist.md);
 здесь — как это собрать вместе.
 
 Все примеры проверены на bazis 0.111.2 и PostgreSQL 17.
@@ -40,11 +40,11 @@ export class Application {}
 | Что | Зачем | Подробнее |
 | --- | --- | --- |
 | Нет `hostname` и `port` | Адрес задаёт окружение: `BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT` | [ниже](#адрес-и-порт) |
-| `health: true` | Оркестратор знает, что приложение готово | [Плавная остановка и health](graceful-shutdown.md) |
-| `accessLog: true` | Запросы видны в журнале | [Журнал запросов](../fundamentals/logging.md#журнал-запросов) |
-| `securityHeaders: { hsts: true }` | Браузер ходит только по HTTPS | [Чек-лист](../security/production-checklist.md#http) |
+| `health: true` | Оркестратор знает, что приложение готово | [Плавная остановка и health](../application/graceful-shutdown.md) |
+| `accessLog: true` | Запросы видны в журнале | [Журнал запросов](../application/logging.md#журнал-запросов) |
+| `securityHeaders: { hsts: true }` | Браузер ходит только по HTTPS | [Чек-лист](production-checklist.md#http) |
 | `startupReport: true` | В журнале видно, что приложение запустилось | [ниже](#журнал) |
-| `secretFilesSource` | Секреты Docker и Kubernetes из файлов | [Файлы секретов](../security/secrets.md#файлы-секретов) |
+| `secretFilesSource` | Секреты Docker и Kubernetes из файлов | [Файлы секретов](../module/config/secrets.md#файлы-секретов) |
 
 ## Переменные окружения
 
@@ -61,7 +61,7 @@ export class Application {}
 | `SECRETS_DIR` | `/run/secrets` | Каталог файлов секретов, если не стандартный |
 
 Имена `BAZIS_…` строятся из ключей конфигурации: `db.password` →
-`BAZIS_DB__PASSWORD` ([Конфигурация](../fundamentals/configuration.md#имена-переменных-окружения)).
+`BAZIS_DB__PASSWORD` ([Конфигурация](../module/config/configuration.md#имена-переменных-окружения)).
 Неверное или пропущенное значение останавливает запуск с кодом 1 и
 названием переменной — до того, как приложение начнёт принимать запросы.
 
@@ -98,7 +98,7 @@ export class Application {}
 ```
 
 - `ctx.clientIp` — адрес клиента; по нему же считают
-  [ограничение частоты](../http/rate-limit.md) и журнал доступа
+  [ограничение частоты](../application/rate-limit.md) и журнал доступа
   (`clientIp`). `ctx.peerIp` — адрес самого соединения, то есть nginx.
 - Заголовку верят, только если соединение пришло от адреса из
   `trustedProxies`. Запрос в обход nginx сохранит свой настоящий адрес:
@@ -136,7 +136,7 @@ info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"dur
   Отключает их `kernel: { startupReport: false }`.
 
 Свой формат или отправка в систему сбора — через свой логгер
-([Свой логгер](../fundamentals/logging.md#свой-логгер)).
+([Свой логгер](../application/logging.md#свой-логгер)).
 
 ## Сроки
 
@@ -162,11 +162,11 @@ info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"dur
    конфигурации и подключений приложение покажет сразу при старте и выйдет
    с кодом 1.
 3. Дождитесь `200` от `/health` и только потом переключайте трафик.
-4. Пройдите [чек-лист](../security/production-checklist.md).
+4. Пройдите [чек-лист](production-checklist.md).
 
 ## Дальше
 
 - [Один исполняемый файл](single-executable.md)
 - [Docker](docker.md)
-- [Плавная остановка и health](graceful-shutdown.md)
-- [Секреты и конфигурация](../security/secrets.md)
+- [Плавная остановка и health](../application/graceful-shutdown.md)
+- [Секреты и конфигурация](../module/config/secrets.md)

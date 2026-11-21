@@ -7,9 +7,9 @@
 - [`bazis.config.json`](#bazisconfigjson).
 
 Настройки самого приложения объявляются через `defineConfig` — это глава
-[Конфигурация](../fundamentals/configuration.md). Настройки коннекторов
+[Конфигурация](../module/config/configuration.md). Настройки коннекторов
 (PostgreSQL, Redis, OpenSearch, LLM, Codex) — в главе
-[Коннекторы](../infra/connectors.md).
+[Коннекторы](../application/infra/connectors.md).
 
 Значения по умолчанию — для bazis 0.100.8.
 
@@ -22,23 +22,23 @@ export class Application {}
 
 | Поле | Что задаёт | Подробно |
 | --- | --- | --- |
-| `modules` | Модули приложения; обязательно | [Приложение](../overview/application.md) |
+| `modules` | Модули приложения; обязательно | [Приложение](../application/application.md) |
 | `http` | HTTP-сервер; без него приложение запускается без HTTP — как фоновый процесс | [HTTP](#http) |
-| `grpc` | gRPC-сервер | [gRPC](../realtime/grpc.md) |
-| `websocket` | Вход, адаптер и лимиты WebSocket; шлюзы собираются из модулей сами | [WebSocket](../realtime/websocket.md) |
+| `grpc` | gRPC-сервер | [gRPC](../module/grpc.md) |
+| `websocket` | Вход, адаптер и лимиты WebSocket; шлюзы собираются из модулей сами | [WebSocket](../module/websocket.md) |
 | `kernel` | Окружение, сроки запуска и остановки, сигналы | [Ядро](#kernel) |
-| `infra` | Манифест `@Infra`: подключения к базе, Redis, LLM | [Инфраструктура](../infra/overview.md) |
-| `cache` | Кэш приложения: `memory({ … })` | [Кэширование](../realtime/caching.md) |
-| `config` | Настройки `defineConfig`, которые не принадлежат модулю | [Конфигурация](../fundamentals/configuration.md) |
+| `infra` | Манифест `@Infra`: подключения к базе, Redis, LLM | [Инфраструктура](../application/infra/overview.md) |
+| `cache` | Кэш приложения: `memory({ … })` | [Кэширование](../application/caching.md) |
+| `config` | Настройки `defineConfig`, которые не принадлежат модулю | [Конфигурация](../module/config/configuration.md) |
 | `language` | Язык текстов ответов: `"en"` (по умолчанию) или `"ru"` | [Русская локализация](../recipes/russian.md) |
 | `messages` | Свои тексты отдельных сообщений поверх `language` | [Русская локализация](../recipes/russian.md#свои-тексты) |
-| `validator` | Свой валидатор моделей запроса вместо встроенного | [Проверка данных](../overview/validation.md) |
-| `configure` | Тонкая настройка `KernelBuilder`: логгер, источники настроек | [Приложение](../overview/application.md) |
+| `validator` | Свой валидатор моделей запроса вместо встроенного | [Проверка данных](../module/controllers/validation.md) |
+| `configure` | Тонкая настройка `KernelBuilder`: логгер, источники настроек | [Приложение](../application/application.md) |
 
 `startTestApp(Application, …)` принимает те же поля, кроме `modules` и
 `port` с `hostname` в `http`, — ими тест заменяет объявленное — и ещё
 `overrides`, замены сервисов
-([Тестирование](../fundamentals/testing.md#приложение-целиком-starttestapp)).
+([Тестирование](../testing/testing.md#приложение-целиком-starttestapp)).
 
 ## `kernel`
 
@@ -47,7 +47,7 @@ export class Application {}
 | `environment` | `BAZIS_ENV`, иначе `NODE_ENV`, иначе `production` | `development`, `test` или `production` |
 | `debug` | `true` везде, кроме `production` | Подробности ошибок в ответах, `/docs` |
 | `startupTimeoutMs` | `30000` | Срок всего запуска; `0` — без срока |
-| `shutdownTimeoutMs` | `10000` | Срок плавной остановки; `0` — без срока ([Срок остановки](../deployment/graceful-shutdown.md#срок-остановки)) |
+| `shutdownTimeoutMs` | `10000` | Срок плавной остановки; `0` — без срока ([Срок остановки](../application/graceful-shutdown.md#срок-остановки)) |
 | `signals` | `["SIGINT", "SIGTERM"]` | Сигналы плавной остановки |
 | `unhandledErrorPolicy` | `"shutdown"` | Необработанная ошибка: `"shutdown"` — остановка с кодом 1, `"none"` — ничего |
 | `validateOnBuild` | `true` | Проверка графа сервисов при запуске |
@@ -59,21 +59,21 @@ export class Application {}
 | Опция | По умолчанию | Что задаёт |
 | --- | --- | --- |
 | `port` | настройка `http.port` (`BAZIS_HTTP__PORT`), `3000` | Закрепляет порт в коде; `0` — свободный порт. Обычно не задают |
-| `hostname` | настройка `http.host` (`BAZIS_HTTP__HOST`): `127.0.0.1`, в production `0.0.0.0` | Закрепляет адрес в коде. Обычно не задают ([Адрес сервера](../overview/application.md#адрес-сервера)) |
+| `hostname` | настройка `http.host` (`BAZIS_HTTP__HOST`): `127.0.0.1`, в production `0.0.0.0` | Закрепляет адрес в коде. Обычно не задают ([Адрес сервера](../application/application.md#адрес-сервера)) |
 | `prefix` | — | Общий префикс маршрутов: `"api"` → `/api/…` |
-| `middleware` | — | Глобальные middleware ([Middleware](../overview/middleware.md)) |
-| `cors` | `false` | CORS для всех маршрутов ([CORS](../http/cors-headers-log.md)) |
+| `middleware` | — | Глобальные middleware ([Middleware](../module/controllers/middleware.md)) |
+| `cors` | `false` | CORS для всех маршрутов ([CORS](../application/cors-headers-log.md)) |
 | `securityHeaders` | включены | Заголовки безопасности; `false` — выключить |
 | `accessLog` | `false` | Журнал запросов: `true` или свой приёмник |
-| `health` | `false` | `/health`: `true` или `{ path, exposeDetails, timeoutMs: 5000, cacheMs: 0 }` ([Health](../fundamentals/health-checks.md)) |
-| `docs` | при `debug` — то есть вне `production` | `/docs` и `/docs/openapi.json` ([OpenAPI](../http/openapi.md)) |
-| `errorHandler` | — | `status` для своих ошибок, `onUnexpectedError` ([Ошибки](../overview/errors.md)) |
+| `health` | `false` | `/health`: `true` или `{ path, exposeDetails, timeoutMs: 5000, cacheMs: 0 }` ([Health](../application/health-checks.md)) |
+| `docs` | при `debug` — то есть вне `production` | `/docs` и `/docs/openapi.json` ([OpenAPI](../module/controllers/openapi.md)) |
+| `errorHandler` | — | `status` для своих ошибок, `onUnexpectedError` ([Ошибки](../module/controllers/errors.md)) |
 | `exposeErrorDetails` | `debug` | `message` и `stack` в ответе 500 |
 | `maxBodyBytes` | `1048576` (1 МиБ) | Предел тела запроса; больше — `413`. `0` — без проверки |
-| `versioning` | путь, если есть `@ApiVersion` | `{ source: "url" \| "query" \| "header", parameterName, headerName, defaultVersion }` ([Версии API](../http/versioning.md)) |
+| `versioning` | путь, если есть `@ApiVersion` | `{ source: "url" \| "query" \| "header", parameterName, headerName, defaultVersion }` ([Версии API](../module/controllers/versioning.md)) |
 | `idleTimeoutSeconds` | как в Bun | Простой соединения, 0–255 секунд |
 | `requestScopeDisposeTimeoutMs` | `5000` | Сколько ждать закрытия DI-области запроса; `0` — без срока |
-| `inspectableRedirects` | `false` | Перенаправления, которые клиент может проверить ([HTTP-клиент](../http/http-client.md)) |
+| `inspectableRedirects` | `false` | Перенаправления, которые клиент может проверить ([HTTP-клиент](../module/http-client.md)) |
 | `phase` | `10` | Фаза запуска HTTP-сервера: после инфраструктуры |
 | `imports` | — | Модули с зависимостями контроллеров, если они не видны иначе |
 
@@ -85,18 +85,18 @@ export class Application {}
 | Переменная | Что задаёт |
 | --- | --- |
 | `BAZIS_ENV` | Окружение: `development`, `test`, `production`. Без неё — `NODE_ENV`, без неё — `production` |
-| `BAZIS_<ПРЕФИКС>__<КЛЮЧ>` | Значение настройки `defineConfig`: `BAZIS_MAIL__PORT` для `mail.port` ([Имена переменных](../fundamentals/configuration.md#имена-переменных-окружения)) |
+| `BAZIS_<ПРЕФИКС>__<КЛЮЧ>` | Значение настройки `defineConfig`: `BAZIS_MAIL__PORT` для `mail.port` ([Имена переменных](../module/config/configuration.md#имена-переменных-окружения)) |
 | `BAZIS_SCHEMA_ONLY` | `1` — только схема базы, затем выход |
 | `BAZIS_LANG` | Язык вывода CLI и экрана запуска: `en`, `ru` |
 | `BAZIS_UI` | `1` — экран запуска и без терминала, `0` — строка журнала и в терминале. По умолчанию экран — в интерактивном терминале вне CI |
 | `NO_COLOR`, `FORCE_COLOR` | Выключить или включить цвет |
-| `BAZIS_CODEGEN_REPORT` | Файл JSON-отчёта кодогенерации ([Кодогенерация](../fundamentals/codegen.md)) |
+| `BAZIS_CODEGEN_REPORT` | Файл JSON-отчёта кодогенерации ([Кодогенерация](../application/codegen.md)) |
 | `BAZIS_BUN_BIN` | Какой `bun` запускать CLI, если его нет в `PATH` |
 | `PORT`, `HOST` | Порт и адрес в `src/index.ts` нового проекта; сам фреймворк их не читает |
 
 Секреты можно передавать и файлами: `secretFilesSource` читает
 `/run/secrets/<ИМЯ_ПЕРЕМЕННОЙ>`
-([Файлы секретов](../security/secrets.md#файлы-секретов)).
+([Файлы секретов](../module/config/secrets.md#файлы-секретов)).
 
 Файл `.env` Bun читает сам — при запуске из исходников. Собранный файл
 `bazis build --bin` его не читает, если не собран с `--dotenv`
@@ -129,6 +129,6 @@ export class Application {}
 
 ## Дальше
 
-- [Конфигурация](../fundamentals/configuration.md)
-- [Коннекторы](../infra/connectors.md)
+- [Конфигурация](../module/config/configuration.md)
+- [Коннекторы](../application/infra/connectors.md)
 - [Команды CLI](../cli/commands.md)

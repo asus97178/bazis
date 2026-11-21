@@ -51,7 +51,7 @@ export const authConfig = defineConfig("auth", {
 
 В production ключ подписи и пароль администратора берутся только из
 окружения — `BAZIS_AUTH__JWTSECRET` и `BAZIS_AUTH__ADMINPASSWORD`; без них
-приложение не стартует ([Секреты](../security/secrets.md)).
+приложение не стартует ([Секреты](../module/config/secrets.md)).
 
 ## 3. Виды токенов и текущий пользователь
 
@@ -88,7 +88,7 @@ export class CurrentUser {
 ```
 
 `CurrentUser` — scoped-сервис: свой на каждый запрос. Проверка входа
-заполняет его, сервисы читают ([Текущий пользователь в сервисах](../security/authorization-patterns.md#текущий-пользователь-в-сервисах)).
+заполняет его, сервисы читают ([Текущий пользователь в сервисах](../application/authorization-patterns.md#текущий-пользователь-в-сервисах)).
 
 ## 4. Токены и проверка
 
@@ -138,7 +138,7 @@ export function requireTokenKind(...kinds: TokenKind[]): AuthorizeCheck {
 `verifyAccess` проверяет подпись, срок, издателя, аудиторию и что это
 access-токен, а не refresh. Любая ошибка — `401` с заголовком
 `WWW-Authenticate: Bearer`; `false` из проверки — `403`
-([JWT](../security/jwt.md#проверка-в-authorize)).
+([JWT](../application/jwt.md#проверка-в-authorize)).
 
 ## 5. Пользователи
 
@@ -241,7 +241,7 @@ export class AuthService {
 - **Неизвестный email и неверный пароль** отвечают одинаково, `401`: по
   ответу нельзя узнать, есть ли такой пользователь.
 - **Повторная регистрация** нарушает уникальный индекс `email`, и
-  приложение отвечает `409` ([Ошибки базы данных](../database/errors.md#занятое-значение)).
+  приложение отвечает `409` ([Ошибки базы данных](../module/database/errors.md#занятое-значение)).
 - **`refresh`** проверяет refresh-токен и что пользователь ещё есть, и
   выдаёт новую пару. Вид токена берётся из базы, а не из старого токена:
   сменили роль — следующее обновление её учтёт.
@@ -282,7 +282,7 @@ info: auth: administrator created {"email":"admin@planner.local"}
 ```
 
 Служба — singleton, а `AuthService` и контекст базы — scoped, поэтому
-служба создаёт свою область ([Scoped-сервисы в фоновой службе](../fundamentals/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
+служба создаёт свою область ([Scoped-сервисы в фоновой службе](../application/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
 
 ## 7. Контроллер и модуль
 
@@ -450,7 +450,7 @@ export class TasksService implements ITasksService {
 ```
 
 Чужая задача отвечает `404`, а не `403`: `403` подтвердил бы, что задача с
-таким номером существует ([Владелец записи](../security/authorization-patterns.md#владелец-записи)).
+таким номером существует ([Владелец записи](../application/authorization-patterns.md#владелец-записи)).
 
 > [!WARNING]
 > Если таблица `tasks` уже создана по рецепту CRUD, `ensureCreated` не
@@ -462,7 +462,7 @@ export class TasksService implements ITasksService {
 > ```
 >
 > Для учебной базы удалите таблицу; для настоящей — добавьте миграцию
-> ([Управление схемой](../database/schema.md)).
+> ([Управление схемой](../module/database/schema.md)).
 
 ## 9. Проверка
 
@@ -639,6 +639,6 @@ $ bunx bazis test
 ## Дальше
 
 - [Второй модуль и связь между модулями](projects-module.md) — следующий шаг планировщика
-- [JWT](../security/jwt.md) — ключи RS256, ротация, одноразовый refresh
-- [Шаблоны авторизации](../security/authorization-patterns.md) — роли, `anyOf`, арендаторы, ключи API
-- [Чек-лист перед продакшеном](../security/production-checklist.md#авторизация)
+- [JWT](../application/jwt.md) — ключи RS256, ротация, одноразовый refresh
+- [Шаблоны авторизации](../application/authorization-patterns.md) — роли, `anyOf`, арендаторы, ключи API
+- [Чек-лист перед продакшеном](../deployment/production-checklist.md#авторизация)

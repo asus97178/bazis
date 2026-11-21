@@ -7,10 +7,10 @@ WebSocket: шлюзы, комнаты, вход, рассылка из серв�
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `WebSocketGateway(options)` | Класс-шлюз в пространстве имён (`namespace: "chat"` → `/ws/chat`); подключается полем `gateways` модуля | [Шлюз](../../realtime/websocket.md#шлюз) |
-| `SubscribeMessage(event, options)` | Метод — обработчик события: проверка данных, `rateLimit` | [Протокол](../../realtime/websocket.md#протокол) |
-| `WebSocketService` | Отправка событий в комнаты из сервиса, контроллера, фоновой задачи | [Отправка из сервиса](../../realtime/websocket.md#отправка-из-сервиса) |
-| `extractWebSocketToken(request)` | Токен из `Authorization` или `Sec-WebSocket-Protocol: bearer.<token>` | [Вход](../../realtime/websocket.md#вход) |
+| `WebSocketGateway(options)` | Класс-шлюз в пространстве имён (`namespace: "chat"` → `/ws/chat`); подключается полем `gateways` модуля | [Шлюз](../../module/websocket.md#шлюз) |
+| `SubscribeMessage(event, options)` | Метод — обработчик события: проверка данных, `rateLimit` | [Протокол](../../module/websocket.md#протокол) |
+| `WebSocketService` | Отправка событий в комнаты из сервиса, контроллера, фоновой задачи | [Отправка из сервиса](../../module/websocket.md#отправка-из-сервиса) |
+| `extractWebSocketToken(request)` | Токен из `Authorization` или `Sec-WebSocket-Protocol: bearer.<token>` | [Вход](../../module/websocket.md#вход) |
 
 ## Несколько экземпляров
 

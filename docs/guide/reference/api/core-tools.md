@@ -5,11 +5,11 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `StandardToolsModule` | Необязательный модуль: `http.request`, значения `$secrets`, виды ссылок `orm.entity` и `orm.field` | [HTTP-запрос и секреты](../../workflow/processes.md#http-запрос-и-секреты) |
-| `HttpRequestTool` | Шаг `http.request`; настройки `tools.http.*` | [HTTP-запрос и секреты](../../workflow/processes.md#http-запрос-и-секреты) |
-| `SecretStore`, `ConfigSecretStore` | Значения `$secrets.NAME`: `get(name, { partition })`; по умолчанию из конфигурации `secrets.*` | [Секреты](../../workflow/processes.md#секреты) |
-| `toolsConfig` | Настройки `tools.http.allow`, `callers`, `allowPrivateNetworks`, `maxResponseBytes`, `timeoutMs` | [HTTP-запрос и секреты](../../workflow/processes.md#http-запрос-и-секреты) |
-| `ormEntityTools(Entity, { context, ops, fields, partitionField?, callers?, name?, maxRows?, maxChanges? })` | Набор инструментов `orm.<сущность>.find`, `create`, `update`, `delete` по именам операций: `orderTools.find`. Идёт в `tools` модуля целиком; с 0.138.0 это набор, а не массив | [Данные без своего инструмента](../../workflow/processes.md#данные-без-своего-инструмента) |
+| `StandardToolsModule` | Необязательный модуль: `http.request`, значения `$secrets`, виды ссылок `orm.entity` и `orm.field` | [HTTP-запрос и секреты](../../module/processes.md#http-запрос-и-секреты) |
+| `HttpRequestTool` | Шаг `http.request`; настройки `tools.http.*` | [HTTP-запрос и секреты](../../module/processes.md#http-запрос-и-секреты) |
+| `SecretStore`, `ConfigSecretStore` | Значения `$secrets.NAME`: `get(name, { partition })`; по умолчанию из конфигурации `secrets.*` | [Секреты](../../module/processes.md#секреты) |
+| `toolsConfig` | Настройки `tools.http.allow`, `callers`, `allowPrivateNetworks`, `maxResponseBytes`, `timeoutMs` | [HTTP-запрос и секреты](../../module/processes.md#http-запрос-и-секреты) |
+| `ormEntityTools(Entity, { context, ops, fields, partitionField?, callers?, name?, maxRows?, maxChanges? })` | Набор инструментов `orm.<сущность>.find`, `create`, `update`, `delete` по именам операций: `orderTools.find`. Идёт в `tools` модуля целиком; с 0.138.0 это набор, а не массив | [Данные без своего инструмента](../../module/processes.md#данные-без-своего-инструмента) |
 
 Типы: `OrmEntityOperation`, `OrmEntityToolsOptions`, `SecretContext`, `ToolsSettings`.
 

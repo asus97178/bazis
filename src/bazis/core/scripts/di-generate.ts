@@ -1095,7 +1095,7 @@ function collectDiClassRegistrations(source: ts.SourceFile): void {
 
 /**
  * A module registers its services only in the agreed forms (docs/guide
- * fundamentals/dependency-injection.md): a class under its contract, a ready
+ * module/services/dependency-injection.md): a class under its contract, a ready
  * value, an asynchronously created resource, event subscribers. Constructor dependencies come from codegen, so a
  * dependency list, a factory or a low-level `DI.*` provider is a fatal error
  * with the agreed form in the message.

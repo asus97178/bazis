@@ -71,7 +71,7 @@
 - `property` — путь к полю: `address.city`, `items[2].qty`.
 - `code` — правило: `required`, `minLength`, `type`, `unknownField`…
   Клиенту удобнее ветвиться по нему, а не по тексту.
-- Все коды — в главе [Проверка данных](../../overview/validation.md).
+- Все коды — в главе [Проверка данных](../../module/controllers/validation.md).
 
 ### Непредвиденные ошибки
 
@@ -87,8 +87,8 @@
   `504 Gateway Timeout`.
 - Свой статус для класса ошибки — опция `errorHandler.status`, например
   ошибки базы данных → `409`, `503`
-  ([Ошибки базы данных](../../database/errors.md)).
-- Подробно — в главе [Ошибки](../../overview/errors.md).
+  ([Ошибки базы данных](../../module/database/errors.md)).
+- Подробно — в главе [Ошибки](../../module/controllers/errors.md).
 
 ## Ошибки маршрутов при запуске
 
@@ -129,7 +129,7 @@
 | `ERR_RESPONSE_TOO_LARGE` | `Response exceeded 1000 bytes` | Ответ больше `maxResponseBytes` |
 | `ERR_CANCELED` | `Request canceled` | Запрос отменён через `signal` |
 | `ERR_TOO_MANY_REDIRECTS` | — | Цепочка перенаправлений длиннее `maxRedirects` |
-| `ERR_REDIRECT_NOT_INSPECTABLE`, `ERR_REDIRECT_BODY_NOT_REPLAYABLE` | — | Перенаправление нельзя безопасно повторить ([HTTP-клиент](../../http/http-client.md)) |
+| `ERR_REDIRECT_NOT_INSPECTABLE`, `ERR_REDIRECT_BODY_NOT_REPLAYABLE` | — | Перенаправление нельзя безопасно повторить ([HTTP-клиент](../../module/http-client.md)) |
 
 ```ts
 try {
@@ -166,10 +166,10 @@ HttpClient "payments" is not configured (known clients: rates)
 
 Текст из исходников. Запрошен именованный клиент, которого нет в
 `HttpClientFactoryBuilder` (именованные клиенты без DI; в приложении —
-[свой класс на сервис](../../http/http-client.md#несколько-внешних-сервисов)).
+[свой класс на сервис](../../module/http-client.md#несколько-внешних-сервисов)).
 
 ## Дальше
 
-- [Ошибки](../../overview/errors.md)
-- [HTTP-клиент](../../http/http-client.md)
+- [Ошибки](../../module/controllers/errors.md)
+- [HTTP-клиент](../../module/http-client.md)
 - [Ошибки запуска и конфигурации](startup.md)

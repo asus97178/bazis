@@ -175,12 +175,12 @@ schema-1  | info: schema only: infrastructure and schema are ready, stopping (BA
   применить не удалось, приложение не запустится.
 - `stop_grace_period: 20s` — больше срока остановки приложения (10
   секунд), чтобы Docker не прервал её `SIGKILL`
-  ([Срок остановки](graceful-shutdown.md#срок-остановки)).
+  ([Срок остановки](../application/graceful-shutdown.md#срок-остановки)).
 - `db_password.txt` не должен попадать ни в git, ни в образ: добавьте его
   в `.gitignore` и `.dockerignore`.
 
 ## Дальше
 
-- [Плавная остановка и health](graceful-shutdown.md)
+- [Плавная остановка и health](../application/graceful-shutdown.md)
 - [Платформы](platforms.md)
 - [Настройка продакшена](production.md)

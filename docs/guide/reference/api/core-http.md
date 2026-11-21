@@ -10,25 +10,25 @@ middleware, авторизация, списки. Основная точка в
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Controller(path?)` | Декоратор класса-контроллера с общим путём | [Контроллеры](../../overview/controllers.md) |
-| `Get`, `Post`, `Put`, `Patch`, `Delete`, `Head`, `Options`, `All` | Декораторы маршрутов; `All` — любой метод, с наименьшим приоритетом | [Маршрутизация](../../http/routing.md) |
-| `HttpCode(code)` | Код успешного ответа метода | [Контроллеры](../../overview/controllers.md#параметры-маршрута-в-декораторе) |
+| `Controller(path?)` | Декоратор класса-контроллера с общим путём | [Контроллеры](../../module/controllers/controllers.md) |
+| `Get`, `Post`, `Put`, `Patch`, `Delete`, `Head`, `Options`, `All` | Декораторы маршрутов; `All` — любой метод, с наименьшим приоритетом | [Маршрутизация](../../module/controllers/routing.md) |
+| `HttpCode(code)` | Код успешного ответа метода | [Контроллеры](../../module/controllers/controllers.md#параметры-маршрута-в-декораторе) |
 | `Produces(contentType)` | `Content-Type` ответа для простых значений | там же |
 | `Consumes(contentType)` | Обязательный `Content-Type` запроса; иначе `415` | там же |
-| `ApiVersion(version)` | Версия API контроллера или метода | [Версии API](../../http/versioning.md) |
-| `Middleware(...middleware)` | Middleware на контроллер или метод | [Middleware](../../overview/middleware.md) |
-| `ActionFilter({ before, after })` | Код до и после метода; `after` может заменить результат | [Фильтры действий](../../overview/middleware.md#фильтры-действий) |
+| `ApiVersion(version)` | Версия API контроллера или метода | [Версии API](../../module/controllers/versioning.md) |
+| `Middleware(...middleware)` | Middleware на контроллер или метод | [Middleware](../../module/controllers/middleware.md) |
+| `ActionFilter({ before, after })` | Код до и после метода; `after` может заменить результат | [Фильтры действий](../../module/controllers/middleware.md#фильтры-действий) |
 | `Catch(ErrorType?)` | Метод контроллера — обработчик ошибок этого типа (по `instanceof`) | — |
 
 ## Аргументы
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `FromQuery<T, Name>`, `FromHeader<T, Name>`, `FromBody<T>`, `FromRoute<T, Name>` | Типы-маркеры источника аргумента; кодогенерация читает их из сигнатуры | [Явный источник](../../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
-| `FromQuery(name)`, `FromHeader(name)` | Декораторы полей модели строки запроса и заголовков: имя в запросе | [Модели строки запроса](../../overview/controllers.md#модели-строки-запроса-и-заголовков) |
-| `RequestModel()` | Помечает класс моделью запроса. Нужен только классу из другого пакета | [Проверка данных](../../overview/validation.md) |
-| `HttpContext` | Контекст запроса: путь, параметры, заголовки, тело, `state`, `services` | [`HttpContext`](../../overview/controllers.md#httpcontext) |
-| `ResponseBuilder` | Код и заголовки ответа до того, как он собран | [Ответы](../../overview/responses.md#код-и-заголовки-responsebuilder) |
+| `FromQuery<T, Name>`, `FromHeader<T, Name>`, `FromBody<T>`, `FromRoute<T, Name>` | Типы-маркеры источника аргумента; кодогенерация читает их из сигнатуры | [Явный источник](../../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `FromQuery(name)`, `FromHeader(name)` | Декораторы полей модели строки запроса и заголовков: имя в запросе | [Модели строки запроса](../../module/controllers/controllers.md#модели-строки-запроса-и-заголовков) |
+| `RequestModel()` | Помечает класс моделью запроса. Нужен только классу из другого пакета | [Проверка данных](../../module/controllers/validation.md) |
+| `HttpContext` | Контекст запроса: путь, параметры, заголовки, тело, `state`, `services` | [`HttpContext`](../../module/controllers/controllers.md#httpcontext) |
+| `ResponseBuilder` | Код и заголовки ответа до того, как он собран | [Ответы](../../module/controllers/responses.md#код-и-заголовки-responsebuilder) |
 
 ## Ответы
 
@@ -41,7 +41,7 @@ middleware, авторизация, списки. Основная точка в
 | `File(pathOrBlob, contentType?)` | Файл по пути, `Blob` или байты; запросы `Range` работают сами |
 | `HttpResult` | Базовый класс результатов: рецепт итогового `Response` |
 
-Подробно — [Ответы](../../overview/responses.md), [Файлы](../../http/files.md).
+Подробно — [Ответы](../../module/controllers/responses.md), [Файлы](../../module/controllers/files.md).
 
 ## Ошибки
 
@@ -55,36 +55,36 @@ middleware, авторизация, списки. Основная точка в
 | `EN_HTTP_MESSAGES`, `RU_HTTP_MESSAGES` | Каталоги текстов HTTP-слоя по ключам |
 | `markUpstreamFailure(error, kind)`, `upstreamFailure(error)` | Пометка ошибки внешнего вызова: необработанная даёт `502` или `504` |
 
-Подробно — [Ошибки](../../overview/errors.md), [справочник ошибок HTTP](../errors/http.md).
+Подробно — [Ошибки](../../module/controllers/errors.md), [справочник ошибок HTTP](../errors/http.md).
 
 ## Middleware
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `cors(options)` | CORS: заголовки и ответы на предварительные запросы | [CORS](../../http/cors-headers-log.md#cors) |
-| `securityHeaders(options)` | Заголовки безопасности; сервер ставит его сам | [CORS, заголовки, журнал](../../http/cors-headers-log.md) |
-| `accessLog(options)` | Журнал запросов: метод, путь, статус, время | [Журнал](../../fundamentals/logging.md#журнал-запросов) |
-| `rateLimit(options)` | Ограничение частоты в памяти, окно фиксированное | [Ограничение частоты](../../http/rate-limit.md) |
-| `createCorrelationIdMiddleware(options)` | Один `x-request-id` на запрос: в ответе, в журнале, в исходящих вызовах | [Correlation id](../../fundamentals/logging.md#correlation-id) |
-| `errorHandler(options)` | Граница ошибок; сервер ставит её сам, настраивается через `http.errorHandler` | [Ошибки](../../overview/errors.md) |
+| `cors(options)` | CORS: заголовки и ответы на предварительные запросы | [CORS](../../application/cors-headers-log.md#cors) |
+| `securityHeaders(options)` | Заголовки безопасности; сервер ставит его сам | [CORS, заголовки, журнал](../../application/cors-headers-log.md) |
+| `accessLog(options)` | Журнал запросов: метод, путь, статус, время | [Журнал](../../application/logging.md#журнал-запросов) |
+| `rateLimit(options)` | Ограничение частоты в памяти, окно фиксированное | [Ограничение частоты](../../application/rate-limit.md) |
+| `createCorrelationIdMiddleware(options)` | Один `x-request-id` на запрос: в ответе, в журнале, в исходящих вызовах | [Correlation id](../../application/logging.md#correlation-id) |
+| `errorHandler(options)` | Граница ошибок; сервер ставит её сам, настраивается через `http.errorHandler` | [Ошибки](../../module/controllers/errors.md) |
 
 ## Авторизация
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Authorize(...checks)` | Проверки доступа на контроллер или метод; все должны пройти | [Авторизация](../../overview/authorization.md) |
-| `AllowAnonymous()` | Открытый метод: снимает все проверки, и контроллера тоже | [Класс, метод и `@AllowAnonymous`](../../overview/authorization.md#класс-метод-и-allowanonymous) |
-| `anyOf(...checks)` | Проверка «хотя бы одна из» | [«Или»](../../security/authorization-patterns.md#или-anyof) |
-| `bearerToken(ctx)` | Токен из `Authorization: Bearer …` или `undefined` | [JWT](../../security/jwt.md#проверка-в-authorize) |
+| `Authorize(...checks)` | Проверки доступа на контроллер или метод; все должны пройти | [Авторизация](../../module/controllers/authorization.md) |
+| `AllowAnonymous()` | Открытый метод: снимает все проверки, и контроллера тоже | [Класс, метод и `@AllowAnonymous`](../../module/controllers/authorization.md#класс-метод-и-allowanonymous) |
+| `anyOf(...checks)` | Проверка «хотя бы одна из» | [«Или»](../../application/authorization-patterns.md#или-anyof) |
+| `bearerToken(ctx)` | Токен из `Authorization: Bearer …` или `undefined` | [JWT](../../application/jwt.md#проверка-в-authorize) |
 | `PRINCIPAL_STATE_KEY` | Ключ `ctx.state`, под которым лежит текущий пользователь | там же |
 
 ## Списки
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `ListRequest` | Базовый класс модели списка | [Списки](../../http/lists.md) |
+| `ListRequest` | Базовый класс модели списка | [Списки](../../module/controllers/lists.md) |
 | `ListOptions(options)`, `Sortable()`, `Filterable(...operators)` | Пределы страниц, сортировка, фильтры модели списка | там же |
-| `buildListDocument(items, query, total, options)` | Ответ-коллекция: `data`, `meta`, `links` | [Ответ](../../http/lists.md#ответ) |
+| `buildListDocument(items, query, total, options)` | Ответ-коллекция: `data`, `meta`, `links` | [Ответ](../../module/controllers/lists.md#ответ) |
 | `serializeListQuery(query)` | Строка запроса из `ListQuery` | там же |
 
 ## Для пакетов и сгенерированного кода

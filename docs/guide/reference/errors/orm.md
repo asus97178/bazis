@@ -21,7 +21,7 @@
 
 Поля `constraint`, `table`, `column` — для ветвления в коде. Как
 превратить их в `409` и `422` — в главе
-[Ошибки базы данных](../../database/errors.md).
+[Ошибки базы данных](../../module/database/errors.md).
 
 ### `OrmValidationError`
 
@@ -54,7 +54,7 @@ No entity or dynamic model named "Notes" is registered in this DbContext. Regist
 A plain object is not an entity class. For a dynamic table add the row through its set: db.setByName("Table").add(row).
 ```
 
-([Динамические модели](../../database/dynamic-models.md)).
+([Динамические модели](../../module/database/dynamic-models.md)).
 
 ### `ModelBuildError`
 
@@ -69,7 +69,7 @@ CHECK references unknown property "prise".
 ## Зашифрованные столбцы
 
 Тексты — из 0.104.0; подробно — в разделе
-[Шифрование столбца](../../database/entities.md#шифрование-столбца).
+[Шифрование столбца](../../module/database/entities.md#шифрование-столбца).
 
 | Текст | Когда |
 | --- | --- |
@@ -99,12 +99,12 @@ Entity "Lead": key "id" cannot be encrypted: equal values are stored differently
 | `PostCommitError` | — | Транзакция **записана**, но упал обработчик `afterCommit`. `committed: true`, ошибки — в `errors`. Не повторять транзакцию |
 | `OrmDatabaseTimeError` | `ORM provider returned an invalid database time value.` | Внутренняя: база вернула неверное время |
 
-Подробно — в главе [Транзакции](../../database/transactions.md#ошибки).
+Подробно — в главе [Транзакции](../../module/database/transactions.md#ошибки).
 
 ## Немедленные изменения
 
 Ошибки `executeUpdate`, `executeDelete`, `insertIfAbsent`
-([Немедленные изменения](../../database/immediate.md)):
+([Немедленные изменения](../../module/database/immediate.md)):
 
 | Класс | Текст |
 | --- | --- |
@@ -121,8 +121,8 @@ Entity "Lead": key "id" cannot be encrypted: equal values are stored differently
 
 | Код | Когда |
 | --- | --- |
-| `ORM_SCHEMA_ADDITIVE_DATA_VIOLATION` | Данные мешают безопасному изменению: например, `NULL` в столбце, который становится обязательным ([Схема](../../database/schema.md#что-добавляется-само)) |
-| `ORM_SCHEMA_OWNERSHIP_CONFLICT` | Одну таблицу создают два контекста ([Несколько модулей](../../database/schema.md#несколько-модулей)) |
+| `ORM_SCHEMA_ADDITIVE_DATA_VIOLATION` | Данные мешают безопасному изменению: например, `NULL` в столбце, который становится обязательным ([Схема](../../module/database/schema.md#что-добавляется-само)) |
+| `ORM_SCHEMA_OWNERSHIP_CONFLICT` | Одну таблицу создают два контекста ([Несколько модулей](../../module/database/schema.md#несколько-модулей)) |
 | `ORM_SCHEMA_CROSS_UNIT_FOREIGN_KEY` | Внешний ключ на сущность другого контекста |
 | `ORM_SCHEMA_HOSTED_PHASE_CONFLICT` | Служба приложения запускается раньше схемы (фаза меньше 0); нужна `phase: 0` или позже |
 | `ORM_SCHEMA_CREATE_FAILED` | `PostgreSQL additive schema admission failed: …` при создании схемы или таблицы — обычно нет прав `CREATE` |
@@ -141,7 +141,7 @@ Entity "Lead": key "id" cannot be encrypted: equal values are stored differently
 
 Изменение модели нельзя применить само — переименование, смена типа,
 удаление. В тексте — список различий и что сделать
-([Что требует миграции](../../database/schema.md#что-требует-миграции)).
+([Что требует миграции](../../module/database/schema.md#что-требует-миграции)).
 
 ### `SchemaVerificationError`
 
@@ -156,7 +156,7 @@ SchemaVerificationError [ORM_SCHEMA_DRIFT]: PostgreSQL schema does not match the
 
 ### `OrmOwnedStoreAdmissionError`
 
-Ошибки [собственных хранилищ](../../database/owned-stores.md):
+Ошибки [собственных хранилищ](../../module/database/owned-stores.md):
 
 | Код | Когда |
 | --- | --- |
@@ -175,6 +175,6 @@ SchemaVerificationError [ORM_SCHEMA_DRIFT]: PostgreSQL schema does not match the
 
 ## Дальше
 
-- [Ошибки базы данных](../../database/errors.md)
-- [Схема](../../database/schema.md)
-- [Транзакции](../../database/transactions.md)
+- [Ошибки базы данных](../../module/database/errors.md)
+- [Схема](../../module/database/schema.md)
+- [Транзакции](../../module/database/transactions.md)

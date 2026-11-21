@@ -9,8 +9,8 @@ ORM: сущности, контекст, запросы, сохранение, �
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `ormBazisConnect(dbConfig, options)` | Коннектор PostgreSQL для `@Infra`: подключение, схема при запуске, здоровье | [Подключение PostgreSQL](../../database/postgresql.md#инфраструктура) |
-| `ormModule(config)` | Регистрация контекста модуля: `context`, `ensureCreated`, `migrations`; `entities` — только для сущностей без набора | [DbContext](../../database/dbcontext.md) |
+| `ormBazisConnect(dbConfig, options)` | Коннектор PostgreSQL для `@Infra`: подключение, схема при запуске, здоровье | [Подключение PostgreSQL](../../module/database/postgresql.md#инфраструктура) |
+| `ormModule(config)` | Регистрация контекста модуля: `context`, `ensureCreated`, `migrations`; `entities` — только для сущностей без набора | [DbContext](../../module/database/dbcontext.md) |
 | `postgres(options)` | Подключение для `ormModule({ provider: postgres(...) })` без `@Infra` | — |
 | `DATABASE_PROVIDER` | Токен общего подключения | — |
 | `OrmLifecycle`, `OrmConnectionLifecycle`, `OrmProviderReadyLifecycle` | Службы запуска схемы и закрытия подключения; создаёт `ormModule` | — |
@@ -19,60 +19,60 @@ ORM: сущности, контекст, запросы, сохранение, �
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Entity(options)` | Класс — таблица | [Сущности](../../database/entities.md#таблица) |
-| `Column(options)`, `Required()`, `Nullable()` | Столбец; метка `NOT NULL` или «NULL можно», одна из двух обязательна | [Столбцы](../../database/entities.md#столбцы) |
-| `Key(options)`, `UUID(options)` | Первичный ключ; ключ UUID (v7) | [Ключи](../../database/entities.md#ключи) |
-| `CreatedAt()`, `UpdatedAt()` | Время создания и изменения | [Время создания и изменения](../../database/entities.md#время-создания-и-изменения) |
-| `Index(options)`, `Check(name, predicate)` | Индекс; условие `CHECK` | [Индексы и проверки](../../database/entities.md#индексы-и-проверки) |
-| `ManyToOne`, `OneToMany`, `ForeignKey` | Связи и внешний ключ | [Связи](../../database/queries.md#связи-и-include) |
+| `Entity(options)` | Класс — таблица | [Сущности](../../module/database/entities.md#таблица) |
+| `Column(options)`, `Required()`, `Nullable()` | Столбец; метка `NOT NULL` или «NULL можно», одна из двух обязательна | [Столбцы](../../module/database/entities.md#столбцы) |
+| `Key(options)`, `UUID(options)` | Первичный ключ; ключ UUID (v7) | [Ключи](../../module/database/entities.md#ключи) |
+| `CreatedAt()`, `UpdatedAt()` | Время создания и изменения | [Время создания и изменения](../../module/database/entities.md#время-создания-и-изменения) |
+| `Index(options)`, `Check(name, predicate)` | Индекс; условие `CHECK` | [Индексы и проверки](../../module/database/entities.md#индексы-и-проверки) |
+| `ManyToOne`, `OneToMany`, `ForeignKey` | Связи и внешний ключ | [Связи](../../module/database/queries.md#связи-и-include) |
 | `Schema(name)` | Схема PostgreSQL таблицы | — |
-| `SoftDelete()` | Мягкое удаление: `remove()` ставит время вместо `DELETE` | [Мягкое удаление](../../database/immediate.md#мягкое-удаление-и-фильтры) |
-| `QueryFilter(predicate)` | Условие, которое добавляется ко всем запросам сущности; с контекстом — для арендаторов | [Арендаторы](../../security/authorization-patterns.md#арендаторы) |
-| `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.json()`, `ValueConverters.encrypted(secret)` — ключ в коде, для ORM без приложения. `null` конвертер не получает, если не объявил `convertsNulls` | [Преобразование значения](../../database/entities.md#преобразование-значения) |
-| `encryptedWith(config, field)` | Шифрование столбца AES-256-GCM ключом из настроек; ключ читается при запуске | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
-| `DecryptionError` | Значение не расшифровать: другой ключ или изменённые данные | [Шифрование столбца](../../database/entities.md#шифрование-столбца) |
-| `buildDynamicModel(definition)` | Модель таблицы из описания, без классов | [Динамические модели](../../database/dynamic-models.md) |
+| `SoftDelete()` | Мягкое удаление: `remove()` ставит время вместо `DELETE` | [Мягкое удаление](../../module/database/immediate.md#мягкое-удаление-и-фильтры) |
+| `QueryFilter(predicate)` | Условие, которое добавляется ко всем запросам сущности; с контекстом — для арендаторов | [Арендаторы](../../application/authorization-patterns.md#арендаторы) |
+| `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.json()`, `ValueConverters.encrypted(secret)` — ключ в коде, для ORM без приложения. `null` конвертер не получает, если не объявил `convertsNulls` | [Преобразование значения](../../module/database/entities.md#преобразование-значения) |
+| `encryptedWith(config, field)` | Шифрование столбца AES-256-GCM ключом из настроек; ключ читается при запуске | [Шифрование столбца](../../module/database/entities.md#шифрование-столбца) |
+| `DecryptionError` | Значение не расшифровать: другой ключ или изменённые данные | [Шифрование столбца](../../module/database/entities.md#шифрование-столбца) |
+| `buildDynamicModel(definition)` | Модель таблицы из описания, без классов | [Динамические модели](../../module/database/dynamic-models.md) |
 | `pluralize(name)` | Множественное число для имени таблицы по умолчанию | — |
 
 ## Контекст и запросы
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `DbContext` | Базовый класс контекста: наборы, `saveChanges`, `database` | [DbContext](../../database/dbcontext.md) |
-| `DbSet` | Таблица в контексте: запросы, `add`, `update`, `remove`, `find` | [`DbSet`](../../database/dbcontext.md#dbset) |
-| `DbContextOptions`, `DbContextFactory` | Опции контекста; фабрика контекстов для ORM без приложения — в приложении вместо неё `createScope()` | [Вне запроса](../../database/dbcontext.md#вне-запроса) |
-| `DatabaseFacade` | `db.database`: схема, сырой SQL, транзакции, проверка связи | [Сырой SQL](../../database/dbcontext.md#сырой-sql) |
-| `EntityQuery`, `IncludableQuery`, `ProjectedQuery` | Запросы: `where`, `orderBy`, `include`, `select`, `toList`, `first` | [Запросы](../../database/queries.md) |
-| `Operand`, `Predicate` | Условия: `t.done.eq(false).and(…)` | [Условия](../../database/queries.md#условия) |
-| `paginate(query, listQuery)` | Страница списка JSON:API: фильтры, сортировка, `total` | [Списки](../../http/lists.md#контроллер-и-сервис) |
-| `ChangeTracker`, `EntityState` | Отслеживание изменений и состояния сущностей | [Состояния](../../database/saving.md#состояния) |
-| `KeyTuple` | Значение составного ключа | [Составной ключ](../../database/entities.md#составной-ключ) |
+| `DbContext` | Базовый класс контекста: наборы, `saveChanges`, `database` | [DbContext](../../module/database/dbcontext.md) |
+| `DbSet` | Таблица в контексте: запросы, `add`, `update`, `remove`, `find` | [`DbSet`](../../module/database/dbcontext.md#dbset) |
+| `DbContextOptions`, `DbContextFactory` | Опции контекста; фабрика контекстов для ORM без приложения — в приложении вместо неё `createScope()` | [Вне запроса](../../module/database/dbcontext.md#вне-запроса) |
+| `DatabaseFacade` | `db.database`: схема, сырой SQL, транзакции, проверка связи | [Сырой SQL](../../module/database/dbcontext.md#сырой-sql) |
+| `EntityQuery`, `IncludableQuery`, `ProjectedQuery` | Запросы: `where`, `orderBy`, `include`, `select`, `toList`, `first` | [Запросы](../../module/database/queries.md) |
+| `Operand`, `Predicate` | Условия: `t.done.eq(false).and(…)` | [Условия](../../module/database/queries.md#условия) |
+| `paginate(query, listQuery)` | Страница списка JSON:API: фильтры, сортировка, `total` | [Списки](../../module/controllers/lists.md#контроллер-и-сервис) |
+| `ChangeTracker`, `EntityState` | Отслеживание изменений и состояния сущностей | [Состояния](../../module/database/saving.md#состояния) |
+| `KeyTuple` | Значение составного ключа | [Составной ключ](../../module/database/entities.md#составной-ключ) |
 
 ## Репозитории
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `IRepository<T>` | Контракт репозитория сущности; внедряется по типу | [Репозитории](../../database/repositories.md) |
+| `IRepository<T>` | Контракт репозитория сущности; внедряется по типу | [Репозитории](../../module/database/repositories.md) |
 | `Repository`, `repositoryFor(Entity)`, `registerRepositories` | Реализация, токен, регистрация | там же |
 
 ## Транзакции и надёжность
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `OrmTransaction` | Транзакция из `db.database.transaction(...)` | [Транзакции](../../database/transactions.md) |
-| `isCommittedOutcome`, `isUnknownTransactionOutcome` | Проверка исхода транзакции | [Тайм-ауты](../../database/errors.md#тайм-ауты-и-недоступная-база) |
-| `ExecutionStrategy`, `withRetry(provider, options)` | Повторы при временных сбоях (как `EnableRetryOnFailure` в EF Core); в приложении — `executionStrategy` модуля и `transactionScope(work, { retry: true })` | [Повтор при временном сбое](../../database/saving.md#повтор-при-временном-сбое), [повтор транзакции](../../database/transactions.md#повтор-при-взаимной-блокировке) |
+| `OrmTransaction` | Транзакция из `db.database.transaction(...)` | [Транзакции](../../module/database/transactions.md) |
+| `isCommittedOutcome`, `isUnknownTransactionOutcome` | Проверка исхода транзакции | [Тайм-ауты](../../module/database/errors.md#тайм-ауты-и-недоступная-база) |
+| `ExecutionStrategy`, `withRetry(provider, options)` | Повторы при временных сбоях (как `EnableRetryOnFailure` в EF Core); в приложении — `executionStrategy` модуля и `transactionScope(work, { retry: true })` | [Повтор при временном сбое](../../module/database/saving.md#повтор-при-временном-сбое), [повтор транзакции](../../module/database/transactions.md#повтор-при-взаимной-блокировке) |
 | `withoutExecutionStrategyRetries` | Отключить вложенные повторы для подсистемы со своими | — |
 
 ## Схема
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Migrator`, `MigrationRunner`, `SchemaDiffer` | Применение изменений схемы, миграции с историей, сравнение модели с базой | [Схема](../../database/schema.md) |
+| `Migrator`, `MigrationRunner`, `SchemaDiffer` | Применение изменений схемы, миграции с историей, сравнение модели с базой | [Схема](../../module/database/schema.md) |
 | `ModelBuilder`, `OrmModel` | Сборка модели из декораторов | — |
 | `compileCheck`, `renderCheck` | Перевод условия `@Check` в SQL | — |
-| `defineOrmOwnedStoreV1(descriptor)` | Описание собственного хранилища пакета | [Собственные хранилища](../../database/owned-stores.md) |
-| `PostgresProvider`, `PostgresDialect` | Провайдер PostgreSQL на встроенном `SQL` Bun | [PostgreSQL](../../database/postgresql.md) |
+| `defineOrmOwnedStoreV1(descriptor)` | Описание собственного хранилища пакета | [Собственные хранилища](../../module/database/owned-stores.md) |
+| `PostgresProvider`, `PostgresDialect` | Провайдер PostgreSQL на встроенном `SQL` Bun | [PostgreSQL](../../module/database/postgresql.md) |
 
 ## Ошибки
 

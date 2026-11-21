@@ -32,52 +32,52 @@
   Контракт сервиса — абстрактный класс: `singleton(IBookStore,
   MemoryBookStore)` вместо `AddSingleton<IBookStore, MemoryBookStore>()`.
 - **Ошибки — не `ProblemDetails`.** Тело ошибки — `{"error": …,
-  "details": …}` ([Ошибки](../overview/errors.md)).
+  "details": …}` ([Ошибки](../module/controllers/errors.md)).
 
 ## Что как называется
 
 | ASP.NET Core | bazis | Где читать |
 | --- | --- | --- |
-| `WebApplication.CreateBuilder` … `app.Run()` | `@App({ http })` | [Приложение](../overview/application.md) |
-| `builder.Services.Add…` в `Program.cs` | `providers` модуля | [Модули](../overview/modules.md) |
-| `AddSingleton` / `AddScoped` / `AddTransient` | `singleton` / `scoped` / `transient` | [Провайдеры](../overview/providers.md#время-жизни) |
-| `AddSingleton<IService, Impl>()` | `singleton(IService, Impl)`, `IService` — абстрактный класс | [Провайдеры](../overview/providers.md#регистрация-по-контракту) |
-| Keyed services, `IEnumerable<T>`, `Lazy<T>` | Ключи, несколько реализаций, ленивые зависимости | [Внедрение зависимостей](../fundamentals/dependency-injection.md) |
-| `ValidateScopes`, `ValidateOnBuild` | Всегда, в любом окружении | [Провайдеры](../overview/providers.md#ошибки-которые-ловятся-при-старте) |
-| `[ApiController]`, `ControllerBase` | `@Controller` | [Контроллеры](../overview/controllers.md) |
-| `[HttpGet("{id:int}")]` | `@Get(":id(int)")` | [Контроллеры](../overview/controllers.md#маршруты) |
-| `[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]` | Имя и тип параметра или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>`, `FromHeader<T>` | [Контроллеры](../overview/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
-| `[FromQuery] SearchQuery query` с DataAnnotations | `query: FromQuery<SearchQuery>` с `@Validator` на полях | [Модели строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
-| `[FromQuery(Name = "page_size")]` на свойстве | `@FromQuery("page_size")` на поле | [Модели строки запроса](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
-| Model state: все ошибки привязки и проверки в одном `400` | Так же: `Validation failed` и все нарушения в `details` | [Контроллеры](../overview/controllers.md#модели-строки-запроса-и-заголовков) |
-| `HttpContext` | `ctx: HttpContext` | [Контроллеры](../overview/controllers.md#httpcontext) |
-| DataAnnotations, автоматический `400` | `@Validator` на полях класса, тоже `400`; `@RequestModel()` — по желанию | [Проверка данных](../overview/validation.md) |
-| `Ok()`, `CreatedAtAction()`, `NoContent()` | `Ok`, `Created` с автоматическим `Location`, `NoContent` | [Ответы](../overview/responses.md#помощники) |
-| `IOptions<T>` + `ValidateOnStart` | `defineConfig` + `ConfigView<T>`, проверка всегда при запуске | [Конфигурация](../fundamentals/configuration.md) |
-| `appsettings.{Environment}.json` | Разделы `default`, `development`, `test`, `production` в `defineConfig` | [Конфигурация](../fundamentals/configuration.md#окружения) |
-| `ASPNETCORE_ENVIRONMENT` | `BAZIS_ENV` | [Конфигурация](../fundamentals/configuration.md#окружения) |
-| `Books__PageSize` | `BAZIS_BOOKS__PAGESIZE` | [Имена переменных](../fundamentals/configuration.md#имена-переменных-окружения) |
-| User Secrets, Key Vault | `secret()`, файлы секретов | [Секреты](../security/secrets.md) |
-| `app.Use…`, `IMiddleware` | `HttpMiddleware` в `http.middleware` | [Middleware](../overview/middleware.md) |
-| Action filters | `@ActionFilter` | [Фильтры действий](../overview/middleware.md#фильтры-действий) |
-| `UseExceptionHandler`, exception filters | Middleware, переводящий ошибку в `HttpError` | [Ошибки](../overview/errors.md#доменные-ошибки) |
-| `[Authorize(Policy = …)]`, `IAuthorizationFilter` | `@Authorize(check)` | [Авторизация](../overview/authorization.md) |
-| JWT Bearer | `bazis/library/jwt` + `bearerToken` | [JWT](../security/jwt.md) |
-| `IHostedService.StartAsync` | `LifecycleHook.onInit` | [Жизненный цикл](../fundamentals/lifecycle.md#хуки-жизненного-цикла) |
-| `BackgroundService.ExecuteAsync` | `BackgroundService.execute` в поле `background` модуля | [Жизненный цикл](../fundamentals/lifecycle.md#фоновые-службы) |
-| `PeriodicTimer` в фоновой службе | `PeriodicBackgroundService` | [Фоновые службы](../realtime/background-services.md) |
-| `CancellationToken` | `AbortSignal` | [Жизненный цикл](../fundamentals/lifecycle.md#отмена) |
-| `ILogger<T>` | `Logger` | [Журнал](../fundamentals/logging.md) |
-| `AddHealthChecks`, `IHealthCheck` | `health: true`, `HEALTH_CHECK` | [Health](../fundamentals/health-checks.md) |
-| `[OutputCache]` | `@OutputCache` | [Кэш ответов](../http/output-cache.md) |
-| `AddRateLimiter` | `rateLimit` | [Ограничение частоты](../http/rate-limit.md) |
-| `Asp.Versioning` | `@ApiVersion` | [Версии API](../http/versioning.md) |
-| `IHttpClientFactory` | `HttpClient` из `bazis/core/http-client` | [HTTP-клиент](../http/http-client.md) |
-| SignalR | WebSocket-шлюз | [WebSocket](../realtime/websocket.md) |
-| Grpc.AspNetCore | gRPC | [gRPC](../realtime/grpc.md) |
-| Swashbuckle | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../http/openapi.md) |
-| EF Core: `DbContext`, `DbSet`, `SaveChangesAsync` | `DbContext`, `DbSet`, `saveChanges` | [DbContext](../database/dbcontext.md) |
-| `WebApplicationFactory` + `ConfigureTestServices` | `startTestApp(AppModule, { overrides })` | [Тестирование](../fundamentals/testing.md#приложение-целиком-starttestapp) |
+| `WebApplication.CreateBuilder` … `app.Run()` | `@App({ http })` | [Приложение](../application/application.md) |
+| `builder.Services.Add…` в `Program.cs` | `providers` модуля | [Модули](../module/modules.md) |
+| `AddSingleton` / `AddScoped` / `AddTransient` | `singleton` / `scoped` / `transient` | [Провайдеры](../module/services/providers.md#время-жизни) |
+| `AddSingleton<IService, Impl>()` | `singleton(IService, Impl)`, `IService` — абстрактный класс | [Провайдеры](../module/services/providers.md#регистрация-по-контракту) |
+| Keyed services, `IEnumerable<T>`, `Lazy<T>` | Ключи, несколько реализаций, ленивые зависимости | [Внедрение зависимостей](../module/services/dependency-injection.md) |
+| `ValidateScopes`, `ValidateOnBuild` | Всегда, в любом окружении | [Провайдеры](../module/services/providers.md#ошибки-которые-ловятся-при-старте) |
+| `[ApiController]`, `ControllerBase` | `@Controller` | [Контроллеры](../module/controllers/controllers.md) |
+| `[HttpGet("{id:int}")]` | `@Get(":id(int)")` | [Контроллеры](../module/controllers/controllers.md#маршруты) |
+| `[FromRoute]`, `[FromQuery]`, `[FromBody]`, `[FromHeader]` | Имя и тип параметра или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>`, `FromHeader<T>` | [Контроллеры](../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
+| `[FromQuery] SearchQuery query` с DataAnnotations | `query: FromQuery<SearchQuery>` с `@Validator` на полях | [Модели строки запроса](../module/controllers/controllers.md#модели-строки-запроса-и-заголовков) |
+| `[FromQuery(Name = "page_size")]` на свойстве | `@FromQuery("page_size")` на поле | [Модели строки запроса](../module/controllers/controllers.md#модели-строки-запроса-и-заголовков) |
+| Model state: все ошибки привязки и проверки в одном `400` | Так же: `Validation failed` и все нарушения в `details` | [Контроллеры](../module/controllers/controllers.md#модели-строки-запроса-и-заголовков) |
+| `HttpContext` | `ctx: HttpContext` | [Контроллеры](../module/controllers/controllers.md#httpcontext) |
+| DataAnnotations, автоматический `400` | `@Validator` на полях класса, тоже `400`; `@RequestModel()` — по желанию | [Проверка данных](../module/controllers/validation.md) |
+| `Ok()`, `CreatedAtAction()`, `NoContent()` | `Ok`, `Created` с автоматическим `Location`, `NoContent` | [Ответы](../module/controllers/responses.md#помощники) |
+| `IOptions<T>` + `ValidateOnStart` | `defineConfig` + `ConfigView<T>`, проверка всегда при запуске | [Конфигурация](../module/config/configuration.md) |
+| `appsettings.{Environment}.json` | Разделы `default`, `development`, `test`, `production` в `defineConfig` | [Конфигурация](../module/config/configuration.md#окружения) |
+| `ASPNETCORE_ENVIRONMENT` | `BAZIS_ENV` | [Конфигурация](../module/config/configuration.md#окружения) |
+| `Books__PageSize` | `BAZIS_BOOKS__PAGESIZE` | [Имена переменных](../module/config/configuration.md#имена-переменных-окружения) |
+| User Secrets, Key Vault | `secret()`, файлы секретов | [Секреты](../module/config/secrets.md) |
+| `app.Use…`, `IMiddleware` | `HttpMiddleware` в `http.middleware` | [Middleware](../module/controllers/middleware.md) |
+| Action filters | `@ActionFilter` | [Фильтры действий](../module/controllers/middleware.md#фильтры-действий) |
+| `UseExceptionHandler`, exception filters | Middleware, переводящий ошибку в `HttpError` | [Ошибки](../module/controllers/errors.md#доменные-ошибки) |
+| `[Authorize(Policy = …)]`, `IAuthorizationFilter` | `@Authorize(check)` | [Авторизация](../module/controllers/authorization.md) |
+| JWT Bearer | `bazis/library/jwt` + `bearerToken` | [JWT](../application/jwt.md) |
+| `IHostedService.StartAsync` | `LifecycleHook.onInit` | [Жизненный цикл](../application/lifecycle.md#хуки-жизненного-цикла) |
+| `BackgroundService.ExecuteAsync` | `BackgroundService.execute` в поле `background` модуля | [Жизненный цикл](../application/lifecycle.md#фоновые-службы) |
+| `PeriodicTimer` в фоновой службе | `PeriodicBackgroundService` | [Фоновые службы](../module/background-services.md) |
+| `CancellationToken` | `AbortSignal` | [Жизненный цикл](../application/lifecycle.md#отмена) |
+| `ILogger<T>` | `Logger` | [Журнал](../application/logging.md) |
+| `AddHealthChecks`, `IHealthCheck` | `health: true`, `HEALTH_CHECK` | [Health](../application/health-checks.md) |
+| `[OutputCache]` | `@OutputCache` | [Кэш ответов](../module/controllers/output-cache.md) |
+| `AddRateLimiter` | `rateLimit` | [Ограничение частоты](../application/rate-limit.md) |
+| `Asp.Versioning` | `@ApiVersion` | [Версии API](../module/controllers/versioning.md) |
+| `IHttpClientFactory` | `HttpClient` из `bazis/core/http-client` | [HTTP-клиент](../module/http-client.md) |
+| SignalR | WebSocket-шлюз | [WebSocket](../module/websocket.md) |
+| Grpc.AspNetCore | gRPC | [gRPC](../module/grpc.md) |
+| Swashbuckle | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../module/controllers/openapi.md) |
+| EF Core: `DbContext`, `DbSet`, `SaveChangesAsync` | `DbContext`, `DbSet`, `saveChanges` | [DbContext](../module/database/dbcontext.md) |
+| `WebApplicationFactory` + `ConfigureTestServices` | `startTestApp(AppModule, { overrides })` | [Тестирование](../testing/testing.md#приложение-целиком-starttestapp) |
 | `dotnet new webapi` | `bazis new` | [Команды CLI](../cli/commands.md#bazis-new) |
 | `dotnet publish -p:PublishSingleFile=true` | `bazis build --bin` | [Один исполняемый файл](../deployment/single-executable.md) |
 
@@ -390,7 +390,7 @@ export class WarmUp implements LifecycleHook {
 
 Долгая работа на всё время жизни приложения, как `BackgroundService`,
 оформляется так же: наследник `BackgroundService` с методом `execute(signal)`
-в поле `background` модуля ([Жизненный цикл](../fundamentals/lifecycle.md#фоновые-службы)).
+в поле `background` модуля ([Жизненный цикл](../application/lifecycle.md#фоновые-службы)).
 
 ### Захваченная зависимость
 

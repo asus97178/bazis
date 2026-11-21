@@ -434,7 +434,7 @@ complete(taskId, output, actor)  // invalid_input по форме; вызыва�
 
 ## 8. Хранилища
 
-Каждая часть владеет своим [owned store](../guide/database/owned-stores.md):
+Каждая часть владеет своим [owned store](../guide/module/database/owned-stores.md):
 фреймворк сам создаёт и проверяет таблицы в базе приложения.
 
 - Схема части фиксируется целиком, когда часть выходит: Definitions и Runtime —
