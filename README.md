@@ -12,7 +12,7 @@ Package: [`bazis` on npm](https://www.npmjs.com/package/bazis) ·
 Changes: [CHANGELOG.md](CHANGELOG.md) · License: MIT
 
 > [!IMPORTANT]
-> **bazis runs on Bun only (1.4.0 or newer). Node.js and Deno are not
+> **bazis runs on Bun only (1.4.5 or newer). Node.js and Deno are not
 > supported.**
 >
 > - The package ships TypeScript sources with standard (TC39) decorators and
@@ -116,7 +116,7 @@ outputs, the rules every change follows:
 | `examples/todo` | Example app built the way a user builds one: three modules, PostgreSQL, an end-to-end test, a binary |
 | `examples/workflow` | Business processes and permissions without a CMS: an order approved by a process, Tools, roles, tests on PostgreSQL |
 | `docs/` | Architecture, quick start, release history |
-| `toolchain/`, `scripts/bazis-bun` | The pinned, hash-checked Bun 1.4.0 used by CI and scripts |
+| `toolchain/`, `scripts/bazis-bun` | The pinned, hash-checked Bun 1.4.5 used by CI and scripts |
 | `scripts/ci.ts`, `scripts/package-check.ts` | CI pipeline and the check that installs the packed package into an empty project |
 | `ops/live-postgres` | Live qualification on a disposable PostgreSQL 17 (Docker) |
 

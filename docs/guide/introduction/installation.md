@@ -18,7 +18,7 @@ curl http://127.0.0.1:3000/health
 
 ## Что понадобится
 
-- **Bun 1.4.0 или новее.** Если его ещё нет, на macOS и Linux он ставится одной командой (подробнее — на [bun.com](https://bun.com/docs/installation)):
+- **Bun 1.4.5 или новее.** Если его ещё нет, на macOS и Linux он ставится одной командой (подробнее — на [bun.com](https://bun.com/docs/installation)):
 
   ```sh
   curl -fsSL https://bun.com/install | bash

@@ -18,13 +18,13 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
-    "@types/bun": "1.4.0",
+    "@types/bun": "1.4.5",
     "typescript": "^6"
   },
   "peerDependencies": {
     "typescript": "^6"
   },
-  "version": "0.141.0",
+  "version": "0.142.0",
   "workspaces": [
     "src/bazis"
   ]

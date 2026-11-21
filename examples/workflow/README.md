@@ -24,7 +24,7 @@ do what is the data of `defineRoles`.
 
 ## Run
 
-Needs Bun ≥ 1.4.0 and PostgreSQL 17. The tables are created on start.
+Needs Bun ≥ 1.4.5 and PostgreSQL 17. The tables are created on start.
 
 ```sh
 docker run -d --name orders-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=orders -p 5432:5432 postgres:17-alpine
