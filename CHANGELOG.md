@@ -4,6 +4,34 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.142.0 — 2026-11-21
+
+The framework moves to Bun 1.4.5. Stores and application code stay as they are.
+Breaking: Bun 1.4.5 or newer is required — see
+[Upgrading](docs/guide/reference/upgrading.md#01420).
+
+### Changed
+
+- Bun 1.4.5 is the pinned and the lowest supported version (was 1.4.0): `engines.bun`,
+  the check before every `bazis` command (`bazis needs Bun 1.4.5 or newer`),
+  `@types/bun` in a new project, the image in the Docker guide (`oven/bun:1.4.5`).
+  What an application on bazis gets from Bun itself: certificate checks during the TLS
+  handshake in `fetch`, WebSocket, `Bun.RedisClient` and `Bun.SQL` (CVE-2026-48618),
+  a `fetch` with a timeout of four seconds or less no longer aborts early, a `Bun.SQL`
+  transaction no longer resolves after the server rolled it back, a streamed response
+  is cancelled when the client disconnects, less CPU while a server is idle.
+
+### Added
+
+- JSON:API lists: the filter operators `icontains`, `istartsWith` and `iendsWith` —
+  `contains`, `startsWith` and `endsWith` without regard to case (`ILIKE` in
+  PostgreSQL). `%` and `_` in the value are ordinary characters.
+
+### Internal
+
+- `ci` runs `bun check`, the type checker built into Bun, next to `tsc`.
+- `toolchain/README.md` describes how the pin is moved to a newer Bun.
+
 ## 0.141.0 — 2026-11-13
 
 Access ([ACCESS-001 v1.5](docs/architecture/ACCESS.md)): why a check answers what it
