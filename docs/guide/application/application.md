@@ -246,7 +246,7 @@ await runApp(Worker);
 
 ## Дальше
 
-- [Модули](../module/modules.md)
+- [Модули](../module/modules/modules.md)
 - [Обработка ошибок](../module/controllers/errors.md)
 - [Жизненный цикл](lifecycle.md) — фоновые службы и хуки
 - [Конфигурация](../module/config/configuration.md)

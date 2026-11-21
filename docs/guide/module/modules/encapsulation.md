@@ -7,6 +7,22 @@
 
 Все примеры проверены на bazis 0.108.0.
 
+## Правило в одной картинке
+
+```text
+┌─────────────────────────┐            ┌─────────────────────────┐
+│ ReportModule            │  imports   │ ClockModule             │
+│                         │ ─────────▶ │                         │
+│ ReportService ──────────┼── нужен ──▶│ IClock     ◀── exports  │
+│                         │            │ ClockCache  (приватный) │
+└─────────────────────────┘            └─────────────────────────┘
+```
+
+`ReportService` получит `IClock`: `ReportModule` импортирует `ClockModule`,
+а тот перечислил `IClock` в `exports`. `ClockCache` в `exports` нет, поэтому
+его не получит никто за пределами `ClockModule`. Уберите любую из двух
+стрелок, `imports` или `exports`, и приложение не запустится.
+
 ## Видимость не передаётся по цепочке
 
 ```ts
@@ -18,6 +34,20 @@ export class ReportModule {}
 
 @Module({ imports: [ReportModule], providers: [scoped(PageService)], exports: [] })
 export class AppModule {}
+```
+
+```text
+┌──────────────┐  imports  ┌──────────────────┐  imports  ┌──────────────┐
+│ AppModule    │ ────────▶ │ ReportModule     │ ────────▶ │ ClockModule  │
+│              │           │                  │           │              │
+│ PageService  │           │ ReportService    │           │ IClock       │
+│              │           │ exports:         │           │ exports:     │
+│              │           │  [ReportService] │           │  [IClock]    │
+└──────────────┘           └──────────────────┘           └──────────────┘
+
+ReportService → IClock         ✔  ReportModule импортирует ClockModule
+PageService   → ReportService  ✔  AppModule импортирует ReportModule
+PageService   → IClock         ✘  ReportModule не отдаёт IClock дальше
 ```
 
 `ReportService` может зависеть от `IClock`. А `PageService` из `AppModule` —
@@ -49,6 +79,13 @@ exports of "ReportModule".
 ```ts
 @Module({ imports: [ClockModule], providers: [scoped(ReportService)], exports: [ReportService, IClock] })
 export class ReportModule {}
+```
+
+```text
+AppModule ──imports──▶ ReportModule ──imports──▶ ClockModule
+                       exports: [ReportService, IClock]
+
+PageService → IClock   ✔  ReportModule отдаёт IClock дальше
 ```
 
 Теперь `IClock` видят все, кто импортирует `ReportModule`. Реэкспортировать
@@ -97,7 +134,7 @@ implementation its own contract.
 ```
 
 Если разным частям приложения действительно нужны разные реализации,
-дайте каждой [свой контракт](services/dependency-injection.md#конкретная-реализация-из-нескольких).
+дайте каждой [свой контракт](../services/dependency-injection.md#конкретная-реализация-из-нескольких).
 
 > [!NOTE]
 > Сообщение в таком виде — с версии 0.97.7.
@@ -148,7 +185,7 @@ export class AppModule {}
   обходите так `exports` в коде функций.
 - **HTTP, фоновые службы, AI-инструменты.** Контроллеры работают при любых
   `exports` — доступ к ним настраивается через
-  [`@Authorize`](controllers/authorization.md).
+  [`@Authorize`](../controllers/authorization.md).
 - **Импорты TypeScript.** `exports` в `@Module` — граница для DI, а не для
   `import` в коде. Что модуль отдаёт как TypeScript-API, решает его
   `index.ts`.
@@ -156,5 +193,5 @@ export class AppModule {}
 ## Дальше
 
 - [Модули](modules.md)
-- [DI подробно](services/dependency-injection.md)
+- [DI подробно](../services/dependency-injection.md)
 - [Архитектура модулей](module-architecture.md)

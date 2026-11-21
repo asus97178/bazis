@@ -279,5 +279,5 @@ products/
 
 ## Дальше
 
-- [Провайдеры и DI](services/providers.md)
-- [Контроллеры](controllers/controllers.md)
+- [Провайдеры и DI](../services/providers.md)
+- [Контроллеры](../controllers/controllers.md)

@@ -215,7 +215,7 @@ export class ProjectsModule {}
 
 `exports: [IProjectsService]` — то, чем модуль делится. Контекст базы и
 сам `ProjectsService` наружу не выходят: таблицу `projects` меняет только
-этот модуль ([Инкапсуляция](../module/encapsulation.md)).
+этот модуль ([Инкапсуляция](../module/modules/encapsulation.md)).
 
 ## 4. Задача в проекте
 
@@ -435,5 +435,5 @@ $ bunx bazis test
 ## Дальше
 
 - [Один исполняемый файл](../deployment/single-executable.md) — собрать планировщик и запустить в production с секретами
-- [Модули](../module/modules.md) и [инкапсуляция](../module/encapsulation.md)
+- [Модули](../module/modules/modules.md) и [инкапсуляция](../module/modules/encapsulation.md)
 - [События](../module/services/events.md)

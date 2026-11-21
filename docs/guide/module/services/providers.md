@@ -181,5 +181,5 @@ export class ReportWriter {
 
 ## Дальше
 
-- [Модули](../modules.md)
+- [Модули](../modules/modules.md)
 - [Контроллеры](../controllers/controllers.md)

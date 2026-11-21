@@ -320,4 +320,4 @@ export class DbController {
 
 - [Провайдеры и DI](providers.md)
 - [Кодогенерация](../../application/codegen.md)
-- [Инкапсуляция модулей](../encapsulation.md)
+- [Инкапсуляция модулей](../modules/encapsulation.md)

@@ -164,4 +164,4 @@ test("orders count products through a fake repository", async () => {
 - [`DbContext` и `DbSet`](dbcontext.md)
 - [Запросы](queries.md)
 - [Сохранение и отслеживание изменений](saving.md)
-- [Инкапсуляция модулей](../encapsulation.md)
+- [Инкапсуляция модулей](../modules/encapsulation.md)

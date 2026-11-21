@@ -7,8 +7,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Module(metadata)` | Декоратор модуля: `imports`, `providers`, `exports`, `controllers`, `config`, `background`, `gateways`… | [Модули](../../module/modules.md) |
-| `Global()` | Модуль, чьи `exports` видны всем без `imports` | [Глобальные модули](../../module/modules.md#глобальные-модули) |
+| `Module(metadata)` | Декоратор модуля: `imports`, `providers`, `exports`, `controllers`, `config`, `background`, `gateways`… | [Модули](../../module/modules/modules.md) |
+| `Global()` | Модуль, чьи `exports` видны всем без `imports` | [Глобальные модули](../../module/modules/modules.md#глобальные-модули) |
 | `markGlobal(module)` | То же для модуля, созданного кодом | — |
 
 ## Регистрация

@@ -33,8 +33,8 @@ NestJS — переносится большая часть привычек. Н
 | NestJS | bazis | Где читать |
 | --- | --- | --- |
 | `NestFactory.create(AppModule)` + `listen` | `@App({ http })` | [Приложение](../application/application.md) |
-| `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../module/modules.md) |
-| `@Global()` | `@Global()` — так же | [Модули](../module/modules.md#глобальные-модули) |
+| `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../module/modules/modules.md) |
+| `@Global()` | `@Global()` — так же | [Модули](../module/modules/modules.md#глобальные-модули) |
 | `@Injectable()` | Не нужен | |
 | `@Param()`, `@Query()`, `@Body()` | Имя и тип параметра метода или маркеры `FromRoute<T>`, `FromQuery<T>`, `FromBody<T>` | [Контроллеры](../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
 | `@Headers("x-id")` | `FromHeader<string, "x-id">` | [Контроллеры](../module/controllers/controllers.md#явный-источник-fromquery-fromheader-frombody-fromroute) |
