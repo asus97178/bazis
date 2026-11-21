@@ -274,7 +274,9 @@ The full list of keys, ACL, errors and the operating procedure are in the report
 
 Current commands, PASS/FAIL, the load profile, hashes and operational limits:
 [enterprise WebSocket qualification](https://github.com/asus97178/osnova/blob/33a4513a56abb43a1694e7a6e56373187b928a70/docs/audits/2026-09-14-websocket-enterprise/REPORT.md).
-The checks use the pinned Bun 1.4.0; the toolchain did not change. Production and the
+The checks used the pinned Bun 1.4.0. Since bazis 0.142.0 the pin is Bun 1.4.5: the
+module's tests pass on it (the full suite on macOS arm64, Linux arm64 and Linux x64,
+2026-11-21); the load qualification of the report was not repeated. Production and the
 application database were not changed. There are no deviations from
 [MOD-ARCH-001](../../../../docs/architecture/MODULE_ARCHITECTURE.md).
 

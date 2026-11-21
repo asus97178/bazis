@@ -1,6 +1,6 @@
 # ORM: operation timeouts and transactionScope cancellation
 
-Passport version: 9. Check date: 2026-10-05.
+Passport version: 10. Check date: 2026-11-21 (Bun 1.4.5: the facts that name a Bun version; the rest as of 2026-10-05).
 Status: server cancellation is integrated; TCP/TLS and binary qualification results are in section 6. Production topologies and other platforms are not qualified.
 Type: an existing atomic library feature that manages ORM transactions.
 Path: `src/bazis/library/orm`.
@@ -89,7 +89,8 @@ reachable. There is no automatic retry of a cancelled callback.
 
 After a reservation is forcibly closed, its pool checks every new reservation for the
 rest of the provider's life with an internal read-only SELECT 1 before BEGIN and business
-SQL. Bun 1.4.0 may hand out a closing TLS slot before its internal handlers finish: the
+SQL. Bun 1.4.0 may hand out a closing TLS slot before its internal handlers finish
+(not checked again on Bun 1.4.5: it needs the TLS target; the retry stays): the
 first check of such a slot ends with a connection timeout. Getting/checking admission is
 retried at most once, only on the native ERR_POSTGRES_CONNECTION_TIMEOUT and within the
 original operation deadline. A bad reservation is closed before the retry. This is not a
@@ -354,8 +355,9 @@ There is no second `JSON.parse`: the JSON strings `"123"`, `"false"`, `"null"` a
 `"{\"role\":\"reader\"}"` keep their string type both in an entity and in a projection.
 `null` still represents a missing value.
 
-On write, Bun 1.4.0 binds a bare number/boolean as an SQL number/boolean, which
-PostgreSQL rejects when assigning to JSONB. Only for these two JSON types the dialect
+On write, Bun binds a bare number/boolean as an SQL number/boolean, which
+PostgreSQL rejects when assigning to JSONB (the same on 1.4.0 and on 1.4.5, checked
+2026-11-21: `column "j" is of type jsonb but expression is of type integer`). Only for these two JSON types the dialect
 creates a frozen internal object with `toJSON` returning the original scalar. The driver
 picks the JSON binding and serializes it itself. Native strings, arrays and objects are
 passed the former way: a prior `JSON.stringify` would encode them twice.

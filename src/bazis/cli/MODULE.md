@@ -1,6 +1,6 @@
 # bazis CLI
 
-Passport version: 1.11. Check date: 2026-10-31. Type: atomic technical module.
+Passport version: 1.12. Check date: 2026-11-21. Type: atomic technical module.
 Scope: command parsing, project, module and process generation, host registration, codegen,
 checking and drawing the processes declared in code (`bazis workflow check|diagram`),
 running the application and building (`bazis dev`, `bazis build`, `bazis build --bin`).
@@ -38,9 +38,11 @@ checks them at startup from sources and warns loudly if the code or the framewor
 version changed after generation (about 10 ms for 750 files). A binary has no sources,
 so the check is skipped. In the framework repository `fingerprint.ts` is not committed:
 it changes with every source edit.
-`build --bin` compiles from a temporary directory (`compileBinary`): Bun 1.4.0 leaves
+`build --bin` compiles from a temporary directory (`compileBinary`): Bun leaves
 `.bun-build` in the working directory if its executable is read-only or has the `uchg`
-flag. The Bun for child processes is `scripts/bazis-bun`, otherwise `BAZIS_BUN_BIN`,
+flag (the same on 1.4.0 and on 1.4.5, checked 2026-11-21 through the pinned launcher).
+Every command first checks the running Bun against `engines.bun` of the package —
+1.4.5 since bazis 0.142.0 — and stops on an older one. The Bun for child processes is `scripts/bazis-bun`, otherwise `BAZIS_BUN_BIN`,
 otherwise `bun` from PATH.
 Since 0.98.29 the executable does not read `bunfig.toml` from the directory it starts in
 (`--no-compile-autoload-bunfig`: a `preload` there would run foreign code inside the

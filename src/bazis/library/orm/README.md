@@ -143,9 +143,16 @@ not called on an unknown outcome.
 After a confirmed rollback the keys and tracking are restored. A confirmed COMMIT
 with a handler error keeps the existing `PostCommitError` contract.
 
-The native `Bun.SQL Query.cancel()` on the pinned Bun 1.4.0 did not confirm
-cancelling an already running query: six checks on PostgreSQL 17.11 left the query
-active after 1.5 seconds. `cancelled === true` alone does not prove cancellation.
+The native `Bun.SQL Query.cancel()` on Bun 1.4.0 did not confirm cancelling an
+already running query: six checks on PostgreSQL 17.11 left the query active after
+1.5 seconds. `cancelled === true` alone does not prove cancellation.
+On Bun 1.4.5, the pinned version since bazis 0.142.0, it does cancel (checked
+2026-11-21, PostgreSQL 17, plain TCP): `select pg_sleep(10)` cancelled after 300 ms
+rejected in 8 ms with `ERR_POSTGRES_SERVER_ERROR: canceling statement due to user
+request`, and the query was gone from `pg_stat_activity`. The same check on 1.4.0
+left the promise pending and the query active after three seconds. The ORM does not
+rely on it yet: it still cancels through a separate connection, as described next.
+Over TLS the native cancel was not checked.
 On leaving `transactionScope()` with an unfinished operation the ORM forbids COMMIT.
 If an unfinished PostgreSQL query remains, the ORM forbids further work on this
 reservation and calls `pg_cancel_backend` through a separate service Bun.SQL
@@ -185,8 +192,9 @@ and saves; reconcile the result through a new context. A lost COMMIT response ke
 `phase: "commit"`. There is no automatic retry.
 
 With an explicit `cancellationMode: "close"` the former policy of closing and
-checking that the backend is gone is kept. In this mode on Bun 1.4.0 **fast
-cancellation over TLS is not confirmed**: the connection-close Promise settles, but
+checking that the backend is gone is kept. In this mode on Bun 1.4.0 (not checked
+again on 1.4.5: it needs the TLS target) **fast cancellation over TLS is not
+confirmed**: the connection-close Promise settles, but
 SQL on the server may stay active. In a check of a 10-second query the backend stayed
 active after five seconds; the ORM returned an unknown outcome within its budget. With
 an explicitly configured server `statementTimeoutMs: 600` a separate check ended with

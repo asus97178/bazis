@@ -429,6 +429,8 @@ The own implementation does not claim to pass the full upstream conformance suit
 ## Checks
 
 Environment: the qualified Bun 1.4.0, macOS arm64; loopback without databases/containers.
+Since bazis 0.142.0 the pin is Bun 1.4.5: the module's tests, the TLS ones included, pass
+on it (2026-11-21); the table below is of the earlier run.
 The test HTTP/2 peer and the Echo protobuf codec are independent of the production codec:
 external gRPC/protobuf SDKs are not used even for checks.
 [Integration tests](test/grpc.integration.test.ts): four modes, metadata, private DI,
