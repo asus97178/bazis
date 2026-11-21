@@ -248,9 +248,8 @@ task/
       TaskListQuery.ts             the allowed surface of a list query
   background/                      hosted services / periodic handlers
   ui/                              @UiProfile declarations
-  ai/
-    tools/                         tools that call the module's services
-    contracts/                     inputs and outputs of AI adapters
+  tools/                           Tools that call the module's services (TOOLS-001)
+    contracts/                     inputs and outputs of the Tools
   events/                          events and their handlers, if needed
   config/                          configuration owned by the feature
   infra/                           application connectors and external clients
