@@ -9,7 +9,7 @@ executable.
 
 ## Requirements
 
-- **Bun 1.4.0 or newer. Node.js and Deno are not supported.** The package
+- **Bun 1.4.5 or newer. Node.js and Deno are not supported.** The package
   ships TypeScript sources with standard decorators and no build step; Bun
   runs them directly. Node.js refuses to load TypeScript from `node_modules`
   (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), and the runtime uses Bun

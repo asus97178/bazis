@@ -40,6 +40,10 @@ run("toolchain", [bun, "run", "toolchain:check"]);
 run("codegen", [bun, "run", "di:generate", "--target", "all"]);
 generatedIsCurrent();
 run("typecheck", [bun, "node_modules/typescript/bin/tsc", "--noEmit"]);
+// The type checker built into Bun (a port of the TypeScript 7 compiler) reads the
+// same tsconfig in a fraction of a second. It runs next to tsc, not instead of
+// it: tsc stays the authority, and a difference between the two is a finding.
+run("bun check", [bun, "check"]);
 run("tests", [bun, "run", "test"]);
 run("cli binary build", [bun, "run", "build:bin"]);
 

@@ -1,7 +1,7 @@
 # Running with the pinned Bun
 
 The version, revision, binary SHA-256 and qualified hosts are set in
-[bun.json](bun.json). The current version is Bun 1.4.0. The check neither installs
+[bun.json](bun.json). The current version is Bun 1.4.5. The check neither installs
 nor updates the runtime.
 
 | Host | What is pinned |
@@ -12,14 +12,33 @@ nor updates the runtime.
 On Linux the Bun copy is protected with mode 0500 in a private 0700 directory: there
 is no immutability flag available to a regular user there. The Linux archives were
 checked against the release's `SHASUMS256.txt`; the `SHASUMS256.txt.asc` signature
-was not verified. Linux qualification (2026-10-05): the full test suite in
-`debian:bookworm-slim` (arm64) and the `linux` job on GitHub-hosted `ubuntu-latest`
-(x64). The Codex and gRPC TLS tests need `python3` and `openssl` in the environment.
+was not verified. Qualification of Bun 1.4.5 (2026-11-21): the whole `ci` on macOS
+arm64, the full test suite in Debian bookworm (arm64) and the `linux` job on
+GitHub-hosted `ubuntu-latest` (x64). The Codex and gRPC TLS tests need `python3` and
+`openssl` in the environment.
+
+## Moving to a newer Bun
+
+1. Download `bun-darwin-aarch64.zip`, `bun-linux-aarch64.zip`, `bun-linux-x64.zip` and
+   `SHASUMS256.txt` of the release from `github.com/oven-sh/bun/releases` and compare
+   the archives with the checksums.
+2. In [bun.json](bun.json) set `version`, `revision` (`Bun.revision` of the new binary)
+   and the SHA-256 of each **binary inside** its archive. The version is also a literal
+   in [scripts/bun-toolchain-check.ts](../scripts/bun-toolchain-check.ts) and in the
+   download address of both jobs in `.github/workflows/ci.yml`.
+3. Set the same version of `@types/bun` in the root `package.json`, in both examples and
+   in the project template (`src/bazis/cli/generateProject.ts`); run `bun install` in the
+   root and in each example so the lockfiles follow.
+4. Qualify: `ci` on macOS, the full test suite on Linux arm64, the pull request's
+   `linux` job for x64, and the live PostgreSQL suites.
+5. The lowest Bun an application may run on is `engines.bun` of `src/bazis/package.json`.
+   Tests run only on the pinned version, so the two are kept equal: raise `engines`,
+   the texts that name the version and the `oven/bun` image in the Docker guide.
 
 Set the absolute path to an existing executable of this version. It must be the
 binary itself, not a symbolic link:
 
-The recommended permanent location is `~/.bazis/toolchain/bun-1.4.0/bun` (mode 0755:
+The recommended permanent location is `~/.bazis/toolchain/bun-1.4.5/bun` (mode 0755:
 with a read-only binary `bun build --compile` leaves `.bun-build` in the directory),
 and the variable goes into `~/.zshenv` so non-interactive shells see it too. Do not
 keep the binary in `/private/tmp`: macOS clears it on reboot.

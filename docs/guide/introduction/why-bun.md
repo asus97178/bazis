@@ -2,7 +2,7 @@
 
 **Bun нужен для разработки и сборки. На сервер можно отправить один исполняемый файл.**
 
-bazis работает на Bun 1.4.0 и новее. Node.js и Deno не поддерживаются, и это осознанное решение, а не временное ограничение. bazis использует одну среду выполнения, чтобы брать то, что в ней уже есть: HTTP-сервер, клиенты PostgreSQL и Redis, запуск TypeScript и сборку в бинарник. Поэтому у самого bazis нет сторонних npm-зависимостей, кроме TypeScript для проверки типов.
+bazis работает на Bun 1.4.5 и новее. Node.js и Deno не поддерживаются, и это осознанное решение, а не временное ограничение. bazis использует одну среду выполнения, чтобы брать то, что в ней уже есть: HTTP-сервер, клиенты PostgreSQL и Redis, запуск TypeScript и сборку в бинарник. Поэтому у самого bazis нет сторонних npm-зависимостей, кроме TypeScript для проверки типов.
 
 ## Всё нужное уже в Bun
 
@@ -41,12 +41,12 @@ bazis проверен на macOS arm64, Linux x64 и Linux arm64. Windows и д
 bun --version
 ```
 
-Минимальная версия указана в `engines` пакета. Перед каждой командой CLI проверяет версию запущенного Bun. Если она ниже 1.4.0, команда остановится и покажет версию и путь к исполняемому файлу:
+Минимальная версия указана в `engines` пакета. Перед каждой командой CLI проверяет версию запущенного Bun. Если она ниже 1.4.5, команда остановится и покажет версию и путь к исполняемому файлу:
 
 ```text
 ✖  FAILED  command failed
 [BUN] /Users/ann/.bun/bin/bun
-✖  bazis needs Bun 1.4.0 or newer; this is Bun 1.3.13.
+✖  bazis needs Bun 1.4.5 or newer; this is Bun 1.3.13.
 ➜  This Bun is /Users/ann/.bun/bin/bun. bunx bazis and bun run scripts start bazis with
    the first bun in PATH, not with the Bun that called them.
 ➜  Update that Bun: bun upgrade. Or put the newer Bun first in PATH.

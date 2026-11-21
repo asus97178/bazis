@@ -30,13 +30,22 @@ test("an older Bun stops a command before it runs, naming the Bun and the fix", 
   expect(r.calls).toHaveLength(0);
   // The panel wraps long lines; compare the text without its frame.
   const output = r.logs.join("\n").replace(/[│╭╮╰╯─]/g, " ").replace(/\s+/g, " ");
-  expect(output).toContain("bazis needs Bun 1.4.0 or newer; this is Bun 1.3.13.");
+  expect(output).toContain("bazis needs Bun 1.4.5 or newer; this is Bun 1.3.13.");
   expect(output).toContain("This Bun is /Users/ann/.bun/bin/bun. bunx bazis and bun run scripts start bazis with the first bun in PATH, not with the Bun that called them.");
   expect(output).toContain("Update that Bun: bun upgrade. Or put the newer Bun first in PATH.");
 });
 
+test("the Bun releases before the supported one are refused too", async () => {
+  // 1.4.0 to 1.4.4 lack the fixes the framework relies on: see toolchain/README.md.
+  for (const version of ["1.4.0", "1.4.4"]) {
+    const r = runtime({ version, path: "/usr/local/bin/bun" });
+    expect(await runCli(["codegen"], r.adapter)).toBe(1);
+    expect(r.calls).toHaveLength(0);
+  }
+});
+
 test("a supported Bun runs the command", async () => {
-  const r = runtime({ version: "1.4.0", path: "/usr/local/bin/bun" });
+  const r = runtime({ version: "1.4.5", path: "/usr/local/bin/bun" });
   expect(await runCli(["codegen"], r.adapter)).toBe(0);
   expect(r.calls).toHaveLength(1);
 });

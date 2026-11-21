@@ -1,7 +1,7 @@
 # From a new project to a binary
 
 bazis uses TypeScript, Bun, DI, DbContext and controllers with decorators.
-It runs on Bun 1.4.0 or newer only; Node.js and Deno are not supported.
+It runs on Bun 1.4.5 or newer only; Node.js and Deno are not supported.
 Codegen infers constructor dependencies and HTTP parameter bindings before the run.
 For a C# developer the closest familiar concepts are the DI scope, EF DbContext and
 ASP.NET controllers. ORM conditions in bazis are built with methods, without LINQ expression trees.
