@@ -57,7 +57,10 @@ src/app/modules/products/
 │   └── Products.service.ts         реализация
 └── http/
     ├── Products.controller.ts      HTTP API
-    └── contracts/                  модели запросов и ответов
+    └── contracts/
+        ├── Products.requests.ts    модели запросов: создание, изменение
+        ├── Products.responses.ts   модели ответов
+        └── ProductsList.query.ts   параметры списка: фильтры, сортировка, страницы
 ```
 
 Все части подключены в `@Module`:
