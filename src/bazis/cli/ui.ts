@@ -53,7 +53,7 @@ export function bazisVersion(): string {
   return typeof version === "string" ? version : "?";
 }
 
-/** The Bun range the package declares in `engines` (`>=1.4.0`). */
+/** The Bun range the package declares in `engines` (`>=1.4.5`). */
 export function requiredBun(): string | undefined {
   const range = bazisPackage()?.engines?.bun;
   return typeof range === "string" ? range : undefined;

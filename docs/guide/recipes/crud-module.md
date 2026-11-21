@@ -13,7 +13,7 @@
 
 ## 1. Проект и база
 
-Нужны Bun 1.4.0 или новее ([Установка](../introduction/installation.md)) и
+Нужны Bun 1.4.5 или новее ([Установка](../introduction/installation.md)) и
 PostgreSQL. Локальная база в Docker, `planner_test` — для тестов:
 
 ```sh

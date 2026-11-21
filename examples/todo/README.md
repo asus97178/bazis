@@ -13,7 +13,7 @@ binary.
 
 ## Run
 
-Needs Bun ≥ 1.4.0 and PostgreSQL (verified with 17; tables are created on
+Needs Bun ≥ 1.4.5 and PostgreSQL (verified with 17; tables are created on
 start by additive auto-migration).
 
 ```sh
