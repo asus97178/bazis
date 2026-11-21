@@ -117,7 +117,7 @@ Override of "ITaskStore" replaces nothing: no module registers it. Check the tok
 
 Обычная регистрация того же токена в тестовом модуле вместо `overrides` не
 сработает: в приложении одна реализация на токен, и
-[проверка инкапсуляции](../module/encapsulation.md#одна-реализация-на-токен)
+[проверка инкапсуляции](../module/modules/encapsulation.md#одна-реализация-на-токен)
 остановит сборку.
 
 ## Приложение целиком: `startTestApp`

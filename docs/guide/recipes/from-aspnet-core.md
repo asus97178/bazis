@@ -39,7 +39,7 @@
 | ASP.NET Core | bazis | Где читать |
 | --- | --- | --- |
 | `WebApplication.CreateBuilder` … `app.Run()` | `@App({ http })` | [Приложение](../application/application.md) |
-| `builder.Services.Add…` в `Program.cs` | `providers` модуля | [Модули](../module/modules.md) |
+| `builder.Services.Add…` в `Program.cs` | `providers` модуля | [Модули](../module/modules/modules.md) |
 | `AddSingleton` / `AddScoped` / `AddTransient` | `singleton` / `scoped` / `transient` | [Провайдеры](../module/services/providers.md#время-жизни) |
 | `AddSingleton<IService, Impl>()` | `singleton(IService, Impl)`, `IService` — абстрактный класс | [Провайдеры](../module/services/providers.md#регистрация-по-контракту) |
 | Keyed services, `IEnumerable<T>`, `Lazy<T>` | Ключи, несколько реализаций, ленивые зависимости | [Внедрение зависимостей](../module/services/dependency-injection.md) |

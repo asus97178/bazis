@@ -145,7 +145,7 @@ but does not export. Add it to the exports of "CatalogModule".
 
 Экспорт контекста открывает другому модулю **все** таблицы контекста.
 Часто лучше экспортировать сервис (`ProductsService`), а контекст оставить
-внутри модуля — см. [Инкапсуляцию](../encapsulation.md).
+внутри модуля — см. [Инкапсуляцию](../modules/encapsulation.md).
 
 ## `DbSet`
 

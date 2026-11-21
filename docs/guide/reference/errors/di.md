@@ -132,7 +132,7 @@ Module "BillingModule": "BillingService" depends on "TariffsRepository", which m
 
 - **Что сделать.** Добавьте `TariffsModule` в `imports` модуля
   `BillingModule`. Импорт в корневом модуле не делает сервис видимым
-  соседям ([Инкапсуляция](../../module/encapsulation.md)).
+  соседям ([Инкапсуляция](../../module/modules/encapsulation.md)).
 
 #### Module imports cycle
 

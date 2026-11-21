@@ -37,13 +37,15 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Коннекторы](application/infra/connectors.md) — PostgreSQL (`postgres`), Redis, OpenSearch, Codex; LLM-коннекторы — в разделе «AI-агенты»
 - ✅ [Свой коннектор](application/infra/custom-connector.md) — клиент, тип для внедрения, `InfraConnector`, конфигурация и секреты, сервис поверх клиента
 
-## 3. Модуль
+## 3. Модульная архитектура
 
-Всё, что можно положить в `@Module`: у каждого поля своя глава.
+Из чего собирается приложение: модули и всё, что можно положить в `@Module`. У каждого поля модуля своя глава.
 
-- ✅ [Модули](module/modules.md) — `@Module`, `imports` / `exports`, корневой `AppModule`
-- ✅ [Инкапсуляция модулей](module/encapsulation.md) — видимость, реэкспорт, одна реализация на токен, модули с параметрами
-- ✅ [Архитектура модулей](module/module-architecture.md) — атомарные и составные модули, создание через CLI, паспорт `MODULE.md`
+### Модули
+
+- ✅ [Модули](module/modules/modules.md) — `@Module`, `imports` / `exports`, корневой `AppModule`
+- ✅ [Архитектура модулей](module/modules/module-architecture.md) — атомарные и составные модули, создание через CLI, паспорт `MODULE.md`
+- ✅ [Инкапсуляция модулей](module/modules/encapsulation.md) — видимость, реэкспорт, одна реализация на токен, модули с параметрами
 
 ### Сервисы (providers)
 

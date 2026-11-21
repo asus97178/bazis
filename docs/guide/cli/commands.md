@@ -229,7 +229,7 @@ bunx bazis g module Discounts --empty --pack Catalog   # ещё одна час�
 
 Частей — не меньше двух, части создаются пустыми. Когда нужен атомарный
 модуль, а когда составной, — в главе
-[Архитектура модулей](../module/module-architecture.md).
+[Архитектура модулей](../module/modules/module-architecture.md).
 
 ## `bazis g process`
 
@@ -618,7 +618,7 @@ bunx bazis build --bin --platform linux-x64  # для другой платфо�
 ## Дальше
 
 - [Установка](../introduction/installation.md)
-- [Архитектура модулей](../module/module-architecture.md)
+- [Архитектура модулей](../module/modules/module-architecture.md)
 - [Кодогенерация](../application/codegen.md)
 - [Тестирование](../testing/testing.md)
 - [Конфигурация](../module/config/configuration.md)

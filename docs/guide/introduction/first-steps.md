@@ -495,7 +495,7 @@ BAZIS_ENV=development ./bin/my-app
 
 ## Что дальше
 
-- Каждое понятие подробно: [модули](../module/modules.md),
+- Каждое понятие подробно: [модули](../module/modules/modules.md),
   [провайдеры и DI](../module/services/providers.md),
   [контроллеры](../module/controllers/controllers.md), [ответы](../module/controllers/responses.md),
   [настройки](../module/config/configuration.md),
