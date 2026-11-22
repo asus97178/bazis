@@ -11,17 +11,18 @@
 
 ```mermaid
 flowchart LR
-  subgraph R["ReportModule · imports: ClockModule"]
+  subgraph R [ReportModule]
     RS[ReportService]
   end
-  subgraph C["ClockModule · exports: IClock"]
-    IC([IClock])
+  subgraph C [ClockModule]
+    IC[IClock]
     CC[ClockCache]
   end
-  RS -- "✔ IClock экспортирован" --> IC
-  RS -. "✘ ClockCache приватный" .-> CC
-  linkStyle 1 stroke:#d9534f,color:#d9534f
-  classDef private stroke-dasharray: 4 3
+  RS -->|"✔ можно"| IC
+  RS -.->|"✘ нельзя"| CC
+  linkStyle 0 stroke:#2e9e5b,stroke-width:2px,color:#2e9e5b
+  linkStyle 1 stroke:#d9534f,stroke-width:2px,color:#d9534f
+  classDef private stroke-dasharray:4 3
   class CC private
 ```
 
@@ -45,19 +46,20 @@ export class AppModule {}
 
 ```mermaid
 flowchart LR
-  subgraph A["AppModule · imports: ReportModule"]
+  subgraph A [AppModule]
     PS[PageService]
   end
-  subgraph R["ReportModule · imports: ClockModule · exports: ReportService"]
+  subgraph R [ReportModule]
     RS[ReportService]
   end
-  subgraph C["ClockModule · exports: IClock"]
-    IC([IClock])
+  subgraph C [ClockModule]
+    IC[IClock]
   end
-  PS -- "✔" --> RS
-  RS -- "✔" --> IC
-  PS -. "✘ ReportModule не отдаёт IClock дальше" .-> IC
-  linkStyle 2 stroke:#d9534f,color:#d9534f
+  PS -->|"✔ можно"| RS
+  RS -->|"✔ можно"| IC
+  PS -.->|"✘ нельзя"| IC
+  linkStyle 0,1 stroke:#2e9e5b,stroke-width:2px,color:#2e9e5b
+  linkStyle 2 stroke:#d9534f,stroke-width:2px,color:#d9534f
 ```
 
 `ReportService` может зависеть от `IClock`. А `PageService` из `AppModule` —
@@ -93,18 +95,19 @@ export class ReportModule {}
 
 ```mermaid
 flowchart LR
-  subgraph A["AppModule · imports: ReportModule"]
+  subgraph A [AppModule]
     PS[PageService]
   end
-  subgraph R["ReportModule · imports: ClockModule · exports: ReportService, IClock"]
+  subgraph R [ReportModule]
     RS[ReportService]
+    RX["IClock (реэкспорт)"]
   end
-  subgraph C["ClockModule · exports: IClock"]
-    IC([IClock])
+  subgraph C [ClockModule]
+    IC[IClock]
   end
-  PS -- "✔" --> RS
-  RS -- "✔" --> IC
-  PS -- "✔ ReportModule отдаёт IClock дальше" --> IC
+  PS -->|"✔ можно"| RX
+  RX -.-|"тот же IClock"| IC
+  linkStyle 0 stroke:#2e9e5b,stroke-width:2px,color:#2e9e5b
 ```
 
 Теперь `IClock` видят все, кто импортирует `ReportModule`. Реэкспортировать
