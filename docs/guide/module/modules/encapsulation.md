@@ -9,19 +9,26 @@
 
 ## Правило в одной картинке
 
-```text
-┌─────────────────────────┐            ┌─────────────────────────┐
-│ ReportModule            │  imports   │ ClockModule             │
-│                         │ ─────────▶ │                         │
-│ ReportService ──────────┼── нужен ──▶│ IClock     ◀── exports  │
-│                         │            │ ClockCache  (приватный) │
-└─────────────────────────┘            └─────────────────────────┘
+```mermaid
+flowchart LR
+  subgraph R["ReportModule · imports: ClockModule"]
+    RS[ReportService]
+  end
+  subgraph C["ClockModule · exports: IClock"]
+    IC([IClock])
+    CC[ClockCache]
+  end
+  RS -- "✔ IClock экспортирован" --> IC
+  RS -. "✘ ClockCache приватный" .-> CC
+  linkStyle 1 stroke:#d9534f,color:#d9534f
+  classDef private stroke-dasharray: 4 3
+  class CC private
 ```
 
 `ReportService` получит `IClock`: `ReportModule` импортирует `ClockModule`,
 а тот перечислил `IClock` в `exports`. `ClockCache` в `exports` нет, поэтому
-его не получит никто за пределами `ClockModule`. Уберите любую из двух
-стрелок, `imports` или `exports`, и приложение не запустится.
+его не получит никто за пределами `ClockModule`. Уберите `ClockModule` из
+`imports` или `IClock` из `exports`, и приложение не запустится.
 
 ## Видимость не передаётся по цепочке
 
@@ -36,18 +43,21 @@ export class ReportModule {}
 export class AppModule {}
 ```
 
-```text
-┌──────────────┐  imports  ┌──────────────────┐  imports  ┌──────────────┐
-│ AppModule    │ ────────▶ │ ReportModule     │ ────────▶ │ ClockModule  │
-│              │           │                  │           │              │
-│ PageService  │           │ ReportService    │           │ IClock       │
-│              │           │ exports:         │           │ exports:     │
-│              │           │  [ReportService] │           │  [IClock]    │
-└──────────────┘           └──────────────────┘           └──────────────┘
-
-ReportService → IClock         ✔  ReportModule импортирует ClockModule
-PageService   → ReportService  ✔  AppModule импортирует ReportModule
-PageService   → IClock         ✘  ReportModule не отдаёт IClock дальше
+```mermaid
+flowchart LR
+  subgraph A["AppModule · imports: ReportModule"]
+    PS[PageService]
+  end
+  subgraph R["ReportModule · imports: ClockModule · exports: ReportService"]
+    RS[ReportService]
+  end
+  subgraph C["ClockModule · exports: IClock"]
+    IC([IClock])
+  end
+  PS -- "✔" --> RS
+  RS -- "✔" --> IC
+  PS -. "✘ ReportModule не отдаёт IClock дальше" .-> IC
+  linkStyle 2 stroke:#d9534f,color:#d9534f
 ```
 
 `ReportService` может зависеть от `IClock`. А `PageService` из `AppModule` —
@@ -81,11 +91,20 @@ exports of "ReportModule".
 export class ReportModule {}
 ```
 
-```text
-AppModule ──imports──▶ ReportModule ──imports──▶ ClockModule
-                       exports: [ReportService, IClock]
-
-PageService → IClock   ✔  ReportModule отдаёт IClock дальше
+```mermaid
+flowchart LR
+  subgraph A["AppModule · imports: ReportModule"]
+    PS[PageService]
+  end
+  subgraph R["ReportModule · imports: ClockModule · exports: ReportService, IClock"]
+    RS[ReportService]
+  end
+  subgraph C["ClockModule · exports: IClock"]
+    IC([IClock])
+  end
+  PS -- "✔" --> RS
+  RS -- "✔" --> IC
+  PS -- "✔ ReportModule отдаёт IClock дальше" --> IC
 ```
 
 Теперь `IClock` видят все, кто импортирует `ReportModule`. Реэкспортировать
