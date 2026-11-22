@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 410" width="840" height="410" role="img" aria-label="TasksModule берёт у ProjectsModule только IProjectsService из exports; ProjectsRepository недоступен"><style>
+.bg{fill:#ffffff}
+.h{font:700 19px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#1d2433}
+.note{font:500 13px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#5b6478}
+.mod{fill:#f3f5fa;stroke:#8f9bb8;stroke-width:3}
+.title{font:600 16px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#3a4560}
+.svc{fill:#ffffff;stroke:#b4bdd3;stroke-width:1.5}
+.txt{font:500 14px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#263046}
+.door{fill:#dcf3e4;stroke:#2e9e5b;stroke-width:2.5}
+.doortxt{font:600 14px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#14532d}
+.priv{fill:#eceef2;stroke:#a0a6b0;stroke-width:1.5;stroke-dasharray:5 4}
+.privtxt{font:500 14px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#6b7280}
+.lock{fill:#9aa1ad}.lockarc{stroke:#9aa1ad;stroke-width:2.2;fill:none}
+.band{fill:#2e9e5b;fill-opacity:.10}
+.bandtxt{font:700 12px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2e9e5b;letter-spacing:.08em}
+.mute{font:700 12px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#7b86a3;letter-spacing:.08em}
+.imp{stroke:#b4bdd3;stroke-width:6;fill:none}.impfill{fill:#b4bdd3}
+.ok{stroke:#2e9e5b;stroke-width:3;fill:none}.okfill{fill:#2e9e5b}
+.oktxt{font:600 14px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#2e9e5b}
+.no{stroke:#d9534f;stroke-width:3;fill:none;stroke-dasharray:7 5}.nofill{fill:#d9534f}
+.notxt{font:600 14px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;fill:#d9534f}
+.link{stroke:#2e9e5b;stroke-width:2;fill:none;stroke-dasharray:3 4}
+.white{stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sep{stroke:#e2e6ee;stroke-width:1}
+@media (prefers-color-scheme: dark){
+.bg{fill:#161b1a}.h{fill:#eef2f8}.note{fill:#9aa3b5}
+.mod{fill:#20262b;stroke:#5d6880}.title{fill:#c9d1e3}
+.svc{fill:#2a3138;stroke:#4b5567}.txt{fill:#e3e8f2}
+.door{fill:#173d27;stroke:#3fbf73}.doortxt{fill:#bff0d1}
+.priv{fill:#262a30;stroke:#5b6170}.privtxt{fill:#8b93a1}
+.lock{fill:#6b7280}.lockarc{stroke:#6b7280}
+.band{fill:#3fbf73;fill-opacity:.12}.bandtxt{fill:#3fbf73}.mute{fill:#8a94ab}
+.imp{stroke:#4a5466}.impfill{fill:#4a5466}
+.ok{stroke:#3fbf73}.okfill{fill:#3fbf73}.oktxt{fill:#3fbf73}.link{stroke:#3fbf73}
+.no{stroke:#ef6b66}.nofill{fill:#ef6b66}.notxt{fill:#ef6b66}
+.white{stroke:#161b1a}.sep{stroke:#2c333b}
+}
+</style><rect class="bg" width="840" height="410" rx="12"/><text class="h" x="30" y="42" text-anchor="start">Что модуль может взять у другого модуля</text><text class="note" x="30" y="66" text-anchor="start">Только то, что тот модуль выставил наружу через exports, и только если вы его импортировали.</text><rect class="mod" x="30" y="100" width="250" height="230" rx="16"/><text class="title" x="46" y="126" text-anchor="start">TasksModule</text><rect class="svc" x="80.0" y="185" width="150" height="40" rx="9"/><text class="txt" x="155" y="210" text-anchor="middle">TasksService</text><rect class="mod" x="450" y="100" width="360" height="230" rx="16"/><text class="title" x="466" y="126" text-anchor="start">ProjectsModule</text><path class="imp" d="M280 135 H 438"/><path class="impfill" d="M450 135 l-14 -9 v18 z"/><text class="mute" x="365.0" y="124" text-anchor="middle">IMPORTS</text><rect class="band" x="452" y="160" width="172" height="160"/><text class="bandtxt" x="538.0" y="310" text-anchor="middle">EXPORTS</text><text class="mute" x="717" y="312" text-anchor="middle">ВНУТРЕННЕЕ</text><rect class="door" x="462.0" y="170" width="152" height="40" rx="9"/><text class="doortxt" x="538" y="195" text-anchor="middle">IProjectsService</text><rect class="priv" x="631.0" y="230" width="172" height="40" rx="9"/><rect class="lock" x="642.0" y="247" width="14" height="11" rx="2"/><path class="lockarc" d="M644.5 247 v-4 a4.5 4.5 0 0 1 9 0 v4"/><text class="privtxt" x="729" y="255" text-anchor="middle">ProjectsRepository</text><path class="ok" d="M230 195 C 341.0 195, 341.0 190, 452 190"/><path class="okfill" d="M462 190 l-12 -7 v14 z"/><circle class="okfill" cx="346.0" cy="192.5" r="13"/><path class="white" d="M340.0 192.5 l4 4.5 l8 -9"/><text class="oktxt" x="346.0" y="172.5" text-anchor="middle">можно</text><path class="no" d="M230 220 C 334.0 220, 334.0 262, 438 262"/><circle class="nofill" cx="452" cy="262" r="13"/><path class="white" d="M447 257 l10 10 M457 257 l-10 10"/><text class="notxt" x="341.0" y="271.0" text-anchor="middle">нельзя</text><line class="sep" x1="30" y1="354" x2="810" y2="354"/><rect class="door" x="42" y="366" width="32" height="32" rx="8"/><text class="note" x="86" y="387" text-anchor="start">в exports: видно другим модулям</text><rect class="priv" x="342" y="366" width="32" height="32" rx="8"/><rect class="lock" x="351" y="379" width="14" height="11" rx="2"/><path class="lockarc" d="M353.5 379 v-4 a4.5 4.5 0 0 1 9 0 v4"/><text class="note" x="386" y="387" text-anchor="start">не в exports: видно только внутри модуля</text></svg>
