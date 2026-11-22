@@ -5,80 +5,49 @@
 а `A` отдаёт этот сервис в `exports`. Здесь — правила подробнее и случаи,
 на которых обычно спотыкаются.
 
-Все примеры проверены на bazis 0.108.0.
+Все примеры проверены на bazis 0.142.0.
 
 ## Правило в одной картинке
 
-```mermaid
-flowchart LR
-  subgraph R [ReportModule]
-    RS[ReportService]
-  end
-  subgraph C [ClockModule]
-    IC[IClock]
-    CC[ClockCache]
-  end
-  RS -->|"✔ можно"| IC
-  RS -.->|"✘ нельзя"| CC
-  linkStyle 0 stroke:#2e9e5b,stroke-width:2px,color:#2e9e5b
-  linkStyle 1 stroke:#d9534f,stroke-width:2px,color:#d9534f
-  classDef private stroke-dasharray:4 3
-  class CC private
-```
+![TasksModule берёт у ProjectsModule только то, что стоит в exports](img/encapsulation-rule.svg)
 
-`ReportService` получит `IClock`: `ReportModule` импортирует `ClockModule`,
-а тот перечислил `IClock` в `exports`. `ClockCache` в `exports` нет, поэтому
-его не получит никто за пределами `ClockModule`. Уберите `ClockModule` из
-`imports` или `IClock` из `exports`, и приложение не запустится.
+`TasksService` получит `IProjectsService`: `TasksModule` импортирует `ProjectsModule`,
+а тот перечислил `IProjectsService` в `exports`. `ProjectsRepository` в `exports` нет, поэтому
+его не получит никто за пределами `ProjectsModule`. Уберите `ProjectsModule` из
+`imports` или `IProjectsService` из `exports`, и приложение не запустится.
 
 ## Видимость не передаётся по цепочке
 
 ```ts
-@Module({ providers: [scoped(IClock, SystemClock)], exports: [IClock] })
-export class ClockModule {}
+@Module({ providers: [scoped(IProjectsService, ProjectsService)], exports: [IProjectsService] })
+export class ProjectsModule {}
 
-@Module({ imports: [ClockModule], providers: [scoped(ReportService)], exports: [ReportService] })
-export class ReportModule {}
+@Module({ imports: [ProjectsModule], providers: [scoped(TasksService)], exports: [TasksService] })
+export class TasksModule {}
 
-@Module({ imports: [ReportModule], providers: [scoped(PageService)], exports: [] })
+@Module({ imports: [TasksModule], providers: [scoped(DashboardService)], exports: [] })
 export class AppModule {}
 ```
 
-```mermaid
-flowchart LR
-  subgraph A [AppModule]
-    PS[PageService]
-  end
-  subgraph R [ReportModule]
-    RS[ReportService]
-  end
-  subgraph C [ClockModule]
-    IC[IClock]
-  end
-  PS -->|"✔ можно"| RS
-  RS -->|"✔ можно"| IC
-  PS -.->|"✘ нельзя"| IC
-  linkStyle 0,1 stroke:#2e9e5b,stroke-width:2px,color:#2e9e5b
-  linkStyle 2 stroke:#d9534f,stroke-width:2px,color:#d9534f
-```
+![Доступ не передаётся по цепочке AppModule → TasksModule → ProjectsModule](img/encapsulation-chain.svg)
 
-`ReportService` может зависеть от `IClock`. А `PageService` из `AppModule` —
-нет, хотя `AppModule` импортирует `ReportModule`, а тот — `ClockModule`:
+`TasksService` может зависеть от `IProjectsService`. А `DashboardService` из `AppModule` —
+нет, хотя `AppModule` импортирует `TasksModule`, а тот — `ProjectsModule`:
 
 ```text
 Module encapsulation violated:
-Module "AppModule": "PageService" depends on "IClock", which its import "ReportModule" receives from
-"ClockModule" but does not export. Add "ClockModule" to the imports of "AppModule", or add it to the
-exports of "ReportModule".
+Module "AppModule": "DashboardService" depends on "IProjectsService", which its import "TasksModule" receives
+from "ProjectsModule" but does not export. Add "ProjectsModule" to the imports of "AppModule", or add it to the
+exports of "TasksModule".
 ```
 
 Выхода два, и сообщение называет оба:
 
-- импортировать `ClockModule` в `AppModule` — модуль перечисляет в
+- импортировать `ProjectsModule` в `AppModule` — модуль перечисляет в
   `imports` всё, чем пользуется сам, и по объявлению видно, от чего он
   зависит;
-- или [реэкспортировать](#реэкспорт) `IClock` из `ReportModule` — если
-  `IClock` действительно часть того, что `ReportModule` отдаёт наружу.
+- или [реэкспортировать](#реэкспорт) `IProjectsService` из `TasksModule` — если
+  `IProjectsService` действительно часть того, что `TasksModule` отдаёт наружу.
 
 > [!NOTE]
 > Оба выхода в сообщении — с версии 0.109.0. Раньше оно предлагало только
@@ -89,40 +58,25 @@ exports of "ReportModule".
 Модуль может отдать дальше токен, который сам импортировал:
 
 ```ts
-@Module({ imports: [ClockModule], providers: [scoped(ReportService)], exports: [ReportService, IClock] })
-export class ReportModule {}
+@Module({ imports: [ProjectsModule], providers: [scoped(TasksService)], exports: [TasksService, IProjectsService] })
+export class TasksModule {}
 ```
 
-```mermaid
-flowchart LR
-  subgraph A [AppModule]
-    PS[PageService]
-  end
-  subgraph R [ReportModule]
-    RS[ReportService]
-    RX["IClock (реэкспорт)"]
-  end
-  subgraph C [ClockModule]
-    IC[IClock]
-  end
-  PS -->|"✔ можно"| RX
-  RX -.-|"тот же IClock"| IC
-  linkStyle 0 stroke:#2e9e5b,stroke-width:2px,color:#2e9e5b
-```
+![Реэкспорт: TasksModule передаёт IProjectsService дальше](img/encapsulation-reexport.svg)
 
-Теперь `IClock` видят все, кто импортирует `ReportModule`. Реэкспортировать
+Теперь `IProjectsService` видят все, кто импортирует `TasksModule`. Реэкспортировать
 модуль целиком нельзя: в `exports` перечисляются только токены и классы.
 
 Отдать то, чего у модуля нет, тоже нельзя:
 
 ```text
 Module encapsulation violated:
-Module "Empty" exports "IClock" which it neither provides nor imports.
+Module "Empty" exports "IProjectsService" which it neither provides nor imports.
 ```
 
 ## Общий модуль у нескольких
 
-Если `ClockModule` импортируют два модуля, сервис создаётся один раз: оба
+Если `ProjectsModule` импортируют два модуля, сервис создаётся один раз: оба
 получают один и тот же экземпляр singleton. Повторные импорты и «ромбы» в
 графе модулей — обычное дело.
 
@@ -135,24 +89,25 @@ Module "Empty" exports "IClock" which it neither provides nor imports.
 Так можно подменить реализацию из чужого модуля:
 
 ```ts
-@Module({ providers: [scoped(IClock, SystemClock)], exports: [IClock] })
-export class ClockModule {}
+@Module({ providers: [scoped(IProjectsService, ProjectsService)], exports: [IProjectsService] })
+export class ProjectsModule {}
 
-@Module({ imports: [ClockModule], providers: [scoped(IClock, FixedClock), scoped(PageService)], exports: [] })
+@Module({ imports: [ProjectsModule], providers: [scoped(IProjectsService, DemoProjectsService), scoped(DashboardService)], exports: [] })
 export class AppModule {}
-// PageService получает FixedClock
+// DashboardService получает DemoProjectsService
 ```
 
-Но если исходный модуль сам пользуется этим токеном, подмена ломает его:
-сервисы `ClockModule` получили бы реализацию из `AppModule`, которую
-`ClockModule` не видит. Запуск останавливается:
+Но если исходный модуль сам пользуется этим токеном (скажем, в `ProjectsModule` есть
+`ProjectStats`, которому нужен `IProjectsService`), подмена ломает его:
+сервисы `ProjectsModule` получили бы реализацию из `AppModule`, которую
+`ProjectsModule` не видит. Запуск останавливается:
 
 ```text
 Module encapsulation violated:
-Module "ClockModule": "ReportService" depends on "IClock", but "IClock" is registered in "ClockModule"
-and "AppModule", and the application uses one implementation per token, the last registered one, from
-"AppModule", which "ClockModule" cannot see. Register "IClock" in one module, or give each
-implementation its own contract.
+Module "ProjectsModule": "ProjectStats" depends on "IProjectsService", but "IProjectsService" is registered in
+"ProjectsModule" and "AppModule", and the application uses one implementation per token, the last registered
+one, from "AppModule", which "ProjectsModule" cannot see. Register "IProjectsService" in one module, or give
+each implementation its own contract.
 ```
 
 Если разным частям приложения действительно нужны разные реализации,
@@ -176,7 +131,7 @@ implementation its own contract.
 
 ```text
 Service graph validation failed:
-Missing dependency "IClock" for "PageService"
+Missing dependency "IProjectsService" for "DashboardService"
 ```
 
 ## Модули с параметрами
@@ -185,14 +140,14 @@ Missing dependency "IClock" for "PageService"
 Это удобно, когда модулю нужны настройки:
 
 ```ts
-export function clockModule(options: { fixed: boolean }) {
+export function projectsModule(options: { demo: boolean }) {
   return {
-    providers: [singleton(IClock, options.fixed ? FixedClock : SystemClock)],
-    exports: [IClock],
+    providers: [singleton(IProjectsService, options.demo ? DemoProjectsService : ProjectsService)],
+    exports: [IProjectsService],
   };
 }
 
-@Module({ imports: [clockModule({ fixed: true })], providers: [scoped(PageService)], exports: [] })
+@Module({ imports: [projectsModule({ demo: true })], providers: [scoped(DashboardService)], exports: [] })
 export class AppModule {}
 ```
 
