@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { registerGeneratedClassDeps, restoreGeneratedClassDeps, snapshotGeneratedClassDeps, type GeneratedClassDependency } from "./di/module/autoDeps";
 import { registerGeneratedBindings, restoreGeneratedBindings, snapshotGeneratedBindings } from "./http/Binding/autoBindings";
@@ -128,8 +129,43 @@ export function loadBazisGeneratedRuntime(): Promise<void> {
 }
 
 async function loadRuntimeOnce(): Promise<void> {
-  const module = await importGeneratedModule<GeneratedRuntimeModule>("runtime");
+  const module = await importGeneratedModule<GeneratedRuntimeModule>(runtimeOfStartedTarget());
   await module?.registerBazisGeneratedRuntime?.();
+}
+
+const TARGET_NAME = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * The generated module of the target this process was started as. A project
+ * may have several entry points (`targets` in bazis.config.json), each with
+ * generated code of its own: the target whose entry point is the file Bun was
+ * started with is the one. Anything else — a test, a script, a project with
+ * one entry point — gets the default target.
+ */
+function runtimeOfStartedTarget(): string {
+  try {
+    const config = JSON.parse(readFileSync(path.join(process.cwd(), "bazis.config.json"), "utf8")) as {
+      readonly defaultTarget?: unknown;
+      readonly targets?: Readonly<Record<string, { readonly entrypoints?: unknown } | undefined>>;
+    };
+    for (const [name, target] of Object.entries(config.targets ?? {})) {
+      if (name === config.defaultTarget || !TARGET_NAME.test(name) || !Array.isArray(target?.entrypoints)) continue;
+      if (target.entrypoints.some((entry) => typeof entry === "string" && path.resolve(process.cwd(), entry) === Bun.main)) return `targets/${name}/runtime`;
+    }
+  } catch {
+    // No project configuration in the working directory: the default generated code, if there is any.
+  }
+  return "runtime";
+}
+
+/**
+ * Whether this is an executable that carries no generated code. A binary reads
+ * nothing from `src/generated` at start: its generated code is compiled in
+ * through the generated `executable.ts`, which `bazis build --bin` compiles.
+ * A binary compiled from the application's own entry point has none.
+ */
+export function executableLacksGeneratedCode(): boolean {
+  return isCompiledBinary() && explicitlyActivatedTargetIds.size === 0;
 }
 
 /**
@@ -140,10 +176,10 @@ async function loadRuntimeOnce(): Promise<void> {
  * `src/generated` next to its sources. Framework sources inside the project
  * (`src/bazis`) find the same directory either way.
  *
- * A compiled binary looks nowhere: its generated code is inside it and comes
- * through `registerBazisGeneratedRuntime()` of the entry point. Reading
- * `src/generated` of whatever directory the binary was started in would run
- * another project's code.
+ * A compiled binary looks nowhere: its generated code is inside it and is
+ * registered by the generated `executable.ts` before the application's entry
+ * point runs. Reading `src/generated` of whatever directory the binary was
+ * started in would run another project's code.
  */
 async function importGeneratedModule<T>(name: string): Promise<T | undefined> {
   if (isCompiledBinary()) return undefined;

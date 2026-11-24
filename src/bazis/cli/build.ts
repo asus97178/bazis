@@ -187,7 +187,7 @@ export async function runBuild(cwd: string, options: BuildOptions, codegen: Code
   s.section(t.section.binary);
   const stopCompile = s.progress(t.step.compile);
   const compileStarted = performance.now();
-  const compiled = await compileBinaryAsync(bun, await projectEntry(cwd), outfile, { dotenv: options.dotenv, platform: options.platform });
+  const compiled = await compileBinaryAsync(bun, await executableEntry(cwd), outfile, { dotenv: options.dotenv, platform: options.platform });
   stopCompile();
   const compileMs = formatDuration(performance.now() - compileStarted);
   const relative = path.relative(cwd, outfile);
@@ -291,6 +291,18 @@ async function projectEntry(cwd: string): Promise<string> {
   const entry = (config.targets?.[config.defaultTarget ?? ""]?.entrypoints as unknown[] | undefined)?.[0];
   if (typeof entry !== "string" || !entry) throw new Error("bazis.config.json has no entrypoint for its default target.");
   return path.resolve(cwd, entry);
+}
+
+/**
+ * What is compiled into the executable: the generated `executable.ts` of the
+ * default target. It registers the generated code and then runs the project's
+ * entry point, so the entry point itself is `await runApp(Application)` alone.
+ */
+async function executableEntry(cwd: string): Promise<string> {
+  await projectEntry(cwd);
+  const executable = path.join(cwd, "src/generated/bazis/executable.ts");
+  if (!existsSync(executable)) throw new Error("src/generated/bazis/executable.ts was not generated. Run: bunx bazis codegen");
+  return executable;
 }
 
 /** `bin/<name>`, or `bin/<name>-<platform>` for another platform, so the local build is kept. */

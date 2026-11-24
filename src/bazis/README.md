@@ -149,7 +149,6 @@ export class AppInfra {}
 export class Application {}
 
 // src/index.ts
-await registerBazisGeneratedRuntime();
 await runApp(Application);
 ```
 

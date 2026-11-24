@@ -65,7 +65,8 @@ describe("new project", () => {
     expect(manifest.scripts).toMatchObject({ codegen: "bazis codegen", dev: "bazis dev", build: "bazis build", "build:bin": "bazis build --bin" });
     expect(manifest.scripts.bazis).toBeUndefined();
     expect(await readFile(path.join(outputPath, "docs/architecture/MODULE_ARCHITECTURE.md"), "utf8")).toContain("atomic module");
-    expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toContain("registerBazisGeneratedRuntime");
+    // The entry point runs the application and nothing else: runApp connects the generated code.
+    expect(await readFile(path.join(outputPath, "src/index.ts"), "utf8")).toBe('import { runApp } from "bazis/core/app";\nimport { Application } from "./app/App";\n\nawait runApp(Application);\n');
     expect((await readFile(path.join(outputPath, ".gitignore"), "utf8")).split("\n")).toEqual(expect.arrayContaining([".env", ".env.*", "!.env.example"]));
     await expect(generateProject(options)).rejects.toThrow("already exists");
     await expect(generateProject({ name: "Bad", outputPath: path.join(root, "bad"), frameworkPath: root })).rejects.toThrow("Local Bazis package not found");

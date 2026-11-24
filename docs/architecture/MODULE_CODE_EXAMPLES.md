@@ -544,9 +544,7 @@ export class TaskExampleApp {}
 // file: src/task-example.ts
 import { runApp } from "bazis";
 import { TaskExampleApp } from "./app/TaskExampleApp";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
-await registerBazisGeneratedRuntime();
 await runApp(TaskExampleApp);
 ```
 

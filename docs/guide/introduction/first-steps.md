@@ -91,16 +91,12 @@ Bun читает `.env` сам. Собранный для сервера фай�
 ```ts
 import { runApp } from "bazis/core/app";
 import { Application } from "./app/App";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
-await registerBazisGeneratedRuntime();
 await runApp(Application);
 ```
 
-Здесь две строки:
-
-- `registerBazisGeneratedRuntime()` подключает код из папки `src/generated/`.
-- `runApp(Application)` запускает объявленное приложение.
+Одна строка: `runApp(Application)` подключает код из папки `src/generated/`
+и запускает объявленное приложение.
 
 > **Что за папка `src/generated/`?** Её создаёт сам bazis при каждом запуске.
 > Там записано, какой класс от какого зависит. Руками её не меняют: при

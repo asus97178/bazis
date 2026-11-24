@@ -89,7 +89,8 @@ older than this controller. Run `bazis codegen` (bazis dev, bazis test and bazis
 | `permissions.ts` | Ключи прав модулей как тип для `can` и `defineRoles`; только если права объявлены ([Права](../module/access.md#ключи-проверяет-компилятор)) |
 | `agentCatalog.ts` | Описания AI-инструментов |
 | `fingerprint.ts` | Отпечаток исходников — для предупреждения об устаревании |
-| `runtime.ts` | `registerBazisGeneratedRuntime()` — подключает всё остальное |
+| `runtime.ts` | Подключает всё остальное; его вызывает `runApp` |
+| `executable.ts` | Точка входа исполняемого файла: её компилирует `bazis build --bin` ([как подключается код](#как-подключается-сгенерированный-код)) |
 
 Папку `src/generated` руками не правят: её содержимое целиком выводится из
 исходников и перезаписывается при каждом `bazis dev`, `bazis test` и
@@ -138,16 +139,44 @@ Codegen разбирает только файлы, до которых можн
 ```
 
 Результат цели по умолчанию лежит в `src/generated/bazis`, остальных — в
-`src/generated/bazis/targets/<имя>`. Точка входа подключает свой вариант:
+`src/generated/bazis/targets/<имя>`. Точка входа любой цели выглядит
+одинаково:
 
 ```ts
 // src/worker.ts
 import { runApp } from "bazis/core/app";
 import { Worker } from "./app/Worker";   // @App({ modules: [WorkerModule], infra: AppInfra })
-import { registerBazisGeneratedRuntime } from "./generated/bazis/targets/worker/runtime";
 
-await registerBazisGeneratedRuntime();
 await runApp(Worker);
+```
+
+## Как подключается сгенерированный код
+
+Подключать `src/generated` вручную не нужно: это делает `runApp`.
+
+| Как запущено приложение | Откуда берётся сгенерированный код |
+| --- | --- |
+| Из исходников: `bazis dev`, `bun src/index.ts` | `runApp` читает `src/generated/bazis` из текущей папки. Какую цель взять, он определяет по файлу, с которого запущен Bun: если это точка входа цели `worker` — её вариант, иначе цель по умолчанию |
+| Тесты: `bazis test`, `startTestApp` | Цель по умолчанию |
+| Исполняемый файл: `bazis build --bin` | Код вшит в файл. Компилируется не `src/index.ts`, а сгенерированный `executable.ts`: он подключает код и затем запускает вашу точку входа |
+
+Исполняемый файл ничего не читает из папки, в которой запущен: иначе он
+выполнил бы чужой `src/generated`. Поэтому собирать его надо через
+`bazis build --bin`. `bazis build --bin` собирает цель по умолчанию; другую
+цель скомпилируйте сами из её `executable.ts`:
+
+```sh
+bun build --compile src/generated/bazis/targets/worker/executable.ts --outfile bin/worker
+```
+
+Если скомпилировать саму точку входа (`bun build --compile src/index.ts`),
+файл соберётся, но при запуске остановится с объяснением:
+
+```text
+[bazis] configuration error: This executable was compiled without the code `bazis codegen`
+generates, so it cannot start. Build it with `bazis build --bin`; to compile by hand, give
+`bun build --compile` the generated `src/generated/bazis/executable.ts` instead of the
+application's entry point.
 ```
 
 ## Ошибки codegen

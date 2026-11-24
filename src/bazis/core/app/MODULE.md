@@ -1,6 +1,6 @@
 # Application composition
 
-Passport version: 1.2. Date: 2026-11-11. Type: existing technical composition module.
+Passport version: 1.3. Date: 2026-11-25. Type: existing technical composition module.
 Path: `src/bazis/core/app`. Entry point: [runApp.ts](runApp.ts).
 Scope: the application declaration `@App` (0.138.0) and `AppSettings.grpc`; the other
 HTTP/UI/infra options are described in the source contracts. The module existed before
@@ -16,7 +16,6 @@ The application is declared once, by a class marked `@App(options)`:
 export class Application {}
 
 // src/index.ts
-await registerBazisGeneratedRuntime();
 await runApp(Application);
 ```
 
@@ -36,9 +35,21 @@ await runApp(Application);
   otherwise; production listens on `0.0.0.0`. `port`/`hostname` in `@App({ http })`
   still pin the value in code. An application's own config section named `http`
   conflicts with the built-in one.
-- A compiled binary gets its generated code only through
-  `registerBazisGeneratedRuntime()` in the entry point; it does not load `src/generated`
-  of the directory it was started in.
+- `runApp` connects the generated code itself (v1.3); an entry point is
+  `await runApp(Application)` alone.
+  - From sources it loads `src/generated/bazis` of the working directory. Of several
+    targets (`bazis.config.json`) it takes the one whose entry point is the file Bun was
+    started with (`Bun.main`): `targets/<name>` for another target, the default one for
+    anything else — a test, a script.
+  - A compiled binary does not load `src/generated` of the directory it was started in:
+    that would run another project's code. Its generated code is compiled in through the
+    generated `executable.ts` of the target (it registers the code, then imports the
+    entry point); `bazis build --bin` compiles that file.
+  - A binary compiled from the entry point itself has no generated code: `runApp` stops
+    with a configuration error that names `bazis build --bin` and `executable.ts`.
+  - `registerBazisGeneratedRuntime()` of the generated `runtime.ts` stays callable and
+    idempotent: an entry point that still calls it works as before.
+  Check: [run-app-generated.integration.test.ts](../scripts/test/run-app-generated.integration.test.ts).
 
 ## gRPC
 
