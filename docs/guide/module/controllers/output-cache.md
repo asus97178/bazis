@@ -154,7 +154,7 @@ unlessAuthenticated — responses may leak between users. Add varyByUser: true o
 персональный ответ нельзя отдавать в CDN.
 
 Персональные данные надёжнее кэшировать в сервисе через `@Cacheable` с
-явным ключом — об этом глава [Кэширование](../../application/caching.md).
+явным ключом — об этом глава [Кэширование](../../infra/caching.md).
 
 ## Именованные политики
 
@@ -216,7 +216,7 @@ featured() { ... }
 ограничивает `maxEntries` — при переполнении удаляются самые давно не
 использованные записи. Общий кэш для нескольких экземпляров —
 `@OutputRedisCache` с Redis: подключение Redis и поведение при его
-недоступности — в главе [Кэширование](../../application/caching.md#общий-кэш-в-redis-cacheableredis).
+недоступности — в главе [Кэширование](../../infra/caching.md#общий-кэш-в-redis-cacheableredis).
 
 `@OutputRedisCache` нужен только Redis с `cache: "distributed"` в `@Infra`,
 модуль `memory()` для него не обязателен. Без такого подключения
@@ -233,6 +233,6 @@ featured() { ... }
 
 ## Дальше
 
-- [Ограничение частоты запросов](../../application/rate-limit.md)
+- [Ограничение частоты запросов](../../security/rate-limit.md)
 - [Авторизация](authorization.md)
 - [HTTP-клиент](../http-client.md)

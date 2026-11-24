@@ -242,6 +242,6 @@ const { data } = await api.get<Order[]>("/orders", { params: { page: 2 } });
 
 ## Дальше
 
-- [Логирование и correlation id](../application/logging.md)
+- [Логирование и correlation id](../deployment/logging.md)
 - [Обработка ошибок](controllers/errors.md)
 - [Тестирование](../testing/testing.md) — подмена зависимостей в тестах

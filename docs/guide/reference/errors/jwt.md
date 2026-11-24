@@ -5,7 +5,7 @@
 
 Ошибка проверки токена в `@Authorize` становится ответом **`401
 Unauthorized`** с заголовком `WWW-Authenticate: Bearer`; текст ошибки
-клиенту не уходит ([JWT](../../application/jwt.md#проверка-в-authorize)).
+клиенту не уходит ([JWT](../../security/jwt.md#проверка-в-authorize)).
 
 | Класс | Текст | Когда |
 | --- | --- | --- |
@@ -32,9 +32,9 @@ RangeError: HS256 secret must be at least 32 bytes
 [bazis] application failed: TypeError: RS256 privateKeyPem is a PKCS#1 key (BEGIN RSA PRIVATE KEY); convert it to PKCS#8: openssl pkcs8 -topk8 -nocrypt -in key.pem -out key-pkcs8.pem
 ```
 
-Подробно — в главе [JWT](../../application/jwt.md#ключи).
+Подробно — в главе [JWT](../../security/jwt.md#ключи).
 
 ## Дальше
 
-- [JWT](../../application/jwt.md)
+- [JWT](../../security/jwt.md)
 - [Авторизация](../../module/controllers/authorization.md)

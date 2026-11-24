@@ -329,7 +329,7 @@ bunx bazis codegen --target all      # все цели bazis.config.json
   ╰──────────────────────────────────────────────────────────────────────────╯
 ```
 
-Коды ошибок и цели — в главе [Кодогенерация](../application/codegen.md).
+Коды ошибок и цели — в главе [Кодогенерация](../startup/codegen.md).
 
 ## `bazis dev`
 
@@ -619,6 +619,6 @@ bunx bazis build --bin --platform linux-x64  # для другой платфо�
 
 - [Установка](../introduction/installation.md)
 - [Архитектура модулей](../module/modules/module-architecture.md)
-- [Кодогенерация](../application/codegen.md)
+- [Кодогенерация](../startup/codegen.md)
 - [Тестирование](../testing/testing.md)
 - [Конфигурация](../module/config/configuration.md)

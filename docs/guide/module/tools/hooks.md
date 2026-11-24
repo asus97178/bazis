@@ -282,4 +282,4 @@ Required Agent Tool hook "enforcement:compliance@1" is not contributed by its ex
 
 - [Агенты](../../agents/agents.md)
 - [Инструменты](tools.md)
-- [Логирование](../../application/logging.md)
+- [Логирование](../../deployment/logging.md)

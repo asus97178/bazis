@@ -241,7 +241,7 @@ export class UsersGrpcController {
 
 Проверки выполняются до чтения запроса и до создания контроллера, так что
 отклонённый вызов не тратит ресурсы на разбор сообщения. `anyOf` работает
-так же, как в HTTP ([Шаблоны авторизации](../application/authorization-patterns.md#или-anyof)).
+так же, как в HTTP ([Шаблоны авторизации](../security/authorization-patterns.md#или-anyof)).
 
 > [!NOTE]
 > `@Authorize` для gRPC — с версии 0.98.32. В той же версии проверка
@@ -408,6 +408,6 @@ try {
 ## Дальше
 
 - [Авторизация](controllers/authorization.md)
-- [Шаблоны авторизации](../application/authorization-patterns.md)
+- [Шаблоны авторизации](../security/authorization-patterns.md)
 - [HTTP-клиент](http-client.md)
 - [Модели запросов и валидация](controllers/validation.md)

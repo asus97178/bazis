@@ -38,7 +38,7 @@
 
 | ASP.NET Core | bazis | Где читать |
 | --- | --- | --- |
-| `WebApplication.CreateBuilder` … `app.Run()` | `@App({ http })` | [Приложение](../application/application.md) |
+| `WebApplication.CreateBuilder` … `app.Run()` | `@App({ http })` | [Приложение](../startup/application.md) |
 | `builder.Services.Add…` в `Program.cs` | `providers` модуля | [Модули](../module/modules/modules.md) |
 | `AddSingleton` / `AddScoped` / `AddTransient` | `singleton` / `scoped` / `transient` | [Провайдеры](../module/services/providers.md#время-жизни) |
 | `AddSingleton<IService, Impl>()` | `singleton(IService, Impl)`, `IService` — абстрактный класс | [Провайдеры](../module/services/providers.md#регистрация-по-контракту) |
@@ -62,15 +62,15 @@
 | Action filters | `@ActionFilter` | [Фильтры действий](../module/controllers/middleware.md#фильтры-действий) |
 | `UseExceptionHandler`, exception filters | Middleware, переводящий ошибку в `HttpError` | [Ошибки](../module/controllers/errors.md#доменные-ошибки) |
 | `[Authorize(Policy = …)]`, `IAuthorizationFilter` | `@Authorize(check)` | [Авторизация](../module/controllers/authorization.md) |
-| JWT Bearer | `bazis/library/jwt` + `bearerToken` | [JWT](../application/jwt.md) |
-| `IHostedService.StartAsync` | `LifecycleHook.onInit` | [Жизненный цикл](../application/lifecycle.md#хуки-жизненного-цикла) |
-| `BackgroundService.ExecuteAsync` | `BackgroundService.execute` в поле `background` модуля | [Жизненный цикл](../application/lifecycle.md#фоновые-службы) |
+| JWT Bearer | `bazis/library/jwt` + `bearerToken` | [JWT](../security/jwt.md) |
+| `IHostedService.StartAsync` | `LifecycleHook.onInit` | [Жизненный цикл](../startup/lifecycle.md#хуки-жизненного-цикла) |
+| `BackgroundService.ExecuteAsync` | `BackgroundService.execute` в поле `background` модуля | [Жизненный цикл](../startup/lifecycle.md#фоновые-службы) |
 | `PeriodicTimer` в фоновой службе | `PeriodicBackgroundService` | [Фоновые службы](../module/background-services.md) |
-| `CancellationToken` | `AbortSignal` | [Жизненный цикл](../application/lifecycle.md#отмена) |
-| `ILogger<T>` | `Logger` | [Журнал](../application/logging.md) |
-| `AddHealthChecks`, `IHealthCheck` | `health: true`, `HEALTH_CHECK` | [Health](../application/health-checks.md) |
+| `CancellationToken` | `AbortSignal` | [Жизненный цикл](../startup/lifecycle.md#отмена) |
+| `ILogger<T>` | `Logger` | [Журнал](../deployment/logging.md) |
+| `AddHealthChecks`, `IHealthCheck` | `health: true`, `HEALTH_CHECK` | [Health](../deployment/health-checks.md) |
 | `[OutputCache]` | `@OutputCache` | [Кэш ответов](../module/controllers/output-cache.md) |
-| `AddRateLimiter` | `rateLimit` | [Ограничение частоты](../application/rate-limit.md) |
+| `AddRateLimiter` | `rateLimit` | [Ограничение частоты](../security/rate-limit.md) |
 | `Asp.Versioning` | `@ApiVersion` | [Версии API](../module/controllers/versioning.md) |
 | `IHttpClientFactory` | `HttpClient` из `bazis/core/http-client` | [HTTP-клиент](../module/http-client.md) |
 | SignalR | WebSocket-шлюз | [WebSocket](../module/websocket.md) |
@@ -390,7 +390,7 @@ export class WarmUp implements LifecycleHook {
 
 Долгая работа на всё время жизни приложения, как `BackgroundService`,
 оформляется так же: наследник `BackgroundService` с методом `execute(signal)`
-в поле `background` модуля ([Жизненный цикл](../application/lifecycle.md#фоновые-службы)).
+в поле `background` модуля ([Жизненный цикл](../startup/lifecycle.md#фоновые-службы)).
 
 ### Захваченная зависимость
 

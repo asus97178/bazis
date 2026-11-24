@@ -146,7 +146,7 @@ export class Application {}
 источников, preflight-запрос `OPTIONS` получает `204`. Настройки CORS:
 `origin` (строка, список или функция), `methods`, `allowedHeaders`,
 `exposedHeaders`, `credentials`, `maxAgeSeconds`. Подробнее — в главе
-[CORS, заголовки безопасности, журнал запросов](../../application/cors-headers-log.md).
+[CORS, заголовки безопасности, журнал запросов](../../security/cors-headers-log.md).
 
 Строка журнала на каждый запрос:
 
@@ -179,7 +179,7 @@ rateLimit({ windowMs: 60_000, max: 100, keyOf: (ctx) => ctx.header("x-api-key") 
 
 Счётчики живут в памяти процесса. Если приложение запущено в нескольких
 экземплярах, у каждого свой лимит. Подробнее — в главе
-[Ограничение частоты запросов](../../application/rate-limit.md).
+[Ограничение частоты запросов](../../security/rate-limit.md).
 
 ## Дальше
 

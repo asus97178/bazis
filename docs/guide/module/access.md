@@ -464,5 +464,5 @@ const access = scope.resolve(IAccess).as({ sub: "user:7" }, scope);
 
 ## Дальше
 
-- [Шаблоны авторизации](../application/authorization-patterns.md) — проверки входа, `anyOf`, ключи API
+- [Шаблоны авторизации](../security/authorization-patterns.md) — проверки входа, `anyOf`, ключи API
 - [Спецификация ACCESS-001](../../architecture/ACCESS.md)

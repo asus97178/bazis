@@ -2,7 +2,7 @@
 
 Где запускается исполняемый файл, как собрать его под Linux с Mac и как
 запустить под systemd. Kubernetes — в главе
-[Плавная остановка и health](../application/graceful-shutdown.md#kubernetes), Docker — в
+[Плавная остановка и health](graceful-shutdown.md#kubernetes), Docker — в
 главе [Docker](docker.md).
 
 Все примеры проверены на bazis 0.111.2 и macOS на Apple Silicon, раздел
@@ -142,5 +142,5 @@ info: bazis started {…}
 
 - [Один исполняемый файл](single-executable.md)
 - [Docker](docker.md)
-- [Плавная остановка и health](../application/graceful-shutdown.md)
+- [Плавная остановка и health](graceful-shutdown.md)
 - [Настройка продакшена](production.md)

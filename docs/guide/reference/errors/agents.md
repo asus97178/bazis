@@ -191,7 +191,7 @@ result.toolResults[] → { name, status: "error" | "denied", error: { code: "TOO
 
 Язык текстов задаёт `@App({ language })` (с 0.105.3), свои тексты —
 `CodexError.useMessages({ … })` поверх него
-([Codex](../../application/infra/connectors.md#codex)).
+([Codex](../../infra/connectors.md#codex)).
 
 ## Дальше
 

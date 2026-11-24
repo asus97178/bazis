@@ -23,13 +23,13 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Bazis` | Точка входа ядра: `Bazis.run(root, options)`; `runApp` вызывает его сам | [Приложение](../../application/application.md) |
+| `Bazis` | Точка входа ядра: `Bazis.run(root, options)`; `runApp` вызывает его сам | [Приложение](../../startup/application.md) |
 | `KernelBuilder`, `Kernel` | Сборка и работа ядра (как `HostApplicationBuilder` в .NET) | там же |
 | `Environment` | Окружение: `name`, `debug`, `isDevelopment`, `isTest`, `isProduction` | [Окружения](../../module/config/configuration.md#окружения) |
-| `ApplicationLifetime` | Моменты жизни приложения и `stop(exitCode)` из любого сервиса | [Жизненный цикл](../../application/lifecycle.md) |
-| `LIFECYCLE_HOOK`, `addLifecycleHook` | Хуки `onInit`, `onBootstrap`, `onShutdown`, `onDestroy` | [Хуки](../../application/lifecycle.md#хуки-жизненного-цикла) |
-| `LifecycleCoordinator` | Порядок запуска и остановки служб и хуков | [Порядок](../../application/lifecycle.md#порядок-запуска-и-остановки) |
-| `SupervisedHostedService`, `supervised` | Перезапуск службы с паузой, если её запуск упал | [Падения и перезапуск](../../application/lifecycle.md#падения-и-перезапуск) |
+| `ApplicationLifetime` | Моменты жизни приложения и `stop(exitCode)` из любого сервиса | [Жизненный цикл](../../startup/lifecycle.md) |
+| `LIFECYCLE_HOOK`, `addLifecycleHook` | Хуки `onInit`, `onBootstrap`, `onShutdown`, `onDestroy` | [Хуки](../../startup/lifecycle.md#хуки-жизненного-цикла) |
+| `LifecycleCoordinator` | Порядок запуска и остановки служб и хуков | [Порядок](../../startup/lifecycle.md#порядок-запуска-и-остановки) |
+| `SupervisedHostedService`, `supervised` | Перезапуск службы с паузой, если её запуск упал | [Падения и перезапуск](../../startup/lifecycle.md#падения-и-перезапуск) |
 | `StartupReport` | Что нашёл и сделал запуск: подключения, схема, маршруты; для экрана запуска | [Экран запуска](../../cli/commands.md#экран-запуска) |
 | `KernelError`, `StartupFailuresError`, `StartupTimeoutError`, `StartupAbortedError`, `ShutdownTimeoutError` | Ошибки запуска и остановки | [Ошибки запуска](../errors/startup.md) |
 
@@ -37,9 +37,9 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `LOGGER` | Токен журнала; сервисы получают `Logger` по типу | [Журнал](../../application/logging.md) |
-| `ConsoleLogger` | Журнал по умолчанию: строка на запись, фильтр уровней | [Уровни](../../application/logging.md#уровни) |
-| `getRequestId()`, `REQUEST_ID_HEADER`, `REQUEST_ID_STATE_KEY` | Идентификатор текущего запроса | [Correlation id](../../application/logging.md#correlation-id) |
+| `LOGGER` | Токен журнала; сервисы получают `Logger` по типу | [Журнал](../../deployment/logging.md) |
+| `ConsoleLogger` | Журнал по умолчанию: строка на запись, фильтр уровней | [Уровни](../../deployment/logging.md#уровни) |
+| `getRequestId()`, `REQUEST_ID_HEADER`, `REQUEST_ID_STATE_KEY` | Идентификатор текущего запроса | [Correlation id](../../deployment/logging.md#correlation-id) |
 | `getTraceparent()`, `TRACEPARENT_HEADER`, `TRACEPARENT_STATE_KEY` | W3C `traceparent` текущего запроса | там же |
 | `getOutboundCorrelationHeaders()` | Заголовки для исходящих вызовов | там же |
 | `runWithRequestContext`, `runWithRequestContextAsync` | Выполнить код с контекстом запроса — например, в фоновой задаче | — |
@@ -60,8 +60,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `HEALTH_CHECK`, `addHealthCheck` | Своя проверка для `/health` | [Своя проверка](../../application/health-checks.md#своя-проверка) |
-| `HealthService` | Выполняет проверки с пределом времени, собирает отчёт | [Health](../../application/health-checks.md) |
+| `HEALTH_CHECK`, `addHealthCheck` | Своя проверка для `/health` | [Своя проверка](../../deployment/health-checks.md#своя-проверка) |
+| `HealthService` | Выполняет проверки с пределом времени, собирает отчёт | [Health](../../deployment/health-checks.md) |
 
 ## Типы
 

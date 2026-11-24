@@ -15,7 +15,7 @@ PriceService uses @Cacheable but is registered transient: a new instance for eve
 кэш не переживёт и одного вызова. Зарегистрируйте сервис как `singleton` или
 `scoped`. Похожая ошибка — `@Cacheable` без `key` на `scoped`-сервисе: кэш
 живёт только в пределах запроса, задайте ключ
-([Кэширование](../../application/caching.md)).
+([Кэширование](../../infra/caching.md)).
 
 ### `CacheError` — нет распределённого кэша
 
@@ -54,9 +54,9 @@ personalized output cache cannot use clientCache.public
 `CacheUnavailableError` получают только прямые вызовы `get`, `remove`,
 `evictByTag`. Методы с `@CacheableRedis` и маршруты с `@OutputRedisCache`
 при недоступном Redis работают без кэша
-([Если Redis недоступен](../../application/caching.md#если-redis-недоступен)).
+([Если Redis недоступен](../../infra/caching.md#если-redis-недоступен)).
 
 ## Дальше
 
-- [Кэширование](../../application/caching.md)
+- [Кэширование](../../infra/caching.md)
 - [Кэш ответов](../../module/controllers/output-cache.md)

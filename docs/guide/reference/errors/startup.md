@@ -87,7 +87,7 @@ InfraError: Infra connector "llm": https://api.openai.com/v1 is not available �
 
 - **Что сделать.** Проверьте, что сервис запущен и доступен по адресу из
   текста; адрес и пароль — в настройках коннектора
-  ([Инфраструктура](../../application/infra/overview.md)).
+  ([Инфраструктура](../../infra/overview.md)).
 - Ключ LLM-провайдера проверяется при запуске вне среды `test`
   ([LLM-коннекторы](../../agents/llm-connectors.md#проверка-при-старте)).
 
@@ -139,7 +139,7 @@ InfraError: Infra connector "llm": https://api.openai.com/v1 is not available �
 - **Что сделать.** Хуки и службы должны слушать сигнал отмены и
   заканчиваться в срок. Если работа долгая по природе — увеличьте срок и
   `stop_grace_period` у Docker
-  ([Плавная остановка](../../application/graceful-shutdown.md#срок-остановки)).
+  ([Плавная остановка](../../deployment/graceful-shutdown.md#срок-остановки)).
 
 ### `StartupAbortedError`
 
@@ -176,4 +176,4 @@ Event "order.paid" handler exceeded 5000ms.
 
 - [Ошибки DI](di.md)
 - [Конфигурация](../../module/config/configuration.md)
-- [Жизненный цикл](../../application/lifecycle.md)
+- [Жизненный цикл](../../startup/lifecycle.md)

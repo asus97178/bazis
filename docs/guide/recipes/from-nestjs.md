@@ -32,7 +32,7 @@ NestJS — переносится большая часть привычек. Н
 
 | NestJS | bazis | Где читать |
 | --- | --- | --- |
-| `NestFactory.create(AppModule)` + `listen` | `@App({ http })` | [Приложение](../application/application.md) |
+| `NestFactory.create(AppModule)` + `listen` | `@App({ http })` | [Приложение](../startup/application.md) |
 | `@Module({ imports, controllers, providers, exports })` | `@Module` с теми же полями | [Модули](../module/modules/modules.md) |
 | `@Global()` | `@Global()` — так же | [Модули](../module/modules/modules.md#глобальные-модули) |
 | `@Injectable()` | Не нужен | |
@@ -48,7 +48,7 @@ NestJS — переносится большая часть привычек. Н
 | Interceptor | `@ActionFilter` или middleware | [Middleware](../module/controllers/middleware.md) |
 | Exception filter | Middleware, переводящий ошибку в `HttpError` | [Ошибки](../module/controllers/errors.md#доменные-ошибки) |
 | `HttpException`, `NotFoundException` | `HttpError`, `NotFoundError` | [Ошибки](../module/controllers/errors.md) |
-| `OnModuleInit`, `OnApplicationShutdown` | `LifecycleHook`: `onInit`, `onShutdown` | [Жизненный цикл](../application/lifecycle.md#хуки-жизненного-цикла) |
+| `OnModuleInit`, `OnApplicationShutdown` | `LifecycleHook`: `onInit`, `onShutdown` | [Жизненный цикл](../startup/lifecycle.md#хуки-жизненного-цикла) |
 | `@nestjs/schedule`, `@Cron` | `PeriodicBackgroundService` в поле `background` модуля | [Фоновые службы](../module/background-services.md) |
 | `@nestjs/swagger` | Не нужен: OpenAPI строит кодогенерация, `/docs` | [OpenAPI](../module/controllers/openapi.md) |
 | `Test.createTestingModule(...).overrideProvider(...)` | `startTestApp(AppModule, { overrides })` | [Тестирование](../testing/testing.md#приложение-целиком-starttestapp) |
@@ -368,10 +368,10 @@ HTTP — без `supertest`.
 
 - **Декораторов на параметрах** и пользовательских param-декораторов
   (`createParamDecorator`): контекст запроса доступен через `HttpContext`,
-  пользователь — через scoped-сервис ([Текущий пользователь](../application/authorization-patterns.md#текущий-пользователь-в-сервисах)).
+  пользователь — через scoped-сервис ([Текущий пользователь](../security/authorization-patterns.md#текущий-пользователь-в-сервисах)).
 - **Динамических модулей `forRoot()` / `forRootAsync()`**: модуль
   объявляет настройки полем `config`, инфраструктура подключается
-  манифестом `@Infra` ([Инфраструктура](../application/infra/overview.md)).
+  манифестом `@Infra` ([Инфраструктура](../infra/overview.md)).
 - **Микросервисных транспортов `@nestjs/microservices`**: есть gRPC и
   WebSocket ([gRPC](../module/grpc.md), [WebSocket](../module/websocket.md)).
 

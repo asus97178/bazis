@@ -99,7 +99,7 @@ export class CatalogStats extends PeriodicBackgroundService {
 ```
 
 Каждый тик получает новый контекст. Подробнее — в главе
-[Жизненный цикл](../../application/lifecycle.md#scoped-сервисы-в-фоновой-службе).
+[Жизненный цикл](../../startup/lifecycle.md#scoped-сервисы-в-фоновой-службе).
 
 Несколько областей — несколько независимых контекстов: так работу можно
 вести параллельно, у каждого контекста своё отслеживание изменений и своя
@@ -199,6 +199,6 @@ await this.db.database.executeSqlRaw("UPDATE products SET price = price * {0}", 
 ## Дальше
 
 - [Сущности и ключи](entities.md)
-- [Жизненный цикл](../../application/lifecycle.md)
+- [Жизненный цикл](../../startup/lifecycle.md)
 - [Запросы](queries.md)
 - [Сохранение и отслеживание изменений](saving.md)

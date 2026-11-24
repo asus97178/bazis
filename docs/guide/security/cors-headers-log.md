@@ -196,7 +196,7 @@ accessLog: { log: (entry) => metrics.observe(entry.path, entry.status, entry.dur
 брошенной `NotFoundError` и к ответам, которые отдаются до
 маршрутизации, — `404`, `405`, `413`, preflight. Клиент может прислать
 свой `x-request-id`, и по нему запрос найдётся в журнале. Подробнее — в
-главе [Логирование и correlation id](logging.md#correlation-id).
+главе [Логирование и correlation id](../deployment/logging.md#correlation-id).
 
 > [!NOTE]
 > Correlation id у ответов `404`/`405`/`413` и preflight, а также
@@ -220,5 +220,5 @@ accessLog: { log: (entry) => metrics.observe(entry.path, entry.status, entry.dur
 ## Дальше
 
 - [Middleware](../module/controllers/middleware.md)
-- [Логирование и correlation id](logging.md)
+- [Логирование и correlation id](../deployment/logging.md)
 - [Ограничение частоты запросов](rate-limit.md)

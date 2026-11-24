@@ -229,7 +229,7 @@ POST /tasks       201 400 401 403  summary: "POST /tasks"
 `bun src/index.ts` после правки JSDoc, типа ответа или тела метода
 приложение запустится с предупреждением `generated code is out of date`,
 а документ останется прежним — выполните `bazis codegen`. Подробнее — в
-главе [Кодогенерация](../../application/codegen.md).
+главе [Кодогенерация](../../startup/codegen.md).
 
 ## Дальше
 

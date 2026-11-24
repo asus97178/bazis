@@ -264,5 +264,5 @@ redisConnect(redisConfig, { cache: { mode: "distributed", operationTimeoutMs: 30
 ## Дальше
 
 - [Кэширование ответов](../module/controllers/output-cache.md)
-- [Шаблоны авторизации](authorization-patterns.md)
+- [Шаблоны авторизации](../security/authorization-patterns.md)
 - [Фоновые службы](../module/background-services.md)

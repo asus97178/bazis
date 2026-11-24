@@ -68,7 +68,7 @@ Singleton "PriceCache" depends on scoped "OrdersRepository". A scoped service li
   `DbContext` на всё приложение, данные одного запроса в другом.
 - **Что сделать.** Сделайте `PriceCache` `scoped`. Если это фоновая служба или
   хук — внедрите `ServiceProvider` и создавайте область на каждую единицу
-  работы ([Жизненный цикл](../../application/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
+  работы ([Жизненный цикл](../../startup/lifecycle.md#scoped-сервисы-в-фоновой-службе)).
 - Если класс зарегистрирован под токеном, в сообщении и класс, и токен:
   `singleton(LIFECYCLE_HOOK, WarmUp)` даст
 

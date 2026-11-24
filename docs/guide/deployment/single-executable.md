@@ -139,7 +139,7 @@ info: schema only: infrastructure and schema are ready, stopping (BAZIS_SCHEMA_O
 
 По `SIGTERM` или `SIGINT` приложение доделывает начатые запросы,
 останавливает фоновые задачи, закрывает подключения и выходит с кодом 0.
-Подробнее — в главе [Плавная остановка и health](../application/graceful-shutdown.md).
+Подробнее — в главе [Плавная остановка и health](graceful-shutdown.md).
 
 Обновление — замена файла и перезапуск. Файл не зависит от того, что
 лежит рядом, поэтому старую версию можно сохранить под другим именем и
@@ -149,5 +149,5 @@ info: schema only: infrastructure and schema are ready, stopping (BAZIS_SCHEMA_O
 
 - [Настройка продакшена](production.md)
 - [Docker](docker.md)
-- [Плавная остановка и health](../application/graceful-shutdown.md)
+- [Плавная остановка и health](graceful-shutdown.md)
 - [Чек-лист перед продакшеном](production-checklist.md)

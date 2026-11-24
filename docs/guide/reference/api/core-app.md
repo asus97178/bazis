@@ -4,8 +4,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `@App({ modules, infra, cache, config, http, grpc, websocket, language, messages, validator, ui, kernel, configure })` | Объявление приложения: его модули, инфраструктура и серверы. Обязательно только `modules`. С версии 0.138.0 | [Приложение](../../application/application.md), [параметры](../configuration.md#app) |
-| `runApp(Application)` | Запуск объявленного приложения: ядро, HTTP, gRPC, WebSocket, инфраструктура, плавная остановка. Принимает только класс с `@App` | [Приложение](../../application/application.md) |
+| `@App({ modules, infra, cache, config, http, grpc, websocket, language, messages, validator, ui, kernel, configure })` | Объявление приложения: его модули, инфраструктура и серверы. Обязательно только `modules`. С версии 0.138.0 | [Приложение](../../startup/application.md), [параметры](../configuration.md#app) |
+| `runApp(Application)` | Запуск объявленного приложения: ядро, HTTP, gRPC, WebSocket, инфраструктура, плавная остановка. Принимает только класс с `@App` | [Приложение](../../startup/application.md) |
 | `AppOptions`, `AppSettings`, `AppClass` | Типы: что принимает `@App`; то же без `modules`; класс с `@App` | [Параметры конфигурации](../configuration.md#app) |
 | `AppLanguage`, `AppMessages` | Язык текстов ответов и свои тексты | [Русская локализация](../../recipes/russian.md) |
 

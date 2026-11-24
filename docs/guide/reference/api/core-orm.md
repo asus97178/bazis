@@ -27,7 +27,7 @@ ORM: сущности, контекст, запросы, сохранение, �
 | `ManyToOne`, `OneToMany`, `ForeignKey` | Связи и внешний ключ | [Связи](../../module/database/queries.md#связи-и-include) |
 | `Schema(name)` | Схема PostgreSQL таблицы | — |
 | `SoftDelete()` | Мягкое удаление: `remove()` ставит время вместо `DELETE` | [Мягкое удаление](../../module/database/immediate.md#мягкое-удаление-и-фильтры) |
-| `QueryFilter(predicate)` | Условие, которое добавляется ко всем запросам сущности; с контекстом — для арендаторов | [Арендаторы](../../application/authorization-patterns.md#арендаторы) |
+| `QueryFilter(predicate)` | Условие, которое добавляется ко всем запросам сущности; с контекстом — для арендаторов | [Арендаторы](../../security/authorization-patterns.md#арендаторы) |
 | `HasConversion(converter)`, `ValueConverters` | Преобразование значения столбца; `ValueConverters.json()`, `ValueConverters.encrypted(secret)` — ключ в коде, для ORM без приложения. `null` конвертер не получает, если не объявил `convertsNulls` | [Преобразование значения](../../module/database/entities.md#преобразование-значения) |
 | `encryptedWith(config, field)` | Шифрование столбца AES-256-GCM ключом из настроек; ключ читается при запуске | [Шифрование столбца](../../module/database/entities.md#шифрование-столбца) |
 | `DecryptionError` | Значение не расшифровать: другой ключ или изменённые данные | [Шифрование столбца](../../module/database/entities.md#шифрование-столбца) |

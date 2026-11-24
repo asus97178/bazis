@@ -81,7 +81,7 @@ export class MailService {
 
 У фреймворка есть свои настройки, объявленные так же. Адрес HTTP-сервера —
 `http.host` и `http.port` (`BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT`), см.
-[Адрес сервера](../../application/application.md#адрес-сервера).
+[Адрес сервера](../../startup/application.md#адрес-сервера).
 
 Если конфиг не подключён ни к модулю, ни к `@App`, приложение не
 стартует:
@@ -251,11 +251,11 @@ mailConfig.get("port");
 Окружение задаёт `BAZIS_ENV` (иначе `NODE_ENV`, иначе `production`):
 `development`, `test` или `production`. От него зависят секция настроек и
 поведение приложения — подробнее в главе
-[Приложение](../../application/application.md#опции-kernel).
+[Приложение](../../startup/application.md#опции-kernel).
 
 ## Дальше
 
-- [Приложение](../../application/application.md)
+- [Приложение](../../startup/application.md)
 - [DI подробно](../services/dependency-injection.md)
-- [Жизненный цикл](../../application/lifecycle.md)
+- [Жизненный цикл](../../startup/lifecycle.md)
 - [Секреты и конфигурация](secrets.md)
