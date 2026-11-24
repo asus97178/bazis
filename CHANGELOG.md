@@ -4,6 +4,37 @@ All notable changes to the `bazis` package. Versions follow
 [Semantic Versioning](https://semver.org); before 1.0 a minor version may
 contain breaking changes, a patch version does not.
 
+## 0.143.0 — 2026-11-25
+
+An entry point is `await runApp(Application)` alone: `runApp` connects the generated
+code itself. Stores and application code stay as they are; an entry point that still
+calls `registerBazisGeneratedRuntime()` works as before. See
+[Upgrading](docs/guide/reference/upgrading.md#01430).
+
+### Changed
+
+- `runApp` connects the code `bazis codegen` generates, so `src/index.ts` no longer
+  imports `./generated/bazis/runtime`. Started from sources, it loads `src/generated/bazis`
+  of the working directory and takes the target whose entry point is the file Bun was
+  started with: the entry point of another target (`src/worker.ts`) needs no import
+  either.
+- `bazis build --bin` compiles the generated `src/generated/bazis/executable.ts` instead
+  of the entry point. Codegen writes `executable.ts` for every target: it registers the
+  generated code and then imports the target's entry point.
+- A new project from `bazis new` has the two-line entry point; so do both examples.
+
+### Added
+
+- An executable compiled from the entry point itself (`bun build --compile src/index.ts`)
+  has no generated code: `runApp` stops with a configuration error that names
+  `bazis build --bin` and `executable.ts`.
+
+### Docs
+
+- The architecture specification (MOD-ARCH-001 v1.13) states the rules of the pinned
+  Bun; the ORM, CLI, WebSocket, DI and gRPC passports say what was checked again on
+  Bun 1.4.5.
+
 ## 0.142.0 — 2026-11-21
 
 The framework moves to Bun 1.4.5. Stores and application code stay as they are.
