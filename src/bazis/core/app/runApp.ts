@@ -9,7 +9,7 @@ import {
   type BazisModuleRef,
 } from "../di";
 import { DI } from "../di/lowLevel";
-import { loadBazisGeneratedRuntime } from "../generatedRuntime";
+import { executableLacksGeneratedCode, loadBazisGeneratedRuntime } from "../generatedRuntime";
 import { missingCacheModuleCheck } from "../cache/http/missingCacheModuleCheck";
 import { cacheableClassProviderHook } from "../cache/di/classProviderHook";
 import { httpModule, useModelValidator, type HttpModuleOptions, type ModelValidator } from "../http";
@@ -154,7 +154,6 @@ const APP_OPTIONS = Symbol.for("bazis/core/app/options");
  * export class TodoApp {}
  *
  * // src/index.ts
- * await registerBazisGeneratedRuntime();
  * await runApp(TodoApp);
  *
  * // a test
@@ -339,19 +338,25 @@ function normalizeAbsolutePath(path: string): string {
  * // src/index.ts
  * import { runApp } from "bazis/core/app";
  * import { TodoApp } from "./app/App";
- * import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
  *
- * await registerBazisGeneratedRuntime();
  * await runApp(TodoApp);
  * ```
  *
- * It does three things you would otherwise write by hand:
- * 1. starts the HTTP server and collects controllers from the whole module tree;
- * 2. plugs in the request body validator (DIP glue between the kernel and the library);
- * 3. starts the kernel with graceful shutdown on SIGINT/SIGTERM.
+ * It does four things you would otherwise write by hand:
+ * 1. connects the code `bazis codegen` generated for this entry point
+ *    (`src/generated/bazis`); an executable has it compiled in by `bazis build --bin`;
+ * 2. starts the HTTP server and collects controllers from the whole module tree;
+ * 3. plugs in the request body validator (DIP glue between the kernel and the library);
+ * 4. starts the kernel with graceful shutdown on SIGINT/SIGTERM.
  */
 export async function runApp(app: AppClass): Promise<number> {
   await loadBazisGeneratedRuntime();
+  if (executableLacksGeneratedCode()) {
+    return reportBuildFailure(new KernelError(
+      "This executable was compiled without the code `bazis codegen` generates, so it cannot start. "
+      + "Build it with `bazis build --bin`; to compile by hand, give `bun build --compile` the generated `src/generated/bazis/executable.ts` instead of the application's entry point.",
+    ));
+  }
   let options: AppSettings;
   let composed: BazisModuleRef;
   try {

@@ -24,15 +24,12 @@ export class Application {}
 // src/index.ts
 import { runApp } from "bazis/core/app";
 import { Application } from "./app/App";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
-await registerBazisGeneratedRuntime();
 await runApp(Application);
 ```
 
-`registerBazisGeneratedRuntime()` подключает результат
-[кодогенерации](codegen.md), `runApp` запускает приложение
-и ждёт его остановки. Когда `await runApp(...)` завершается, приложение уже
+`runApp` подключает результат [кодогенерации](codegen.md), запускает
+приложение и ждёт его остановки. Когда `await runApp(...)` завершается, приложение уже
 остановлено, а код выхода записан в `process.exitCode`.
 
 То же объявление читают тесты: `startTestApp(Application)` поднимает ровно

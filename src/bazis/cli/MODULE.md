@@ -1,6 +1,6 @@
 # bazis CLI
 
-Passport version: 1.12. Check date: 2026-11-21. Type: atomic technical module.
+Passport version: 1.13. Check date: 2026-11-25. Type: atomic technical module.
 Scope: command parsing, project, module and process generation, host registration, codegen,
 checking and drawing the processes declared in code (`bazis workflow check|diagram`),
 running the application and building (`bazis dev`, `bazis build`, `bazis build --bin`).
@@ -38,6 +38,10 @@ checks them at startup from sources and warns loudly if the code or the framewor
 version changed after generation (about 10 ms for 750 files). A binary has no sources,
 so the check is skipped. In the framework repository `fingerprint.ts` is not committed:
 it changes with every source edit.
+`build --bin` compiles the generated `src/generated/bazis/executable.ts` of the default
+target, not the entry point: that file registers the generated code and then imports the
+entry point, so the entry point is `await runApp(Application)` alone
+([application passport](../core/app/MODULE.md)).
 `build --bin` compiles from a temporary directory (`compileBinary`): Bun leaves
 `.bun-build` in the working directory if its executable is read-only or has the `uchg`
 flag (the same on 1.4.0 and on 1.4.5, checked 2026-11-21 through the pinned launcher).

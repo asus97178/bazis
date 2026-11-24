@@ -153,9 +153,7 @@ export class Application {}
 ```ts
 import { runApp } from "bazis/core/app";
 import { Application } from "./app/App";
-import { registerBazisGeneratedRuntime } from "./generated/bazis/runtime";
 
-await registerBazisGeneratedRuntime();
 await runApp(Application);
 ```
 
