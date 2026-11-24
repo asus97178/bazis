@@ -7,7 +7,7 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `memory(options)` | Кэш в памяти одной строкой: `@App({ cache: memory({ maxEntries }) })` | [Кэширование](../../application/caching.md) |
+| `memory(options)` | Кэш в памяти одной строкой: `@App({ cache: memory({ maxEntries }) })` | [Кэширование](../../infra/caching.md) |
 | `buildCacheModule(config)` | Модуль кэша с расширенными настройками: политики, распределённый кэш | — |
 
 Распределённый кэш включает коннектор Redis:
@@ -18,8 +18,8 @@
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `Cacheable(options)` | Результат метода в памяти процесса | [`@Cacheable`](../../application/caching.md#кэш-в-памяти-cacheable) |
-| `CacheableRedis(options)` | Результат метода в Redis — общий для всех экземпляров | [`@CacheableRedis`](../../application/caching.md#общий-кэш-в-redis-cacheableredis) |
+| `Cacheable(options)` | Результат метода в памяти процесса | [`@Cacheable`](../../infra/caching.md#кэш-в-памяти-cacheable) |
+| `CacheableRedis(options)` | Результат метода в Redis — общий для всех экземпляров | [`@CacheableRedis`](../../infra/caching.md#общий-кэш-в-redis-cacheableredis) |
 | `ICache` | Кэш в памяти по типу: `get`, `list`, `set`, `getOrCreate`, `getOrCreateAsync`, `remove`, `evictByTag`, `clear` | там же |
 | `IDistributedCache`, `connectionCache(name)` | Распределённый кэш по типу; кэш именованного подключения | [Несколько экземпляров](../../recipes/multiple-instances.md) |
 | `cacheToken<T>(name)` | Типизированный токен для значений одного типа | — |

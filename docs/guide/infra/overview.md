@@ -32,7 +32,7 @@ export class Application {}
 Ключ манифеста — имя экземпляра: `db`, `cache`, `search`. Оно видно в
 `/health` (`infra:db`) и в сообщениях о сбоях. Конфигурацию каждый
 коннектор берёт из своего `defineConfig` — она проверяется до старта, как
-и всякая [конфигурация](../../module/config/configuration.md).
+и всякая [конфигурация](../module/config/configuration.md).
 
 `@Infra` — обычный модуль, видимый всему приложению: импортировать его в
 модули не нужно.
@@ -65,10 +65,10 @@ GET /stats → {"db":"infra_lab","hits":3,"search":"green"}
 | `postgres` | `IPostgres` | `SQL` из Bun |
 | `redisConnect` | `IRedis` | `RedisClient` из Bun |
 | `openSearchConnect` | `IOpenSearch` | Клиент OpenSearch из bazis |
-| `llmConnect`, `llmRouter` | `AgentRuntime` | См. [LLM-коннекторы](../../agents/llm-connectors.md) |
+| `llmConnect`, `llmRouter` | `AgentRuntime` | См. [LLM-коннекторы](../agents/llm-connectors.md) |
 
 Для работы с базой через ORM есть свой коннектор, `ormBazisConnect`, —
-см. [Подключение PostgreSQL](../../module/database/postgresql.md). `postgres` даёт
+см. [Подключение PostgreSQL](../module/database/postgresql.md). `postgres` даёт
 голый SQL-клиент, когда ORM не нужен.
 
 > [!NOTE]
@@ -90,7 +90,7 @@ SIGTERM
 
 Так запросы и фоновые задачи не начинаются без базы и не теряют её
 посреди работы при остановке. Подробнее — в главе
-[Жизненный цикл](../lifecycle.md).
+[Жизненный цикл](../startup/lifecycle.md).
 
 ## Если подключиться не удалось
 
@@ -124,7 +124,7 @@ OpenSearch недоступен:
 
 В терминале вместо этих строк — экран с панелью на каждое подключение,
 адресом и переменными, которые стоит проверить (см.
-[Команды CLI](../../cli/commands.md#если-запуск-не-удался)).
+[Команды CLI](../cli/commands.md#если-запуск-не-удался)).
 
 Если что-то не ответило совсем, срабатывает общий срок старта — 30 секунд
 (`@App({ kernel: { startupTimeoutMs } })`). Сообщение называет, что
@@ -155,7 +155,7 @@ OpenSearch недоступен:
 
 Если хоть одна проверка не прошла, `/health` отвечает `503` — оркестратор
 выведет экземпляр из балансировки. Подробнее — в главе
-[Health checks](../health-checks.md).
+[Health checks](../deployment/health-checks.md).
 
 ## Два экземпляра одного типа
 
@@ -205,5 +205,5 @@ GET /health → … {"name":"infra:cache",…}, {"name":"infra:queue",…} …
 
 - [Коннекторы](connectors.md)
 - [Свой коннектор](custom-connector.md)
-- [Конфигурация](../../module/config/configuration.md)
-- [Секреты](../../module/config/secrets.md)
+- [Конфигурация](../module/config/configuration.md)
+- [Секреты](../module/config/secrets.md)

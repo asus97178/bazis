@@ -239,4 +239,4 @@ export const mailConfig = defineConfig("mail", {
 - [Тесты процесса](../module/processes.md#тесты-процесса) — `testWorkflow` с часами теста
 - [DI подробно](../module/services/dependency-injection.md)
 - [Конфигурация](../module/config/configuration.md)
-- [Кодогенерация](../application/codegen.md)
+- [Кодогенерация](../startup/codegen.md)

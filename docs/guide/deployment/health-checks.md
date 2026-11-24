@@ -141,6 +141,6 @@ http: { health: { path: "/ready", exposeDetails: false, timeoutMs: 5000, cacheMs
 
 ## Дальше
 
-- [Приложение](application.md)
+- [Приложение](../startup/application.md)
 - [Логирование и correlation id](logging.md)
 - [Тестирование](../testing/testing.md)

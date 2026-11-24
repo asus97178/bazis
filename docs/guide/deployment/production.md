@@ -40,8 +40,8 @@ export class Application {}
 | Что | Зачем | Подробнее |
 | --- | --- | --- |
 | Нет `hostname` и `port` | Адрес задаёт окружение: `BAZIS_HTTP__HOST`, `BAZIS_HTTP__PORT` | [ниже](#адрес-и-порт) |
-| `health: true` | Оркестратор знает, что приложение готово | [Плавная остановка и health](../application/graceful-shutdown.md) |
-| `accessLog: true` | Запросы видны в журнале | [Журнал запросов](../application/logging.md#журнал-запросов) |
+| `health: true` | Оркестратор знает, что приложение готово | [Плавная остановка и health](graceful-shutdown.md) |
+| `accessLog: true` | Запросы видны в журнале | [Журнал запросов](logging.md#журнал-запросов) |
 | `securityHeaders: { hsts: true }` | Браузер ходит только по HTTPS | [Чек-лист](production-checklist.md#http) |
 | `startupReport: true` | В журнале видно, что приложение запустилось | [ниже](#журнал) |
 | `secretFilesSource` | Секреты Docker и Kubernetes из файлов | [Файлы секретов](../module/config/secrets.md#файлы-секретов) |
@@ -98,7 +98,7 @@ export class Application {}
 ```
 
 - `ctx.clientIp` — адрес клиента; по нему же считают
-  [ограничение частоты](../application/rate-limit.md) и журнал доступа
+  [ограничение частоты](../security/rate-limit.md) и журнал доступа
   (`clientIp`). `ctx.peerIp` — адрес самого соединения, то есть nginx.
 - Заголовку верят, только если соединение пришло от адреса из
   `trustedProxies`. Запрос в обход nginx сохранит свой настоящий адрес:
@@ -136,7 +136,7 @@ info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"dur
   Отключает их `kernel: { startupReport: false }`.
 
 Свой формат или отправка в систему сбора — через свой логгер
-([Свой логгер](../application/logging.md#свой-логгер)).
+([Свой логгер](logging.md#свой-логгер)).
 
 ## Сроки
 
@@ -168,5 +168,5 @@ info: POST /orders 409 5.0ms {"method":"POST","path":"/orders","status":409,"dur
 
 - [Один исполняемый файл](single-executable.md)
 - [Docker](docker.md)
-- [Плавная остановка и health](../application/graceful-shutdown.md)
+- [Плавная остановка и health](graceful-shutdown.md)
 - [Секреты и конфигурация](../module/config/secrets.md)

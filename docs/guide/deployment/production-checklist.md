@@ -47,7 +47,7 @@
   иначе любой получит карту всех маршрутов ([OpenAPI](../module/controllers/openapi.md)).
 - [ ] **`/health` включён для оркестратора** — `http: { health: true }`.
   `exposeDetails` — только если адрес закрыт снаружи
-  ([Health checks](../application/health-checks.md#подробности)).
+  ([Health checks](health-checks.md#подробности)).
 - [ ] **Ответы на ошибки БД — по смыслу**, а не `500`: с версии 0.137.0 это
   так без настройки; текст для занятого значения задаёт `conflict` индекса
   ([Ошибки базы данных](../module/database/errors.md#http-статусы)).
@@ -70,7 +70,7 @@
   подделать его в обход прокси нельзя ([За nginx](production.md#за-nginx)).
 - [ ] **CORS — явный список источников.** `credentials: true` вместе с
   `origin: "*"` приложение не пропустит при запуске
-  ([CORS](../application/cors-headers-log.md#cors)).
+  ([CORS](../security/cors-headers-log.md#cors)).
 - [ ] **Лимит частоты на входе и других дорогих маршрутах:**
 
   ```ts
@@ -81,7 +81,7 @@
 
   Счётчики хранятся в памяти экземпляра: у трёх экземпляров за
   балансировщиком лимит фактически втрое больше
-  ([Ограничение частоты](../application/rate-limit.md)).
+  ([Ограничение частоты](../security/rate-limit.md)).
 - [ ] **Журнал запросов включён** — `http: { accessLog: true }`. Путь
   пишется без строки запроса, поэтому токен из `?token=…` в журнал не
   попадёт; токены в самом пути (`/reset/<токен>`) — попадут.
@@ -136,12 +136,12 @@ error: expect(received).toEqual(expected)
 - [ ] **Открытые маршруты перечислены в тесте** (выше).
 - [ ] **Ключ подписи JWT** — из секретов, для HS256 не короче 32 байт;
   сервис токенов создаётся при запуске, чтобы ошибка ключа остановила
-  старт ([JWT: ключи](../application/jwt.md#ключи)).
+  старт ([JWT: ключи](../security/jwt.md#ключи)).
 - [ ] **Короткий срок access-токена**, refresh-токены отзываются
-  ([Обновление пары](../application/jwt.md#обновление-пары)).
+  ([Обновление пары](../security/jwt.md#обновление-пары)).
 - [ ] **Данные арендаторов разделены фильтром запросов**, а не условием в
   каждом методе; чужая запись отвечает `404`
-  ([Арендаторы](../application/authorization-patterns.md#арендаторы)).
+  ([Арендаторы](../security/authorization-patterns.md#арендаторы)).
 - [ ] **Ответы, зависящие от пользователя, кэшируются только с
   `varyByUser`** ([Кэш ответов](../module/controllers/output-cache.md#защищённые-маршруты)).
 
@@ -236,6 +236,6 @@ applies the schema and exits), or grant the rights.
 ## Дальше
 
 - [Секреты и конфигурация](../module/config/secrets.md)
-- [Шаблоны авторизации](../application/authorization-patterns.md)
-- [Аутентификация через JWT](../application/jwt.md)
-- [CORS, заголовки безопасности, журнал запросов](../application/cors-headers-log.md)
+- [Шаблоны авторизации](../security/authorization-patterns.md)
+- [Аутентификация через JWT](../security/jwt.md)
+- [CORS, заголовки безопасности, журнал запросов](../security/cors-headers-log.md)

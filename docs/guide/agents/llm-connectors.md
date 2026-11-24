@@ -389,5 +389,5 @@ healthCheck вернул false
 
 - [Агенты](agents.md)
 - [Инструменты](../module/tools/tools.md)
-- [Health checks](../application/health-checks.md)
+- [Health checks](../deployment/health-checks.md)
 - [Конфигурация](../module/config/configuration.md)

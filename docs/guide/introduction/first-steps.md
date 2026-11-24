@@ -499,7 +499,7 @@ BAZIS_ENV=development ./bin/my-app
   [провайдеры и DI](../module/services/providers.md),
   [контроллеры](../module/controllers/controllers.md), [ответы](../module/controllers/responses.md),
   [настройки](../module/config/configuration.md),
-  [кодогенерация](../application/codegen.md) и
+  [кодогенерация](../startup/codegen.md) и
   [путь запроса через middleware](../module/controllers/middleware.md#порядок-выполнения).
 - Настоящий проект с базой данных и входом: планировщик задач в трёх
   рецептах. Начните с [«CRUD-модуля целиком»](../recipes/crud-module.md).

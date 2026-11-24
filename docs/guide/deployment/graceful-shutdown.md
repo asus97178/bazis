@@ -2,7 +2,7 @@
 
 Как приложение останавливается по сигналу, сколько ждёт и что видит
 оркестратор через `/health`. Порядок остановки служб и хуки — в главе
-[Жизненный цикл](lifecycle.md#порядок-запуска-и-остановки),
+[Жизненный цикл](../startup/lifecycle.md#порядок-запуска-и-остановки),
 сами проверки — в главе [Health checks](health-checks.md).
 
 Все примеры проверены на bazis 0.111.2: исполняемый файл, запущенный
@@ -126,7 +126,7 @@ terminationGracePeriodSeconds: 30
 
 ## Дальше
 
-- [Docker](../deployment/docker.md)
-- [Платформы](../deployment/platforms.md)
-- [Жизненный цикл](lifecycle.md)
+- [Docker](docker.md)
+- [Платформы](platforms.md)
+- [Жизненный цикл](../startup/lifecycle.md)
 - [Health checks](health-checks.md)

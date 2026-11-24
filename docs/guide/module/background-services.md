@@ -2,7 +2,7 @@
 
 Как устроены фоновые службы — `BackgroundService`,
 `PeriodicBackgroundService`, отмена, перезапуск, параметры, — рассказано
-в главе [Жизненный цикл](../application/lifecycle.md#фоновые-службы).
+в главе [Жизненный цикл](../startup/lifecycle.md#фоновые-службы).
 Здесь — задачи, которые с ними решают на практике: очередь задач в
 базе, работа на нескольких экземплярах приложения и наблюдение за
 службами через `/health`.
@@ -255,7 +255,7 @@ GET /health  →  503
 
 ## Дальше
 
-- [Жизненный цикл](../application/lifecycle.md)
+- [Жизненный цикл](../startup/lifecycle.md)
 - [Транзакции](database/transactions.md)
 - [Немедленные изменения](database/immediate.md)
-- [Health checks](../application/health-checks.md)
+- [Health checks](../deployment/health-checks.md)

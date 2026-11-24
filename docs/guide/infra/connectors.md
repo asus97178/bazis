@@ -10,10 +10,10 @@ OpenSearch 2.17. Codex проверен только без установлен
 | Коннектор | Клиент | Глава |
 | --- | --- | --- |
 | `postgres` | `IPostgres` — SQL-клиент Bun | Здесь |
-| `ormBazisConnect` | ORM bazis | [Подключение PostgreSQL](../../module/database/postgresql.md) |
-| `redisConnect` | `IRedis` — Redis-клиент Bun | Здесь и [Кэширование](../caching.md) |
+| `ormBazisConnect` | ORM bazis | [Подключение PostgreSQL](../module/database/postgresql.md) |
+| `redisConnect` | `IRedis` — Redis-клиент Bun | Здесь и [Кэширование](caching.md) |
 | `openSearchConnect` | `IOpenSearch` | Здесь |
-| `llmConnect`, `llmRouter` | `AgentRuntime` | [LLM-коннекторы](../../agents/llm-connectors.md) |
+| `llmConnect`, `llmRouter` | `AgentRuntime` | [LLM-коннекторы](../agents/llm-connectors.md) |
 | `codexAppServerConnect` | `ICodex` | Здесь |
 
 ## PostgreSQL: `postgres`
@@ -80,7 +80,7 @@ export class AppInfra {}
 | Опция | По умолчанию | Что задаёт |
 | --- | --- | --- |
 | `connectTimeoutMs` | 5000 | Сколько старт ждёт первого подключения |
-| `cache` | — | `"distributed"` — общий кэш на этом Redis, см. [Кэширование](../caching.md#общий-кэш-в-redis-cacheableredis) |
+| `cache` | — | `"distributed"` — общий кэш на этом Redis, см. [Кэширование](caching.md#общий-кэш-в-redis-cacheableredis) |
 | `token` | `IRedis` | Свой токен для второго экземпляра, см. [обзор](overview.md#два-экземпляра-одного-типа) |
 
 ```ts
@@ -162,7 +162,7 @@ InfraError: OpenSearch POST /missing-index/_search -> 404: {"error":{"root_cause
 в режиме App Server и даёт приложению вести диалог с ChatGPT от имени
 подключённого аккаунта: вход, список моделей, ответ с потоковым текстом и
 вызовами инструментов. Это отдельный исполнитель, а не модель для
-[`AgentRuntime`](../../agents/agents.md).
+[`AgentRuntime`](../agents/agents.md).
 
 > [!WARNING]
 > Раздел написан по коду и проверен только без установленного CLI `codex`:
@@ -200,7 +200,7 @@ export class Assistant {
 > [!NOTE]
 > `ICodex` — с версии 0.103.0. Раньше клиент брали токеном
 > `CODEX_APP_SERVER` и перечисляли зависимости вручную; см.
-> [Обновление](../../reference/upgrading.md).
+> [Обновление](../reference/upgrading.md).
 
 Методы:
 
@@ -258,5 +258,5 @@ language: "ru"  {"code":"NOT_CONFIGURED","message":"Подключение ChatG
 
 - [Обзор `@Infra`](overview.md)
 - [Свой коннектор](custom-connector.md)
-- [Подключение PostgreSQL](../../module/database/postgresql.md)
-- [Кэширование](../caching.md)
+- [Подключение PostgreSQL](../module/database/postgresql.md)
+- [Кэширование](caching.md)

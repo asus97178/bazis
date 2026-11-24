@@ -18,7 +18,7 @@
 ```
 
 С `BAZIS_CODEGEN_REPORT=<файл>` те же ошибки записываются в JSON-отчёт
-([Кодогенерация](../../application/codegen.md)).
+([Кодогенерация](../../startup/codegen.md)).
 
 Тексты получены на bazis 0.100.8, кроме отмеченных «текст из исходников».
 
@@ -184,7 +184,7 @@ Tool schema CreateTaskInput must be a named exported top-level class (src/app/as
 ```
 
 `bazis.config.json` не читается или в нём нет обязательных полей.
-Правильная форма — в главе [Кодогенерация](../../application/codegen.md).
+Правильная форма — в главе [Кодогенерация](../../startup/codegen.md).
 
 ### `BAZIS_CODEGEN_ENTRY_NOT_IN_PROGRAM`
 
@@ -226,5 +226,5 @@ BAZIS_TYPESCRIPT_API_MISSING: TypeScript 7 has no compiler API, and bazis codege
 ## Дальше
 
 - [Ошибки DI](di.md)
-- [Кодогенерация](../../application/codegen.md)
+- [Кодогенерация](../../startup/codegen.md)
 - [Команды CLI](../../cli/commands.md#bazis-codegen)

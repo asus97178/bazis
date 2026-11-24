@@ -322,5 +322,5 @@ WebSocketDeliveryError [DURABILITY_CONFIGURATION]: WebSocket delivery needs a Re
 ## Дальше
 
 - [Авторизация](controllers/authorization.md)
-- [Аутентификация через JWT](../application/jwt.md)
-- [Логирование и correlation id](../application/logging.md)
+- [Аутентификация через JWT](../security/jwt.md)
+- [Логирование и correlation id](../deployment/logging.md)

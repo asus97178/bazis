@@ -216,5 +216,5 @@ POST /signup/ann → {"welcomeId":1,"auditId":2}
 
 - [Обзор `@Infra`](overview.md)
 - [Коннекторы](connectors.md)
-- [Конфигурация](../../module/config/configuration.md)
-- [Секреты](../../module/config/secrets.md)
+- [Конфигурация](../module/config/configuration.md)
+- [Секреты](../module/config/secrets.md)

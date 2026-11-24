@@ -9,4 +9,4 @@
 | `bazis/core/http/OpenApi/generatedOpenApiRegistry` | `registerGeneratedOpenApiMetadata`, `registerGeneratedOpenApiSchemaModel`, `getGeneratedOpenApiMetadata`, `getGeneratedOpenApiSchemaName` | Сгенерированное описание OpenAPI |
 
 Если запуск предупреждает `generated code is out of date`, запустите
-`bunx bazis codegen` ([Кодогенерация](../../application/codegen.md)).
+`bunx bazis codegen` ([Кодогенерация](../../startup/codegen.md)).

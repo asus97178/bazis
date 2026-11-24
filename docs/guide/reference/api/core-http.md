@@ -61,11 +61,11 @@ middleware, авторизация, списки. Основная точка в
 
 | Экспорт | Что это | Подробно |
 | --- | --- | --- |
-| `cors(options)` | CORS: заголовки и ответы на предварительные запросы | [CORS](../../application/cors-headers-log.md#cors) |
-| `securityHeaders(options)` | Заголовки безопасности; сервер ставит его сам | [CORS, заголовки, журнал](../../application/cors-headers-log.md) |
-| `accessLog(options)` | Журнал запросов: метод, путь, статус, время | [Журнал](../../application/logging.md#журнал-запросов) |
-| `rateLimit(options)` | Ограничение частоты в памяти, окно фиксированное | [Ограничение частоты](../../application/rate-limit.md) |
-| `createCorrelationIdMiddleware(options)` | Один `x-request-id` на запрос: в ответе, в журнале, в исходящих вызовах | [Correlation id](../../application/logging.md#correlation-id) |
+| `cors(options)` | CORS: заголовки и ответы на предварительные запросы | [CORS](../../security/cors-headers-log.md#cors) |
+| `securityHeaders(options)` | Заголовки безопасности; сервер ставит его сам | [CORS, заголовки, журнал](../../security/cors-headers-log.md) |
+| `accessLog(options)` | Журнал запросов: метод, путь, статус, время | [Журнал](../../deployment/logging.md#журнал-запросов) |
+| `rateLimit(options)` | Ограничение частоты в памяти, окно фиксированное | [Ограничение частоты](../../security/rate-limit.md) |
+| `createCorrelationIdMiddleware(options)` | Один `x-request-id` на запрос: в ответе, в журнале, в исходящих вызовах | [Correlation id](../../deployment/logging.md#correlation-id) |
 | `errorHandler(options)` | Граница ошибок; сервер ставит её сам, настраивается через `http.errorHandler` | [Ошибки](../../module/controllers/errors.md) |
 
 ## Авторизация
@@ -74,8 +74,8 @@ middleware, авторизация, списки. Основная точка в
 | --- | --- | --- |
 | `Authorize(...checks)` | Проверки доступа на контроллер или метод; все должны пройти | [Авторизация](../../module/controllers/authorization.md) |
 | `AllowAnonymous()` | Открытый метод: снимает все проверки, и контроллера тоже | [Класс, метод и `@AllowAnonymous`](../../module/controllers/authorization.md#класс-метод-и-allowanonymous) |
-| `anyOf(...checks)` | Проверка «хотя бы одна из» | [«Или»](../../application/authorization-patterns.md#или-anyof) |
-| `bearerToken(ctx)` | Токен из `Authorization: Bearer …` или `undefined` | [JWT](../../application/jwt.md#проверка-в-authorize) |
+| `anyOf(...checks)` | Проверка «хотя бы одна из» | [«Или»](../../security/authorization-patterns.md#или-anyof) |
+| `bearerToken(ctx)` | Токен из `Authorization: Bearer …` или `undefined` | [JWT](../../security/jwt.md#проверка-в-authorize) |
 | `PRINCIPAL_STATE_KEY` | Ключ `ctx.state`, под которым лежит текущий пользователь | там же |
 
 ## Списки

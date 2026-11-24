@@ -319,5 +319,5 @@ $ bunx bazis test
 
 - [Фоновые службы](../module/background-services.md) — очередь задач,
   «ровно один раз за период», блокировки
-- [Жизненный цикл](../application/lifecycle.md#фоновые-службы)
+- [Жизненный цикл](../startup/lifecycle.md#фоновые-службы)
 - [Несколько экземпляров с Redis](multiple-instances.md)

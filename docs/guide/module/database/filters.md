@@ -248,11 +248,11 @@ SELECT "id", "title", "archived", "deletedAt" FROM "posts"
 
 Так строится разделение данных между организациями: каждый запрос сам
 получает условие по организации текущего пользователя. Полный пример —
-в главе [Шаблоны авторизации](../../application/authorization-patterns.md).
+в главе [Шаблоны авторизации](../../security/authorization-patterns.md).
 
 ## Дальше
 
 - [Запросы](queries.md)
 - [Немедленные изменения](immediate.md)
 - [Сохранение и отслеживание изменений](saving.md)
-- [Шаблоны авторизации](../../application/authorization-patterns.md)
+- [Шаблоны авторизации](../../security/authorization-patterns.md)

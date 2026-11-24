@@ -319,5 +319,5 @@ export class DbController {
 ## Дальше
 
 - [Провайдеры и DI](providers.md)
-- [Кодогенерация](../../application/codegen.md)
+- [Кодогенерация](../../startup/codegen.md)
 - [Инкапсуляция модулей](../modules/encapsulation.md)

@@ -15,27 +15,13 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 - ✅ [Установка](introduction/installation.md)
 - ✅ [Первые шаги](introduction/first-steps.md)
 
-## 2. Приложение
+## 2. Запуск приложения
 
-То, что не принадлежит одному модулю: запуск, инфраструктура, общие настройки HTTP, вход.
+Точка входа: `@App` и `runApp` в `index.ts`, что происходит при запуске и остановке, как связывается код.
 
-- ✅ [Приложение](application/application.md) — `@App`, `runApp`, запуск, остановка, коды выхода
-- ✅ [Жизненный цикл](application/lifecycle.md) — фоновые службы, перезапуск, хуки, порядок запуска и остановки
-- ✅ [Плавная остановка и health](application/graceful-shutdown.md) — `SIGTERM`, срок остановки и коды выхода, `/health`, проверки Kubernetes
-- ✅ [Кодогенерация](application/codegen.md) — как связываются зависимости и HTTP, `src/generated`, цели
-- ✅ [Кэширование](application/caching.md) — кэш в памяти и в Redis, `@Cacheable` и ключи, время жизни сервиса, только простые данные в Redis, недоступный Redis
-- ✅ [CORS, заголовки безопасности, журнал запросов](application/cors-headers-log.md) — источники и preflight, CORS для части маршрутов, HSTS и CSP, `accessLog`
-- ✅ [Ограничение частоты запросов](application/rate-limit.md) — `rateLimit`, ключи, работа за прокси, заголовки `RateLimit-*`
-- ✅ [Логирование и correlation id](application/logging.md) — `Logger`, уровни, маскировка, журнал запросов, `x-request-id`
-- ✅ [Health checks](application/health-checks.md) — `/health`, свои проверки, подробности, тайм-ауты
-- ✅ [Аутентификация через JWT](application/jwt.md) — пара токенов, обновление и отзыв refresh, HS256 и RS256, ротация ключей, виды токенов
-- ✅ [Шаблоны авторизации](application/authorization-patterns.md) — текущий пользователь, роли и права, `anyOf`, владелец записи, арендаторы, ключи API
-
-### Инфраструктура
-
-- ✅ [Обзор `@Infra`](application/infra/overview.md) — манифест, клиенты по типу, порядок старта и остановки, сбой подключения, срок старта, здоровье, два экземпляра одного типа
-- ✅ [Коннекторы](application/infra/connectors.md) — PostgreSQL (`postgres`), Redis, OpenSearch, Codex; LLM-коннекторы — в разделе «AI-агенты»
-- ✅ [Свой коннектор](application/infra/custom-connector.md) — клиент, тип для внедрения, `InfraConnector`, конфигурация и секреты, сервис поверх клиента
+- ✅ [Приложение](startup/application.md) — `@App`, `runApp`, запуск, остановка, коды выхода
+- ✅ [Жизненный цикл](startup/lifecycle.md) — фоновые службы, перезапуск, хуки, порядок запуска и остановки
+- ✅ [Кодогенерация](startup/codegen.md) — как связываются зависимости и HTTP, `src/generated`, цели
 
 ## 3. Модульная архитектура
 
@@ -124,28 +110,51 @@ bazis — модульный бэкенд-фреймворк для [Bun](https:
 
 - ⏳ Описание интерфейса (UI-профили) — отложено до выхода рендерера
 
-## 4. AI-агенты
+## 4. Инфраструктура
+
+Внешние системы, к которым подключается приложение: базы, кэш, поиск, модели.
+
+- ✅ [Обзор `@Infra`](infra/overview.md) — манифест, клиенты по типу, порядок старта и остановки, сбой подключения, срок старта, здоровье, два экземпляра одного типа
+- ✅ [Коннекторы](infra/connectors.md) — PostgreSQL (`postgres`), Redis, OpenSearch, Codex; LLM-коннекторы — в разделе «AI-агенты»
+- ✅ [Свой коннектор](infra/custom-connector.md) — клиент, тип для внедрения, `InfraConnector`, конфигурация и секреты, сервис поверх клиента
+- ✅ [Кэширование](infra/caching.md) — кэш в памяти и в Redis, `@Cacheable` и ключи, время жизни сервиса, только простые данные в Redis, недоступный Redis
+
+## 5. Безопасность
+
+Вход, права и защита HTTP. Права модулей, `@Authorize` в контроллерах и секреты — поля модуля, они описаны в своих главах:
+[права модулей](module/access.md), [авторизация в контроллерах](module/controllers/authorization.md),
+[секреты](module/config/secrets.md), [маскировка в логах](deployment/logging.md#маскировка-секретов).
+
+- ✅ [Аутентификация через JWT](security/jwt.md) — пара токенов, обновление и отзыв refresh, HS256 и RS256, ротация ключей, виды токенов
+- ✅ [Шаблоны авторизации](security/authorization-patterns.md) — текущий пользователь, роли и права, `anyOf`, владелец записи, арендаторы, ключи API
+- ✅ [CORS, заголовки безопасности, журнал запросов](security/cors-headers-log.md) — источники и preflight, CORS для части маршрутов, HSTS и CSP, `accessLog`
+- ✅ [Ограничение частоты запросов](security/rate-limit.md) — `rateLimit`, ключи, работа за прокси, заголовки `RateLimit-*`
+
+## 6. AI-агенты
 
 - ✅ [Агенты](agents/agents.md) — агент как данные, `AgentRuntime.run` и `check`, агенты в базе, что видит модель, структурированный ответ, аудит и подтверждение, диалог, пределы, тесты со скриптовой моделью
 - ✅ [LLM-коннекторы](agents/llm-connectors.md) — конфигурация `llm`, `llmConnect` и `openAiCompatibleAdapter`, что уходит провайдеру, здоровье, профили `llmRouter`, запасная модель, ошибки, свой адаптер
 
-## 5. Тестирование
+## 7. Тестирование
 
 - ✅ [Тестирование](testing/testing.md) — `bazis test`, `createTestContainer`, `startTestApp`, подмена зависимостей
 
-## 6. CLI
+## 8. CLI
 
 - ✅ [Команды CLI](cli/commands.md) — вывод и язык, `new`, `g module`, `g pack`, `codegen`, `dev` и экран запуска, `test`, `build` и исполняемый файл, коды выхода, переменные окружения
 
-## 7. Развёртывание
+## 9. Развёртывание и эксплуатация
 
 - ✅ [Один исполняемый файл](deployment/single-executable.md) — сборка, что попадает внутрь, запуск, среда production, шаг схемы
 - ✅ [Настройка продакшена](deployment/production.md) — точка входа для production, переменные окружения, журнал, сроки, порядок выкладки
 - ✅ [Docker](deployment/docker.md) — двухэтапный образ, healthcheck без curl, секреты, Compose с шагом схемы
 - ✅ [Платформы](deployment/platforms.md) — glibc и musl, Linux-файл с Mac (`--platform`), systemd
 - ✅ [Чек-лист перед продакшеном](deployment/production-checklist.md) — что bazis делает сам, секреты, ошибки и `/health`, HTTP, открытые маршруты, пользователь БД без прав на схему, `BAZIS_SCHEMA_ONLY`
+- ✅ [Плавная остановка и health](deployment/graceful-shutdown.md) — `SIGTERM`, срок остановки и коды выхода, `/health`, проверки Kubernetes
+- ✅ [Health checks](deployment/health-checks.md) — `/health`, свои проверки, подробности, тайм-ауты
+- ✅ [Логирование и correlation id](deployment/logging.md) — `Logger`, уровни, маскировка, журнал запросов, `x-request-id`
 
-## 8. Рецепты и справочник
+## 10. Рецепты и справочник
 
 ### Рецепты
 

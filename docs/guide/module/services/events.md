@@ -190,6 +190,6 @@ onStarted(event: ApplicationStartedEvent) {
 
 ## Дальше
 
-- [Жизненный цикл](../../application/lifecycle.md)
+- [Жизненный цикл](../../startup/lifecycle.md)
 - [DI подробно](dependency-injection.md)
-- [Логирование и correlation id](../../application/logging.md)
+- [Логирование и correlation id](../../deployment/logging.md)

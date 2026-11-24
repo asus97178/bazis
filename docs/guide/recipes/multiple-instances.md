@@ -16,7 +16,7 @@ Planner из предыдущих рецептов запускается в д�
 | `@Cacheable`, `@OutputCache`, `memory()` | Свой кэш у каждого экземпляра |
 | `@CacheableRedis`, `@OutputRedisCache` | Общий кэш в Redis |
 | Комнаты и сессии WebSocket | В памяти процесса; общие — с адаптером Redis |
-| `rateLimit` | Свои счётчики у каждого экземпляра ([Ограничение частоты](../application/rate-limit.md#как-считается)) |
+| `rateLimit` | Свои счётчики у каждого экземпляра ([Ограничение частоты](../security/rate-limit.md#как-считается)) |
 
 ## 1. Redis
 
@@ -47,7 +47,7 @@ export class AppInfra {}
 `cache: "distributed"` публикует общий кэш поверх этого подключения.
 `@OutputRedisCache` и `IDistributedCache` в этом рецепте работают без
 `memory()`. Для `@Cacheable` и `@CacheableRedis` на методах сервисов он
-нужен ([Кэширование](../application/caching.md#два-уровня)).
+нужен ([Кэширование](../infra/caching.md#два-уровня)).
 
 ## 2. Общий кэш списка задач
 
@@ -249,7 +249,7 @@ $ bunx bazis test
 
 ## Дальше
 
-- [Кэширование](../application/caching.md) — `@CacheableRedis`, недоступный Redis
+- [Кэширование](../infra/caching.md) — `@CacheableRedis`, недоступный Redis
 - [Кэш ответов](../module/controllers/output-cache.md)
 - [WebSocket](../module/websocket.md)
-- [Плавная остановка и health](../application/graceful-shutdown.md)
+- [Плавная остановка и health](../deployment/graceful-shutdown.md)
