@@ -75,12 +75,19 @@ bazis сначала всё проверяет и только потом отк
    модулях — перечислять их не нужно.
 
 Если что-то не так, вы узнаёте об этом сразу, а не от первого пользователя.
-Запуск останавливается с кодом 1 и понятной причиной:
+Запуск останавливается, в журнале остаётся понятная причина, а процесс
+завершается с кодом 1. Пример: в production не задан секрет для токенов.
 
 ```text
-[bazis] configuration error: Invalid configuration (environment "production"):
-auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
+$ BAZIS_ENV=production bun src/index.ts
+[bazis] configuration error: Invalid configuration (environment "production"): auth.jwtSecret — required non-empty secret is not set (BAZIS_AUTH__JWTSECRET).
+$ echo $?
+1
 ```
+
+Сам код в выводе не печатается: его получает тот, кто запустил процесс. В
+терминале его показывает `echo $?`, а Docker и Kubernetes по нему понимают,
+что запуск не удался.
 
 Когда всё в порядке, в журнале появляется строка с адресом сервера (в
 терминале вне production вместо неё — [экран запуска](../cli/commands.md#экран-запуска)):
