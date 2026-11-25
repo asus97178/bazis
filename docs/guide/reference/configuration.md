@@ -59,7 +59,7 @@ export class Application {}
 | Опция | По умолчанию | Что задаёт |
 | --- | --- | --- |
 | `port` | настройка `http.port` (`BAZIS_HTTP__PORT`), `3000` | Закрепляет порт в коде; `0` — свободный порт. Обычно не задают |
-| `hostname` | настройка `http.host` (`BAZIS_HTTP__HOST`): `127.0.0.1`, в production `0.0.0.0` | Закрепляет адрес в коде. Обычно не задают ([Адрес сервера](../startup/application.md#адрес-сервера)) |
+| `hostname` | настройка `http.host` (`BAZIS_HTTP__HOST`): `127.0.0.1`, в production `0.0.0.0` | Закрепляет адрес в коде. Обычно не задают ([Адрес сервера](../startup/settings.md#порт-и-адрес)) |
 | `prefix` | — | Общий префикс маршрутов: `"api"` → `/api/…` |
 | `middleware` | — | Глобальные middleware ([Middleware](../module/controllers/middleware.md)) |
 | `cors` | `false` | CORS для всех маршрутов ([CORS](../security/cors-headers-log.md)) |
